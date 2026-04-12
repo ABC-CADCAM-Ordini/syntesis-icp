@@ -31,8 +31,9 @@ SCANBODY_PROFILES = [
     {
         "name": "Shining", "color": "#EF9F27",
         "parts": [
-            {"name": "disco", "min": 3200,  "max": 4700,  "role": "ring"},
-            {"name": "corpo", "min": 20000, "max": 30000, "role": "body"},
+            {"name": "disco",       "min": 3200,  "max": 4700,  "role": "ring"},
+            {"name": "corpo",       "min": 20000, "max": 32000, "role": "body"},
+            {"name": "corpo_half",  "min": 12000, "max": 19999, "role": "body"},
         ]
     },
 ]
