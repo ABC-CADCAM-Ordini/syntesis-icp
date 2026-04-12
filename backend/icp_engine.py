@@ -36,6 +36,14 @@ SCANBODY_PROFILES = [
             {"name": "corpo_half",  "min": 12000, "max": 19999, "role": "body"},
         ]
     },
+    {
+        "name": "Generico", "color": "#888888",
+        "parts": [
+            {"name": "parte_a", "min": 200,  "max": 1249,  "role": "body"},
+            {"name": "parte_b", "min": 1551, "max": 2127,  "role": "body"},
+            {"name": "parte_c", "min": 5401, "max": 11999, "role": "body"},
+        ]
+    },
 ]
 
 CLIN_LEVELS = [
