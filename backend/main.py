@@ -244,6 +244,12 @@ async def analyze_public(
         "ct_b_final":       result.get("ct_b_final", []),
         "filename_a":       file_a.filename,
         "filename_b":       file_b.filename,
+        # Dati mesh per anteprime e PDF
+        "tris_a":           result.get("tris_a", []),
+        "tris_b_all":       result.get("tris_b_all", []),
+        "bg_a":             result.get("bg_a", []),
+        "cyl_tris_a":       result.get("cyl_tris_a", []),
+        "cyl_tris_b":       result.get("cyl_tris_b", []),
     }
 
 
