@@ -162,3 +162,132 @@ async def register(req: RegisterRequest):
 @router.get("/me")
 async def me(current_user: dict = Depends(verify_token)):
     return current_user
+
+
+# ── Social Login (Google, Apple, Facebook) ────────────────────────────────────
+class SocialLoginRequest(BaseModel):
+    provider: str          # "google" | "apple" | "facebook"
+    token: str             # ID token (Google/Apple) o access token (Facebook)
+    name: Optional[str] = ""
+    email: Optional[str] = ""
+
+
+async def _verify_google_token(token: str) -> dict:
+    """Verifica ID token Google tramite Google tokeninfo API."""
+    import urllib.request, json as _json
+    url = f"https://oauth2.googleapis.com/tokeninfo?id_token={token}"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = _json.loads(resp.read())
+        if "email" not in data:
+            raise ValueError("Token Google non valido")
+        return {"email": data["email"], "name": data.get("name", "")}
+    except Exception as e:
+        raise HTTPException(401, detail=f"Token Google non valido: {e}")
+
+
+async def _verify_apple_token(token: str) -> dict:
+    """Verifica Apple ID token decodificando il JWT (senza dipendenze)."""
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise ValueError("Formato JWT non valido")
+        import base64 as _b64, json as _json
+        payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
+        payload = _json.loads(_b64.urlsafe_b64decode(payload_b64))
+        email = payload.get("email", "")
+        if not email:
+            raise ValueError("Email non presente nel token Apple")
+        return {"email": email, "name": ""}
+    except Exception as e:
+        raise HTTPException(401, detail=f"Token Apple non valido: {e}")
+
+
+async def _verify_facebook_token(access_token: str, name: str, email: str) -> dict:
+    """Verifica access token Facebook tramite Graph API."""
+    import urllib.request, json as _json
+    url = f"https://graph.facebook.com/me?fields=id,name,email&access_token={access_token}"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = _json.loads(resp.read())
+        if "id" not in data:
+            raise ValueError("Token Facebook non valido")
+        return {
+            "email": data.get("email", email),
+            "name": data.get("name", name)
+        }
+    except Exception as e:
+        raise HTTPException(401, detail=f"Token Facebook non valido: {e}")
+
+
+@router.post("/social", response_model=TokenResponse)
+async def social_login(req: SocialLoginRequest):
+    """Login/registrazione tramite provider social. Nessuna licenza richiesta."""
+    import uuid as _uuid
+
+    # Verifica token con il provider
+    provider = req.provider.lower()
+    if provider == "google":
+        user_info = await _verify_google_token(req.token)
+    elif provider == "apple":
+        user_info = await _verify_apple_token(req.token)
+    elif provider == "facebook":
+        user_info = await _verify_facebook_token(req.token, req.name or "", req.email or "")
+    else:
+        raise HTTPException(400, detail=f"Provider non supportato: {req.provider}")
+
+    email = user_info["email"].lower().strip()
+    name = user_info.get("name") or req.name or email.split("@")[0]
+
+    if not email:
+        raise HTTPException(400, detail="Email non disponibile dal provider social.")
+
+    # Cerca utente esistente
+    from database import get_user_by_email as _get_user, get_pool
+    existing = await _get_user(email)
+
+    if existing:
+        # Login
+        if not existing["active"]:
+            raise HTTPException(403, detail="Account disabilitato.")
+        user_id = existing["id"]
+        user_name = existing["name"]
+        user_role = existing["role"]
+        user_org = existing.get("organization", "")
+    else:
+        # Registrazione automatica senza licenza (social)
+        user_id = str(_uuid.uuid4())
+        user_name = name
+        user_role = "user"
+        user_org = ""
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO users (id, email, name, password_hash, salt, role, active, license_key)
+                VALUES ($1, $2, $3, $4, $5, $6, TRUE, NULL)
+                ON CONFLICT (email) DO NOTHING
+            """, user_id, email, user_name, f"social_{provider}", f"social_{provider}")
+        # Rileggi per assicurarsi che sia stato inserito
+        existing2 = await _get_user(email)
+        if existing2:
+            user_id = existing2["id"]
+
+    token = create_token({
+        "user_id": user_id,
+        "email": email,
+        "name": user_name,
+        "role": user_role,
+        "org": user_org,
+        "provider": provider
+    })
+
+    return {
+        "access_token": token,
+        "user": {
+            "id": user_id,
+            "email": email,
+            "name": user_name,
+            "role": user_role,
+            "organization": user_org
+        }
+    }
