@@ -3,7 +3,7 @@ Syntesis-ICP — Backend API
 Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
 """
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
