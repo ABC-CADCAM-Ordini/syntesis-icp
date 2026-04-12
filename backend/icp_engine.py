@@ -531,14 +531,26 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     tris_b_all = apply_transform_tris(tris_b_pre, icp["R"], icp["t"])
 
     # Assi cilindri
+    # Costruisci mappa pi -> triangoli usando clust_a/b_sorted
+    # (identico al JS: sortA[pi].map(idx => tA[idx]) e sortB[bestBi].map(idx => tBall[idx]))
+    def cluster_tris_a(pi):
+        """Triangoli del cilindro pi-esimo (ordinato come pairs)."""
+        if pi >= len(clust_a_sorted):
+            return np.empty((0, 3, 3), dtype=np.float32)
+        idx_all = [ti for ci in clust_a_sorted[pi] for ti in scan_a[ci]]
+        return tris_a[idx_all] if idx_all else np.empty((0, 3, 3), dtype=np.float32)
+
+    def cluster_tris_b_all(pi):
+        """Triangoli B trasformati del cilindro pi-esimo (ordinato come pairs)."""
+        if pi >= len(clust_b_sorted):
+            return np.empty((0, 3, 3), dtype=np.float32)
+        idx_all = [ti for ci in clust_b_sorted[pi] for ti in scan_b[ci]]
+        return tris_b_all[idx_all] if idx_all else np.empty((0, 3, 3), dtype=np.float32)
+
     cyl_axes = []
     for pi, pp in enumerate(pairs):
-        if pi >= len(scan_a):
-            cyl_axes.append({"ax_a": None, "ax_b": None, "angle_deg": None})
-            continue
-
-        tris_comp_a = tris_a[scan_a[pi]] if pi < len(scan_a) else None
-        if tris_comp_a is None or len(tris_comp_a) == 0:
+        tris_comp_a = cluster_tris_a(pi)
+        if len(tris_comp_a) == 0:
             cyl_axes.append({"ax_a": None, "ax_b": None, "angle_deg": None})
             continue
 
@@ -548,14 +560,14 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
             cyl_axes.append({"ax_a": ax_a.tolist(), "ax_b": None, "angle_deg": None})
             continue
 
-        # Trova il componente B più vicino
+        # Trova il cilindro B più vicino per centroide (come nel JS originale)
         b_pos = np.array(pp["b"])
         best_bi, best_d = -1, float("inf")
-        for bi, bc in enumerate(scan_b):
-            bc_pos = centroid(tris_b, bc) + offset
-            if not np.allclose(pre["R"], np.eye(3)):
-                bc_pos = pre["R"] @ bc_pos + pre["t"]
-            bc_al = icp["R"] @ bc_pos + icp["t"]
+        for bi in range(len(clust_b_sorted)):
+            idx_all_b = [ti for ci in clust_b_sorted[bi] for ti in scan_b[ci]]
+            if not idx_all_b:
+                continue
+            bc_al = tris_b_all[idx_all_b].reshape(-1, 3).mean(axis=0)
             d = float(np.linalg.norm(b_pos - bc_al))
             if d < best_d:
                 best_d, best_bi = d, bi
@@ -564,7 +576,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
             cyl_axes.append({"ax_a": ax_a.tolist(), "ax_b": None, "angle_deg": None})
             continue
 
-        tris_comp_b = tris_b_all[scan_b[best_bi]]
+        tris_comp_b = cluster_tris_b_all(best_bi)
         ax_b = cyl_axis(tris_comp_b)
         ax_b_canon = icp["R"].T @ ax_b
         ang = axis_angle_deg(ax_a, ax_b_canon)
@@ -597,12 +609,22 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     cyl_tris_a = []
     cyl_tris_b = []
     for pi in range(len(pairs)):
-        if pi < len(scan_a):
-            cyl_tris_a.append(tris_to_list(tris_a[scan_a[pi]], 800))
-        else:
-            cyl_tris_a.append([])
-        if pairs[pi].get("b") is not None and pi < len(scan_b):
-            cyl_tris_b.append(tris_to_list(tris_b_all[scan_b[pi]], 800))
+        ta = cluster_tris_a(pi)
+        cyl_tris_a.append(tris_to_list(ta, 800) if len(ta) > 0 else [])
+        if pairs[pi].get("b") is not None:
+            # Trova il cilindro B corrispondente (stesso metodo del cyl_axes)
+            b_pos = np.array(pairs[pi]["b"])
+            best_bi2, best_d2 = -1, float("inf")
+            for bi2 in range(len(clust_b_sorted)):
+                idx_all_b2 = [ti for ci in clust_b_sorted[bi2] for ti in scan_b[ci]]
+                if not idx_all_b2:
+                    continue
+                bc_al2 = tris_b_all[idx_all_b2].reshape(-1, 3).mean(axis=0)
+                d2 = float(np.linalg.norm(b_pos - bc_al2))
+                if d2 < best_d2:
+                    best_d2, best_bi2 = d2, bi2
+            tb = cluster_tris_b_all(best_bi2) if best_bi2 >= 0 else np.empty((0,3,3))
+            cyl_tris_b.append(tris_to_list(tb, 800) if len(tb) > 0 else [])
         else:
             cyl_tris_b.append([])
 
