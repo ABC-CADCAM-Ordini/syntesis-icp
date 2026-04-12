@@ -4450,15 +4450,20 @@ var AM = (function() {
   // ── Marker repere ─────────────────────────────────────────────────────────
   function _drawMarkers(side, ctx, W, H, cx, cy, cz, sc, cam) {
     var pts = side==='A' ? _ptsA : _ptsB;
-    var col = side==='A' ? '#60a5fa' : '#fb923c';
+    var colFill = side==='A' ? '#2563eb' : '#d97706';
+    var colStroke = side==='A' ? '#93c5fd' : '#fcd34d';
     pts.forEach(function(p,i){
-      var proj=_project(cam,(p.x-cx)*sc,(p.y-cy)*sc,(p.z-cz)*sc,W,H);
-      ctx.beginPath(); ctx.arc(proj[0],proj[1],11,0,Math.PI*2);
-      ctx.fillStyle=col; ctx.fill();
-      ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();
-      ctx.fillStyle='#fff'; ctx.font='bold 10px monospace';
+      // Usa coordinate schermo salvate al click (robuste, non dipendono dalla rotazione)
+      var px = (p.sx !== undefined) ? p.sx*W : W/2;
+      var py = (p.sy !== undefined) ? p.sy*H : H/2;
+      // Cerchio pieno
+      ctx.beginPath(); ctx.arc(px,py,13,0,Math.PI*2);
+      ctx.fillStyle=colFill; ctx.fill();
+      ctx.strokeStyle=colStroke; ctx.lineWidth=3; ctx.stroke();
+      // Numero
+      ctx.fillStyle='#fff'; ctx.font='bold 11px monospace';
       ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(i+1,proj[0],proj[1]);
+      ctx.fillText(i+1,px,py);
     });
   }
 
@@ -4541,21 +4546,21 @@ var AM = (function() {
 
   function _unproject(side, ex, ey) {
     var cv=document.getElementById(side==='A'?'cv3dA':'cv3dB');
-    if (!cv||!cv._ri) return {x:0,y:0,z:0};
+    if (!cv||!cv._ri) return {x:0,y:0,z:0,sx:ex,sy:ey};
     var ri=cv._ri, cam=ri.cam, W=ri.W, H=ri.H;
     var d=200, fill=0.42, zoom=cam.zoom;
+    // Proiezione inversa sul piano medio (z_norm=0)
     var x3n=(ex-W/2-cam.panX*W/2)/(d*zoom*fill*W);
     var y3n=-(ey-H/2+cam.panY*H/2)/(d*zoom*fill*H);
-    // Inverti rotZ
     var cz=Math.cos(cam.rotZ||0), sz=Math.sin(cam.rotZ||0);
     var x1n=x3n*cz+y3n*sz, y2n=-x3n*sz+y3n*cz;
-    // Inverti rotX
-    var cx=Math.cos(cam.rotX), sx=Math.sin(cam.rotX);
-    var yn=y2n*cx, z1n=-y2n*sx;
-    // Inverti rotY
+    var cx2=Math.cos(cam.rotX), sx2=Math.sin(cam.rotX);
+    var yn=y2n*cx2;
     var cy2=Math.cos(cam.rotY), sy2=Math.sin(cam.rotY);
-    var xn=x1n*cy2-z1n*sy2;
-    return {x:xn/ri.sc+ri.cx, y:yn/ri.sc+ri.cy, z:z1n/ri.sc/cy2+ri.cz};
+    var xn=x1n*cy2;
+    // Salva anche le coordinate schermo normalizzate per il disegno
+    return {x:xn/ri.sc+ri.cx, y:yn/ri.sc+ri.cy, z:ri.cz,
+            sx:ex/W, sy:ey/H};  // coords schermo normalizzate
   }
 
   function _flash(side) {
