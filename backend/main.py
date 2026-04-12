@@ -174,17 +174,3 @@ async def leaderboard(
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
-
-
-# ── ENDPOINT ADMIN TEMPORANEO — rimuovere dopo il seed ───────────────────────
-import hashlib
-
-@app.post("/admin/seed-licenses")
-async def seed_licenses(secret: str, keys: list[str]):
-    """Inserisce licenze nel DB. Protetto da ADMIN_SECRET env var."""
-    admin_secret = os.getenv("ADMIN_SECRET", "")
-    if not admin_secret or not hashlib.sha256(secret.encode()).hexdigest() == hashlib.sha256(admin_secret.encode()).hexdigest():
-        raise HTTPException(403, detail="Non autorizzato.")
-    from database import create_licenses
-    await create_licenses(keys)
-    return {"inserted": len(keys), "keys": keys}
