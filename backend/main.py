@@ -201,9 +201,11 @@ async def leaderboard(
 @app.post("/api/analyze-public")
 async def analyze_public(
     file_a: UploadFile = File(...),
-    file_b: UploadFile = File(...)
+    file_b: UploadFile = File(...),
+    landmarks: Optional[str] = Form(None)
 ):
-    """Analisi STL senza autenticazione. La logica ICP gira sul server."""
+    """Analisi STL senza autenticazione. La logica ICP gira sul server.
+    landmarks: JSON opzionale {"a":[{x,y,z}x3], "b":[{x,y,z}x3]} per pre-allineamento manuale."""
     for f in [file_a, file_b]:
         if not f.filename.lower().endswith(".stl"):
             raise HTTPException(400, detail=f"'{f.filename}' non è un STL valido.")
@@ -216,10 +218,19 @@ async def analyze_public(
     if len(data_a) < 84 or len(data_b) < 84:
         raise HTTPException(400, detail="File STL non valido o corrotto.")
 
+    # Parsing landmarks
+    lm_parsed = None
+    if landmarks:
+        try:
+            import json as _json
+            lm_parsed = _json.loads(landmarks)
+        except Exception:
+            lm_parsed = None
+
     try:
         result = await asyncio.get_event_loop().run_in_executor(
             None, analyze_stl_pair, data_a, data_b,
-            file_a.filename, file_b.filename
+            file_a.filename, file_b.filename, lm_parsed
         )
     except ValueError as e:
         raise HTTPException(422, detail=str(e))
