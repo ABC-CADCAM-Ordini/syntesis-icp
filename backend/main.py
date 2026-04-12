@@ -5,7 +5,8 @@ Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import asyncio
 import io
@@ -49,6 +50,20 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/auth")
+
+# ── Serve frontend statico ────────────────────────────────────────────────────
+import pathlib
+_STATIC_DIR = pathlib.Path(__file__).parent / "static"
+_INDEX = _STATIC_DIR / "index.html"
+
+if _INDEX.exists():
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+@app.get("/", include_in_schema=False)
+async def serve_frontend():
+    if _INDEX.exists():
+        return FileResponse(str(_INDEX))
+    return JSONResponse({"status": "ok", "message": "Syntesis-ICP API"})
 
 # ── Rate limiting semplice in memoria ────────────────────────────────────────
 _rate_store: dict[str, list[float]] = {}
