@@ -236,8 +236,10 @@ def sig_diff(sa: np.ndarray, sb: np.ndarray) -> float:
 
 def robust_pre_align(ct_a: np.ndarray, ct_b: np.ndarray) -> dict:
     """
-    Pre-allineamento robusto: prova rotazioni ogni 5° + hungarian matching.
-    Gestisce qualsiasi sistema di riferimento relativo tra le due mesh.
+    Pre-allineamento robusto con firma distanze + Kabsch 3D completo.
+    1. Matching per firma distanze inter-centroide (invariante a roto-traslazione)
+    2. Kabsch 3D su punti matchati -> rotazione 3D completa (pitch + roll + yaw)
+    3. Refinamento ICP centroidi
     """
     from scipy.optimize import linear_sum_assignment as hungarian
 
@@ -246,47 +248,60 @@ def robust_pre_align(ct_a: np.ndarray, ct_b: np.ndarray) -> dict:
         off = ct_a.mean(0) - ct_b.mean(0) if na > 0 and nb > 0 else np.zeros(3)
         return {"aligned": ct_b + off, "R": np.eye(3), "t": off, "method": "empty"}
 
-    ca = ct_a.mean(axis=0)
-    cb = ct_b.mean(axis=0)
-    A_c = ct_a - ca
-    B_c = ct_b - cb
+    n = min(na, nb)
+    A, B = ct_a[:n], ct_b[:n]
 
-    best_cost = float("inf")
-    best_R = np.eye(3)
-    best_t = ca - cb
+    # ── 1. Matching per firma distanze (invariante a roto-traslazione) ────────
+    def sig(pts, i):
+        return np.sort([np.linalg.norm(pts[i]-pts[j]) for j in range(len(pts)) if j!=i])
 
-    # Prova rotazioni nel piano XY ogni 5°
-    for angle_deg in range(0, 360, 5):
-        rad = np.radians(angle_deg)
-        cos_a, sin_a = np.cos(rad), np.sin(rad)
-        R_z = np.array([[cos_a, -sin_a, 0.0],
-                        [sin_a,  cos_a, 0.0],
-                        [0.0,    0.0,   1.0]])
-        B_rot = (R_z @ B_c.T).T  # centroidi B ruotati
+    sig_A = np.array([sig(A, i) for i in range(n)])
+    sig_B = np.array([sig(B, i) for i in range(n)])
+    SIM = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            s = min(len(sig_A[i]), len(sig_B[j]))
+            SIM[i,j] = np.sum((sig_A[i,:s] - sig_B[j,:s])**2)
+    row, col = hungarian(SIM)
 
-        n_match = min(na, nb)
-        D = np.linalg.norm(A_c[:, None, :] - B_rot[None, :, :], axis=2)
-        row, col = hungarian(D[:n_match, :n_match])
-        cost = float(D[row, col].sum())
+    A_matched = A[row]
+    B_matched = B[col]
 
-        if cost < best_cost:
-            best_cost = cost
-            # Raffina con Kabsch sui punti matchati
-            A_matched = A_c[row]
-            B_matched = B_rot[col]
-            H = B_matched.T @ A_matched
-            U, S, Vt = np.linalg.svd(H)
-            R_kb = Vt.T @ U.T
-            if np.linalg.det(R_kb) < 0:
-                Vt[-1] *= -1
-                R_kb = Vt.T @ U.T
-            R_final = R_kb @ R_z
-            t_final = ca - R_final @ cb
-            best_R = R_final
-            best_t = t_final
+    # ── 2. Kabsch 3D completo sui punti matchati ──────────────────────────────
+    def kabsch3d(A_m, B_m):
+        ca, cb = A_m.mean(0), B_m.mean(0)
+        Ac, Bc = A_m - ca, B_m - cb
+        H = Bc.T @ Ac
+        U, S, Vt = np.linalg.svd(H)
+        R = Vt.T @ U.T
+        if np.linalg.det(R) < 0:
+            Vt[-1] *= -1
+            R = Vt.T @ U.T
+        t = ca - R @ cb
+        return R, t
 
-    aligned = (best_R @ ct_b.T).T + best_t
-    return {"aligned": aligned, "R": best_R, "t": best_t, "method": "angle_search"}
+    R, t = kabsch3d(A_matched, B_matched)
+    B_al = (R @ B.T).T + t
+
+    # ── 3. Refinamento: re-match + re-Kabsch (3 iterazioni) ──────────────────
+    for _ in range(3):
+        D = np.linalg.norm(A[:,None] - B_al[None,:], axis=2)
+        r2, c2 = hungarian(D)
+        R2, t2 = kabsch3d(A[r2], B_al[c2])
+        B_al = (R2 @ B_al.T).T + t2
+        R = R2 @ R
+        t = R2 @ t + t2
+
+    # Calcola RMSD finale
+    D_f = np.linalg.norm(A[:,None] - B_al[None,:], axis=2)
+    rf, cf = hungarian(D_f)
+    rmsd = float(np.sqrt(np.mean(D_f[rf,cf]**2)))
+
+    # Applica la stessa trasformazione a ct_b completo
+    aligned_full = (R @ ct_b.T).T + t
+
+    return {"aligned": aligned_full, "R": R, "t": t,
+            "method": "signature_kabsch3d", "rmsd_centroids": rmsd}
 
 
 def run_icp(fixed: np.ndarray, moving: np.ndarray, max_iter: int = 80) -> dict:
