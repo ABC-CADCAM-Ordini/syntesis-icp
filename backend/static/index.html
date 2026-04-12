@@ -76,6 +76,27 @@
 .btn-rot:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
 .btn-rot:active{transform:scale(0.92)}
 
+
+/* ── Viewer allineamento A/B ──────────────────────────────────────────────── */
+.align-viewers{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:14px}
+.av-col{display:flex;flex-direction:column;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.av-col-a .av-header{background:var(--blue);color:#fff}
+.av-col-b .av-header{background:#D97706;color:#fff}
+.av-header{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;font-family:var(--font)}
+.av-title{font-size:12px;font-weight:700}
+.av-status{font-size:11px;opacity:.85;font-style:italic}
+.av-canvas-wrap{background:#f0f4f8;border-left:1.5px solid var(--border);border-right:1.5px solid var(--border)}
+.av-canvas-wrap canvas{display:block;width:100%;height:250px;cursor:crosshair;min-height:250px}
+.av-canvas-wrap.waiting-click{outline:3px dashed var(--gold);outline-offset:-3px}
+.av-rot-bar{display:flex;align-items:center;gap:4px;padding:7px 10px;overflow-x:auto}
+.av-rot-a{background:#EEF6FF;border:1.5px solid #93c5fd;border-top:none;border-radius:0 0 12px 12px}
+.av-rot-b{background:#FFF7ED;border:1.5px solid #fcd34d;border-top:none;border-radius:0 0 12px 12px}
+.av-rot-bar button{padding:4px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid rgba(0,0,0,.10);background:#fff;color:#334155;transition:.15s;white-space:nowrap;flex-shrink:0}
+.av-rot-a button:first-child,.av-rot-a button:nth-child(2){background:var(--blue);color:#fff;border-color:var(--blue)}
+.av-rot-b button:first-child,.av-rot-b button:nth-child(2){background:#D97706;color:#fff;border-color:#D97706}
+.av-rot-bar button:hover{filter:brightness(1.1)}
+.av-rot-bar button:active{transform:scale(.93)}
+.av-sep{width:1px;height:20px;background:rgba(0,0,0,.12);margin:0 3px;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -133,23 +154,56 @@
             </div>
             <div class="align-hint" id="align-hint">Clicca un punto su <strong>File A</strong> per il Repere #1</div>
             <div class="align-viewers">
-              <div class="align-viewer-wrap waiting-click" id="vwA">
-                <div class="align-viewer-label">A — Riferimento</div>
-                <canvas id="cv3dA" height="520"></canvas>
+
+              <!-- COLONNA A -->
+              <div class="av-col av-col-a">
+                <div class="av-header">
+                  <span class="av-title">📁 FILE A — Riferimento</span>
+                  <span class="av-status" id="avh-hintA">carica un file STL</span>
+                </div>
+                <div class="av-canvas-wrap waiting-click" id="vwA">
+                  <canvas id="cv3dA"></canvas>
+                </div>
+                <div class="av-rot-bar av-rot-a">
+                  <button onclick="AM.rotate('A','top')">⊙ Dall'alto</button>
+                  <button onclick="AM.rotate('A','front')">↗ Frontale</button>
+                  <span class="av-sep"></span>
+                  <button onclick="AM.rotate('A','yL')">◀</button>
+                  <button onclick="AM.rotate('A','yR')">▶</button>
+                  <button onclick="AM.rotate('A','xU')">▲</button>
+                  <button onclick="AM.rotate('A','xD')">▼</button>
+                  <button onclick="AM.rotate('A','zL')">↺</button>
+                  <button onclick="AM.rotate('A','zR')">↻</button>
+                </div>
               </div>
-              <div class="align-viewer-wrap" id="vwB">
-                <div class="align-viewer-label">B — Confronto</div>
-                <canvas id="cv3dB" height="520"></canvas>
+
+              <!-- COLONNA B -->
+              <div class="av-col av-col-b">
+                <div class="av-header">
+                  <span class="av-title">📁 FILE B — Confronto</span>
+                  <span class="av-status" id="avh-hintB">carica un file STL</span>
+                </div>
+                <div class="av-canvas-wrap" id="vwB">
+                  <canvas id="cv3dB"></canvas>
+                </div>
+                <div class="av-rot-bar av-rot-b">
+                  <button onclick="AM.rotate('B','top')">⊙ Dall'alto</button>
+                  <button onclick="AM.rotate('B','front')">↗ Frontale</button>
+                  <span class="av-sep"></span>
+                  <button onclick="AM.rotate('B','yL')">◀</button>
+                  <button onclick="AM.rotate('B','yR')">▶</button>
+                  <button onclick="AM.rotate('B','xU')">▲</button>
+                  <button onclick="AM.rotate('B','xD')">▼</button>
+                  <button onclick="AM.rotate('B','zL')">↺</button>
+                  <button onclick="AM.rotate('B','zR')">↻</button>
+                </div>
               </div>
+
             </div>
             <div class="align-controls">
-              <button onclick="AM.resetAll()" class="btn-reset-align">↺ Reset repere</button>
+              <button onclick="AM.resetAll()" class="btn-reset-align">↺ Reset tutti i repere</button>
               <button onclick="AM.undoLast()">← Annulla ultimo</button>
-              <div class="rot-group">
-                <span>↔</span>
-                <button class="btn-rot" onclick="AM.rotate('A','yL')" title="Ruota A sinistra">◀</button>
-                <button class="btn-rot" onclick="AM.rotate('A','yR')" title="Ruota A destra">▶</button>
-              </div>
+            </div>
               <div class="rot-group">
                 <span>↕</span>
                 <button class="btn-rot" onclick="AM.rotate('A','xU')" title="Ruota A su">▲</button>
@@ -4524,8 +4578,8 @@ var AM = (function() {
     // Highlight viewer atteso
     var vwA = document.getElementById('vwA');
     var vwB = document.getElementById('vwB');
-    if (vwA) vwA.className = 'align-viewer-wrap' + (waitA && _step<_maxSteps ? ' waiting-click' : '');
-    if (vwB) vwB.className = 'align-viewer-wrap' + (!waitA && _step<_maxSteps ? ' waiting-click' : '');
+    if (vwA) vwA.className = 'av-canvas-wrap' + (waitA && _step<_maxSteps ? ' waiting-click' : '');
+    if (vwB) vwB.className = 'av-canvas-wrap' + (!waitA && _step<_maxSteps ? ' waiting-click' : '');
 
     _updateHint();
   }
