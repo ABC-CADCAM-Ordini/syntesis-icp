@@ -499,10 +499,12 @@ def cluster_comps(cents: np.ndarray, thresh: float) -> list[list[int]]:
 
 # ── Main entry point ──────────────────────────────────────────────────────────
 def analyze_stl_pair(data_a: bytes, data_b: bytes,
-                     name_a: str = "A.stl", name_b: str = "B.stl") -> dict:
+                     name_a: str = "A.stl", name_b: str = "B.stl",
+                     landmarks: dict = None) -> dict:
     """
     Analisi ICP completa di due file STL.
-    Restituisce dizionario con tutti i risultati.
+    landmarks: {"a":[{x,y,z}x3], "b":[{x,y,z}x3]} per pre-allineamento manuale.
+    Se fornito, bypassa il robust_pre_align automatico.
     """
     tris_a = parse_stl(data_a)
     tris_b = parse_stl(data_b)
@@ -546,7 +548,34 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     offset = gc_a - gc_b
     raw_ct_b_shifted = raw_ct_b + offset
 
-    pre = robust_pre_align(raw_ct_a, raw_ct_b_shifted)
+    # Pre-allineamento: usa landmark manuali se forniti, altrimenti automatico
+    if landmarks and len(landmarks.get("a", [])) >= 3 and len(landmarks.get("b", [])) >= 3:
+        # Landmark-based pre-align: Kabsch su 3 punti corrispondenti
+        pts_a_lm = np.array([[p["x"], p["y"], p["z"]] for p in landmarks["a"][:3]], dtype=np.float64)
+        pts_b_lm = np.array([[p["x"], p["y"], p["z"]] for p in landmarks["b"][:3]], dtype=np.float64)
+        # Kabsch diretto sui 3 landmark
+        ca_lm = pts_a_lm.mean(0)
+        cb_lm = pts_b_lm.mean(0)
+        Ac_lm = pts_a_lm - ca_lm
+        Bc_lm = pts_b_lm - cb_lm
+        H_lm = Bc_lm.T @ Ac_lm
+        U_lm, _, Vt_lm = np.linalg.svd(H_lm)
+        R_lm = Vt_lm.T @ U_lm.T
+        if np.linalg.det(R_lm) < 0:
+            Vt_lm[-1] *= -1
+            R_lm = Vt_lm.T @ U_lm.T
+        t_lm = ca_lm - R_lm @ cb_lm
+        aligned_lm = (R_lm @ raw_ct_b_shifted.T).T + t_lm
+        pre = {"aligned": aligned_lm, "R": R_lm, "t": t_lm, "method": "landmark"}
+        # Applica anche ai triangoli
+        tris_b = apply_transform_tris(tris_b, R_lm, t_lm - R_lm @ offset + offset)
+        raw_ct_b = np.array([centroid(tris_b, c) for c in scan_b])
+        gc_b_new = global_centroid(tris_b)
+        offset = gc_a - gc_b_new
+        raw_ct_b_shifted = raw_ct_b + offset
+        pre = robust_pre_align(raw_ct_a, raw_ct_b_shifted)
+    else:
+        pre = robust_pre_align(raw_ct_a, raw_ct_b_shifted)
     ct_b_pre = pre["aligned"]
 
     # Clustering
