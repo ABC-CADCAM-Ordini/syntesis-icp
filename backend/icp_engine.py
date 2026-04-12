@@ -365,38 +365,39 @@ def match_pairs(ct_a: np.ndarray, ct_b: np.ndarray) -> list[dict]:
 
 
 # ── Score ─────────────────────────────────────────────────────────────────────
-def calc_score(pairs: list[dict], cyl_axes: list[dict]) -> int:
+def calc_score(pairs: list[dict], cyl_axes: list[dict]) -> float:
+    """
+    Algoritmo identico al frontend originale (syntesis-icp v4):
+    L6-norm pesata di XY (55%), Z (30%), assi (15%)
+    Curva iperbole: 100 / (1 + (eff/110)^1.5)
+    """
     valid = [p for p in pairs if p["d3"] is not None]
     if not valid:
         return 0
 
-    d3_um = [p["d3"] * 1000 for p in valid]
-    rmsd_um = math.sqrt(sum(d**2 for d in d3_um) / len(d3_um))
+    n = len(valid)
 
-    ax_degs = [a["angle_deg"] for a in cyl_axes if a.get("angle_deg") is not None]
-    max_ax = max(ax_degs) if ax_degs else 0.0
+    # L6-norm deviazioni XY
+    L6xy = (sum(abs(p["dxy"] * 1000) ** 6 for p in valid) / n) ** (1/6)
 
-    # Score da RMSD (0-70 punti)
-    if rmsd_um < 30:
-        score_d = 70
-    elif rmsd_um < 80:
-        score_d = int(70 - (rmsd_um - 30) / 50 * 30)
-    elif rmsd_um < 200:
-        score_d = int(40 - (rmsd_um - 80) / 120 * 30)
+    # L6-norm deviazioni Z
+    L6z = (sum(abs(p["dz"] * 1000) ** 6 for p in valid) / n) ** (1/6)
+
+    # L6-norm angoli assi (ogni grado ≈ 30 µm equivalente)
+    ax_vals = [a["angle_deg"] for a in cyl_axes if a and a.get("angle_deg") is not None]
+    if ax_vals:
+        L6ax = (sum((a * 30) ** 6 for a in ax_vals) / len(ax_vals)) ** (1/6)
     else:
-        score_d = max(0, int(10 - (rmsd_um - 200) / 100 * 10))
+        L6ax = 0.0
 
-    # Score da asse (0-30 punti)
-    if max_ax < 0.5:
-        score_ax = 30
-    elif max_ax < 1.5:
-        score_ax = int(30 - (max_ax - 0.5) * 15)
-    elif max_ax < 3.0:
-        score_ax = int(15 - (max_ax - 1.5) * 7)
-    else:
-        score_ax = max(0, int(5 - (max_ax - 3.0) * 2))
+    # Combinazione L2 pesata dei componenti L6
+    eff = math.sqrt(L6xy**2 * 0.55 + L6z**2 * 0.30 + L6ax**2 * 0.15)
 
-    return min(100, score_d + score_ax)
+    # Curva iperbole: inflection a 110 µm, steepness 1.5
+    # eff=25 -> ~90, eff=60 -> ~78, eff=110 -> ~50, eff=200 -> ~29, eff=307 -> ~21
+    score = 100 / (1 + (eff / 110) ** 1.5)
+
+    return max(0.0, min(100.0, round(score * 100) / 100))
 
 
 def score_label(score: int) -> dict:
