@@ -367,49 +367,46 @@ def match_pairs(ct_a: np.ndarray, ct_b: np.ndarray) -> list[dict]:
 # ── Score ─────────────────────────────────────────────────────────────────────
 def calc_score(pairs: list[dict], cyl_axes: list[dict]) -> float:
     """
-    Algoritmo identico al frontend originale (syntesis-icp v4):
-    L6-norm pesata di XY (55%), Z (30%), assi (15%)
-    Curva iperbole: 100 / (1 + (eff/110)^1.5)
+    Identico a calcScore() in syntesis-icp v4 (index_4_.html):
+    L6-norm pesata XY(55%) Z(30%) assi(15%) + iperbole 100/(1+(eff/110)^1.5)
     """
-    valid = [p for p in pairs if p["d3"] is not None]
+    valid = [p for p in pairs if p.get("d3") is not None]
     if not valid:
-        return 0
-
+        return 0.0
     n = len(valid)
 
     # L6-norm deviazioni XY
-    L6xy = (sum(abs(p["dxy"] * 1000) ** 6 for p in valid) / n) ** (1/6)
+    L6xy = (sum(abs(p["dxy"] * 1000) ** 6 for p in valid) / n) ** (1.0/6)
 
     # L6-norm deviazioni Z
-    L6z = (sum(abs(p["dz"] * 1000) ** 6 for p in valid) / n) ** (1/6)
+    L6z  = (sum(abs(p["dz"]  * 1000) ** 6 for p in valid) / n) ** (1.0/6)
 
-    # L6-norm angoli assi (ogni grado ≈ 30 µm equivalente)
-    ax_vals = [a["angle_deg"] for a in cyl_axes if a and a.get("angle_deg") is not None]
+    # L6-norm angoli assi (1° ≈ 30 µm equivalente)
+    ax_vals = [a["angle_deg"] for a in (cyl_axes or [])
+               if a and a.get("angle_deg") is not None]
     if ax_vals:
-        L6ax = (sum((a * 30) ** 6 for a in ax_vals) / len(ax_vals)) ** (1/6)
+        L6ax = (sum((a * 30) ** 6 for a in ax_vals) / len(ax_vals)) ** (1.0/6)
     else:
         L6ax = 0.0
 
-    # Combinazione L2 pesata dei componenti L6
+    # Combinazione L2 pesata
     eff = math.sqrt(L6xy**2 * 0.55 + L6z**2 * 0.30 + L6ax**2 * 0.15)
 
-    # Curva iperbole: inflection a 110 µm, steepness 1.5
-    # eff=25 -> ~90, eff=60 -> ~78, eff=110 -> ~50, eff=200 -> ~29, eff=307 -> ~21
-    score = 100 / (1 + (eff / 110) ** 1.5)
+    # Curva iperbole: inflection 110 µm, steepness 1.5
+    score = 100.0 / (1.0 + (eff / 110.0) ** 1.5)
 
     return max(0.0, min(100.0, round(score * 100) / 100))
-
-
-def score_label(score: int) -> dict:
-    if score >= 90:
-        return {"label": "Eccellente", "col": "#0D9E6E"}
-    if score >= 75:
-        return {"label": "Ottimo",     "col": "#639922"}
-    if score >= 55:
-        return {"label": "Accettabile","col": "#D97706"}
-    if score >= 35:
-        return {"label": "Rischioso",  "col": "#F97316"}
-    return {"label": "Critico",    "col": "#DC2626"}
+def score_label(score: float) -> dict:
+    """Soglie identiche a scoreLabel() nel frontend v4."""
+    if score >= 85:
+        return {"label": "Eccellente", "col": "#639922", "bg": "#EAF3DE", "fg": "#3B6D11"}
+    if score >= 70:
+        return {"label": "Buono",      "col": "#D97706", "bg": "#FEFCE8", "fg": "#854D0E"}
+    if score >= 50:
+        return {"label": "Sufficiente","col": "#F97316", "bg": "#FFF3E0", "fg": "#9A3412"}
+    if score >= 33:
+        return {"label": "Scarso",     "col": "#EF4444", "bg": "#FEE2E2", "fg": "#991B1B"}
+    return     {"label": "Critico",    "col": "#A855F7", "bg": "#F3E0F7", "fg": "#6B21A8"}
 
 
 # ── Clustering ────────────────────────────────────────────────────────────────
