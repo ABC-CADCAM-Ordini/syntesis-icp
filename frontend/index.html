@@ -181,30 +181,30 @@
               <input type="checkbox" id="align-auto" checked onchange="AM.onToggle(this.checked)">
               <span class="toggle-sl"></span>
             </label>
-            <label for="align-auto">Allineamento automatico</label>
+            <label for="align-auto"><span data-t="alignAuto">Allineamento automatico</span></label>
           </div>
 
           <div id="align-panel">
             <div class="align-step-bar" id="align-steps">
-              <div class="align-step active" id="as0"><span class="step-dot"><span>1</span></span> Repere #1</div>
-              <div class="align-step" id="as1"><span class="step-dot"><span>2</span></span> Repere #2</div>
-              <div class="align-step" id="as2"><span class="step-dot"><span>3</span></span> Repere #3</div>
+              <div class="align-step active" id="as0"><span class="step-dot"><span>1</span></span data-t="alignRep1"> Repere #1</div>
+              <div class="align-step" id="as1"><span class="step-dot"><span>2</span></span data-t="alignRep2"> Repere #2</div>
+              <div class="align-step" id="as2"><span class="step-dot"><span>3</span></span data-t="alignRep3"> Repere #3</div>
             </div>
-            <div class="align-hint" id="align-hint">Clicca un punto su <strong>File A</strong> per il Repere #1</div>
+            <div class="align-hint" id="align-hint"><span data-t="alignClickA">Clicca un punto su <strong>File A</strong> per il Repere #1</span></div>
             <div class="align-viewers">
 
               <!-- COLONNA A -->
               <div class="av-col av-col-a">
                 <div class="av-header">
-                  <span class="av-title">📁 FILE A — Riferimento</span>
-                  <span class="av-status" id="avh-hintA">carica un file STL</span>
+                  <span class="av-title"><span data-t="alignFileA">📁 FILE A — Riferimento</span></span>
+                  <span class="av-status" id="avh-hintA" data-t="alignLoad">carica un file STL</span>
                 </div>
                 <div class="av-canvas-wrap waiting-click" id="vwA">
                   <canvas id="cv3dA"></canvas><canvas id="ab_A" class="av-arcball"></canvas>
                 </div>
                 <div class="av-rot-bar av-rot-a">
-                  <button onclick="AM.rotate('A','top')">⊙ Dall'alto</button>
-                  <button onclick="AM.rotate('A','front')">↗ Frontale</button>
+                  <button onclick="AM.rotate('A','top')" data-t="alignTop">⊙ Dall'alto</button>
+                  <button onclick="AM.rotate('A','front')" data-t="alignFront">↗ Frontale</button>
                   <span class="av-sep"></span>
                   <button onclick="AM.rotate('A','yL')">◀</button>
                   <button onclick="AM.rotate('A','yR')">▶</button>
@@ -218,7 +218,7 @@
               <!-- COLONNA B -->
               <div class="av-col av-col-b">
                 <div class="av-header">
-                  <span class="av-title">📁 FILE B — Confronto</span>
+                  <span class="av-title"><span data-t="alignFileB">📁 FILE B — Confronto</span></span>
                   <span class="av-status" id="avh-hintB">carica un file STL</span>
                 </div>
                 <div class="av-canvas-wrap" id="vwB">
@@ -239,15 +239,15 @@
 
             </div>
             <div class="align-controls">
-              <button onclick="AM.resetAll()" class="btn-reset-align">↺ Reset tutti i repere</button>
-              <button onclick="AM.undoLast()">← Annulla ultimo</button>
+              <button onclick="AM.resetAll()" class="btn-reset-align" data-t="alignReset">↺ Reset tutti i repere</button>
+              <button onclick="AM.undoLast()" data-t="alignUndo">← Annulla ultimo</button>
             </div>
           </div>
 
           <button id="run" class="btn-primary" disabled onclick="C.go()">seleziona entrambi i file per avviare</button>
 
           <div id="analysis-progress">
-            <div class="ap-label">⚙️ Analisi in corso</div>
+            <div class="ap-label" data-t="progLabel">⚙️ Analisi in corso</div>
             <div class="ap-phrase" id="ap-phrase">Inizializzazione motore ICP...</div>
             <div class="ap-bar-wrap"><div class="ap-bar" id="ap-bar"></div></div>
             <div class="ap-pct" id="ap-pct">0%</div>
@@ -382,8 +382,35 @@ var STRINGS = {
     sExcellent:'Eccellente',sGood:'Buono',sSuff:'Sufficiente',sPoor:'Scarso',sCrit:'Critico',
     lbEmpty:'Nessun risultato per i filtri selezionati.',lbLoading:'Caricamento…',
     allF:'Tutte',allM:'Tutti',now:'Adesso',
-    rankProv:'in provincia',rankGlobal:'globale',of:'su',saved:'Salvato!'
-  },
+    rankProv:'in provincia',rankGlobal:'globale',of:'su',saved:'Salvato!',
+    alignAuto:'Allineamento automatico',
+    alignRep1:'Repere #1',
+    alignRep2:'Repere #2',
+    alignRep3:'Repere #3',
+    alignClickA:'Clicca un punto su File A per il Repere',
+    alignClickB:'Clicca un punto su File B per il Repere',
+    alignDone:'✅ Premi Analizza',
+    alignFileA:'📁 FILE A — Riferimento',
+    alignFileB:'📁 FILE B — Confronto',
+    alignLoad:'carica un file STL',
+    alignTop:"⊙ Dall'alto",
+    alignFront:'↗ Frontale',
+    alignLeft:'◀',
+    alignRight:'▶',
+    alignUp:'▲',
+    alignDown:'▼',
+    alignRotL:'↺',
+    alignRotR:'↻',
+    alignReset:'↺ Reset tutti i repere',
+    alignUndo:'← Annulla ultimo',
+    alignAnalyze:'Analizza con repere',
+    progLabel:'⚙️ Analisi in corso',
+    sectionFiles:'<span data-t="sectionFiles">01 — CARICA I FILE STL</span>',
+    pdfTitle:'Syntesis-ICP — Precision Scanner',
+    pdfReport:'Report di analisi',
+    pdfDeviations:'DEVIAZIONI PER COPPIA',
+    pdfScore:'Voto precisione',
+    pdfDist:'DISTANZE INTER-CENTROIDE'},
   en:{
     tab1:'STL Analysis',tab2:'Leaderboard',tab3:'How it works',tab4:'Distances',
     dropA:'File A — Reference',dropB:'File B — Comparison',dropHint:'drag .stl here or click',
@@ -414,8 +441,35 @@ var STRINGS = {
     sExcellent:'Excellent',sGood:'Good',sSuff:'Sufficient',sPoor:'Poor',sCrit:'Critical',
     lbEmpty:'No results for selected filters.',lbLoading:'Loading…',
     allF:'All',allM:'All',now:'Just now',
-    rankProv:'in province',rankGlobal:'global',of:'of',saved:'Saved!'
-  },
+    rankProv:'in province',rankGlobal:'global',of:'of',saved:'Saved!',
+    alignAuto:'Automatic alignment',
+    alignRep1:'Landmark #1',
+    alignRep2:'Landmark #2',
+    alignRep3:'Landmark #3',
+    alignClickA:'Click a point on File A for Landmark',
+    alignClickB:'Click a point on File B for Landmark',
+    alignDone:'✅ Press Analyze',
+    alignFileA:'📁 FILE A — Reference',
+    alignFileB:'📁 FILE B — Comparison',
+    alignLoad:'load an STL file',
+    alignTop:'⊙ Top view',
+    alignFront:'↗ Front view',
+    alignLeft:'◀',
+    alignRight:'▶',
+    alignUp:'▲',
+    alignDown:'▼',
+    alignRotL:'↺',
+    alignRotR:'↻',
+    alignReset:'↺ Reset all landmarks',
+    alignUndo:'← Undo last',
+    alignAnalyze:'Analyze with landmarks',
+    progLabel:'⚙️ Analysis in progress',
+    sectionFiles:'01 — LOAD STL FILES',
+    pdfTitle:'Syntesis-ICP — Precision Scanner',
+    pdfReport:'Analysis report',
+    pdfDeviations:'DEVIATIONS PER PAIR',
+    pdfScore:'Precision score',
+    pdfDist:'INTER-CENTROID DISTANCES'},
   es:{
     tab1:'Análisis STL',tab2:'Clasificación',tab3:'Cómo funciona',tab4:'Distancias',
     dropA:'Archivo A — Referencia',dropB:'Archivo B — Comparación',dropHint:'arrastra .stl aquí o haz clic',
@@ -446,8 +500,35 @@ var STRINGS = {
     sExcellent:'Excelente',sGood:'Bueno',sSuff:'Suficiente',sPoor:'Escaso',sCrit:'Crítico',
     lbEmpty:'Sin resultados para los filtros seleccionados.',lbLoading:'Cargando…',
     allF:'Todas',allM:'Todos',now:'Ahora',
-    rankProv:'en provincia',rankGlobal:'global',of:'de',saved:'Guardado!'
-  },
+    rankProv:'en provincia',rankGlobal:'global',of:'de',saved:'Guardado!',
+    alignAuto:'Alineación automática',
+    alignRep1:'Punto #1',
+    alignRep2:'Punto #2',
+    alignRep3:'Punto #3',
+    alignClickA:'Haz clic en un punto del Archivo A para el Punto',
+    alignClickB:'Haz clic en un punto del Archivo B para el Punto',
+    alignDone:'✅ Pulsa Analizar',
+    alignFileA:'📁 ARCHIVO A — Referencia',
+    alignFileB:'📁 ARCHIVO B — Comparación',
+    alignLoad:'carga un archivo STL',
+    alignTop:'⊙ Vista superior',
+    alignFront:'↗ Vista frontal',
+    alignLeft:'◀',
+    alignRight:'▶',
+    alignUp:'▲',
+    alignDown:'▼',
+    alignRotL:'↺',
+    alignRotR:'↻',
+    alignReset:'↺ Resetear puntos',
+    alignUndo:'← Deshacer último',
+    alignAnalyze:'Analizar con puntos',
+    progLabel:'⚙️ Análisis en curso',
+    sectionFiles:'01 — CARGAR ARCHIVOS STL',
+    pdfTitle:'Syntesis-ICP — Precision Scanner',
+    pdfReport:'Informe de análisis',
+    pdfDeviations:'DESVIACIONES POR PAR',
+    pdfScore:'Puntuación de precisión',
+    pdfDist:'DISTANCIAS INTER-CENTROIDE'},
   fr:{
     tab1:'Analyse STL',tab2:'Classement',tab3:'Comment ça marche',tab4:'Distances',
     dropA:'Fichier A — Référence',dropB:'Fichier B — Comparaison',dropHint:'glissez le .stl ici ou cliquez',
@@ -478,8 +559,35 @@ var STRINGS = {
     sExcellent:'Excellent',sGood:'Bon',sSuff:'Suffisant',sPoor:'Faible',sCrit:'Critique',
     lbEmpty:'Aucun résultat pour les filtres sélectionnés.',lbLoading:'Chargement…',
     allF:'Toutes',allM:'Tous',now:'Maintenant',
-    rankProv:'dans la province',rankGlobal:'mondial',of:'sur',saved:'Enregistré!'
-  },
+    rankProv:'dans la province',rankGlobal:'mondial',of:'sur',saved:'Enregistré!',
+    alignAuto:'Alignement automatique',
+    alignRep1:'Repère #1',
+    alignRep2:'Repère #2',
+    alignRep3:'Repère #3',
+    alignClickA:'Cliquez un point sur Fichier A pour le Repère',
+    alignClickB:'Cliquez un point sur Fichier B pour le Repère',
+    alignDone:'✅ Appuyez sur Analyser',
+    alignFileA:'📁 FICHIER A — Référence',
+    alignFileB:'📁 FICHIER B — Comparaison',
+    alignLoad:'charger un fichier STL',
+    alignTop:'⊙ Vue du dessus',
+    alignFront:'↗ Vue frontale',
+    alignLeft:'◀',
+    alignRight:'▶',
+    alignUp:'▲',
+    alignDown:'▼',
+    alignRotL:'↺',
+    alignRotR:'↻',
+    alignReset:'↺ Réinitialiser repères',
+    alignUndo:'← Annuler dernier',
+    alignAnalyze:'Analyser avec repères',
+    progLabel:'⚙️ Analyse en cours',
+    sectionFiles:'01 — CHARGER FICHIERS STL',
+    pdfTitle:'Syntesis-ICP — Precision Scanner',
+    pdfReport:"Rapport d'analyse",
+    pdfDeviations:'DÉVIATIONS PAR PAIRE',
+    pdfScore:'Score de précision',
+    pdfDist:'DISTANCES INTER-CENTROÏDE'},
   de:{
     tab1:'STL-Analyse',tab2:'Rangliste',tab3:'Wie es funktioniert',tab4:'Abstände',
     dropA:'Datei A — Referenz',dropB:'Datei B — Vergleich',dropHint:'.stl hier ablegen oder klicken',
@@ -510,8 +618,35 @@ var STRINGS = {
     sExcellent:'Ausgezeichnet',sGood:'Gut',sSuff:'Ausreichend',sPoor:'Schlecht',sCrit:'Kritisch',
     lbEmpty:'Keine Ergebnisse für die gewählten Filter.',lbLoading:'Wird geladen…',
     allF:'Alle',allM:'Alle',now:'Jetzt',
-    rankProv:'in Provinz',rankGlobal:'global',of:'von',saved:'Gespeichert!'
-  }
+    rankProv:'in Provinz',rankGlobal:'global',of:'von',saved:'Gespeichert!',
+    alignAuto:'Automatische Ausrichtung',
+    alignRep1:'Referenzpunkt #1',
+    alignRep2:'Referenzpunkt #2',
+    alignRep3:'Referenzpunkt #3',
+    alignClickA:'Klicken Sie einen Punkt auf Datei A für Referenzpunkt',
+    alignClickB:'Klicken Sie einen Punkt auf Datei B für Referenzpunkt',
+    alignDone:'✅ Analysieren drücken',
+    alignFileA:'📁 DATEI A — Referenz',
+    alignFileB:'📁 DATEI B — Vergleich',
+    alignLoad:'STL-Datei laden',
+    alignTop:'⊙ Draufsicht',
+    alignFront:'↗ Vorderansicht',
+    alignLeft:'◀',
+    alignRight:'▶',
+    alignUp:'▲',
+    alignDown:'▼',
+    alignRotL:'↺',
+    alignRotR:'↻',
+    alignReset:'↺ Referenzpunkte zurücksetzen',
+    alignUndo:'← Letztes rückgängig',
+    alignAnalyze:'Mit Referenzpunkten analysieren',
+    progLabel:'⚙️ Analyse läuft',
+    sectionFiles:'01 — STL-DATEIEN LADEN',
+    pdfTitle:'Syntesis-ICP — Precision Scanner',
+    pdfReport:'Analysebericht',
+    pdfDeviations:'ABWEICHUNGEN PRO PAAR',
+    pdfScore:'Präzisionsbewertung',
+    pdfDist:'INTER-ZENTROID-ABSTÄNDE'}
 };
 
 var _lang = (function(){
@@ -543,7 +678,7 @@ function applyLangToDOM(){
   t=document.getElementById('lbl-fileB'); if(t)t.textContent=T('dropB');
   var hA=document.getElementById('hA'); if(hA&&!hA.querySelector('.dn'))hA.textContent=T('dropHint');
   var hB=document.getElementById('hB'); if(hB&&!hB.querySelector('.dn'))hB.textContent=T('dropHint');
-  // Run button (only if not yet run)
+  // Run button
   var btn=document.getElementById('run');
   if(btn&&!window._LR){
     btn.textContent=btn.disabled?T('btnRun'):T('btnAnalyze');
@@ -551,7 +686,31 @@ function applyLangToDOM(){
   // Footer
   t=document.getElementById('footer-sub'); if(t)t.textContent='STL Cylinder Comparator v7 · Biaggini Medical Devices S.r.l.';
   // LB headers
-  t=document.getElementById('lbl-lb-loc'); if(t)t.textContent=T('scanA')==='Scanbody A'?'Posizione':'Location'; // quick check
+  t=document.getElementById('lbl-lb-loc'); if(t)t.textContent=T('scanA')==='Scanbody A'?'Posizione':'Location';
+
+  // ── Applica tutti gli elementi con data-t ─────────────────────────────────
+  document.querySelectorAll('[data-t]').forEach(function(el){
+    var key=el.getAttribute('data-t');
+    var val=T(key);
+    if(val) el.textContent=val;
+  });
+
+  // ── Pannello allineamento (testi nel DOM generato da JS) ──────────────────
+  // I pulsanti av-rot-bar hanno testi fissi (simboli) -- non cambiano
+  // I testi dinamici sono gestiti da AM._updateHint()
+  t=document.getElementById('align-hint');
+  if(t&&t.innerHTML.indexOf('Repere')!==-1||t&&t.innerHTML.indexOf('Landmark')!==-1){
+    // Aggiorna hint con lingua corrente
+    if(typeof AM!=='undefined') AM._refreshHint && AM._refreshHint();
+  }
+
+  // ── Pulsante "Analizza con repere" ───────────────────────────────────────
+  var btnRun=document.getElementById('run');
+  if(btnRun&&btnRun.textContent.indexOf('repere')!==-1||
+     btnRun&&btnRun.textContent.indexOf('landmark')!==-1||
+     btnRun&&btnRun.textContent.indexOf('Referenz')!==-1){
+    btnRun.textContent=T('alignAnalyze');
+  }
 }
 
 function buildLangSel(){
@@ -2395,6 +2554,7 @@ var C = (function(){
       var fd = new FormData();
       fd.append('file_a', fA);
       fd.append('file_b', fB);
+      fd.append('lang', typeof _lang!=='undefined'?_lang:'it');
 
       // Aggiunge i landmark per allineamento manuale
       if(AM.isManualMode()) {
@@ -4170,6 +4330,10 @@ var _AP = (function() {
 <script>
 // ── AM: Alignment Manager con Arcball ────────────────────────────────────────
 var AM = (function() {
+  // Helper traduzione -- usa T() globale se disponibile
+  function _t(key, fallback) {
+    try { var v=window.T&&window.T(key); return v||fallback; } catch(e){ return fallback; }
+  }
 
   var _enabled = false;
   var _trisA = null, _trisB = null;
@@ -4336,7 +4500,7 @@ var AM = (function() {
     if (!tObj) {
       ctx.fillStyle='rgba(0,50,120,.28)'; ctx.font='13px sans-serif';
       ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText('Carica un file STL', W/2, H/2); return;
+      ctx.fillText(_t('alignLoad','Carica un file STL'), W/2, H/2); return;
     }
 
     var cam=_cam[side], tris=tObj.tris, n=tObj.n;
@@ -4604,20 +4768,20 @@ var AM = (function() {
     var h=document.getElementById('align-hint');
     var ok=!!_trisA&&!!_trisB;
     if (!ok){
-      if(hA) hA.textContent=_trisA?'✅ caricato':'in attesa...';
+      if(hA) hA.textContent=_trisA?'✅ caricato':_t('alignLoad','in attesa...');
       if(hB) hB.textContent=_trisB?'✅ caricato':'in attesa...';
       if(h) h.innerHTML='Carica entrambi i file STL.'; return;
     }
     if (_step>=_maxSteps){
-      if(hA) hA.textContent='✅ 3 repere ok';
+      if(hA) hA.textContent=_t('alignDone','✅ ok');
       if(hB) hB.textContent='✅ 3 repere ok';
-      if(h) h.innerHTML='✅ Premi <strong>Analizza</strong>';
+      if(h) h.innerHTML=_t('alignDone','✅ Analizza');
       return;
     }
     var n=Math.floor(_step/2)+1, wA=_step%2===0;
-    if(hA) hA.textContent=wA?'👆 clicca Repere #'+n:(_ptsA.length+'/3 ✅');
+    if(hA) hA.textContent=wA?_t('alignClickA','👆 Repere #')+n:(_ptsA.length+'/3 ✅');
     if(hB) hB.textContent=!wA?'👆 clicca Repere #'+n:(_ptsB.length+'/3 ✅');
-    if(h) h.innerHTML='Repere #'+n+': clicca su '+(wA?'<strong style="color:var(--blue)">File A</strong>':'<strong style="color:#D97706">File B</strong>');
+    if(h) h.innerHTML=_t('alignClickA','Repere #')+n+': '+(wA?'<strong>'+_t('alignFileA','File A')+'</strong>':'<strong>'+_t('alignFileB','File B')+'</strong>');
   }
 
   function _onAllPointsSet() {
@@ -4650,7 +4814,7 @@ var AM = (function() {
 
   function isManualMode() { return _enabled&&_step>=_maxSteps; }
 
-  return {onToggle,onFileLoaded,resetAll,undoLast,getLandmarks,isManualMode,rotate};
+  return {onToggle,onFileLoaded,resetAll,undoLast,getLandmarks,isManualMode,rotate,_refreshHint:_updateHint};
 })();
 
 </script>
