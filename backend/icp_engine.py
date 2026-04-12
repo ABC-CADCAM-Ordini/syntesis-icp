@@ -588,7 +588,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         gc_b_new = global_centroid(tris_b)
         offset = gc_a - gc_b_new
         raw_ct_b_shifted = raw_ct_b + offset
-        pre = robust_pre_align(raw_ct_a, raw_ct_b_shifted)
+        # (landmark Kabsch già calcolato sopra, usa quello)
     else:
         pre = robust_pre_align(raw_ct_a, raw_ct_b_shifted)
     ct_b_pre = pre["aligned"]
@@ -606,14 +606,22 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         idx_all = [i for ci in cluster for i in comps_list[ci]]
         return centroid(tris, idx_all)
 
-    sort_key_a = lambda cl: tuple(raw_ct_a[[c for c in cl]].mean(axis=0)[:2])
-    sort_key_b = lambda cl: tuple(ct_b_pre[[c for c in cl]].mean(axis=0)[:2])
+    # Calcola centroidi per cluster
+    ct_a_unsorted = np.array([raw_ct_a[[c for c in cl]].mean(axis=0) for cl in clust_a])
+    ct_b_unsorted = np.array([ct_b_pre[[c for c in cl]].mean(axis=0) for cl in clust_b])
 
-    clust_a_sorted = sorted(clust_a, key=sort_key_a)
-    clust_b_sorted = sorted(clust_b, key=sort_key_b)
+    # Usa hungarian matching per abbinare i cluster (robusto a qualsiasi rotazione)
+    from scipy.optimize import linear_sum_assignment as hungarian
+    na_cl, nb_cl = len(ct_a_unsorted), len(ct_b_unsorted)
+    n_cl = min(na_cl, nb_cl)
+    D_cl = np.linalg.norm(ct_a_unsorted[:n_cl, None] - ct_b_unsorted[None, :n_cl], axis=2)
+    r_cl, c_cl = hungarian(D_cl)
+    # Ordina entrambi secondo il matching hungarian
+    clust_a_sorted = [clust_a[i] for i in r_cl]
+    clust_b_sorted = [clust_b[i] for i in c_cl]
 
-    ct_a = np.array([raw_ct_a[cl].mean(axis=0) for cl in clust_a_sorted])
-    ct_b_raw = np.array([ct_b_pre[cl].mean(axis=0) for cl in clust_b_sorted])
+    ct_a = np.array([raw_ct_a[[c for c in cl]].mean(axis=0) for cl in clust_a_sorted])
+    ct_b_raw = np.array([ct_b_pre[[c for c in cl]].mean(axis=0) for cl in clust_b_sorted])
 
     # ICP
     icp = run_icp(ct_a, ct_b_raw, max_iter=80)
