@@ -235,28 +235,60 @@ def sig_diff(sa: np.ndarray, sb: np.ndarray) -> float:
 
 
 def robust_pre_align(ct_a: np.ndarray, ct_b: np.ndarray) -> dict:
+    """
+    Pre-allineamento robusto: prova rotazioni ogni 5° + hungarian matching.
+    Gestisce qualsiasi sistema di riferimento relativo tra le due mesh.
+    """
+    from scipy.optimize import linear_sum_assignment as hungarian
+
     na, nb = len(ct_a), len(ct_b)
-    sigs_a = [dist_sig(ct_a, i) for i in range(na)]
-    sigs_b = [dist_sig(ct_b, i) for i in range(nb)]
+    if na == 0 or nb == 0:
+        off = ct_a.mean(0) - ct_b.mean(0) if na > 0 and nb > 0 else np.zeros(3)
+        return {"aligned": ct_b + off, "R": np.eye(3), "t": off, "method": "empty"}
 
-    corr = []
-    for i in range(na):
-        best_j = min(range(nb), key=lambda j: sig_diff(sigs_a[i], sigs_b[j]))
-        corr.append(best_j)
+    ca = ct_a.mean(axis=0)
+    cb = ct_b.mean(axis=0)
+    A_c = ct_a - ca
+    B_c = ct_b - cb
 
-    # Verifica biiezione
-    if len(set(corr)) == na:
-        b_matched = ct_b[corr]
-        R, t = kabsch(b_matched, ct_a)
-        aligned = apply_transform(ct_b, R, t)
-        return {"aligned": aligned, "R": R, "t": t, "method": "signature"}
+    best_cost = float("inf")
+    best_R = np.eye(3)
+    best_t = ca - cb
 
-    # Fallback: traslazione centroidi
-    off = ct_a.mean(axis=0) - ct_b.mean(axis=0)
-    return {"aligned": ct_b + off, "R": np.eye(3), "t": off, "method": "centroid"}
+    # Prova rotazioni nel piano XY ogni 5°
+    for angle_deg in range(0, 360, 5):
+        rad = np.radians(angle_deg)
+        cos_a, sin_a = np.cos(rad), np.sin(rad)
+        R_z = np.array([[cos_a, -sin_a, 0.0],
+                        [sin_a,  cos_a, 0.0],
+                        [0.0,    0.0,   1.0]])
+        B_rot = (R_z @ B_c.T).T  # centroidi B ruotati
+
+        n_match = min(na, nb)
+        D = np.linalg.norm(A_c[:, None, :] - B_rot[None, :, :], axis=2)
+        row, col = hungarian(D[:n_match, :n_match])
+        cost = float(D[row, col].sum())
+
+        if cost < best_cost:
+            best_cost = cost
+            # Raffina con Kabsch sui punti matchati
+            A_matched = A_c[row]
+            B_matched = B_rot[col]
+            H = B_matched.T @ A_matched
+            U, S, Vt = np.linalg.svd(H)
+            R_kb = Vt.T @ U.T
+            if np.linalg.det(R_kb) < 0:
+                Vt[-1] *= -1
+                R_kb = Vt.T @ U.T
+            R_final = R_kb @ R_z
+            t_final = ca - R_final @ cb
+            best_R = R_final
+            best_t = t_final
+
+    aligned = (best_R @ ct_b.T).T + best_t
+    return {"aligned": aligned, "R": best_R, "t": best_t, "method": "angle_search"}
 
 
-# ── ICP ───────────────────────────────────────────────────────────────────────
 def run_icp(fixed: np.ndarray, moving: np.ndarray, max_iter: int = 80) -> dict:
     """ICP point-to-point con Kabsch. Ritorna R_acc, t_acc, aligned, rmsd, angle."""
     Bt = moving.copy()
