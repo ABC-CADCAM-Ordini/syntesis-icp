@@ -97,6 +97,44 @@
 .av-rot-bar button:hover{filter:brightness(1.1)}
 .av-rot-bar button:active{transform:scale(.93)}
 .av-sep{width:1px;height:20px;background:rgba(0,0,0,.12);margin:0 3px;flex-shrink:0}
+/* ── Arcball viewer ──────────────────────────────────────────────────────── */
+.av-rot-bar{ display:none }  /* nascondi vecchia barra */
+.av-viewer-section{
+  display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:14px
+}
+.av-col{ display:flex;flex-direction:column;border-radius:12px;overflow:hidden;
+  box-shadow:0 2px 12px rgba(0,0,0,.10) }
+.av-col-a .av-header{ background:var(--blue);color:#fff }
+.av-col-b .av-header{ background:#D97706;color:#fff }
+.av-header{ display:flex;justify-content:space-between;align-items:center;
+  padding:9px 14px;font-family:var(--font) }
+.av-title{ font-size:12px;font-weight:700 }
+.av-status{ font-size:11px;opacity:.85;font-style:italic }
+.av-body{ position:relative;background:#1a1f2e;
+  border-left:2px solid rgba(255,255,255,.08);
+  border-right:2px solid rgba(255,255,255,.08) }
+.av-canvas-wrap{ position:relative }
+.av-canvas-wrap canvas{ display:block;width:100%;height:240px;
+  cursor:crosshair;min-height:240px }
+.av-canvas-wrap.waiting-click{ outline:3px dashed var(--gold);outline-offset:-3px }
+/* Arcball overlay canvas */
+.av-arcball{ position:absolute;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:3 }
+/* Barra pulsanti mini */
+.av-toolbar{ display:flex;align-items:center;gap:6px;padding:6px 10px;
+  background:#f8fafc;border:1.5px solid var(--border);
+  border-radius:0 0 12px 12px;border-top:none }
+.av-col-a .av-toolbar{ background:#EEF6FF;border-color:#93c5fd }
+.av-col-b .av-toolbar{ background:#FFF7ED;border-color:#fcd34d }
+.av-tbtn{ padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;
+  cursor:pointer;border:1.5px solid rgba(0,0,0,.10);background:#fff;
+  color:#334155;transition:.15s;white-space:nowrap }
+.av-col-a .av-tbtn.primary{ background:var(--blue);color:#fff;border-color:var(--blue) }
+.av-col-b .av-tbtn.primary{ background:#D97706;color:#fff;border-color:#D97706 }
+.av-tbtn:hover{ filter:brightness(1.1) }
+.av-tbtn:active{ transform:scale(.93) }
+.av-sep2{ flex:1 }
+
 </style>
 </head>
 <body>
@@ -162,7 +200,7 @@
                   <span class="av-status" id="avh-hintA">carica un file STL</span>
                 </div>
                 <div class="av-canvas-wrap waiting-click" id="vwA">
-                  <canvas id="cv3dA"></canvas>
+                  <canvas id="cv3dA"></canvas><canvas id="ab_A" class="av-arcball"></canvas>
                 </div>
                 <div class="av-rot-bar av-rot-a">
                   <button onclick="AM.rotate('A','top')">⊙ Dall'alto</button>
@@ -184,7 +222,7 @@
                   <span class="av-status" id="avh-hintB">carica un file STL</span>
                 </div>
                 <div class="av-canvas-wrap" id="vwB">
-                  <canvas id="cv3dB"></canvas>
+                  <canvas id="cv3dB"></canvas><canvas id="ab_B" class="av-arcball"></canvas>
                 </div>
                 <div class="av-rot-bar av-rot-b">
                   <button onclick="AM.rotate('B','top')">⊙ Dall'alto</button>
@@ -203,37 +241,7 @@
             <div class="align-controls">
               <button onclick="AM.resetAll()" class="btn-reset-align">↺ Reset tutti i repere</button>
               <button onclick="AM.undoLast()">← Annulla ultimo</button>
-            </div>
-              <div class="rot-group">
-                <span>↕</span>
-                <button class="btn-rot" onclick="AM.rotate('A','xU')" title="Ruota A su">▲</button>
-                <button class="btn-rot" onclick="AM.rotate('A','xD')" title="Ruota A giù">▼</button>
-              </div>
-              <div class="rot-group">
-                <span>⟳</span>
-                <button class="btn-rot" onclick="AM.rotate('A','zL')" title="Gira A sinistrorso">↺</button>
-                <button class="btn-rot" onclick="AM.rotate('A','zR')" title="Gira A destrorso">↻</button>
-              </div>
-              <div style="width:1px;height:24px;background:var(--border);margin:0 2px"></div>
-              <div class="rot-group">
-                <span style="color:var(--gold)">B↔</span>
-                <button class="btn-rot" onclick="AM.rotate('B','yL')">◀</button>
-                <button class="btn-rot" onclick="AM.rotate('B','yR')">▶</button>
-              </div>
-              <div class="rot-group">
-                <span style="color:var(--gold)">B↕</span>
-                <button class="btn-rot" onclick="AM.rotate('B','xU')">▲</button>
-                <button class="btn-rot" onclick="AM.rotate('B','xD')">▼</button>
-              </div>
-              <div class="rot-group">
-                <span style="color:var(--gold)">B⟳</span>
-                <button class="btn-rot" onclick="AM.rotate('B','zL')">↺</button>
-                <button class="btn-rot" onclick="AM.rotate('B','zR')">↻</button>
-              </div>
-            </div>
-          </div>
-
-          <button id="run" class="btn-primary" disabled onclick="C.go()">seleziona entrambi i file per avviare</button>
+            </div><button id="run" class="btn-primary" disabled onclick="C.go()">seleziona entrambi i file per avviare</button>
 
           <div id="analysis-progress">
             <div class="ap-label">⚙️ Analisi in corso</div>
@@ -4157,595 +4165,502 @@ var _AP = (function() {
 
 
 <script>
-// ── AM: Alignment Manager (3D viewer + repere manuale) ────────────────────────
+// ── AM: Alignment Manager con Arcball ────────────────────────────────────────
 var AM = (function() {
 
-  // Stato
-  var _enabled = false;         // allineamento manuale attivo
-  var _trisA = null;            // triangoli File A (Float32Array, già parsed)
-  var _trisB = null;            // triangoli File B
-  var _ptsA  = [];              // repere su A: [{x,y,z}]
-  var _ptsB  = [];              // repere su B: [{x,y,z}]
-  var _step  = 0;               // 0..5: 0=A1,1=B1,2=A2,3=B2,4=A3,5=B3
-  var _maxSteps = 6;
+  var _enabled = false;
+  var _trisA = null, _trisB = null;
+  var _ptsA = [], _ptsB = [];
+  var _step = 0, _maxSteps = 6;
 
-  // Stato camera per ogni viewer
+  // Camera per ogni viewer
   var _cam = {
-    A: { rotX:0.4, rotY:-0.4, rotZ:0, zoom:1, panX:0, panY:0 },
-    B: { rotX:0.4, rotY:-0.4, rotZ:0, zoom:1, panX:0, panY:0 }
+    A: { rotX:Math.PI/2, rotY:0, rotZ:0, zoom:1, panX:0, panY:0 },
+    B: { rotX:Math.PI/2, rotY:0, rotZ:0, zoom:1, panX:0, panY:0 }
   };
-  var _drag = { active:false, side:null, mode:'rot', lx:0, ly:0 };
 
-  // ── Toggle on/off ──────────────────────────────────────────────────────────
+  // Stato drag
+  var _drag = { active:false, side:null, mode:'arc', sx:0, sy:0,
+                startRotX:0, startRotY:0, startRotZ:0, startPanX:0, startPanY:0,
+                arcAxis:null }; // 'x','y','z' o null=free
+
+  // ── Toggle ──────────────────────────────────────────────────────────────
   function onToggle(checked) {
     _enabled = !checked;
     var panel = document.getElementById('align-panel');
     if (!panel) return;
     if (_enabled) {
       panel.classList.add('visible');
-      // RAF x2 per assicurare il layout dopo display:block
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          _initDrag('A'); _initTouch('A');
-          _initDrag('B'); _initTouch('B');
-          // Ricarica file già presenti se i viewer sono ancora vuoti
-          var fA = (window.FILES && window.FILES.A);
-          var fB = (window.FILES && window.FILES.B);
-          if (fA && !_trisA) { onFileLoaded('A', fA); }
-          if (fB && !_trisB) { onFileLoaded('B', fB); }
-          if (_trisA) _render('A');
-          if (_trisB) _render('B');
-          _updateHint();
-        });
-      });
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        _initViewer('A'); _initViewer('B');
+        var fA = window.FILES && window.FILES.A;
+        var fB = window.FILES && window.FILES.B;
+        if (fA && !_trisA) onFileLoaded('A', fA);
+        if (fB && !_trisB) onFileLoaded('B', fB);
+        if (_trisA) _render('A');
+        if (_trisB) _render('B');
+        _updateHint();
+      }); });
     } else {
       panel.classList.remove('visible');
     }
   }
 
-  // ── Chiamato quando un file viene caricato (da setFile) ────────────────────
+  // ── File loading ─────────────────────────────────────────────────────────
   function onFileLoaded(side, file) {
     if (!_enabled) return;
     var reader = new FileReader();
     reader.onload = function(e) {
       var buf = e.target.result;
-      var tris = _parseBinarySTL(buf);
-      if (side === 'A') { _trisA = tris; }
-      else              { _trisB = tris; }
-      // Preset: vista dall'alto per vedere i cerchi degli scanbody
-      _cam[side].rotX = Math.PI / 2;
-      _cam[side].rotY = 0;
-      _cam[side].rotZ = 0;
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          _render(side);
-          _updateHint();
-        });
-      });
+      var tris = _parseSTL(buf);
+      if (side === 'A') _trisA = tris; else _trisB = tris;
+      _cam[side] = { rotX:Math.PI/2, rotY:0, rotZ:0, zoom:1, panX:0, panY:0 };
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        _initViewer(side);
+        _render(side);
+        _updateHint();
+      }); });
     };
     reader.readAsArrayBuffer(file);
   }
 
-  // ── Parser STL (binario + ASCII): conserva cap, subsampling pareti ────────
-  function _parseBinarySTL(buf) {
+  // ── Parser STL binario + ASCII ───────────────────────────────────────────
+  function _parseSTL(buf) {
     var dv = new DataView(buf);
-
-    // Rilevamento formato: se inizia con "solid" e contiene "facet" -> ASCII
-    var header = '';
-    for (var ci=0; ci<80 && ci<buf.byteLength; ci++)
-      header += String.fromCharCode(dv.getUint8(ci));
-
-    if (header.trimStart().startsWith('solid')) {
-      // Potrebbe essere ASCII -- verifica leggendo i primi 256 chars
-      var probe = '';
-      for (var ci=0; ci<Math.min(256, buf.byteLength); ci++)
-        probe += String.fromCharCode(dv.getUint8(ci));
-      if (probe.indexOf('facet') !== -1 || probe.indexOf('vertex') !== -1) {
-        return _parseASCII_STL(buf);
-      }
-    }
-
-    var n  = dv.getUint32(80, true);
-
-    // Primo passaggio: separa triangoli orizzontali (cap) da laterali (pareti)
-    var caps = [];    // indici triangoli con normale quasi verticale |nz| > 0.6
-    var walls = [];   // indici triangoli laterali
-
-    for (var i = 0; i < n; i++) {
-      var off = 84 + i * 50;
-      // Leggi normale (già presente nell'STL binario)
-      var nx = dv.getFloat32(off,    true);
-      var ny = dv.getFloat32(off+4,  true);
-      var nz = dv.getFloat32(off+8,  true);
-      var nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
-      var absNz = Math.abs(nz / nl);
-      if (absNz > 0.5) {
-        caps.push(i);   // faccia orizzontale: cap del cilindro
-      } else {
-        walls.push(i);  // faccia verticale: parete del cilindro
-      }
-    }
-
-    // Subsampling selettivo: cap TUTTI, pareti max 8000
-    var MAX_WALLS = 8000;
-    var wallStep = walls.length > MAX_WALLS ? Math.ceil(walls.length / MAX_WALLS) : 1;
-    var selectedWalls = [];
-    for (var k = 0; k < walls.length; k += wallStep) {
-      selectedWalls.push(walls[k]);
-    }
-
-    var selected = caps.concat(selectedWalls);
-    var out = new Float32Array(selected.length * 9);
-    var j = 0;
-    for (var si = 0; si < selected.length; si++) {
-      var off = 84 + selected[si] * 50 + 12; // +12 salta normale
-      out[j++] = dv.getFloat32(off,    true); out[j++] = dv.getFloat32(off+4,  true); out[j++] = dv.getFloat32(off+8,  true);
-      out[j++] = dv.getFloat32(off+12, true); out[j++] = dv.getFloat32(off+16, true); out[j++] = dv.getFloat32(off+20, true);
-      out[j++] = dv.getFloat32(off+24, true); out[j++] = dv.getFloat32(off+28, true); out[j++] = dv.getFloat32(off+32, true);
-    }
-    var actualN = j / 9;
-    return { tris: out.subarray(0, actualN * 9), n: actualN };
+    var probe = '';
+    for (var ci=0; ci<Math.min(256,buf.byteLength); ci++)
+      probe += String.fromCharCode(dv.getUint8(ci));
+    if (probe.trimStart().startsWith('solid') && probe.indexOf('facet')!==-1)
+      return _parseASCII(buf);
+    return _parseBinary(buf);
   }
 
-  // ── Parser STL ASCII ─────────────────────────────────────────────────────
-  function _parseASCII_STL(buf) {
-    // Decodifica il buffer come testo
-    var text = '';
-    var uint8 = new Uint8Array(buf);
-    // Leggi in chunks per evitare stack overflow su file grandi
-    var CHUNK = 65536;
-    for (var s=0; s<uint8.length; s+=CHUNK)
-      text += String.fromCharCode.apply(null, uint8.subarray(s, Math.min(s+CHUNK, uint8.length)));
-
-    var lines = text.split(/\n/);
-    var allTris = [];
-    var cur = null;
-
-    for (var li=0; li<lines.length; li++) {
-      var line = lines[li].trim();
-      if (line.startsWith('facet normal')) {
-        var parts = line.split(/\s+/);
-        cur = { nx: parseFloat(parts[2]), ny: parseFloat(parts[3]), nz: parseFloat(parts[4]), verts: [] };
-      } else if (line.startsWith('vertex') && cur) {
-        var p = line.split(/\s+/);
-        cur.verts.push([parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])]);
-      } else if (line.startsWith('endfacet') && cur && cur.verts.length === 3) {
-        allTris.push(cur);
-        cur = null;
-      }
+  function _parseBinary(buf) {
+    var dv = new DataView(buf);
+    var n = dv.getUint32(80,true);
+    var n_real = Math.min(n, Math.floor((buf.byteLength-84)/50));
+    var caps=[], walls=[];
+    for (var i=0; i<n_real; i++) {
+      var off = 84+i*50;
+      var nx=dv.getFloat32(off,true), ny=dv.getFloat32(off+4,true), nz=dv.getFloat32(off+8,true);
+      var nl=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+      if (Math.abs(nz/nl)>0.5) caps.push(i); else walls.push(i);
     }
-
-    var n = allTris.length;
-    if (n === 0) return { tris: new Float32Array(0), n: 0 };
-
-    // Stesso smart-subsampling del parser binario
-    var caps = [], walls = [];
-    for (var i=0; i<n; i++) {
-      var t = allTris[i];
-      var nl = Math.sqrt(t.nx*t.nx + t.ny*t.ny + t.nz*t.nz) || 1;
-      if (Math.abs(t.nz/nl) > 0.5) caps.push(i);
-      else walls.push(i);
+    var MAX_W=8000, ws=walls.length>MAX_W?Math.ceil(walls.length/MAX_W):1;
+    var sel=caps.slice();
+    for (var k=0;k<walls.length;k+=ws) sel.push(walls[k]);
+    var out=new Float32Array(sel.length*9), j=0;
+    for (var si=0;si<sel.length;si++){
+      var off=84+sel[si]*50+12;
+      out[j++]=dv.getFloat32(off,true);   out[j++]=dv.getFloat32(off+4,true);  out[j++]=dv.getFloat32(off+8,true);
+      out[j++]=dv.getFloat32(off+12,true);out[j++]=dv.getFloat32(off+16,true);out[j++]=dv.getFloat32(off+20,true);
+      out[j++]=dv.getFloat32(off+24,true);out[j++]=dv.getFloat32(off+28,true);out[j++]=dv.getFloat32(off+32,true);
     }
-    var MAX_WALLS = 8000;
-    var wallStep = walls.length > MAX_WALLS ? Math.ceil(walls.length / MAX_WALLS) : 1;
-    var selected = caps.slice();
-    for (var k=0; k<walls.length; k+=wallStep) selected.push(walls[k]);
-
-    var out = new Float32Array(selected.length * 9);
-    var j = 0;
-    for (var si=0; si<selected.length; si++) {
-      var t = allTris[selected[si]];
-      out[j++]=t.verts[0][0]; out[j++]=t.verts[0][1]; out[j++]=t.verts[0][2];
-      out[j++]=t.verts[1][0]; out[j++]=t.verts[1][1]; out[j++]=t.verts[1][2];
-      out[j++]=t.verts[2][0]; out[j++]=t.verts[2][1]; out[j++]=t.verts[2][2];
-    }
-    var actualN = j/9;
-    return { tris: out.subarray(0, actualN*9), n: actualN };
+    return {tris:out.subarray(0,j), n:j/9};
   }
 
-  // ── Render Canvas 2D con proiezione isometrica ─────────────────────────────
+  function _parseASCII(buf) {
+    var uint8=new Uint8Array(buf), text='', C=65536;
+    for (var s=0;s<uint8.length;s+=C)
+      text+=String.fromCharCode.apply(null,uint8.subarray(s,Math.min(s+C,uint8.length)));
+    var lines=text.split(/\n/), allT=[], cur=null;
+    for (var li=0;li<lines.length;li++){
+      var ln=lines[li].trim();
+      if (ln.startsWith('facet normal')){
+        var p=ln.split(/\s+/);
+        cur={nx:+p[2],ny:+p[3],nz:+p[4],v:[]};
+      } else if (ln.startsWith('vertex')&&cur){
+        var p=ln.split(/\s+/);
+        cur.v.push([+p[1],+p[2],+p[3]]);
+      } else if (ln.startsWith('endfacet')&&cur&&cur.v.length===3){
+        allT.push(cur); cur=null;
+      }
+    }
+    var caps=[],walls=[];
+    for (var i=0;i<allT.length;i++){
+      var t=allT[i], nl2=Math.sqrt(t.nx*t.nx+t.ny*t.ny+t.nz*t.nz)||1;
+      if (Math.abs(t.nz/nl2)>0.5) caps.push(i); else walls.push(i);
+    }
+    var MAX_W=8000, ws=walls.length>MAX_W?Math.ceil(walls.length/MAX_W):1;
+    var sel=caps.slice();
+    for (var k=0;k<walls.length;k+=ws) sel.push(walls[k]);
+    var out=new Float32Array(sel.length*9), j=0;
+    for (var si=0;si<sel.length;si++){
+      var t=allT[sel[si]];
+      out[j++]=t.v[0][0];out[j++]=t.v[0][1];out[j++]=t.v[0][2];
+      out[j++]=t.v[1][0];out[j++]=t.v[1][1];out[j++]=t.v[1][2];
+      out[j++]=t.v[2][0];out[j++]=t.v[2][1];out[j++]=t.v[2][2];
+    }
+    return {tris:out.subarray(0,j), n:j/9};
+  }
+
+  // ── Render Canvas 2D ─────────────────────────────────────────────────────
+  function _project(cam, px, py, pz, W, H) {
+    var x=px, y=py, z=pz;
+    // Rot Y (yaw)
+    var cy=Math.cos(cam.rotY), sy=Math.sin(cam.rotY);
+    var x1=x*cy+z*sy, z1=-x*sy+z*cy;
+    // Rot X (pitch)
+    var cx=Math.cos(cam.rotX), sx=Math.sin(cam.rotX);
+    var y2=y*cx-z1*sx, z2=y*sx+z1*cx;
+    // Rot Z (roll)
+    var cz=Math.cos(cam.rotZ||0), sz=Math.sin(cam.rotZ||0);
+    var x3=x1*cz-y2*sz, y3=x1*sz+y2*cz;
+    var d=200.0, w=d+z2; if(w<0.1) w=0.1;
+    var fill=0.42;
+    return [
+      (x3/w)*d*cam.zoom*fill*W + W/2 + cam.panX*W/2,
+      (-y3/w)*d*cam.zoom*fill*H + H/2 - cam.panY*H/2,
+      z2
+    ];
+  }
+
   function _render(side) {
-    var trisObj = side === 'A' ? _trisA : _trisB;
-    var canvasId = side === 'A' ? 'cv3dA' : 'cv3dB';
-    var cam = _cam[side];
-    if (!trisObj) return;
-
-    var cv = document.getElementById(canvasId);
+    var tObj = side==='A' ? _trisA : _trisB;
+    var cvId = side==='A' ? 'cv3dA' : 'cv3dB';
+    var cv = document.getElementById(cvId);
     if (!cv) return;
-
-    // Forza dimensioni fisiche usando il parent
     var parent = cv.parentElement;
-    var W = parent ? (parent.offsetWidth - 4) : 400;
-    var H = 260;
-    if (W < 50) W = 400;
-    cv.width = W;
-    cv.height = H;
-
-    var ctx = cv.getContext('2d');
+    var W = parent ? (parent.offsetWidth||400) : 400;
+    var H = 240;
+    cv.width=W; cv.height=H;
+    var ctx=cv.getContext('2d');
     if (!ctx) return;
 
-    var tris = trisObj.tris;
+    // Sfondo scuro
+    ctx.fillStyle='#1a1f2e'; ctx.fillRect(0,0,W,H);
 
-    // Bounding box
+    if (!tObj) {
+      ctx.fillStyle='rgba(255,255,255,.18)'; ctx.font='13px '+getComputedStyle(document.body).fontFamily;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('Carica un file STL', W/2, H/2); return;
+    }
+
+    var cam=_cam[side], tris=tObj.tris, n=tObj.n;
+    // BBox per normalizzare
     var mnx=1e9,mny=1e9,mnz=1e9, mxx=-1e9,mxy=-1e9,mxz=-1e9;
-    for (var i=0; i<tris.length; i+=3) {
+    for (var i=0;i<tris.length;i+=3){
       if(tris[i]<mnx)mnx=tris[i]; if(tris[i]>mxx)mxx=tris[i];
       if(tris[i+1]<mny)mny=tris[i+1]; if(tris[i+1]>mxy)mxy=tris[i+1];
       if(tris[i+2]<mnz)mnz=tris[i+2]; if(tris[i+2]>mxz)mxz=tris[i+2];
     }
-    var cx=(mnx+mxx)/2, cy=(mny+mxy)/2, cz=(mnz+mxz)/2;
-    // sc: normalizza le coordinate 3D in range [-1,1]
-    // maxDim/2 -> 1.0, poi proiezione usa questo valore direttamente
-    var maxDim = Math.max(mxx-mnx, mxy-mny, mxz-mnz, 0.001);
-    var sc = 1.0 / (maxDim / 2);  // ora i punti sono in [-1, 1]
+    var cx=(mnx+mxx)/2, cy=(mny+mxy)/2, cz2=(mnz+mxz)/2;
+    var maxD=Math.max(mxx-mnx,mxy-mny,mxz-mnz,0.001);
+    var sc=2/maxD; // normalizza in [-1,1]
 
-    // Matrice rotazione da cam.rotX, cam.rotY
-    var rx = cam.rotX, ry = cam.rotY;
-    var cosX=Math.cos(rx), sinX=Math.sin(rx);
-    var cosY=Math.cos(ry), sinY=Math.sin(ry);
-
-    // Proiezione teleobiettivo: d=50 elimina qualsiasi distorsione prospettica
-    var zoom = cam.zoom;
-    var d = 200.0;
-    function project(px, py, pz) {
-      // Centra
-      var x = px - cx, y = py - cy, z = pz - cz;
-      // Scala
-      x *= sc; y *= sc; z *= sc;
-      // Ruota Y (yaw)
-      var x1 = x*cosY + z*sinY;
-      var z1 = -x*sinY + z*cosY;
-      // Ruota X (pitch)
-      var y2 = y*cosX - z1*sinX;
-      var z2 = y*sinX + z1*cosX;
-      // Ruota Z (roll) -- pulsante "gira sul centro"
-      var rotZ = cam.rotZ || 0;
-      var cosZ = Math.cos(rotZ), sinZ = Math.sin(rotZ);
-      var x1f = x1*cosZ - y2*sinZ;
-      var y2f = x1*sinZ + y2*cosZ;
-      // Prospettiva
-      var w = d + z2;
-      if (w < 0.1) w = 0.1;
-      var fill = 0.42;
-      var sx = (x1f / w) * d * zoom * fill * W + W/2 + cam.panX * W/2;
-      var sy = (-y2f / w) * d * zoom * fill * H + H/2 - cam.panY * H/2;
-      return [sx, sy, z2]; // z2 per depth sorting
+    var colBase = side==='A' ? [40,140,220] : [220,120,20];
+    var front=[];
+    for (var i=0;i<n;i++){
+      var b=i*9;
+      var ax=tris[b]-cx, ay=tris[b+1]-cy, az=tris[b+2]-cz2;
+      var bx2=tris[b+3]-cx,by2=tris[b+4]-cy,bz2=tris[b+5]-cz2;
+      var cx2=tris[b+6]-cx,cy2=tris[b+7]-cy,cz3=tris[b+8]-cz2;
+      ax*=sc;ay*=sc;az*=sc; bx2*=sc;by2*=sc;bz2*=sc; cx2*=sc;cy2*=sc;cz3*=sc;
+      var p0=_project(cam,ax,ay,az,W,H);
+      var p1=_project(cam,bx2,by2,bz2,W,H);
+      var p2=_project(cam,cx2,cy2,cz3,W,H);
+      // Backface
+      var ex=p1[0]-p0[0],ey=p1[1]-p0[1], fx=p2[0]-p0[0],fy=p2[1]-p0[1];
+      if (ex*fy-ey*fx>0) continue;
+      // Normal 3D per shading
+      var enx=tris[b+3]-tris[b],eny=tris[b+4]-tris[b+1],enz=tris[b+5]-tris[b+2];
+      var fnx=tris[b+6]-tris[b],fny=tris[b+7]-tris[b+1],fnz=tris[b+8]-tris[b+2];
+      var nnx=eny*fnz-enz*fny, nny=enz*fnx-enx*fnz, nnz=enx*fny-eny*fnx;
+      var nl=Math.sqrt(nnx*nnx+nny*nny+nnz*nnz)||1;
+      var diff=Math.max(0,(nnx*0.5+nny*0.7+nnz*0.5)/nl/1.03);
+      front.push({p0,p1,p2,diff,d:(p0[2]+p1[2]+p2[2])/3});
     }
-
-    // Sfondo
-    ctx.fillStyle = '#f4f7fb';
-    ctx.fillRect(0,0,W,H);
-
-    var n = trisObj.n;
-    var colBase = side==='A' ? [0, 101, 179] : [200, 90, 15];
-
-    // Prima passata: raccoglie triangoli frontali con normale e depth
-    var front = [];
-    for (var i=0; i<n; i++) {
-      var base = i * 9;
-      var p0 = project(tris[base],   tris[base+1], tris[base+2]);
-      var p1 = project(tris[base+3], tris[base+4], tris[base+5]);
-      var p2 = project(tris[base+6], tris[base+7], tris[base+8]);
-      // Backface culling 2D (cross product del contorno proiettato)
-      var ex=p1[0]-p0[0], ey=p1[1]-p0[1];
-      var fx=p2[0]-p0[0], fy=p2[1]-p0[1];
-      if (ex*fy - ey*fx > 0) continue; // backface scartato
-      // Normale 3D per shading Lambertiano
-      var ax3=tris[base+3]-tris[base], ay3=tris[base+4]-tris[base+1], az3=tris[base+5]-tris[base+2];
-      var bx3=tris[base+6]-tris[base], by3=tris[base+7]-tris[base+1], bz3=tris[base+8]-tris[base+2];
-      var nx=ay3*bz3-az3*by3, ny=az3*bx3-ax3*bz3, nz=ax3*by3-ay3*bx3;
-      var nl=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
-      // Luce fissa: direzione (0.5, 0.7, 0.5) normalizzata
-      var diff=Math.max(0,(nx*0.5+ny*0.7+nz*0.5)/nl/1.03);
-      var depth=(p0[2]+p1[2]+p2[2])/3;
-      front.push({p0:p0,p1:p1,p2:p2,diff:diff,depth:depth});
-    }
-
-    // Depth sort (painter)
-    front.sort(function(a,b){return a.depth-b.depth;});
-
-    // Disegna con shading Lambertiano
-    var ambient=0.35;
-    for (var i=0; i<front.length; i++) {
-      var f=front[i];
-      var bright=ambient + (1-ambient)*f.diff;
-      var r=Math.min(255,Math.round(colBase[0]*bright));
-      var g=Math.min(255,Math.round(colBase[1]*bright));
-      var b=Math.min(255,Math.round(colBase[2]*bright));
+    front.sort(function(a,b){return a.d-b.d;});
+    var amb=0.25;
+    for (var i=0;i<front.length;i++){
+      var f=front[i], br=amb+(1-amb)*f.diff;
+      var r=Math.min(255,Math.round(colBase[0]*br));
+      var g=Math.min(255,Math.round(colBase[1]*br));
+      var bl=Math.min(255,Math.round(colBase[2]*br));
       ctx.beginPath();
-      ctx.moveTo(f.p0[0],f.p0[1]);
-      ctx.lineTo(f.p1[0],f.p1[1]);
-      ctx.lineTo(f.p2[0],f.p2[1]);
-      ctx.closePath();
-      ctx.fillStyle='rgb('+r+','+g+','+b+')';
-      ctx.fill();
+      ctx.moveTo(f.p0[0],f.p0[1]); ctx.lineTo(f.p1[0],f.p1[1]); ctx.lineTo(f.p2[0],f.p2[1]);
+      ctx.closePath(); ctx.fillStyle='rgb('+r+','+g+','+bl+')'; ctx.fill();
     }
 
-    // Salva info per il raycast
-    cv._renderInfo = { cx:cx, cy:cy, cz:cz, sc:sc, project:project, W:W, H:H,
-                       cam:cam, rx:rx, ry:ry, cosX:cosX, sinX:sinX, cosY:cosY, sinY:sinY, zoom:zoom, d:d };
+    // Salva info per raycast
+    cv._ri = {cx:cx,cy:cy,cz:cz2,sc:sc,cam:cam,W:W,H:H};
 
-    _drawMarkers2D(side);
+    _drawMarkers(side, ctx, W, H, cx, cy, cz2, sc, cam);
+    _drawArcball(side, W, H);
   }
 
-  function _drawMarkers2D(side) {
-    var pts = side==='A' ? _ptsA : _ptsB;
-    var cv = document.getElementById(side==='A'?'cv3dA':'cv3dB');
-    if (!cv || !cv._renderInfo) return;
-    var info = cv._renderInfo;
-    var ctx = cv.getContext('2d');
+  // ── Arcball overlay ───────────────────────────────────────────────────────
+  function _drawArcball(side, W, H) {
+    var ovId = 'ab_'+side;
+    var ov = document.getElementById(ovId);
+    if (!ov) return;
+    ov.width=W; ov.height=H;
+    var ctx=ov.getContext('2d');
+    ctx.clearRect(0,0,W,H);
 
-    pts.forEach(function(p, i) {
-      var proj = info.project(p.x, p.y, p.z);
-      var col = side==='A' ? '#0065B3' : '#F59E0B';
+    var cx=W/2, cy=H/2;
+    var R = Math.min(W,H)*0.38; // raggio arcball
+
+    // Tre cerchi: rosso=X, verde=Y, blu=Z
+    var rings = [
+      {color:'#ef4444', label:'X', tilt:0.3},   // cerchio X (inclinato)
+      {color:'#22c55e', label:'Y', tilt:0},      // cerchio Y (piano)
+      {color:'#3b82f6', label:'Z', tilt:Math.PI/2} // cerchio Z (verticale)
+    ];
+
+    ctx.globalAlpha=0.7;
+    rings.forEach(function(ring, ri) {
       ctx.beginPath();
-      ctx.arc(proj[0], proj[1], 11, 0, Math.PI*2);
-      ctx.fillStyle = col;
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle=ring.color;
+      ctx.lineWidth=2.5;
+      // Disegna ellisse per simulare il cerchio 3D
+      var ry = ri===2 ? R : R*0.3; // Z è verticale, X/Y sono orizzontali
+      var rx2 = ri===2 ? R*0.3 : R;
+      ctx.ellipse(cx, cy, rx2, ri===1?R*0.15:ry, ri===0?0.4:ri===2?0:0, 0, Math.PI*2);
       ctx.stroke();
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 10px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(i+1, proj[0], proj[1]);
+      // Label
+      ctx.fillStyle=ring.color; ctx.font='bold 10px monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      if (ri===0) ctx.fillText(ring.label, cx-rx2-8, cy-ry/2);
+      else if (ri===1) ctx.fillText(ring.label, cx+rx2+8, cy);
+      else ctx.fillText(ring.label, cx+rx2/2+8, cy-R-6);
+    });
+    ctx.globalAlpha=1;
+
+    // Assi RGB piccoli al centro
+    var axLen=25;
+    var cam=_cam[side];
+    // X axis (red), Y axis (green), Z axis (blue)
+    var axes=[
+      {dir:[1,0,0], color:'#ef4444'},
+      {dir:[0,1,0], color:'#22c55e'},
+      {dir:[0,0,1], color:'#3b82f6'}
+    ];
+    axes.forEach(function(ax){
+      var p=_projectPt(cam, ax.dir[0]*0.3, ax.dir[1]*0.3, ax.dir[2]*0.3, W, H, 0,0,0, 2/1);
+      ctx.beginPath();
+      ctx.moveTo(cx,cy); ctx.lineTo(p[0],p[1]);
+      ctx.strokeStyle=ax.color; ctx.lineWidth=2;
+      ctx.stroke();
+      // Punta
+      ctx.beginPath();
+      ctx.arc(p[0],p[1],3,0,Math.PI*2);
+      ctx.fillStyle=ax.color; ctx.fill();
     });
   }
 
-    // ── Inverti proiezione Canvas 2D -> punto 3D sul piano medio ─────────────
-  function _clickTo3D(canvasId, ex, ey) {
-    var cv = document.getElementById(canvasId);
-    if (!cv || !cv._renderInfo) return null;
-    var info = cv._renderInfo;
-    var W=info.W, H=info.H, zoom=info.zoom, d=info.d;
-    var cam=info.cam;
-
-    // Inverti prospettiva con d=12
-    var fill = 0.42;
-    var px2d = (ex - W/2 - cam.panX*W/2) / (info.zoom * fill * W);
-    var py2d = -(ey - H/2 + cam.panY*H/2) / (info.zoom * fill * H);
-    var pz2d = 0; // piano medio
-
-    // Inverti rotazione X (pitch)
-    var cosX=info.cosX, sinX=info.sinX;
-    var y3 = py2d*cosX + pz2d*sinX;
-    var z3 = -py2d*sinX + pz2d*cosX;
-
-    // Inverti rotazione Y (yaw)
-    var cosY=info.cosY, sinY=info.sinY;
-    var x4 = px2d*cosY - z3*sinY;
-    var z4 = px2d*sinY + z3*cosY;
-
-    // Denormalizza e unscale
-    var sc = info.sc;
-    return {
-      x: x4/sc + info.cx,
-      y: y3/sc + info.cy,
-      z: z4/sc + info.cz
-    };
+  function _projectPt(cam, px, py, pz, W, H, offcx, offcy, offcz, sc2) {
+    // Proietta punto nel sistema camera, usato per gli assi
+    var cy2=Math.cos(cam.rotY), sy2=Math.sin(cam.rotY);
+    var x1=px*cy2+pz*sy2, z1=-px*sy2+pz*cy2;
+    var cx2=Math.cos(cam.rotX), sx2=Math.sin(cam.rotX);
+    var y2=py*cx2-z1*sx2, z2=py*sx2+z1*cx2;
+    var cz2=Math.cos(cam.rotZ||0), sz2=Math.sin(cam.rotZ||0);
+    var x3=x1*cz2-y2*sz2, y3=x1*sz2+y2*cz2;
+    var d=200, w=d+z2; if(w<0.1)w=0.1;
+    return [(x3/w)*d*cam.zoom*0.42*W+W/2, (-y3/w)*d*cam.zoom*0.42*H+H/2];
   }
 
-  // ── Gestione click su canvas ───────────────────────────────────────────────
-  function _onCanvasClick(side, ev) {
-    if (!_enabled) return;
+  // ── Marker repere ─────────────────────────────────────────────────────────
+  function _drawMarkers(side, ctx, W, H, cx, cy, cz, sc, cam) {
+    var pts = side==='A' ? _ptsA : _ptsB;
+    var col = side==='A' ? '#60a5fa' : '#fb923c';
+    pts.forEach(function(p,i){
+      var proj=_project(cam,(p.x-cx)*sc,(p.y-cy)*sc,(p.z-cz)*sc,W,H);
+      ctx.beginPath(); ctx.arc(proj[0],proj[1],11,0,Math.PI*2);
+      ctx.fillStyle=col; ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='bold 10px monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(i+1,proj[0],proj[1]);
+    });
+  }
+
+  // ── Interazione mouse ─────────────────────────────────────────────────────
+  function _initViewer(side) {
     var cv = document.getElementById(side==='A'?'cv3dA':'cv3dB');
-    var rect = cv.getBoundingClientRect();
-    var ex = (ev.clientX - rect.left) * (cv.width / rect.width);
-    var ey = (ev.clientY - rect.top)  * (cv.height / rect.height);
+    var ab = document.getElementById('ab_'+side);
+    if (!cv || cv._amInited) return;
+    cv._amInited = true;
 
-    // Capisce se questo clic è atteso per questo side
-    var expectedSide = _step % 2 === 0 ? 'A' : 'B';
-    if (side !== expectedSide) {
-      _flash(side);
-      return;
+    function getXY(e) {
+      var rect=cv.getBoundingClientRect();
+      var touch = e.touches ? e.touches[0] : e;
+      return [(touch.clientX-rect.left)*(cv.width/rect.width),
+              (touch.clientY-rect.top)*(cv.height/rect.height)];
     }
-    if (_step >= _maxSteps) return;
 
-    var pt = _clickTo3D(side==='A'?'cv3dA':'cv3dB', ex, ey);
+    function onDown(e) {
+      var xy=getXY(e), x=xy[0], y=xy[1];
+      var cam=_cam[side];
+      var mode = e.shiftKey ? 'pan' : 'rot';
+      _drag={active:true,side:side,mode:mode,sx:x,sy:y,
+             startRotX:cam.rotX,startRotY:cam.rotY,startRotZ:cam.rotZ||0,
+             startPanX:cam.panX,startPanY:cam.panY,moved:false};
+      e.preventDefault();
+    }
+
+    function onMove(e) {
+      if (!_drag.active || _drag.side!==side) return;
+      var xy=getXY(e), dx=(xy[0]-_drag.sx)/cv.width, dy=(xy[1]-_drag.sy)/cv.height;
+      if (Math.abs(dx)>0.005||Math.abs(dy)>0.005) _drag.moved=true;
+      var cam=_cam[side];
+      if (_drag.mode==='pan') {
+        cam.panX=_drag.startPanX+dx*2;
+        cam.panY=_drag.startPanY-dy*2;
+      } else {
+        cam.rotY=_drag.startRotY+dx*Math.PI*2;
+        cam.rotX=_drag.startRotX+dy*Math.PI*2;
+      }
+      _render(side); e.preventDefault();
+    }
+
+    function onUp(e) {
+      if (!_drag.active||_drag.side!==side) return;
+      if (!_drag.moved) _onClick(side, e);
+      _drag.active=false;
+    }
+
+    cv.addEventListener('mousedown', onDown);
+    cv.addEventListener('mousemove', onMove);
+    cv.addEventListener('mouseup', onUp);
+    cv.addEventListener('wheel', function(e){
+      _cam[side].zoom *= e.deltaY>0?0.88:1.12;
+      _cam[side].zoom=Math.max(0.1,Math.min(10,_cam[side].zoom));
+      _render(side); e.preventDefault();
+    },{passive:false});
+    cv.addEventListener('touchstart', function(e){ onDown(e.touches[0]||e); },{passive:false});
+    cv.addEventListener('touchmove', function(e){ onMove(e.touches[0]||e); },{passive:false});
+    cv.addEventListener('touchend', onUp);
+  }
+
+  function _onClick(side, e) {
+    if (!_enabled) return;
+    var cv=document.getElementById(side==='A'?'cv3dA':'cv3dB');
+    if (!cv||!cv._ri) return;
+    var rect=cv.getBoundingClientRect();
+    var touch=e.touches?e.touches[0]:e;
+    var ex=(touch.clientX-rect.left)*(cv.width/rect.width);
+    var ey=(touch.clientY-rect.top)*(cv.height/rect.height);
+    var expectedSide=_step%2===0?'A':'B';
+    if (side!==expectedSide){_flash(side);return;}
+    if (_step>=_maxSteps) return;
+    var pt=_unproject(side,ex,ey);
     if (!pt) return;
-
-    if (side === 'A') _ptsA.push(pt);
-    else              _ptsB.push(pt);
-
+    if (side==='A') _ptsA.push(pt); else _ptsB.push(pt);
     _step++;
-    _updateUI();
-    _render('A'); _render('B');
+    _updateUI(); _render('A'); _render('B');
+    if (_step>=_maxSteps) _onAllPointsSet();
+  }
 
-    if (_step >= _maxSteps) _onAllPointsSet();
+  function _unproject(side, ex, ey) {
+    var cv=document.getElementById(side==='A'?'cv3dA':'cv3dB');
+    if (!cv||!cv._ri) return {x:0,y:0,z:0};
+    var ri=cv._ri, cam=ri.cam, W=ri.W, H=ri.H;
+    var d=200, fill=0.42, zoom=cam.zoom;
+    var x3n=(ex-W/2-cam.panX*W/2)/(d*zoom*fill*W);
+    var y3n=-(ey-H/2+cam.panY*H/2)/(d*zoom*fill*H);
+    // Inverti rotZ
+    var cz=Math.cos(cam.rotZ||0), sz=Math.sin(cam.rotZ||0);
+    var x1n=x3n*cz+y3n*sz, y2n=-x3n*sz+y3n*cz;
+    // Inverti rotX
+    var cx=Math.cos(cam.rotX), sx=Math.sin(cam.rotX);
+    var yn=y2n*cx, z1n=-y2n*sx;
+    // Inverti rotY
+    var cy2=Math.cos(cam.rotY), sy2=Math.sin(cam.rotY);
+    var xn=x1n*cy2-z1n*sy2;
+    return {x:xn/ri.sc+ri.cx, y:yn/ri.sc+ri.cy, z:z1n/ri.sc/cy2+ri.cz};
   }
 
   function _flash(side) {
-    var vw = document.getElementById('vw'+side);
-    if (!vw) return;
-    vw.style.transition='box-shadow .1s';
-    vw.style.boxShadow='0 0 0 3px #EF4444';
-    setTimeout(function(){ vw.style.boxShadow=''; }, 400);
+    var vw=document.getElementById('vw'+side);
+    if(!vw) return;
+    vw.style.outline='3px solid #ef4444';
+    setTimeout(function(){vw.style.outline='';},400);
   }
 
-  // ── UI update ──────────────────────────────────────────────────────────────
-  function _updateUI() {
-    var reperePair = Math.floor(_step/2);  // 0,1,2
-    var waitA = _step % 2 === 0;
-
-    // Step indicators
-    for (var i=0; i<3; i++) {
-      var el = document.getElementById('as'+i);
-      if (!el) continue;
-      el.className = 'align-step' + (i < reperePair ? ' done' : (i === reperePair ? ' active' : ''));
+  // ── Rotazione via pulsanti ────────────────────────────────────────────────
+  function rotate(side, dir) {
+    var cam=_cam[side], S=Math.PI/12;
+    if (dir==='top')  { cam.rotX=Math.PI/2; cam.rotY=0; cam.rotZ=0; cam.panX=0; cam.panY=0; }
+    else if (dir==='front') { cam.rotX=0; cam.rotY=0; cam.rotZ=0; cam.panX=0; cam.panY=0; }
+    else {
+      switch(dir){
+        case 'yL': cam.rotY-=S; break; case 'yR': cam.rotY+=S; break;
+        case 'xU': cam.rotX-=S; break; case 'xD': cam.rotX+=S; break;
+        case 'zL': cam.rotZ=(cam.rotZ||0)-S; break;
+        case 'zR': cam.rotZ=(cam.rotZ||0)+S; break;
+      }
     }
+    _render(side);
+  }
 
-    // Highlight viewer atteso
-    var vwA = document.getElementById('vwA');
-    var vwB = document.getElementById('vwB');
-    if (vwA) vwA.className = 'av-canvas-wrap' + (waitA && _step<_maxSteps ? ' waiting-click' : '');
-    if (vwB) vwB.className = 'av-canvas-wrap' + (!waitA && _step<_maxSteps ? ' waiting-click' : '');
-
+  // ── UI update ─────────────────────────────────────────────────────────────
+  function _updateUI() {
+    var n=Math.floor(_step/2), waitA=_step%2===0;
+    for (var i=0;i<3;i++) {
+      var el=document.getElementById('as'+i);
+      if(el) el.className='align-step'+(i<n?' done':i===n?' active':'');
+    }
+    var vwA=document.getElementById('vwA'), vwB=document.getElementById('vwB');
+    if(vwA) vwA.className='av-canvas-wrap'+(waitA&&_step<_maxSteps?' waiting-click':'');
+    if(vwB) vwB.className='av-canvas-wrap'+(!waitA&&_step<_maxSteps?' waiting-click':'');
     _updateHint();
   }
 
   function _updateHint() {
-    var hint = document.getElementById('align-hint');
-    if (!hint) return;
-    var trisOk = !!_trisA && !!_trisB;
-    if (!trisOk) {
-      hint.innerHTML = 'Carica entrambi i file STL per attivare la visualizzazione 3D.';
+    var hA=document.getElementById('avh-hintA'), hB=document.getElementById('avh-hintB');
+    var h=document.getElementById('align-hint');
+    var ok=!!_trisA&&!!_trisB;
+    if (!ok){
+      if(hA) hA.textContent=_trisA?'✅ caricato':'in attesa...';
+      if(hB) hB.textContent=_trisB?'✅ caricato':'in attesa...';
+      if(h) h.innerHTML='Carica entrambi i file STL.'; return;
+    }
+    if (_step>=_maxSteps){
+      if(hA) hA.textContent='✅ 3 repere ok';
+      if(hB) hB.textContent='✅ 3 repere ok';
+      if(h) h.innerHTML='✅ Premi <strong>Analizza</strong>';
       return;
     }
-    if (_step >= _maxSteps) {
-      hint.innerHTML = '✅ 3 repere impostati! Premi <strong>Analizza</strong> per procedere.';
-      return;
-    }
-    var n = Math.floor(_step/2)+1;
-    var side = _step%2===0 ? '<strong style="color:var(--blue)">File A</strong>' : '<strong style="color:var(--gold)">File B</strong>';
-    hint.innerHTML = 'Clicca un punto su ' + side + ' per il Repere #' + n;
+    var n=Math.floor(_step/2)+1, wA=_step%2===0;
+    if(hA) hA.textContent=wA?'👆 clicca Repere #'+n:(_ptsA.length+'/3 ✅');
+    if(hB) hB.textContent=!wA?'👆 clicca Repere #'+n:(_ptsB.length+'/3 ✅');
+    if(h) h.innerHTML='Repere #'+n+': clicca su '+(wA?'<strong style="color:var(--blue)">File A</strong>':'<strong style="color:#D97706">File B</strong>');
   }
 
   function _onAllPointsSet() {
-    // Abilita il bottone run
-    var btn = document.getElementById('run');
-    if (btn) {
-      var fA = (window.FILES && window.FILES.A) || FILES.A;
-      var fB = (window.FILES && window.FILES.B) || FILES.B;
-      if (fA && fB) {
-        btn.disabled = false;
-        btn.classList.add('on');
-        btn.textContent = 'Analizza con repere';
-      }
+    var btn=document.getElementById('run');
+    if(btn&&window.FILES&&window.FILES.A&&window.FILES.B){
+      btn.disabled=false; btn.classList.add('on');
+      btn.textContent='Analizza con repere';
     }
   }
 
-  // ── Drag per rotazione / pan / zoom ───────────────────────────────────────
-  function _initDrag(side) {
-    var cv = document.getElementById(side==='A'?'cv3dA':'cv3dB');
-    if (!cv || cv._dragInited) return;
-    cv._dragInited = true;
-
-    cv.addEventListener('mousedown', function(e) {
-      _drag = { active:true, side:side, mode: e.shiftKey?'pan':'rot', lx:e.clientX, ly:e.clientY };
-      e.preventDefault();
-    });
-    cv.addEventListener('wheel', function(e) {
-      _cam[side].zoom *= e.deltaY > 0 ? 0.9 : 1.1;
-      _cam[side].zoom = Math.max(0.2, Math.min(8, _cam[side].zoom));
-      _render(side);
-      e.preventDefault();
-    }, {passive:false});
-    cv.addEventListener('click', function(e) {
-      if (_drag._moved) { _drag._moved=false; return; }
-      _onCanvasClick(side, e);
-    });
-  }
-
-  document.addEventListener('mousemove', function(e) {
-    if (!_drag.active) return;
-    var dx = e.clientX - _drag.lx;
-    var dy = e.clientY - _drag.ly;
-    if (Math.abs(dx)>2 || Math.abs(dy)>2) _drag._moved = true;
-    var cam = _cam[_drag.side];
-    if (_drag.mode === 'rot') {
-      cam.rotY += dx * 0.008;
-      cam.rotX += dy * 0.008;
-    } else {
-      cam.panX += dx * 0.003 / cam.zoom;
-      cam.panY -= dy * 0.003 / cam.zoom;
-    }
-    _drag.lx = e.clientX; _drag.ly = e.clientY;
-    _render(_drag.side);
-  });
-  document.addEventListener('mouseup', function() { _drag.active = false; });
-
-  // ── Touch support ──────────────────────────────────────────────────────────
-  function _initTouch(side) {
-    var cv = document.getElementById(side==='A'?'cv3dA':'cv3dB');
-    if (!cv || cv._touchInited) return;
-    cv._touchInited = true;
-    var lastDist = 0, lastX = 0, lastY = 0, touchCount = 0;
-
-    cv.addEventListener('touchstart', function(e) {
-      touchCount = e.touches.length;
-      if (touchCount === 1) { lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; }
-      if (touchCount === 2) {
-        var dx = e.touches[0].clientX - e.touches[1].clientX;
-        var dy = e.touches[0].clientY - e.touches[1].clientY;
-        lastDist = Math.sqrt(dx*dx+dy*dy);
-      }
-      e.preventDefault();
-    }, {passive:false});
-
-    cv.addEventListener('touchmove', function(e) {
-      var cam = _cam[side];
-      if (e.touches.length === 1) {
-        var dx = e.touches[0].clientX - lastX;
-        var dy = e.touches[0].clientY - lastY;
-        cam.rotY += dx*0.01; cam.rotX += dy*0.01;
-        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-      } else if (e.touches.length === 2) {
-        var dx = e.touches[0].clientX - e.touches[1].clientX;
-        var dy = e.touches[0].clientY - e.touches[1].clientY;
-        var dist = Math.sqrt(dx*dx+dy*dy);
-        cam.zoom *= dist/lastDist;
-        cam.zoom = Math.max(0.2, Math.min(8, cam.zoom));
-        lastDist = dist;
-      }
-      _render(side);
-      e.preventDefault();
-    }, {passive:false});
-  }
-
-  // ── Reset / undo ──────────────────────────────────────────────────────────
+  // ── Public ────────────────────────────────────────────────────────────────
   function resetAll() {
-    _ptsA = []; _ptsB = []; _step = 0;
-    _cam.A = { rotX:0.4, rotY:-0.4, rotZ:0, zoom:1, panX:0, panY:0 };
-    _cam.B = { rotX:0.4, rotY:-0.4, rotZ:0, zoom:1, panX:0, panY:0 };
-    _updateUI();
-    _render('A'); _render('B');
-    var btn = document.getElementById('run');
-    if (btn) {
-      var fA = (window.FILES&&window.FILES.A)||FILES.A;
-      var fB = (window.FILES&&window.FILES.B)||FILES.B;
-      if (!(!fA||!fB)) { btn.disabled=false; btn.classList.add('on'); btn.textContent='seleziona entrambi i file per avviare'; }
-      else { btn.disabled=true; btn.textContent='seleziona entrambi i file per avviare'; }
-    }
-  }
-
-  function undoLast() {
-    if (_step === 0) return;
-    _step--;
-    if (_step % 2 === 0) _ptsA.pop(); else _ptsB.pop();
+    _ptsA=[]; _ptsB=[]; _step=0;
+    _cam.A={rotX:Math.PI/2,rotY:0,rotZ:0,zoom:1,panX:0,panY:0};
+    _cam.B={rotX:Math.PI/2,rotY:0,rotZ:0,zoom:1,panX:0,panY:0};
     _updateUI(); _render('A'); _render('B');
   }
 
-  // ── Init: attacca eventi ai canvas ────────────────────────────────────────
-  function _tryRender() {
-    setTimeout(function() {
-      _initDrag('A'); _initTouch('A');
-      _initDrag('B'); _initTouch('B');
-      if (_trisA) _render('A');
-      if (_trisB) _render('B');
-      _updateHint();
-    }, 100);
+  function undoLast() {
+    if(!_step) return;
+    _step--;
+    if(_step%2===0) _ptsA.pop(); else _ptsB.pop();
+    _updateUI(); _render('A'); _render('B');
   }
 
-  // ── Ritorna i repere per il backend ───────────────────────────────────────
   function getLandmarks() {
-    if (_ptsA.length < 3 || _ptsB.length < 3) return null;
-    return { a: _ptsA.slice(0,3), b: _ptsB.slice(0,3) };
+    if(_ptsA.length<3||_ptsB.length<3) return null;
+    return {a:_ptsA.slice(0,3),b:_ptsB.slice(0,3)};
   }
 
-  function isManualMode() { return _enabled && _step >= _maxSteps; }
+  function isManualMode() { return _enabled&&_step>=_maxSteps; }
 
-  return {
-    onToggle: onToggle,
-    onFileLoaded: onFileLoaded,
-    resetAll: resetAll,
-    undoLast: undoLast,
-    getLandmarks: getLandmarks,
-    isManualMode: isManualMode
-  };
+  return {onToggle,onFileLoaded,resetAll,undoLast,getLandmarks,isManualMode,rotate};
 })();
-
-
 
 </script>
 </body>
