@@ -692,7 +692,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     cyl_tris_b = []
     for pi in range(len(pairs)):
         ta = cluster_tris_a(pi)
-        cyl_tris_a.append(tris_to_list(ta, 800) if len(ta) > 0 else [])
+        cyl_tris_a.append(tris_to_list(ta, 3500) if len(ta) > 0 else [])
         if pairs[pi].get("b") is not None:
             # Trova il cilindro B corrispondente (stesso metodo del cyl_axes)
             b_pos = np.array(pairs[pi]["b"])
