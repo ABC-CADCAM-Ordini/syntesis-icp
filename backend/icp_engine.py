@@ -150,6 +150,27 @@ def centroid(tris: np.ndarray, indices: list[int]) -> np.ndarray:
     return pts.mean(axis=0)
 
 
+
+def cap_centroid(tris: np.ndarray, indices: list[int]) -> np.ndarray:
+    """Centroide delle sole facce orizzontali (cap superiore) del cilindro.
+    Se non ci sono cap, ritorna il centroide normale."""
+    t = tris[indices]
+    # Calcola normali per triangolo
+    v0, v1, v2 = t[:,0], t[:,1], t[:,2]
+    e1, e2 = v1 - v0, v2 - v0
+    nx = e1[:,1]*e2[:,2] - e1[:,2]*e2[:,1]
+    ny = e1[:,2]*e2[:,0] - e1[:,0]*e2[:,2]
+    nz = e1[:,0]*e2[:,1] - e1[:,1]*e2[:,0]
+    nl = np.sqrt(nx**2 + ny**2 + nz**2).clip(1e-9)
+    # Facce orizzontali: |nz/nl| > 0.5
+    cap_mask = np.abs(nz / nl) > 0.5
+    if cap_mask.sum() < 3:
+        # Nessuna cap trovata -- usa centroide standard
+        return t.reshape(-1, 3).mean(0)
+    cap_tris = t[cap_mask]
+    # Centroide delle cap (media dei centri dei triangoli)
+    return cap_tris.mean(axis=1).mean(axis=0)
+
 def global_centroid(tris: np.ndarray) -> np.ndarray:
     return tris.reshape(-1, 3).mean(axis=0)
 
@@ -541,9 +562,10 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         scan_a = comps_a
         scan_b = comps_b
 
-    # Calcola centroidi grezzi
-    raw_ct_a = np.array([centroid(tris_a, c) for c in scan_a])
-    raw_ct_b = np.array([centroid(tris_b, c) for c in scan_b])
+    # Calcola centroidi delle cap (facce superiori) -- riferimento clinico consistente
+    # tra scanner diversi: la cap è sempre alla stessa quota dell'impianto
+    raw_ct_a = np.array([cap_centroid(tris_a, c) for c in scan_a])
+    raw_ct_b = np.array([cap_centroid(tris_b, c) for c in scan_b])
 
     # Pre-allineamento globale
     gc_a = global_centroid(tris_a)
