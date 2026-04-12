@@ -562,9 +562,6 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
 
     offset = gc_a - gc_b
     raw_ct_b_shifted = raw_ct_b + offset
-    import sys
-    print(f"DEBUG raw_ct_a ({len(raw_ct_a)}): {raw_ct_a[:3].tolist()}", file=sys.stderr)
-    print(f"DEBUG raw_ct_b_shifted ({len(raw_ct_b_shifted)}): {raw_ct_b_shifted[:3].tolist()}", file=sys.stderr)
 
     # ── Clustering preliminare per avere N centroidi per il pre-align ─────────
     thresh_a_pre = auto_thresh(raw_ct_a)
