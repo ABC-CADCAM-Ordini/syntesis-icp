@@ -2,6 +2,7 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Cache bust: 20260412130440
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev gcc && \
     rm -rf /var/lib/apt/lists/*
@@ -9,7 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copia tutto il contenuto della directory backend (inclusa static/)
 COPY . .
+
+# Verifica che static/index.html sia presente
+RUN ls -la /app/static/ && echo "Frontend presente: OK" || echo "Frontend MANCANTE"
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
