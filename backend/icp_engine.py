@@ -566,77 +566,69 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     print(f"DEBUG raw_ct_a ({len(raw_ct_a)}): {raw_ct_a[:3].tolist()}", file=sys.stderr)
     print(f"DEBUG raw_ct_b_shifted ({len(raw_ct_b_shifted)}): {raw_ct_b_shifted[:3].tolist()}", file=sys.stderr)
 
-    # Pre-allineamento: usa landmark manuali se forniti, altrimenti automatico
+    # ── Clustering preliminare per avere N centroidi per il pre-align ─────────
+    thresh_a_pre = auto_thresh(raw_ct_a)
+    thresh_b_pre = auto_thresh(raw_ct_b_shifted)
+    thresh_pre = min(thresh_a_pre, thresh_b_pre)
+
+    clust_a_pre = cluster_comps(raw_ct_a, thresh_pre)
+    clust_b_pre = cluster_comps(raw_ct_b_shifted, thresh_pre)
+
+    ct_a_pre = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a_pre])
+    ct_b_pre6 = np.array([raw_ct_b_shifted[[c for c in cl]].mean(0) for cl in clust_b_pre])
+
+    # ── Pre-allineamento sui centroidi clusterizzati ──────────────────────────
     if landmarks and len(landmarks.get("a", [])) >= 3 and len(landmarks.get("b", [])) >= 3:
-        # Landmark-based pre-align: Kabsch su 3 punti corrispondenti
         pts_a_lm = np.array([[p["x"], p["y"], p["z"]] for p in landmarks["a"][:3]], dtype=np.float64)
         pts_b_lm = np.array([[p["x"], p["y"], p["z"]] for p in landmarks["b"][:3]], dtype=np.float64)
-        # Kabsch diretto sui 3 landmark
-        ca_lm = pts_a_lm.mean(0)
-        cb_lm = pts_b_lm.mean(0)
-        Ac_lm = pts_a_lm - ca_lm
-        Bc_lm = pts_b_lm - cb_lm
-        H_lm = Bc_lm.T @ Ac_lm
+        ca_lm, cb_lm = pts_a_lm.mean(0), pts_b_lm.mean(0)
+        H_lm = (pts_b_lm - cb_lm).T @ (pts_a_lm - ca_lm)
         U_lm, _, Vt_lm = np.linalg.svd(H_lm)
-        R_lm = Vt_lm.T @ U_lm.T
-        if np.linalg.det(R_lm) < 0:
-            Vt_lm[-1] *= -1
-            R_lm = Vt_lm.T @ U_lm.T
-        t_lm = ca_lm - R_lm @ cb_lm
-        aligned_lm = (R_lm @ raw_ct_b_shifted.T).T + t_lm
-        pre = {"aligned": aligned_lm, "R": R_lm, "t": t_lm, "method": "landmark"}
-        # Applica anche ai triangoli
-        tris_b = apply_transform_tris(tris_b, R_lm, t_lm - R_lm @ offset + offset)
-        raw_ct_b = np.array([centroid(tris_b, c) for c in scan_b])
-        gc_b_new = global_centroid(tris_b)
-        offset = gc_a - gc_b_new
-        raw_ct_b_shifted = raw_ct_b + offset
-        # (landmark Kabsch già calcolato sopra, usa quello)
+        R_pre = Vt_lm.T @ U_lm.T
+        if np.linalg.det(R_pre) < 0:
+            Vt_lm[-1] *= -1; R_pre = Vt_lm.T @ U_lm.T
+        t_pre = ca_lm - R_pre @ cb_lm
+        method_pre = "landmark"
     else:
-        pre = robust_pre_align(raw_ct_a, raw_ct_b_shifted)
-    ct_b_pre = pre["aligned"]
+        pa = robust_pre_align(ct_a_pre, ct_b_pre6)
+        R_pre, t_pre = pa["R"], pa["t"]
+        method_pre = pa.get("method", "auto")
 
-    # Clustering
-    thresh_a = auto_thresh(raw_ct_a)
-    thresh_b = auto_thresh(raw_ct_b)
-    thresh = min(thresh_a, thresh_b)
+    # Applica R_pre/t_pre a raw_ct_b_shifted e a tris_b
+    raw_ct_b_aligned = (R_pre @ raw_ct_b_shifted.T).T + t_pre
+    tris_b_aligned = apply_transform_tris(tris_b + offset, R_pre, t_pre)
 
-    clust_a = cluster_comps(raw_ct_a, thresh)
-    clust_b = cluster_comps(ct_b_pre, thresh)
+    # ── Clustering finale su B allineato + hungarian matching ────────────────
+    thresh_b2 = auto_thresh(raw_ct_b_aligned)
+    thresh2 = min(thresh_a_pre, thresh_b2)
+    clust_a = cluster_comps(raw_ct_a, thresh2)
+    clust_b = cluster_comps(raw_ct_b_aligned, thresh2)
 
-    # Merge clusters → centroidi finali per ICP
-    def merged_cent(tris, comps_list, cluster):
-        idx_all = [i for ci in cluster for i in comps_list[ci]]
-        return centroid(tris, idx_all)
+    ct_a_cl = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a])
+    ct_b_cl = np.array([raw_ct_b_aligned[[c for c in cl]].mean(0) for cl in clust_b])
 
-    # Calcola centroidi per cluster
-    ct_a_unsorted = np.array([raw_ct_a[[c for c in cl]].mean(axis=0) for cl in clust_a])
-    ct_b_unsorted = np.array([ct_b_pre[[c for c in cl]].mean(axis=0) for cl in clust_b])
-
-    # Usa hungarian matching per abbinare i cluster (robusto a qualsiasi rotazione)
     from scipy.optimize import linear_sum_assignment as hungarian
-    na_cl, nb_cl = len(ct_a_unsorted), len(ct_b_unsorted)
-    n_cl = min(na_cl, nb_cl)
-    D_cl = np.linalg.norm(ct_a_unsorted[:n_cl, None] - ct_b_unsorted[None, :n_cl], axis=2)
+    n_cl = min(len(ct_a_cl), len(ct_b_cl))
+    D_cl = np.linalg.norm(ct_a_cl[:n_cl, None] - ct_b_cl[None, :n_cl], axis=2)
     r_cl, c_cl = hungarian(D_cl)
-    # Ordina entrambi secondo il matching hungarian
     clust_a_sorted = [clust_a[i] for i in r_cl]
     clust_b_sorted = [clust_b[i] for i in c_cl]
 
-    ct_a = np.array([raw_ct_a[[c for c in cl]].mean(axis=0) for cl in clust_a_sorted])
-    ct_b_raw = np.array([ct_b_pre[[c for c in cl]].mean(axis=0) for cl in clust_b_sorted])
+    ct_a = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a_sorted])
+    ct_b_raw = np.array([raw_ct_b_aligned[[c for c in cl]].mean(0) for cl in clust_b_sorted])
+
+    # Override tris_b e offset per pipeline ICP
+    tris_b = tris_b_aligned
+    offset = np.zeros(3)  # già incluso in tris_b_aligned
+    pre = {"R": R_pre, "t": t_pre, "method": method_pre}
 
     # ICP
     icp = run_icp(ct_a, ct_b_raw, max_iter=80)
     pairs = match_pairs(ct_a, icp["aligned"])
 
     # Trasforma tutte le mesh B
-    tris_b_offset = tris_b + offset
-    if not np.allclose(pre["R"], np.eye(3)):
-        tris_b_pre = apply_transform_tris(tris_b_offset, pre["R"], pre["t"])
-    else:
-        tris_b_pre = tris_b_offset
-    tris_b_all = apply_transform_tris(tris_b_pre, icp["R"], icp["t"])
+    # tris_b è già pre-allineato (R_pre+t_pre applicati sopra)
+    tris_b_all = apply_transform_tris(tris_b, icp["R"], icp["t"])
 
     # Assi cilindri
     # Costruisci mappa pi -> triangoli usando clust_a/b_sorted
