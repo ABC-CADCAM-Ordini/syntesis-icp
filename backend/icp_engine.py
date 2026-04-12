@@ -490,6 +490,18 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     # Pre-allineamento globale
     gc_a = global_centroid(tris_a)
     gc_b = global_centroid(tris_b)
+
+    # Auto-flip Z se le mesh sono specchiate (es. scanner intraorali con Z negativa)
+    # Condizione: centroidi Z di segno opposto E distanza Z grande
+    z_dist = abs(gc_a[2] - gc_b[2])
+    z_same_sign = (gc_a[2] * gc_b[2]) > 0
+    if not z_same_sign and z_dist > 5.0:
+        # Flippa Z di tris_b per allinearla al sistema di riferimento di tris_a
+        tris_b = tris_b.copy()
+        tris_b[:, :, 2] *= -1
+        gc_b = global_centroid(tris_b)
+        raw_ct_b = np.array([centroid(tris_b, c) for c in scan_b])
+
     offset = gc_a - gc_b
     raw_ct_b_shifted = raw_ct_b + offset
 
