@@ -202,7 +202,8 @@ async def leaderboard(
 async def analyze_public(
     file_a: UploadFile = File(...),
     file_b: UploadFile = File(...),
-    landmarks: Optional[str] = Form(None)
+    landmarks: Optional[str] = Form(None),
+    lang: Optional[str] = Form(None)
 ):
     """Analisi STL senza autenticazione. La logica ICP gira sul server.
     landmarks: JSON opzionale {"a":[{x,y,z}x3], "b":[{x,y,z}x3]} per pre-allineamento manuale."""
