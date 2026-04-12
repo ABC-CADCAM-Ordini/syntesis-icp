@@ -189,3 +189,22 @@ async def leaderboard(
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
+
+
+@app.get("/debug/fs", include_in_schema=False)
+async def debug_fs():
+    import os, pathlib
+    app_dir = pathlib.Path("/app")
+    result = {}
+    for root, dirs, files in os.walk("/app"):
+        rel = os.path.relpath(root, "/app")
+        if rel == ".":
+            result["files_in_app"] = files
+            result["dirs_in_app"] = dirs
+        if "static" in root:
+            result[f"static_contents_{rel}"] = files
+    result["__file__"] = __file__
+    result["cwd"] = os.getcwd()
+    result["index_exists"] = str(_INDEX)
+    result["index_is_file"] = _INDEX.is_file()
+    return result
