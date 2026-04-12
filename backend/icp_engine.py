@@ -706,7 +706,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
                 if d2 < best_d2:
                     best_d2, best_bi2 = d2, bi2
             tb = cluster_tris_b_all(best_bi2) if best_bi2 >= 0 else np.empty((0,3,3))
-            cyl_tris_b.append(tris_to_list(tb, 800) if len(tb) > 0 else [])
+            cyl_tris_b.append(tris_to_list(tb, 3500) if len(tb) > 0 else [])
         else:
             cyl_tris_b.append([])
 
