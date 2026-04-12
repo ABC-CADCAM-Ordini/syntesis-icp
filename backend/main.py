@@ -200,3 +200,28 @@ async def leaderboard(
 async def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
 
+
+
+# ── ENDPOINT TEMP: crea utente admin ────────────────────────────────────────
+@app.post("/admin/create-user")
+async def create_admin_user(secret: str, email: str, password: str, name: str, role: str = "admin"):
+    import hashlib, hmac as _hmac
+    admin_secret = os.getenv("ADMIN_SECRET", "")
+    if not admin_secret or not _hmac.compare_digest(
+        hashlib.sha256(secret.encode()).hexdigest(),
+        hashlib.sha256(admin_secret.encode()).hexdigest()
+    ):
+        raise HTTPException(403)
+    from auth import hash_password as _hp
+    from database import get_pool
+    hashed, salt = _hp(password)
+    import uuid as _uuid
+    user_id = str(_uuid.uuid4())
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO users (id, email, name, password_hash, salt, role, active)
+            VALUES ($1,$2,$3,$4,$5,$6,TRUE)
+            ON CONFLICT (email) DO UPDATE SET password_hash=$4, salt=$5, role=$6, active=TRUE
+        """, user_id, email, name, hashed, salt, role)
+    return {"created": True, "email": email, "role": role}
