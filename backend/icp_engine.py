@@ -580,6 +580,32 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
 
     detected = dominant_profile(scan_a + scan_b)
 
+    # Prepara triangoli mesh per anteprime (subsample se troppo grandi)
+    def tris_to_list(t, max_tris=4000):
+        arr = np.asarray(t)
+        if len(arr) > max_tris:
+            idx = np.linspace(0, len(arr)-1, max_tris, dtype=int)
+            arr = arr[idx]
+        return arr.tolist()
+
+    # Background triangoli di A
+    bg_tris_a = []
+    for bi in bg_idx_a:
+        bg_tris_a.extend(tris_a[comps_a[bi]].tolist())
+
+    # Triangoli per cilindro A e B (per report)
+    cyl_tris_a = []
+    cyl_tris_b = []
+    for pi in range(len(pairs)):
+        if pi < len(scan_a):
+            cyl_tris_a.append(tris_to_list(tris_a[scan_a[pi]], 800))
+        else:
+            cyl_tris_a.append([])
+        if pairs[pi].get("b") is not None and pi < len(scan_b):
+            cyl_tris_b.append(tris_to_list(tris_b_all[scan_b[pi]], 800))
+        else:
+            cyl_tris_b.append([])
+
     return {
         "score": score,
         "score_label": sl["label"],
@@ -595,4 +621,13 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         "excluded_b": len(bg_idx_b),
         "filename_a": name_a,
         "filename_b": name_b,
+        # Dati mesh per anteprime e PDF
+        "tris_a":    tris_to_list(tris_a, 6000),
+        "tris_b_all": tris_to_list(tris_b_all, 6000),
+        "bg_a":      tris_to_list(bg_tris_a, 2000) if bg_tris_a else [],
+        "cyl_tris_a": cyl_tris_a,
+        "cyl_tris_b": cyl_tris_b,
+        "ct_a":      ct_a.tolist(),
+        "ct_b_final": icp["aligned"].tolist(),
+        "off":       offset.tolist(),
     }
