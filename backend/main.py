@@ -196,6 +196,57 @@ async def leaderboard(
     return {"rows": rows}
 
 
+
+# ── Endpoint analisi pubblica (no auth) ──────────────────────────────────────
+@app.post("/api/analyze-public")
+async def analyze_public(
+    file_a: UploadFile = File(...),
+    file_b: UploadFile = File(...)
+):
+    """Analisi STL senza autenticazione. La logica ICP gira sul server."""
+    for f in [file_a, file_b]:
+        if not f.filename.lower().endswith(".stl"):
+            raise HTTPException(400, detail=f"'{f.filename}' non è un STL valido.")
+        if f.size and f.size > 50 * 1024 * 1024:
+            raise HTTPException(413, detail="File troppo grande (max 50 MB).")
+
+    data_a = await file_a.read()
+    data_b = await file_b.read()
+
+    if len(data_a) < 84 or len(data_b) < 84:
+        raise HTTPException(400, detail="File STL non valido o corrotto.")
+
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, analyze_stl_pair, data_a, data_b,
+            file_a.filename, file_b.filename
+        )
+    except ValueError as e:
+        raise HTTPException(422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Errore analisi ICP: {e}", exc_info=True)
+        raise HTTPException(500, detail="Errore interno durante l'analisi.")
+
+    return {
+        "pairs":            result["pairs"],
+        "cyl_axes":         result["cyl_axes"],
+        "icp_rmsd":         result["icp_rmsd"],
+        "icp_angle":        result["icp_angle"],
+        "score":            result["score"],
+        "score_label":      result["score_label"],
+        "detected_profile": result.get("detected_profile"),
+        "n_scan_a":         result.get("n_scan_a", 0),
+        "n_scan_b":         result.get("n_scan_b", 0),
+        "excluded_a":       result.get("excluded_a", 0),
+        "excluded_b":       result.get("excluded_b", 0),
+        "off":              result.get("off", [0, 0, 0]),
+        "ct_a":             result.get("ct_a", []),
+        "ct_b_final":       result.get("ct_b_final", []),
+        "filename_a":       file_a.filename,
+        "filename_b":       file_b.filename,
+    }
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
