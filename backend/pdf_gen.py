@@ -21,6 +21,89 @@ def generate_pdf(record: dict) -> bytes:
 
 def _generate_reportlab(record: dict) -> bytes:
     from reportlab.lib.pagesizes import A4
+
+    # Traduzioni PDF
+    lang = record.get("lang", "it")
+    PDF_STRINGS = {
+        "it": {"title":LS["title"],"report":"Report di analisi",
+               "devs":LS["devs"],"score":"Voto precisione",
+               "dist":LS["dist"],"fileA":LS["fileA"],
+               "fileB":LS["fileB"],"profile":LS["profile"],"rmsdLabel":LS["rmsdLabel"],
+               "excellent":"Eccellente","good":"Ottimo","acceptable":"Accettabile",
+               "risky":"Rischioso","critical":"Critico",
+               "pair":"Coppia","cylinder":"Cilindro","global":"Voto globale",
+               "deviation":"Deviazione","axis":"Asse cilindro","centA":"Centroide A",
+               "centB":"Centroide B allineato","meshView":LS["meshView"],
+               "devCard":LS["devCard"],"table":LS["table"],
+               "param":LS["param"],"value":LS["value"],"eval":LS["eval"],
+               "d3":"D3D totale","dxy":LS["dxy"],"dz":"Deviazione Z",
+               "dx":LS["dx"],"dy":LS["dy"],"dir":LS["dir"],
+               "distTable":"DISTANZE INTER-CENTROIDE","distA":"Distanza A",
+               "distB":"Distanza B","diff":"Differenza","note":"Note"},
+        "en": {"title":"Syntesis-ICP — Precision Scanner","report":"Analysis report",
+               "devs":"DEVIATIONS PER PAIR","score":"Precision score",
+               "dist":"INTER-CENTROID DISTANCES","fileA":"File A (reference)",
+               "fileB":"File B (comparison)","profile":"Profile","rmsdLabel":"ICP RMSD",
+               "excellent":"Excellent","good":"Good","acceptable":"Acceptable",
+               "risky":"Risky","critical":"Critical",
+               "pair":"Pair","cylinder":"Cylinder","global":"Global score",
+               "deviation":"Deviation","axis":"Cylinder axis","centA":"Centroid A",
+               "centB":"Aligned centroid B","meshView":"3D MESH VISUALIZATION",
+               "devCard":"DEVIATION ANALYSIS","table":"MEASUREMENTS TABLE",
+               "param":"Parameter","value":"Value","eval":"Evaluation",
+               "d3":"Total 3D |D|","dxy":"XY deviation (plane)","dz":"Z deviation",
+               "dx":"X deviation","dy":"Y deviation","dir":"XY DISPLACEMENT DIRECTION",
+               "distTable":"INTER-CENTROID DISTANCES","distA":"Distance A",
+               "distB":"Distance B","diff":"Difference","note":"Notes"},
+        "es": {"title":"Syntesis-ICP — Precision Scanner","report":"Informe de análisis",
+               "devs":"DESVIACIONES POR PAR","score":"Puntuación de precisión",
+               "dist":"DISTANCIAS INTER-CENTROIDE","fileA":"Archivo A (referencia)",
+               "fileB":"Archivo B (comparación)","profile":"Perfil","rmsdLabel":"ICP RMSD",
+               "excellent":"Excelente","good":"Bueno","acceptable":"Aceptable",
+               "risky":"Arriesgado","critical":"Crítico",
+               "pair":"Par","cylinder":"Cilindro","global":"Puntuación global",
+               "deviation":"Desviación","axis":"Eje del cilindro","centA":"Centroide A",
+               "centB":"Centroide B alineado","meshView":"VISUALIZACIÓN MALLA 3D",
+               "devCard":"ANÁLISIS DE DESVIACIÓN","table":"TABLA DE MEDICIONES",
+               "param":"Parámetro","value":"Valor","eval":"Evaluación",
+               "d3":"D3D total","dxy":"Desviación XY (plano)","dz":"Desviación Z",
+               "dx":"Desviación X","dy":"Desviación Y","dir":"DIRECCIÓN DESPLAZAMIENTO XY",
+               "distTable":"DISTANCIAS INTER-CENTROIDE","distA":"Distancia A",
+               "distB":"Distancia B","diff":"Diferencia","note":"Notas"},
+        "fr": {"title":"Syntesis-ICP — Precision Scanner","report":"Rapport d'analyse",
+               "devs":"DÉVIATIONS PAR PAIRE","score":"Score de précision",
+               "dist":"DISTANCES INTER-CENTROÏDE","fileA":"Fichier A (référence)",
+               "fileB":"Fichier B (comparaison)","profile":"Profil","rmsdLabel":"ICP RMSD",
+               "excellent":"Excellent","good":"Bon","acceptable":"Acceptable",
+               "risky":"Risqué","critical":"Critique",
+               "pair":"Paire","cylinder":"Cylindre","global":"Score global",
+               "deviation":"Déviation","axis":"Axe du cylindre","centA":"Centroïde A",
+               "centB":"Centroïde B aligné","meshView":"VISUALISATION MAILLAGE 3D",
+               "devCard":"ANALYSE DE DÉVIATION","table":"TABLEAU DE MESURES",
+               "param":"Paramètre","value":"Valeur","eval":"Évaluation",
+               "d3":"D3D total","dxy":"Déviation XY (plan)","dz":"Déviation Z",
+               "dx":"Déviation X","dy":"Déviation Y","dir":"DIRECTION DÉCALAGE XY",
+               "distTable":"DISTANCES INTER-CENTROÏDE","distA":"Distance A",
+               "distB":"Distance B","diff":"Différence","note":"Notes"},
+        "de": {"title":"Syntesis-ICP — Precision Scanner","report":"Analysebericht",
+               "devs":"ABWEICHUNGEN PRO PAAR","score":"Präzisionsbewertung",
+               "dist":"INTER-ZENTROID-ABSTÄNDE","fileA":"Datei A (Referenz)",
+               "fileB":"Datei B (Vergleich)","profile":"Profil","rmsdLabel":"ICP RMSD",
+               "excellent":"Ausgezeichnet","good":"Gut","acceptable":"Akzeptabel",
+               "risky":"Riskant","critical":"Kritisch",
+               "pair":"Paar","cylinder":"Zylinder","global":"Gesamtbewertung",
+               "deviation":"Abweichung","axis":"Zylinderachse","centA":"Zentroid A",
+               "centB":"Ausgerichteter Zentroid B","meshView":"3D-GITTER-VISUALISIERUNG",
+               "devCard":"ABWEICHUNGSANALYSE","table":"MESSTABELLE",
+               "param":"Parameter","value":"Wert","eval":"Bewertung",
+               "d3":"Gesamt 3D |D|","dxy":"XY-Abweichung (Ebene)","dz":"Z-Abweichung",
+               "dx":"X-Abweichung","dy":"Y-Abweichung","dir":"XY-VERSATZRICHTUNG",
+               "distTable":"INTER-ZENTROID-ABSTÄNDE","distA":"Abstand A",
+               "distB":"Abstand B","diff":"Differenz","note":"Notizen"},
+    }
+    LS = PDF_STRINGS.get(lang, PDF_STRINGS["en"])  # fallback English
+
+
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.colors import HexColor, black, white, Color
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
@@ -74,7 +157,7 @@ def _generate_reportlab(record: dict) -> bytes:
     # Header
     story.append(Paragraph("Syntesis-ICP — Precision Scanner", title_style))
     story.append(Paragraph(
-        f"Report di analisi · {created_at.strftime('%d/%m/%Y %H:%M') if hasattr(created_at,'strftime') else str(created_at)[:16]} · ID: {str(analysis_id)[:8].upper()}",
+        fLS["report"]+" · {created_at.strftime('%d/%m/%Y %H:%M') if hasattr(created_at,'strftime') else str(created_at)[:16]} · ID: {str(analysis_id)[:8].upper()}",
         sub_style))
     story.append(HRFlowable(width="100%", thickness=2, color=BLUE, spaceAfter=10))
 
