@@ -4902,4 +4902,1788 @@ var AM = (function() {
 
 </script>
 </body>
+</html  // ── Full-page dark navy background (matches badge style) ──────────
+  doc.setFillColor(13,27,42);doc.rect(0,0,W,H,'F');
+
+  // Gold radial glow top-right (decorative)
+  // (jsPDF doesn't support radial gradients natively - simulate with circles)
+  for(var gi=0;gi<5;gi++){
+    var ga=0.04-gi*0.007;
+    var gr2=60+gi*18;
+    doc.setFillColor(245,158,11);
+    doc.setGState(new doc.GState({opacity:ga}));
+    doc.circle(W-10,10,gr2,'F');
+  }
+  doc.setGState(new doc.GState({opacity:1}));
+
+  // Top gold bar
+  var goldBar=doc.setFillColor(255,215,0);doc.rect(0,0,W,3,'F');
+  doc.setFillColor(245,158,11);doc.rect(0,3,W,1.5,'F');
+
+  // ── LOGO centrato in testa (su dark bg) ────────────────────────────
+  try{
+    if(LOGO_DATA&&LOGO_DATA.length>100){
+      var logoW=80,logoH=22;
+      var logoX=(W-logoW)/2;  // centrato
+      doc.addImage(LOGO_DATA,'PNG',logoX,9,logoW,logoH);
+    }
+  }catch(e){
+    // Fallback: testo logo
+    doc.setFont('helvetica','bold');doc.setFontSize(18);
+    doc.setTextColor(255,255,255);
+    doc.text('Syntesis-ICP',W/2,18,{align:'center'});
+  }
+
+  // ── BADGE IMAGE - render score card directly onto offscreen canvas ─
+  // Replica exacta di drawShareCard ma sincrona, senza DOM share-canvas
+  var badgePng='';
+  try{
+    var _bcv=document.createElement('canvas');
+    _bcv.width=1080;_bcv.height=1080;
+    var _bctx=_bcv.getContext('2d');
+    var _bW=1080,_bH=1080,_bCX=540,_bCY=360;
+    // Background gradient
+    var _bg=_bctx.createLinearGradient(0,0,_bW,_bH);
+    _bg.addColorStop(0,'#0d1b2a');_bg.addColorStop(.5,'#12253d');_bg.addColorStop(1,'#0d1b2a');
+    _bctx.fillStyle=_bg;_bctx.fillRect(0,0,_bW,_bH);
+    // Glow effects
+    function _glow(x,y,r,c){var g=_bctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,c);g.addColorStop(1,'transparent');_bctx.fillStyle=g;_bctx.beginPath();_bctx.arc(x,y,r,0,Math.PI*2);_bctx.fill();}
+    _glow(_bW*.85,_bH*.08,380,'rgba(245,158,11,.18)');
+    _glow(_bW*.15,_bH*.92,300,'rgba(245,158,11,.12)');
+    _glow(_bCX,_bCY*.95,260,'rgba('+lvRGB.join(',')+',.08)');
+    // Gold top bar
+    var _topGrad=_bctx.createLinearGradient(0,0,_bW,0);
+    _topGrad.addColorStop(0,'transparent');_topGrad.addColorStop(.3,'rgba(245,158,11,.7)');
+    _topGrad.addColorStop(.5,'rgba(255,215,0,.9)');_topGrad.addColorStop(.7,'rgba(245,158,11,.7)');_topGrad.addColorStop(1,'transparent');
+    _bctx.fillStyle=_topGrad;_bctx.fillRect(0,0,_bW,5);
+    // Score ring
+    var _r=208,_lw=28,_sa=-Math.PI/2;
+    _bctx.beginPath();_bctx.arc(_bCX,_bCY,_r,0,Math.PI*2);
+    _bctx.strokeStyle='rgba(255,255,255,.06)';_bctx.lineWidth=_lw;_bctx.stroke();
+    var _ag=_bctx.createLinearGradient(_bCX-_r,_bCY-_r,_bCX+_r,_bCY+_r);
+    _ag.addColorStop(0,'#FFD700');_ag.addColorStop(.5,lv.col);_ag.addColorStop(1,'#F59E0B');
+    _bctx.shadowColor='rgba(245,158,11,.6)';_bctx.shadowBlur=32;
+    _bctx.beginPath();_bctx.arc(_bCX,_bCY,_r,_sa,_sa+(score/100)*Math.PI*2);
+    _bctx.strokeStyle=_ag;_bctx.lineWidth=_lw;_bctx.lineCap='round';_bctx.stroke();
+    _bctx.shadowBlur=0;
+    // Score number
+    _bctx.shadowColor='rgba(245,158,11,.4)';_bctx.shadowBlur=20;
+    _bctx.fillStyle='#fff';_bctx.font='900 172px sans-serif';
+    _bctx.textAlign='center';_bctx.textBaseline='middle';
+    _bctx.fillText(score.toFixed(2),_bCX,_bCY-16);_bctx.shadowBlur=0;
+    _bctx.fillStyle='rgba(255,215,0,.55)';_bctx.font='600 40px sans-serif';
+    _bctx.fillText('/100',_bCX,_bCY+76);
+    // Score label pill
+    var _py=_bCY+_r+42,_pw=340,_ph=62;
+    var _pg=_bctx.createLinearGradient(_bCX-_pw/2,_py,_bCX+_pw/2,_py+_ph);
+    _pg.addColorStop(0,'rgba(245,158,11,.22)');_pg.addColorStop(1,'rgba(255,215,0,.12)');
+    _bctx.fillStyle=_pg;
+    _bctx.beginPath();_bctx.roundRect(_bCX-_pw/2,_py,_pw,_ph,31);_bctx.fill();
+    var _pb=_bctx.createLinearGradient(_bCX-_pw/2,_py,_bCX+_pw/2,_py);
+    _pb.addColorStop(0,'rgba(245,158,11,.2)');_pb.addColorStop(.5,'rgba(255,215,0,.8)');_pb.addColorStop(1,'rgba(245,158,11,.2)');
+    _bctx.strokeStyle=_pb;_bctx.lineWidth=1.5;
+    _bctx.beginPath();_bctx.roundRect(_bCX-_pw/2,_py,_pw,_ph,31);_bctx.stroke();
+    _bctx.shadowColor='rgba(245,158,11,.5)';_bctx.shadowBlur=12;
+    _bctx.fillStyle='#FFD700';_bctx.font='800 30px sans-serif';_bctx.textBaseline='middle';
+    _bctx.fillText(lv.label.toUpperCase(),_bCX,_py+_ph/2);_bctx.shadowBlur=0;
+    // Divider line
+    var _dy=_py+_ph+52;
+    var _dg=_bctx.createLinearGradient(80,_dy,_bW-80,_dy);
+    _dg.addColorStop(0,'transparent');_dg.addColorStop(.3,'rgba(245,158,11,.5)');
+    _dg.addColorStop(.5,'rgba(255,215,0,.8)');_dg.addColorStop(.7,'rgba(245,158,11,.5)');_dg.addColorStop(1,'transparent');
+    _bctx.strokeStyle=_dg;_bctx.lineWidth=1;
+    _bctx.beginPath();_bctx.moveTo(120,_dy);_bctx.lineTo(_bW-120,_dy);_bctx.stroke();
+    // File names row
+    var _ny=_dy+72;
+    _bctx.fillStyle='#fff';_bctx.font='700 48px sans-serif';_bctx.textBaseline='middle';
+    var _nA=(p.nA||'').replace(/\.stl$/i,'').slice(0,22);
+    var _nB=(p.nB||'').replace(/\.stl$/i,'').slice(0,22);
+    _bctx.fillText(_nA,_bCX,_ny);
+    _bctx.fillStyle='rgba(255,215,0,.6)';_bctx.font='500 28px sans-serif';
+    _bctx.fillText(_nA+' → '+_nB,_bCX,_ny+62);
+    // Bottom bar + footer
+    _bctx.fillStyle=_topGrad;_bctx.fillRect(0,_bH-5,_bW,5);
+    _bctx.fillStyle='rgba(255,255,255,.18)';_bctx.font='500 22px sans-serif';_bctx.textBaseline='middle';
+    _bctx.fillText('syntesis-icp.com · Precision Scanner',_bCX,1045);
+    // Logo bianco (preload sincrono da data URI)
+    try{
+      var _li=new Image();_li.src=LOGO_DATA;
+      if(_li.complete&&_li.naturalWidth>0){
+        var _lh=90,_lw2=_lh*(_li.naturalWidth/_li.naturalHeight);
+        _bctx.fillStyle='rgba(255,255,255,.07)';
+        _bctx.beginPath();_bctx.roundRect(_bCX-_lw2/2-20,_ny+110,_lw2+40,_lh+28,16);_bctx.fill();
+        _bctx.globalAlpha=.92;_bctx.drawImage(_li,_bCX-_lw2/2,_ny+124,_lw2,_lh);_bctx.globalAlpha=1;
+      }
+    }catch(_le){}
+    badgePng=_bcv.toDataURL('image/png');
+  }catch(_be){badgePng='';}
+
+  // Badge position: centered, filling upper half of page
+  var badgeSize=118; // mm - grande, impattante
+  var badgeX=(W-badgeSize)/2;
+  var badgeY=34; // below the centered logo
+
+  if(badgePng){
+    doc.addImage(badgePng,'PNG',badgeX,badgeY,badgeSize,badgeSize);
+  } else {
+    // Last-resort fallback: simple ring
+    var cx2=W/2,cy2=badgeY+badgeSize/2,r2=36,lw2=6;
+    doc.setDrawColor(20,35,55);doc.setLineWidth(lw2+2);doc.circle(cx2,cy2,r2,'S');
+    var startA=-90,endA=startA+(score/100*360);
+    pdfArc(cx2,cy2,r2,startA,endA,lw2,lvRGB);
+    doc.setFont('helvetica','bold');doc.setFontSize(26);setTxt(lv.col);
+    doc.text(score.toFixed(2),cx2,cy2+4,{align:'center'});
+    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(120,144,164);
+    doc.text('/100',cx2,cy2+12,{align:'center'});
+  }
+
+  // ── Info row (directly after badge - pill already in badge card) ───
+  var iy2=badgeY+badgeSize+6;
+  // Divider line (gold)
+  doc.setDrawColor(245,158,11);doc.setLineWidth(0.25);
+  doc.line(ml+20,iy2-3,W-mr-20,iy2-3);
+
+  // Tronca i nomi file in modo intelligente (max 28 chars + ellipsis)
+  function truncate(s,n){return s.length>n?s.slice(0,n-1)+'…':s;}
+
+  var infos=[
+    ['File A - Riferimento', truncate(p.nA,30)],
+    ['File B - Confronto',   truncate(p.nB,30)],
+    ['N deg cilindri',          p.cA+''],
+    ['RMSD ICP',             p.icpRmsd.toFixed(4)+' mm'],
+    ['Data analisi',         new Date().toLocaleDateString('it-IT')]
+  ];
+
+  // Layout su 2 righe: [0,1,2] poi [3,4] - 3 colonne / 2 colonne
+  [[0,1,2],[3,4]].forEach(function(row,ri){
+    var nCols=row.length;
+    row.forEach(function(ii,ci){
+      if(ii>=infos.length)return;
+      var colW2=cw/nCols;
+      var ix=ml+ci*colW2+colW2/2;
+      var rowY=iy2+ri*14;
+      // Label
+      doc.setFont('helvetica','normal');doc.setFontSize(6.5);
+      doc.setTextColor(100,120,150);  // grigio-blu discreto
+      doc.text(infos[ii][0],ix,rowY,{align:'center'});
+      doc.setFont('helvetica','bold');doc.setFontSize(9);
+      doc.setTextColor(255,255,255);  // bianco puro per i valori
+      var val=infos[ii][1];
+      var valW=doc.getTextWidth(val);
+      if(valW>colW2-4){
+        // Scale font down to fit
+        doc.setFontSize(Math.max(5.5, 8*(colW2-4)/valW));
+      }
+      doc.text(val,ix,rowY+6,{align:'center'});
+      doc.setFontSize(8); // reset
+    });
+  });
+
+  // ── Colorimetric map ────────────────────────────────────────────────
+  var mapY2=iy2+32; // info rows + margin
+  // Assicura che non vada fuori pagina
+  if(mapY2>195) mapY2=195;
+  // Section label
+  doc.setFont('helvetica','bold');doc.setFontSize(7.5);
+  doc.setTextColor(255,215,0);
+  doc.text('MAPPA COLORIMETRICA - POSIZIONI SCANBODY',ml,mapY2);
+
+  // Calcola altezza mappa in modo che non sbordi dalla pagina
+  var availH=H-16-(mapY2+4)-12; // spazio disponibile fino al footer
+  var mapH2=Math.min(cw*400/900, availH);
+  var mapPng2=cvPng(900,400,function(cv){drawColorMap(cv,p.pairs);});
+  doc.addImage(mapPng2,'PNG',ml,mapY2+4,cw,mapH2);
+
+  // ── Clinical scale legend ───────────────────────────────────────────
+  var legY2=mapY2+4+mapH2+4;
+  var clin2=[
+    {c:'#639922',label:'0-50 um  Ottimo'},
+    {c:'#D97706',label:'50-100  Accett.'},
+    {c:'#F97316',label:'100-150  Risch.'},
+    {c:'#EF4444',label:'150-250  Tens.'},
+    {c:'#A855F7',label:'>250 um  Fuori'}
+  ];
+  var lw3=cw/clin2.length;
+  // Disegna legenda solo se c'è spazio
+  if(legY2+12<H-10){
+    clin2.forEach(function(cl,i){
+      var lx=ml+i*lw3;
+      var cRGB2=hexRGB(cl.c);
+      doc.setFillColor(cRGB2[0],cRGB2[1],cRGB2[2]);
+      doc.rect(lx,legY2,lw3-1,3,'F');
+      doc.setFont('helvetica','normal');doc.setFontSize(6);
+      doc.setTextColor(180,190,200);
+      doc.text(cl.label,lx+1,legY2+7);
+    });
+  }
+
+  // ── Bottom bar (gold) + footer ──────────────────────────────────────
+  doc.setFillColor(255,215,0);doc.rect(0,H-3,W,3,'F');
+  doc.setFillColor(245,158,11);doc.rect(0,H-4.5,W,1.5,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(7);
+  doc.setTextColor(120,144,164);
+  doc.text('Syntesis-ICP v7.2.0.012  ·  Biaggini Medical Devices S.r.l.  ·  syntesis-icp.com',W/2,H-6,{align:'center'});
+
+  // ══════════════════════════════════════════════════════════════════
+  //  ONE PAGE PER CYLINDER
+  // ══════════════════════════════════════════════════════════════════
+  p.pairs.forEach(function(pp,ci){
+    doc.addPage();
+    var y=0;
+
+    var d3um=pp.d3!==null?Math.round(pp.d3*1000):0;
+    var dxum=pp.dx!==null?Math.round(pp.dx*1000):0;
+    var dyum=pp.dy!==null?Math.round(pp.dy*1000):0;
+    var dzum=pp.dz!==null?Math.round(pp.dz*1000):0;
+    var dxyum=pp.dxy!==null?Math.round(pp.dxy*1000):0;
+    var clv=clinLevel(d3um);
+    var clRGB=hexRGB(clv.col);
+    var clBgRGB=hexRGB(clv.bg);
+    var clFgRGB=hexRGB(clv.fg);
+    var axInfo=p.cylAxes&&p.cylAxes[ci]&&p.cylAxes[ci].angleDeg!==null?p.cylAxes[ci]:null;
+    var axRGB=axInfo?hexRGB(clinAxis(axInfo.angleDeg).col):[100,100,100];
+
+    // ── NASA running header ─────────────────────────────────────────
+    // Blue top bar
+    doc.setFillColor(0,82,163);doc.rect(0,0,W,3,'F');
+    // Running header text
+    doc.setFont('helvetica','bold');doc.setFontSize(7);
+    doc.setTextColor(0,82,163);
+    doc.text('Syntesis-ICP',ml,8);
+    doc.setFont('helvetica','normal');doc.setFontSize(7);
+    doc.setTextColor(100,116,139);
+    doc.text('Cilindro #'+(ci+1)+' di '+p.pairs.length, W/2,8,{align:'center'});
+    doc.text('Pag. '+(ci+2)+' / '+(p.pairs.length+1+(p.dists?p.dists.length:0)),W-mr,8,{align:'right'});
+    // Thin rule
+    doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
+    doc.line(ml,10.5,W-mr,10.5);
+
+    // ── Cylinder title ────────────────────────────────────────────
+    y=14;
+    // Number + status dot
+    doc.setFont('helvetica','bold');doc.setFontSize(22);
+    doc.setTextColor(15,23,42);
+    doc.text('Cilindro #'+(ci+1),ml,y+9);
+    // Status badge (small pill)
+    var titleW=doc.getTextWidth('Cilindro #'+(ci+1));
+    doc.setFillColor(clRGB[0],clRGB[1],clRGB[2]);
+    doc.roundedRect(ml+titleW+4,y+1,28,6,1.5,1.5,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(7);
+    doc.setTextColor(255,255,255);
+    doc.text(clv.label.toUpperCase(),ml+titleW+18,y+5.5,{align:'center'});
+    // D3D value
+    doc.setFont('helvetica','bold');doc.setFontSize(10);
+    doc.setTextColor(clRGB[0],clRGB[1],clRGB[2]);
+    doc.text(d3um+' µm  |D3D|',ml+titleW+36,y+5.5);
+    // Right: global score
+    doc.setFont('helvetica','bold');doc.setFontSize(9);
+    doc.setTextColor(0,82,163);
+    doc.text('Score: '+score.toFixed(2)+'/100',W-mr,y+4,{align:'right'});
+    doc.setFont('helvetica','normal');doc.setFontSize(7);
+    doc.setTextColor(100,116,139);
+    doc.text(p.nA+' vs '+p.nB,W-mr,y+9,{align:'right'});
+    // Separator
+    doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);
+    doc.line(ml,y+12,W-mr,y+12);
+
+    y=y+16;
+
+    // ── 3 views (XY / XZ / YZ) - filled triangles ─────────────────
+    doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+    doc.setTextColor(0,82,163);
+    doc.text('VISUALIZZAZIONE MESH 3D',ml,y);
+    doc.setDrawColor(0,82,163);doc.setLineWidth(0.2);
+    doc.line(ml+doc.getTextWidth('VISUALIZZAZIONE MESH 3D')+2,y-0.8,W-mr,y-0.8);
+    y+=3;
+
+    // Find which triangles belong to this cylinder
+    // Use sortA[ci] indices to get A tris, match B tris by proximity
+    var viewW=64,viewH=64,gap=4;
+    var views=[
+      {label:'Vista XY (dall\'alto)',ax1:0,ax2:1,axD:2},
+      {label:'Vista XZ (frontale)', ax1:0,ax2:2,axD:1},
+      {label:'Vista YZ (laterale)', ax1:1,ax2:2,axD:0}
+    ];
+
+    // Get tris for this specific cylinder from global mesh
+    // We render the full mesh but highlight this cylinder
+    views.forEach(function(v,vi){
+      var vx=ml+vi*(viewW+gap);
+      var cylA=p.cylTrisA&&p.cylTrisA[ci]?p.cylTrisA[ci]:[];
+      var cylB=p.cylTrisB&&p.cylTrisB[ci]?p.cylTrisB[ci]:[];
+      var png=cvPng(viewW*8,viewH*8,function(cv){
+        paintViewCyl(cv,cylA,cylB,v.ax1,v.ax2,v.axD,v.label,ci);
+      });
+      doc.addImage(png,'PNG',vx,y,viewW,viewH);
+      // Label
+      doc.setFont('helvetica','normal');doc.setFontSize(6);setTxt('#7A90A4');
+      doc.text(v.label,vx+viewW/2,y+viewH+3,{align:'center'});
+    });
+
+    y+=viewH+8;
+
+    // ── Deviation card (gauge + compass + bars) ────────────────────
+    doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+    doc.setTextColor(0,82,163);
+    doc.text('ANALISI DEVIAZIONE',ml,y);
+    doc.setDrawColor(0,82,163);doc.setLineWidth(0.2);
+    doc.line(ml+doc.getTextWidth('ANALISI DEVIAZIONE')+2,y-0.8,W-mr,y-0.8);
+    y+=3;
+
+    var cardW=cw,cardH=52;
+    var devPng=cvPng(720,200,function(cv){
+      drawCard(cv,dxum,dyum,dzum,d3um,scaleUm,axInfo?axInfo.angleDeg:null);
+    });
+    doc.addImage(devPng,'PNG',ml,y,cardW,cardH);
+    y+=cardH+6;
+
+    // ── Measurements table ─────────────────────────────────────────
+    doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+    doc.setTextColor(0,82,163);
+    doc.text('TABELLA MISURAZIONI',ml,y);
+    doc.setDrawColor(0,82,163);doc.setLineWidth(0.2);
+    doc.line(ml+doc.getTextWidth('TABELLA MISURAZIONI')+2,y-0.8,W-mr,y-0.8);
+    y+=2;
+
+    var rows=[
+      ['|D| 3D totale', d3um+'um', clv.label, ''],
+      ['Deviazione XY (piano)', dxyum+'um', dxyum<50?'Ottimo':dxyum<100?'Accettabile':dxyum<150?'Rischioso':dxyum<250?'Tensione':'Fuori', ''],
+      ['Deviazione X', (dxum>=0?'+':'')+dxum+'um', '', ''],
+      ['Deviazione Y', (dyum>=0?'+':'')+dyum+'um', '', ''],
+      ['Deviazione Z (verticale)', (dzum>=0?'+':'')+dzum+'um', '', ''],
+    ];
+    if(axInfo){
+      var axLv=clinAxis(axInfo.angleDeg);
+      rows.push(['Angolo asse cilindro', axInfo.angleDeg.toFixed(3)+' deg', axLv.label, '']);
+    }
+    rows.push(['Centroide A (X,Y,Z)', pp.a[0].toFixed(3)+', '+pp.a[1].toFixed(3)+', '+pp.a[2].toFixed(3)+' mm', '', '']);
+    if(pp.b) rows.push(['Centroide B allineato', pp.b[0].toFixed(3)+', '+pp.b[1].toFixed(3)+', '+pp.b[2].toFixed(3)+' mm', '', '']);
+
+    doc.autoTable({
+      startY:y,
+      margin:{left:ml,right:mr},
+      head:[['Parametro','Valore','Valutazione','']],
+      body:rows,
+      styles:{font:'helvetica',fontSize:8,cellPadding:2,lineColor:[214,228,240],lineWidth:.2,valign:'middle'},
+      headStyles:{fillColor:[15,23,42],textColor:255,fontStyle:'bold',fontSize:6.5,halign:'left'},
+      columnStyles:{
+        0:{cellWidth:72,fontStyle:'bold',textColor:[30,41,59]},
+        1:{cellWidth:44,halign:'center',font:'courier',fontStyle:'bold',textColor:clRGB},
+        2:{cellWidth:40,halign:'center',textColor:[71,85,105],fontSize:7},
+        3:{cellWidth:16}
+      },
+      alternateRowStyles:{fillColor:[248,250,252]},
+      didParseCell:function(data){
+        if(data.column.index===1&&data.section==='body'){
+          // Color value cell by clinical level
+          var val=parseInt(data.cell.raw);
+          if(!isNaN(val)&&data.row.index===0){
+            var rgb=hexRGB(clv.col);
+            data.cell.styles.textColor=rgb;
+          }
+        }
+      }
+    });
+
+    var tableBottom=doc.lastAutoTable.finalY+6;
+
+    // ── Direction compass (bigger, standalone) ──────────────────────
+    if(tableBottom < H-50){
+      var compY=tableBottom;
+      doc.setFont('helvetica','bold');doc.setFontSize(8);setTxt('#0065B3');
+      doc.text('DIREZIONE SCOSTAMENTO XY',ml,compY);compY+=3;
+
+      var compPng=cvPng(300,300,function(cv){
+        var ctx=cv.getContext('2d'),W2=300,H2=300;
+        ctx.clearRect(0,0,W2,H2);
+        ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,W2,H2);
+        var ccx=W2/2,ccy=H2/2,cr=100;
+        // Rings
+        ctx.beginPath();ctx.arc(ccx,ccy,cr,0,Math.PI*2);
+        ctx.strokeStyle='#e2eaf3';ctx.lineWidth=1.5;ctx.stroke();
+        ctx.beginPath();ctx.arc(ccx,ccy,cr*0.5,0,Math.PI*2);
+        ctx.strokeStyle='#eef3f8';ctx.lineWidth=0.8;ctx.stroke();
+        // Crosshair
+        ctx.strokeStyle='#e8eff7';ctx.lineWidth=0.6;ctx.setLineDash([4,6]);
+        ctx.beginPath();ctx.moveTo(ccx,ccy-cr+5);ctx.lineTo(ccx,ccy+cr-5);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(ccx-cr+5,ccy);ctx.lineTo(ccx+cr-5,ccy);ctx.stroke();
+        ctx.setLineDash([]);
+        // Cardinals
+        ctx.fillStyle='#94a3b8';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+        ctx.fillText('N',ccx,ccy-cr-6);ctx.fillText('S',ccx,ccy+cr+16);
+        ctx.textAlign='left';ctx.fillText('E',ccx+cr+6,ccy+5);
+        ctx.textAlign='right';ctx.fillText('O',ccx-cr-6,ccy+5);
+        // Arrow
+        var bearing=Math.atan2(dxum,-dyum);
+        var arLen=cr*0.72;
+        var bx=ccx+arLen*Math.sin(bearing),by=ccy-arLen*Math.cos(bearing);
+        var col2=clv.col;
+        ctx.strokeStyle=col2;ctx.lineWidth=3;
+        ctx.beginPath();ctx.moveTo(ccx,ccy);ctx.lineTo(bx,by);ctx.stroke();
+        var ah=cr*0.18,aa=Math.atan2(by-ccy,bx-ccx);
+        ctx.fillStyle=col2;ctx.beginPath();
+        ctx.moveTo(bx,by);
+        ctx.lineTo(bx-ah*Math.cos(aa-0.42),by-ah*Math.sin(aa-0.42));
+        ctx.lineTo(bx-ah*Math.cos(aa+0.42),by-ah*Math.sin(aa+0.42));
+        ctx.closePath();ctx.fill();
+        // Center dot A
+        ctx.beginPath();ctx.arc(ccx,ccy,6,0,Math.PI*2);
+        ctx.fillStyle='#0065B3';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+        // B dot
+        var dxy2=Math.sqrt(dxum*dxum+dyum*dyum);
+        if(dxy2>1){
+          ctx.beginPath();ctx.arc(bx,by,6,0,Math.PI*2);
+          ctx.fillStyle=col2;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+          // XY label
+          ctx.fillStyle=col2;ctx.font='bold 13px monospace';ctx.textAlign='center';
+          ctx.fillText(Math.round(dxy2)+'um',ccx+(bx-ccx)*0.55+14,ccy-(by-ccy)*0.55);
+        }
+        // Z badge
+        if(Math.abs(dzum)>2){
+          var zbg=dzum>0?'rgba(254,226,226,0.92)':'rgba(219,234,254,0.92)';
+          var zcl=dzum>0?'#ef4444':'#2563eb';
+          ctx.fillStyle=zbg;ctx.beginPath();ctx.arc(W2-28,24,18,0,Math.PI*2);ctx.fill();
+          ctx.strokeStyle=zcl;ctx.lineWidth=1.5;ctx.stroke();
+          ctx.fillStyle=zcl;ctx.font='bold 11px monospace';ctx.textAlign='center';
+          ctx.fillText(dzum>0?'↑':'↓',W2-28,21);
+          ctx.font='10px monospace';ctx.fillText(Math.abs(dzum),W2-28,33);
+        }
+      });
+      doc.addImage(compPng,'PNG',ml,compY,40,40);
+
+      // Compass legend
+      doc.setFont('helvetica','normal');doc.setFontSize(7);setTxt('#0F1923');
+      doc.text('A = centroide riferimento',ml+44,compY+8);
+      doc.setTextColor(clRGB[0],clRGB[1],clRGB[2]);
+      doc.text('B = centroide misurato (post-ICP)',ml+44,compY+14);
+      setTxt('#0F1923');
+      var vectStr='XY: '+dxyum+' um  dX:'+(dxum>=0?'+':'')+dxum+'  dY:'+(dyum>=0?'+':'')+dyum;
+      doc.text(vectStr,ml+44,compY+20);
+      doc.text('Deviazione Z: '+(dzum>=0?'+':'')+dzum+'um',ml+44,compY+26);
+      if(axInfo){
+        doc.setTextColor(axRGB[0],axRGB[1],axRGB[2]);
+        var axStr='Asse: '+axInfo.angleDeg.toFixed(2)+'deg  '+clinAxis(axInfo.angleDeg).label;
+        doc.text(axStr,ml+44,compY+32);
+      }
+    }
+
+    // ── NASA footer ─────────────────────────────────────────────────
+    doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
+    doc.line(ml,H-10,W-mr,H-10);
+    doc.setFont('helvetica','normal');doc.setFontSize(6);
+    doc.setTextColor(148,163,184);
+    doc.text('Syntesis-ICP v7.2.0.012  ·  Cilindro #'+(ci+1)+' di '+p.pairs.length,ml,H-6.5);
+    doc.text('Pag. '+(ci+2)+' / '+(p.pairs.length+1),W-mr,H-6.5,{align:'right'});
+    doc.setFillColor(0,82,163);doc.rect(0,H-2.5,W,2.5,'F');
+  });
+
+  // ── Pagine Distanze Inter-Centroide (una pagina per coppia) ──────────
+  if(p.pairs && p.pairs.length >= 2){
+
+    var ctA2 = p.pairs.map(function(pp){return pp.a;});
+    var ctB2 = p.pairs.map(function(pp){return pp.b;});
+
+    function dist3pdf(a,b){
+      if(!a||!b)return null;
+      return Math.sqrt((a[0]-b[0])*(a[0]-b[0])+(a[1]-b[1])*(a[1]-b[1])+(a[2]-b[2])*(a[2]-b[2]));
+    }
+    function allPairsPdf(n){
+      var out=[];
+      for(var i=0;i<n;i++)for(var j=i+1;j<n;j++)out.push([i,j]);
+      return out;
+    }
+    function diffColorPdf(diff_um){
+      var a=Math.abs(diff_um);
+      if(a<50)  return{col:'#3a7d08',bg:'#EAF3DE',border:'#a3d26a'};
+      if(a<100) return{col:'#D97706',bg:'#FEFCE8',border:'#f5d06a'};
+      if(a<200) return{col:'#ea5a00',bg:'#FFF3E0',border:'#f9b97a'};
+      return    {col:'#c91a1a',bg:'#FEE2E2',border:'#f9a0a0'};
+    }
+
+    var pairsD=allPairsPdf(ctA2.length);
+    var nTotal=pairsD.length;
+
+    // ── Pre-calcola proiezione PCA globale (stessa scala per tutte le mappe) ──
+    var n2=ctA2.length;
+    var cmx=0,cmy=0,cmz=0;
+    ctA2.forEach(function(pt){cmx+=pt[0]/n2;cmy+=pt[1]/n2;cmz+=pt[2]/n2;});
+    var cov2=[[0,0,0],[0,0,0],[0,0,0]];
+    ctA2.forEach(function(pt){
+      var d=[pt[0]-cmx,pt[1]-cmy,pt[2]-cmz];
+      for(var ii=0;ii<3;ii++)for(var jj=0;jj<3;jj++)cov2[ii][jj]+=d[ii]*d[jj]/n2;
+    });
+    var eig2=jacobi3(cov2);
+    var ord2=[0,1,2].sort(function(a,b){return eig2.vals[b]-eig2.vals[a];});
+    var u1g=[eig2.vecs[0][ord2[0]],eig2.vecs[1][ord2[0]],eig2.vecs[2][ord2[0]]];
+    var u2g=[eig2.vecs[0][ord2[1]],eig2.vecs[1][ord2[1]],eig2.vecs[2][ord2[1]]];
+    function projG(pt){
+      var dx=pt[0]-cmx,dy=pt[1]-cmy,dz=pt[2]-cmz;
+      return[dx*u1g[0]+dy*u1g[1]+dz*u1g[2],dx*u2g[0]+dy*u2g[1]+dz*u2g[2]];
+    }
+    var projA2=ctA2.map(projG);
+    var projB2=ctB2.map(function(pt){return pt?projG(pt):null;});
+
+    // Bounds globali (tutti i punti A e B)
+    var allPts2=[];
+    projA2.forEach(function(pt){allPts2.push(pt);});
+    projB2.forEach(function(pt){if(pt)allPts2.push(pt);});
+    var p1s2=allPts2.map(function(pt){return pt[0];}),p2s2=allPts2.map(function(pt){return pt[1];});
+    var mn1g=Math.min.apply(null,p1s2),mx1g=Math.max.apply(null,p1s2);
+    var mn2g=Math.min.apply(null,p2s2),mx2g=Math.max.apply(null,p2s2);
+    var rg2=Math.max(mx1g-mn1g,mx2g-mn2g,0.001),mg2=rg2*0.35;
+    var c1g=(mn1g+mx1g)/2,c2g=(mn2g+mx2g)/2,ts2=rg2+mg2*2;
+
+    // Funzione di proiezione canvas - usata da tutti i mini-canvas PDF
+    function toCanvasPdf(pt2d, CW, CH, pad){
+      return[
+        pad+(pt2d[0]-(c1g-ts2/2))/ts2*(CW-pad*2),
+        CH-pad-(pt2d[1]-(c2g-ts2/2))/ts2*(CH-pad*2)
+      ];
+    }
+
+    // ── Per ogni coppia: pagina dedicata ─────────────────────────────
+    pairsD.forEach(function(ij, pageIdx){
+      var hi=ij[0], hj=ij[1];
+      var dA=dist3pdf(ctA2[hi],ctA2[hj]);
+      var dB=(ctB2[hi]&&ctB2[hj])?dist3pdf(ctB2[hi],ctB2[hj]):null;
+      var diff=dB!==null?(dB-dA)*1000:null;
+      var lv2=diff!==null?diffColorPdf(diff):{col:'#6b7280',bg:'#f3f4f6',border:'#e5e7eb'};
+      var lvRGB2=hexRGB(lv2.bg);
+      var lvFG=hexRGB(lv2.col);
+      var diffStr=diff!==null?(diff>=0?'+':'')+diff.toFixed(1)+'um':'N/A';
+      var label=diff===null?'Non abbinato':Math.abs(diff)<50?'Ottimo':Math.abs(diff)<100?'Buono':Math.abs(diff)<200?'Accettabile':'Da verificare';
+
+      doc.addPage();
+
+      // ── Header pagina ────────────────────────────────────────────
+      setFill('#0F1923');doc.rect(0,0,W,22,'F');
+      setFill('#1a5f9e');doc.rect(0,22,W,2,'F');
+      doc.setFont('helvetica','bold');doc.setFontSize(13);setTxt('#FFFFFF');
+      doc.text('Distanza Inter-Centroide #'+(hi+1)+'-#'+(hj+1),ml,14);
+      doc.setFontSize(8);doc.setFont('helvetica','normal');setTxt('#7A90A4');
+      var coppiaStr='Coppia '+(pageIdx+1)+'/'+nTotal+'  A (rif.) vs B (post-ICP)';
+      doc.text(coppiaStr,ml,19);
+
+      // Badge Δ in header a destra
+      if(diff!==null){
+        doc.setFillColor(lvRGB2[0],lvRGB2[1],lvRGB2[2]);
+        doc.rect(W-mr-40,5,40,12,'F');
+        doc.setTextColor(lvFG[0],lvFG[1],lvFG[2]);
+        doc.setFont('helvetica','bold');doc.setFontSize(9);
+        var _ds2=diff!==null?(diff>=0?'+':'')+diff.toFixed(1)+'um':'N/A';
+        doc.text(_ds2,W-mr-20,10,{align:'center'});
+        doc.setFontSize(7);doc.setFont('helvetica','normal');
+        doc.text(label,W-mr-20,16,{align:'center'});
+      }
+
+      var curY2=28;
+
+      // ── Mappa dedicata per questa coppia ──────────────────────────
+      // Usa stessa logica di drawPairMap, ma off-screen per jsPDF
+      var mapW2=500, mapH2=320;
+      var mapPng2=cvPng(mapW2,mapH2,function(cv){
+        var ctx=cv.getContext('2d'),CW=cv.width,CH=cv.height;
+        var pad=38;
+        ctx.fillStyle='#fafafa';ctx.fillRect(0,0,CW,CH);
+
+        function sc(pt2d){return toCanvasPdf(pt2d,CW,CH,pad);}
+
+        // Linee sfondo (grigio per le coppie non attive)
+        pairsD.forEach(function(ij2){
+          if(ij2[0]===hi&&ij2[1]===hj)return;
+          var pa=sc(projA2[ij2[0]]),pb=sc(projA2[ij2[1]]);
+          ctx.beginPath();ctx.moveTo(pa[0],pa[1]);ctx.lineTo(pb[0],pb[1]);
+          ctx.strokeStyle='rgba(200,215,235,0.55)';ctx.lineWidth=1;ctx.stroke();
+          if(projB2[ij2[0]]&&projB2[ij2[1]]){
+            var qb=sc(projB2[ij2[0]]),rb=sc(projB2[ij2[1]]);
+            ctx.beginPath();ctx.moveTo(qb[0],qb[1]);ctx.lineTo(rb[0],rb[1]);
+            ctx.strokeStyle='rgba(220,195,150,0.35)';ctx.lineWidth=0.8;
+            ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+          }
+        });
+
+        // Linea A evidenziata (blu solido con glow)
+        var pA=sc(projA2[hi]),qA=sc(projA2[hj]);
+        ctx.beginPath();ctx.moveTo(pA[0],pA[1]);ctx.lineTo(qA[0],qA[1]);
+        ctx.strokeStyle='rgba(26,95,158,0.1)';ctx.lineWidth=12;ctx.stroke();
+        ctx.beginPath();ctx.moveTo(pA[0],pA[1]);ctx.lineTo(qA[0],qA[1]);
+        ctx.strokeStyle='#1a5f9e';ctx.lineWidth=2.5;ctx.stroke();
+        // Label A al centro ruotata lungo il segmento
+        var mxA=(pA[0]+qA[0])/2,myA=(pA[1]+qA[1])/2;
+        var angA=Math.atan2(qA[1]-pA[1],qA[0]-pA[0]);
+        ctx.save();ctx.translate(mxA,myA);ctx.rotate(angA);
+        ctx.fillStyle='rgba(255,255,255,0.9)';ctx.fillRect(-30,-14,60,14);
+        ctx.fillStyle='#1a5f9e';ctx.font='bold 11px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText((dA*1000).toFixed(1)+'um',0,-7);
+        ctx.restore();
+
+        // Linea B evidenziata (arancio tratteggiato)
+        if(projB2[hi]&&projB2[hj]&&dB!==null){
+          var pB=sc(projB2[hi]),qB=sc(projB2[hj]);
+          ctx.beginPath();ctx.moveTo(pB[0],pB[1]);ctx.lineTo(qB[0],qB[1]);
+          ctx.strokeStyle='rgba(186,117,23,0.15)';ctx.lineWidth=8;ctx.stroke();
+          ctx.beginPath();ctx.moveTo(pB[0],pB[1]);ctx.lineTo(qB[0],qB[1]);
+          ctx.strokeStyle='#ba7517';ctx.lineWidth=2;ctx.setLineDash([6,4]);ctx.stroke();
+          ctx.setLineDash([]);
+          var mxB=(pB[0]+qB[0])/2,myB=(pB[1]+qB[1])/2;
+          var angB=Math.atan2(qB[1]-pB[1],qB[0]-pB[0]);
+          ctx.save();ctx.translate(mxB,myB);ctx.rotate(angB);
+          ctx.fillStyle='rgba(255,248,238,0.9)';ctx.fillRect(-30,2,60,14);
+          ctx.fillStyle='#ba7517';ctx.font='bold 11px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText((dB*1000).toFixed(1)+'um',0,9);
+          ctx.restore();
+        }
+
+        // Nodi A di sfondo (grigio)
+        projA2.forEach(function(pa2,i){
+          if(i===hi||i===hj)return;
+          var pa=sc(pa2);
+          ctx.beginPath();ctx.arc(pa[0],pa[1],7,0,Math.PI*2);
+          ctx.fillStyle='rgba(200,215,235,0.7)';ctx.fill();
+          ctx.strokeStyle='#b0c4de';ctx.lineWidth=1;ctx.stroke();
+          ctx.fillStyle='#9ba8b8';ctx.font='bold 9px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText(''+(i+1),pa[0],pa[1]);ctx.textBaseline='alphabetic';
+        });
+        // Nodi B di sfondo (grigio arancio)
+        projB2.forEach(function(pb2,i){
+          if(!pb2||i===hi||i===hj)return;
+          var pb=sc(pb2);
+          ctx.beginPath();ctx.arc(pb[0],pb[1],6,0,Math.PI*2);
+          ctx.fillStyle='rgba(235,215,185,0.6)';ctx.fill();
+          ctx.strokeStyle='#d4b47a';ctx.lineWidth=1;ctx.stroke();
+        });
+
+        // Nodi A attivi (blu grandi)
+        [hi,hj].forEach(function(idx){
+          var pa=sc(projA2[idx]);
+          ctx.beginPath();ctx.arc(pa[0],pa[1],15,0,Math.PI*2);
+          ctx.fillStyle='rgba(26,95,158,0.07)';ctx.fill();
+          ctx.beginPath();ctx.arc(pa[0],pa[1],10,0,Math.PI*2);
+          ctx.fillStyle='rgba(26,95,158,0.14)';ctx.fill();
+          ctx.strokeStyle='#1a5f9e';ctx.lineWidth=2;ctx.stroke();
+          ctx.fillStyle='#1a5f9e';ctx.font='bold 11px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText(''+(idx+1),pa[0],pa[1]);ctx.textBaseline='alphabetic';
+          ctx.font='bold 9px monospace';ctx.textAlign='center';ctx.fillStyle='#1a5f9e';
+          ctx.fillText('A'+(idx+1),pa[0],pa[1]-20);
+        });
+
+        // Nodi B attivi (arancio)
+        [hi,hj].forEach(function(idx){
+          if(!projB2[idx])return;
+          var pb=sc(projB2[idx]);
+          ctx.beginPath();ctx.arc(pb[0],pb[1],9,0,Math.PI*2);
+          ctx.fillStyle='#ba7517';ctx.fill();
+          ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+          ctx.fillStyle='#fff';ctx.font='bold 11px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText(''+(idx+1),pb[0],pb[1]);ctx.textBaseline='alphabetic';
+          ctx.fillStyle='#ba7517';ctx.font='bold 9px monospace';ctx.textAlign='center';
+          ctx.fillText('B'+(idx+1),pb[0],pb[1]+19);
+        });
+
+        // Badge Δ in alto a destra del canvas
+        if(diff!==null){
+          var badge2=(diff>=0?'+':'')+diff.toFixed(1)+'um';
+          ctx.font='bold 12px monospace';
+          var bw2=ctx.measureText(badge2).width+22;
+          var bx2=CW-bw2-8,by2=8;
+          ctx.fillStyle=lv2.bg;
+          if(ctx.roundRect){ctx.beginPath();ctx.roundRect(bx2,by2,bw2,20,4);ctx.fill();}
+          else{ctx.fillRect(bx2,by2,bw2,20);}
+          ctx.strokeStyle=lv2.border;ctx.lineWidth=1;ctx.strokeRect(bx2,by2,bw2,20);
+          ctx.fillStyle=lv2.col;ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText(badge2,bx2+bw2/2,by2+10);ctx.textBaseline='alphabetic';
+        }
+
+        // Legenda
+        ctx.beginPath();ctx.arc(pad,CH-12,5,0,Math.PI*2);
+        ctx.strokeStyle='#1a5f9e';ctx.lineWidth=1.5;ctx.fillStyle='rgba(26,95,158,0.12)';ctx.fill();ctx.stroke();
+        ctx.fillStyle='#374151';ctx.font='9px monospace';ctx.textAlign='left';
+        ctx.fillText('Centroide A (riferimento)',pad+9,CH-8);
+        ctx.beginPath();ctx.arc(pad+145,CH-12,5,0,Math.PI*2);
+        ctx.fillStyle='#ba7517';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+        ctx.fillStyle='#374151';ctx.fillText('Centroide B (post-ICP)',pad+154,CH-8);
+        ctx.beginPath();ctx.moveTo(pad+290,CH-12);ctx.lineTo(pad+310,CH-12);
+        ctx.strokeStyle='rgba(26,95,158,0.8)';ctx.lineWidth=2;ctx.stroke();
+        ctx.fillStyle='#374151';ctx.fillText('Dist A',pad+314,CH-8);
+        ctx.beginPath();ctx.moveTo(pad+355,CH-12);ctx.lineTo(pad+375,CH-12);
+        ctx.strokeStyle='rgba(186,117,23,0.8)';ctx.lineWidth=2;ctx.setLineDash([5,3]);ctx.stroke();ctx.setLineDash([]);
+        ctx.fillStyle='#374151';ctx.fillText('Dist B',pad+379,CH-8);
+      });
+
+      // Inserisce mappa nel PDF (larghezza full, altezza proporzionale)
+      var pdfMapW=cw;
+      var pdfMapH=Math.round(mapH2/mapW2*pdfMapW);
+      doc.addImage(mapPng2,'PNG',ml,curY2,pdfMapW,pdfMapH);
+      curY2+=pdfMapH+8;
+
+      // ── Scheda dati numerici ─────────────────────────────────────
+      // Box sfondo colorato
+      doc.setFillColor(lvRGB2[0],lvRGB2[1],lvRGB2[2]);
+      doc.rect(ml,curY2,cw,36,'F');
+      var bdrRGB=hexRGB(lv2.border);
+      doc.setDrawColor(bdrRGB[0],bdrRGB[1],bdrRGB[2]);
+      doc.setLineWidth(0.5);
+      doc.rect(ml,curY2,cw,36,'D');
+
+      // Colonne dati
+      var dcol=[ml+4, ml+46, ml+92, ml+138];
+      var dcw=42;
+
+      doc.setFont('helvetica','bold');doc.setFontSize(7);setTxt('#374151');
+      doc.text('DISTANZA A',dcol[0],curY2+6);
+      doc.text('DISTANZA B',dcol[1],curY2+6);
+      doc.text('DIFFERENZA',dcol[2],curY2+6);
+      doc.text('VALUTAZIONE',dcol[3],curY2+6);
+
+      doc.setFontSize(11);doc.setFont('helvetica','bold');
+      setTxt('#1a5f9e');
+      doc.text((dA*1000).toFixed(1)+'um',dcol[0],curY2+17);
+      doc.setFontSize(8);doc.setFont('helvetica','normal');setTxt('#374151');
+      doc.text((dA).toFixed(4)+' mm',dcol[0],curY2+23);
+
+      if(dB!==null){
+        doc.setFontSize(11);doc.setFont('helvetica','bold');setTxt('#ba7517');
+        doc.text((dB*1000).toFixed(1)+'um',dcol[1],curY2+17);
+        doc.setFontSize(8);doc.setFont('helvetica','normal');setTxt('#374151');
+        doc.text((dB).toFixed(4)+' mm',dcol[1],curY2+23);
+
+        doc.setFontSize(12);doc.setFont('helvetica','bold');
+        doc.setTextColor(lvFG[0],lvFG[1],lvFG[2]);
+        doc.text(diffStr,dcol[2],curY2+17);
+
+        // Draw evaluation colored box — spaziatura compatta
+        var _evBg=hexRGB(lv2.bg), _evFg=hexRGB(lv2.col);
+        doc.setFillColor(_evBg[0],_evBg[1],_evBg[2]);
+        doc.rect(dcol[3]-1,curY2+7,W-mr-dcol[3]+1,26,'F');
+        // Label valutazione (bold, grande)
+        doc.setFontSize(8);doc.setFont('helvetica','bold');
+        doc.setTextColor(_evFg[0],_evFg[1],_evFg[2]);
+        doc.text(label,dcol[3]+1,curY2+13);
+        // Direzione
+        doc.setFont('helvetica','normal');doc.setFontSize(6);
+        doc.setTextColor(55,65,81);
+        var _dir=diff>=0?'B distante da A':'B vicino ad A';
+        doc.text(_dir,dcol[3]+1,curY2+19);
+        // Soglie su 2 righe ravvicinate
+        doc.setFontSize(5.5);
+        doc.text('0-50um Ottimo   50-100um Buono',dcol[3]+1,curY2+24);
+        doc.text('100-200um Accettabile   >200um Verifica',dcol[3]+1,curY2+29);
+      } else {
+        doc.setFontSize(9);doc.setFont('helvetica','normal');setTxt('#9ca3af');
+        doc.text('Non abbinato',dcol[1],curY2+17);
+        doc.text('-',dcol[2],curY2+17);
+        doc.text('Centroide B assente',dcol[3],curY2+17);
+      }
+
+      curY2+=44;
+
+      // ── Tutte le altre coppie a confronto (mini-tabella riassuntiva) ──
+      if(pairsD.length>1){
+        doc.setFont('helvetica','bold');doc.setFontSize(7);setTxt('#374151');
+        doc.text('Confronto con le altre coppie:',ml,curY2+4);
+        curY2+=7;
+
+        // Mini header
+        setFill('#e2e8f0');doc.rect(ml,curY2,cw,5,'F');
+        doc.setFont('helvetica','bold');doc.setFontSize(6);setTxt('#374151');
+        doc.text('Coppia',ml+1,curY2+3.5);
+        doc.text('A (um)',ml+28,curY2+3.5);
+        doc.text('B (um)',ml+58,curY2+3.5);
+        doc.text('Delta',ml+88,curY2+3.5);
+        doc.text('Note',ml+118,curY2+3.5);
+        curY2+=5;
+
+        pairsD.forEach(function(ij2,k2){
+          var isActive=ij2[0]===hi&&ij2[1]===hj;
+          var dA2=dist3pdf(ctA2[ij2[0]],ctA2[ij2[1]]);
+          var dB2=(ctB2[ij2[0]]&&ctB2[ij2[1]])?dist3pdf(ctB2[ij2[0]],ctB2[ij2[1]]):null;
+          var diff2=dB2!==null?(dB2-dA2)*1000:null;
+          var lv3=diff2!==null?diffColorPdf(diff2):{col:'#9ca3af',bg:'#f3f4f6',border:'#e5e7eb'};
+
+          if(isActive){
+            setFill('#dbeafe');doc.rect(ml,curY2,cw,5,'F');
+          } else if(k2%2===0){
+            setFill('#f8fafc');doc.rect(ml,curY2,cw,5,'F');
+          }
+          doc.setDrawColor(220,230,240);doc.setLineWidth(0.15);
+          doc.line(ml,curY2+5,ml+cw,curY2+5);
+
+          if(isActive){
+            doc.setFont('helvetica','bold');doc.setFontSize(6);setTxt('#1a5f9e');
+            doc.text('> #'+(ij2[0]+1)+'-#'+(ij2[1]+1)+' (questa)',ml+1,curY2+3.5);
+          } else {
+            doc.setFont('helvetica','normal');doc.setFontSize(6);setTxt('#374151');
+            doc.text('#'+(ij2[0]+1)+'-#'+(ij2[1]+1),ml+1,curY2+3.5);
+          }
+
+          setTxt('#1a5f9e');doc.setFont('helvetica',isActive?'bold':'normal');
+          doc.text((dA2*1000).toFixed(1),ml+28,curY2+3.5);
+
+          if(dB2!==null){
+            setTxt('#ba7517');
+            doc.text((dB2*1000).toFixed(1),ml+58,curY2+3.5);
+            var lv3RGB=hexRGB(lv3.bg),lv3FG=hexRGB(lv3.col);
+            doc.setFillColor(lv3RGB[0],lv3RGB[1],lv3RGB[2]);
+            doc.rect(ml+82,curY2+0.5,22,4,'F');
+            doc.setTextColor(lv3FG[0],lv3FG[1],lv3FG[2]);
+            doc.setFont('helvetica','bold');
+            doc.text((diff2>=0?'+':'')+diff2.toFixed(1),ml+83,curY2+3.5);
+            setTxt('#374151');doc.setFont('helvetica','normal');
+            var lb2=Math.abs(diff2)<50?'Ottimo':Math.abs(diff2)<100?'Buono':Math.abs(diff2)<200?'Accept.':'Verifica';
+            doc.text(lb2,ml+118,curY2+3.5);
+          } else {
+            setTxt('#9ca3af');doc.text('-',ml+58,curY2+3.5);doc.text('-',ml+88,curY2+3.5);doc.text('N/A',ml+118,curY2+3.5);
+          }
+          curY2+=5;
+        });
+      }
+
+      // ── Footer pagina ────────────────────────────────────────────
+      doc.setFont('helvetica','normal');doc.setFontSize(7);setTxt('#7A90A4');
+      doc.line(ml,H-8,W-mr,H-8);
+      doc.text('Syntesis-ICP · Distanza inter-centroide #'+(hi+1)+'-#'+(hj+1),ml,H-4);
+      var totPages=p.pairs.length+1+nTotal;
+      doc.text('Pag. '+(p.pairs.length+1+pageIdx+1)+' / '+totPages,W-mr,H-4,{align:'right'});
+    });
+  }
+
+  // ── Save ────────────────────────────────────────────────────────────
+  var fname='PrecisionReport_v7_'+new Date().toISOString().slice(0,10)+'.pdf';
+  doc.save(fname);
+}
+
+
+// ── paintViewCylShaded - renders ONE cylinder, shaded with lighting ──────
+function paintViewCyl(cv, triA_cyl, triB_cyl, ax1, ax2, axD, title, cylIdx){
+  if(!cv)return;
+  var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  var pd=8, th=22;
+  var vw=W-pd*2, vh=H-pd*2-th;
+
+  // Background
+  ctx.clearRect(0,0,W,H);
+  var bg=ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#f0f5fa'); bg.addColorStop(1,'#e8eff8');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+  // Viewport
+  ctx.fillStyle='#ffffff'; ctx.fillRect(pd,pd,vw,vh);
+  ctx.strokeStyle='#c8d8e8'; ctx.lineWidth=1.5; ctx.strokeRect(pd,pd,vw,vh);
+
+  var allT=(triA_cyl||[]).concat(triB_cyl||[]);
+  if(!allT.length){
+    ctx.fillStyle='rgba(0,50,100,0.7)'; ctx.fillRect(pd,pd+vh,vw,th);
+    ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(title, W/2, pd+vh+th/2); return;
+  }
+
+  // Compute tight bounds from THIS cylinder only
+  var mn1=Infinity,mx1=-Infinity,mn2=Infinity,mx2=-Infinity;
+  allT.forEach(function(t){t.forEach(function(v){
+    if(v[ax1]<mn1)mn1=v[ax1]; if(v[ax1]>mx1)mx1=v[ax1];
+    if(v[ax2]<mn2)mn2=v[ax2]; if(v[ax2]>mx2)mx2=v[ax2];
+  });});
+  var rg=Math.max(mx1-mn1,mx2-mn2)||1;
+  var margin=rg*0.15; // tight zoom
+  var c1=(mn1+mx1)/2, c2=(mn2+mx2)/2;
+  var scale=Math.min(vw,vh)/(rg+margin*2);
+
+  function px(v){
+    return [
+      pd+(v[ax1]-(c1-rg/2-margin))*scale + (vw-(rg+margin*2)*scale)/2,
+      pd+vh-(v[ax2]-(c2-rg/2-margin))*scale - (vh-(rg+margin*2)*scale)/2
+    ];
+  }
+
+  // Lighting: define a light direction for pseudo-3D shading
+  // Light from top-left-front: normalized vector
+  // Luce da top-front-right per una visione solida
+  var lightDir=[0.35, 0.65, 0.65]; // in 3D space
+  var lLen=Math.sqrt(lightDir[0]*lightDir[0]+lightDir[1]*lightDir[1]+lightDir[2]*lightDir[2]);
+  lightDir=[lightDir[0]/lLen,lightDir[1]/lLen,lightDir[2]/lLen];
+
+  function faceNormal(t){
+    // Cross product of two edges
+    var ax=t[1][0]-t[0][0], ay=t[1][1]-t[0][1], az=t[1][2]-t[0][2];
+    var bx=t[2][0]-t[0][0], by=t[2][1]-t[0][1], bz=t[2][2]-t[0][2];
+    var nx=ay*bz-az*by, ny=az*bx-ax*bz, nz=ax*by-ay*bx;
+    var len=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+    return[nx/len,ny/len,nz/len];
+  }
+
+  function shade(t, baseR, baseG, baseB){
+    var n=faceNormal(t);
+    var diff=Math.max(0, n[0]*lightDir[0]+n[1]*lightDir[1]+n[2]*lightDir[2]);
+    // Luce secondaria da sotto-destra per rim lighting
+    var diff2=Math.max(0,-n[0]*0.3+n[1]*0.2-n[2]*0.4)*0.25;
+    // Specular highlight (Phong, shininess 16)
+    var rx2=2*n[0]*diff-lightDir[0], ry2=2*n[1]*diff-lightDir[1], rz2=2*n[2]*diff-lightDir[2];
+    var spec=Math.pow(Math.max(0,rz2),12)*0.18; // viewer da +Z
+    var ambient=0.30, diffuse=0.55;
+    var intensity=Math.min(1, ambient+diffuse*diff+diff2+spec);
+    var r=Math.min(255,Math.round(baseR*intensity));
+    var g=Math.min(255,Math.round(baseG*intensity));
+    var b=Math.min(255,Math.round(baseB*intensity));
+    return 'rgb('+r+','+g+','+b+')';
+  }
+
+  // Depth sort all triangles together (painter's algorithm)
+  function prepareTris(tris, br, bg2, bb){
+    return tris.map(function(t){
+      var d=(t[0][axD]+t[1][axD]+t[2][axD])/3;
+      return {t:t, d:d, r:br, g:bg2, b:bb};
+    });
+  }
+
+  var allItems=[];
+  if(triA_cyl&&triA_cyl.length)
+    allItems=allItems.concat(prepareTris(triA_cyl,  38,120,200));  // blue - reference
+  if(triB_cyl&&triB_cyl.length)
+    allItems=allItems.concat(prepareTris(triB_cyl, 220,130, 30));  // amber - measured
+
+  // Sort back-to-front
+  allItems.sort(function(a,b){return a.d-b.d;});
+
+  // Draw shaded triangles
+  allItems.forEach(function(item){
+    var t=item.t;
+    var p0=px(t[0]),p1=px(t[1]),p2=px(t[2]);
+    var col=shade(t, item.r, item.g, item.b);
+    ctx.beginPath();
+    ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.lineTo(p2[0],p2[1]);
+    ctx.closePath();
+    ctx.fillStyle=col;
+    ctx.fill();
+    // Very subtle edge (only for definition, not wireframe look)
+    // No edge -- il bordo crea la texture pixellata a scacchi
+    // ctx.stroke();  // rimosso per rendering solido pulito
+  });
+
+  // Centroid markers
+  var pair=window._LR&&window._LR.pairs[cylIdx];
+  if(pair&&pair.a){
+    var pa=px(pair.a);
+    ctx.beginPath();ctx.arc(pa[0],pa[1],9,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,101,179,0.2)';ctx.fill();
+    ctx.beginPath();ctx.arc(pa[0],pa[1],5,0,Math.PI*2);
+    ctx.fillStyle='#0065B3';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('A',pa[0],pa[1]);ctx.textBaseline='alphabetic';
+  }
+  if(pair&&pair.b){
+    var pb=px(pair.b);
+    var d3um=pair.d3!==null?Math.round(pair.d3*1000):0;
+    var col2=clinLevel(d3um).col;
+    ctx.beginPath();ctx.arc(pb[0],pb[1],9,0,Math.PI*2);
+    ctx.fillStyle=col2+'33';ctx.fill();
+    ctx.beginPath();ctx.arc(pb[0],pb[1],5,0,Math.PI*2);
+    ctx.fillStyle=col2;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('B',pb[0],pb[1]);ctx.textBaseline='alphabetic';
+    // Deviation line A→B
+    if(pair.a){
+      var pa2=px(pair.a);
+      ctx.beginPath();ctx.moveTo(pa2[0],pa2[1]);ctx.lineTo(pb[0],pb[1]);
+      ctx.strokeStyle=col2;ctx.lineWidth=1.5;ctx.setLineDash([3,3]);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Legend dots
+  ctx.fillStyle='rgba(38,120,200,0.9)';ctx.beginPath();ctx.arc(pd+8,pd+vh-12,4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#1a3a5c';ctx.font='bold 9px sans-serif';ctx.textAlign='left';
+  ctx.fillText('A - Riferimento',pd+16,pd+vh-9);
+  ctx.fillStyle='rgba(220,130,30,0.9)';ctx.beginPath();ctx.arc(pd+8,pd+vh-3,4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#5c3010';ctx.fillText('B - Misurato',pd+16,pd+vh);
+
+  // Title bar
+  ctx.fillStyle='rgba(0,50,100,0.82)'; ctx.fillRect(pd,pd+vh,vw,th);
+  ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(title, W/2, pd+vh+th/2); ctx.textBaseline='alphabetic';
+}
+
+window.C_pdf = pdf;
+
+
+
+// ── Progress bar finta (distrae mentre il server calcola) ────────────────────
+var _AP = (function() {
+  var _timer = null;
+  var _barTimer = null;
+  var _idx = 0;
+  var _pct = 0;
+  var _targetPct = 0;
+  var _phrases = {
+    it: ["Inizializzazione motore ICP...", "Caricamento mesh superficiale...", "Decomposizione triangolare in corso...", "Calcolo normali alle facce...", "Identificazione scanbody primari...", "Allineamento pre-registrazione...", "Stima centroidi geometrici...", "Applicazione trasformazione rigida...", "Iterazione Kabsch n.1...", "Iterazione Kabsch n.2...", "Iterazione Kabsch n.3...", "Convergenza SVD in corso...", "Decomposizione ai valori singolari...", "Calcolo matrice di covarianza...", "Ottimizzazione rotazione 3D...", "Verifica stabilità numerica...", "Raffinamento ICP iterativo...", "Minimizzazione errore quadratico medio...", "Analisi componenti principali...", "Costruzione KD-tree spaziale...", "Ricerca nearest neighbor...", "Proiezione assi cilindrici...", "Calcolo deviazioni assiali...", "Stima vettori normali superficiali...", "Clustering geometrico automatico...", "Separazione mesh scanbody / mucosa...", "Filtraggio outlier statistici...", "Correzione offset globale...", "Calcolo distanze inter-centroide...", "Analisi dispersione punti...", "Verifica coerenza topologica...", "Interpolazione superficie di riferimento...", "Stima errore di registrazione residuo...", "Calcolo RMSD tridimensionale...", "Analisi componente XY...", "Analisi componente Z...", "Stima angolo di inclinazione assiale...", "Confronto profilo rilevato...", "Identificazione impianto: scansione in corso...", "Matching database geometrico...", "Verifica tolleranze ISO 14801...", "Calcolo norma L6 ponderata...", "Applicazione peso componente laterale...", "Applicazione peso componente verticale...", "Calcolo efficacia combinata...", "Conversione unità: mm → μm...", "Arrotondamento valori clinici...", "Generazione matrice di trasformazione finale...", "Validazione risultati...", "Calcolo intervalli di confidenza...", "Stima incertezza di misura...", "Verifica ripetibilità intra-sessione...", "Analisi simmetria mesh...", "Calcolo baricentro globale...", "Allineamento sistema di riferimento...", "Ottimizzazione parametri di scala...", "Verifica integrità file STL...", "Parsing header binario...", "Controllo consistenza normali...", "Rilevamento superfici degeneri...", "Correzione orientamento facce...", "Analisi curvatura locale...", "Stima dimensione scanbody...", "Classificazione forma geometrica...", "Mappatura superficie cilindrica...", "Estrazione asse longitudinale...", "Calcolo angolo divergenza...", "Proiezione piano occlusale...", "Allineamento piano di riferimento...", "Stima parallelismo implantare...", "Valutazione concordanza angolare...", "Applicazione filtro mediano...", "Rimozione rumore superficiale...", "Compensazione distorsione scanner...", "Normalizzazione scala metrica...", "Verifica unità di misura...", "Controllo risoluzione mesh...", "Stima densità triangolare...", "Analisi distribuzione punti...", "Ottimizzazione memoria di calcolo...", "Parallelizzazione operazioni vettoriali...", "Riduzione dimensionalità...", "Proiezione spazio euclideo 3D...", "Calcolo distanza di Hausdorff...", "Stima errore massimo locale...", "Analisi worst-case scenario...", "Validazione soglie cliniche...", "Confronto standard protesici...", "Generazione report diagnostico...", "Calcolo score di precisione...", "Ponderazione fattori critici...", "Applicazione curva di valutazione...", "Normalizzazione punteggio finale...", "Verifica coerenza dati...", "Compilazione risultati...", "Formattazione output clinico...", "Preparazione visualizzazione...", "Generazione tabella deviazioni...", "Calcolo grafico di convergenza...", "Finalizzazione analisi ICP...", "Elaborazione completata.",
+    "Reticolando le spline...", "Inversione della matrice di adiacenza...", "Allineamento delle matrici di covarianza...", "Parametrizzazione delle superfici non-euclidee...", "Calcolo dei vettori di flusso...", "Normalizzazione dei coefficienti di probabilità...", "Risoluzione delle equazioni differenziali del caos...", "Iterazione degli algoritmi di pathfinding...", "Hashing delle stringhe di identità...", "Ottimizzazione dei buffer di rendering...", "Calcolo della densità della nebbia...", "Sincronizzazione della velocità degli orologi...", "Sintetizzazione dei campioni di rumore...", "Inizializzazione dei motori di calcolo...", "Calibrazione dei parametri di simulazione..."],
+    en: ["Initializing ICP engine...", "Loading surface mesh...", "Triangular decomposition in progress...", "Computing face normals...", "Identifying primary scanbodies...", "Searching optimal rotation (0°–360°)...", "Hungarian inter-centroid matching...", "Minimizing assignment cost...", "Pre-registration alignment...", "Estimating geometric centroids...", "Applying rigid transformation...", "Kabsch iteration n.1...", "Kabsch iteration n.2...", "Kabsch iteration n.3...", "SVD convergence in progress...", "Singular value decomposition...", "Computing covariance matrix...", "Optimizing 3D rotation...", "Checking numerical stability...", "Iterative ICP refinement...", "Minimizing mean square error...", "Principal component analysis...", "Building spatial KD-tree...", "Nearest neighbor search...", "Projecting cylindrical axes...", "Computing axial deviations...", "Estimating surface normal vectors...", "Automatic geometric clustering...", "Separating scanbody/mucosa mesh...", "Filtering statistical outliers...", "Correcting global offset...", "Computing inter-centroid distances...", "Analyzing point dispersion...", "Verifying topological consistency...", "Interpolating reference surface...", "Estimating residual registration error...", "Computing 3D RMSD...", "Analyzing XY component...", "Analyzing Z component...", "Estimating axial tilt angle...", "Comparing detected profile...", "Implant identification: scanning...", "Geometric database matching...", "Verifying ISO 14801 tolerances...", "Computing weighted L6 norm...", "Applying lateral component weight...", "Applying vertical component weight...", "Computing combined efficiency...", "Unit conversion: mm → μm...", "Rounding clinical values...", "Generating final transformation matrix...", "Validating results...", "Computing confidence intervals...", "Estimating measurement uncertainty...", "Verifying intra-session repeatability...", "Analyzing mesh symmetry...", "Computing global centroid...", "Aligning reference system...", "Optimizing scale parameters...", "Verifying STL file integrity...", "Parsing binary header...", "Checking normal consistency...", "Detecting degenerate surfaces...", "Correcting face orientation...", "Analyzing local curvature...", "Estimating scanbody size...", "Classifying geometric shape...", "Mapping cylindrical surface...", "Extracting longitudinal axis...", "Computing divergence angle...", "Projecting occlusal plane...", "Aligning reference plane...", "Estimating implant parallelism...", "Evaluating angular agreement...", "Applying scoring function...", "Computing hyperbolic efficiency...", "Generating color map...", "Rendering graphical output...", "Formatting numerical values...", "Preparing PDF structure...", "Inserting colometric legend...", "Generating deviation card...", "Composing inter-centroid graph...", "Finalizing page layout...", "Applying digital signature...", "Archiving result...", "Updating analysis database...", "Preparing leaderboard entry...", "Computing global ranking...", "Applying precision filters...", "Verifying data consistency...", "Generating unique session ID...", "Encrypting result token...", "Preparing 3D visualization...", "Generating deviation table...", "Computing convergence chart...", "Finalizing ICP analysis...", "Processing complete.",
+    "Reticulating splines...", "Inverting the adjacency matrix...", "Aligning the covariance matrices...", "Parameterizing non-Euclidean surfaces...", "Computing flow vectors...", "Normalizing probability coefficients...", "Solving chaotic differential equations...", "Iterating pathfinding algorithms...", "Hashing identity strings...", "Optimizing rendering buffers...", "Computing fog density...", "Synchronizing clock speeds...", "Synthesizing noise samples...", "Initializing computation engines...", "Calibrating simulation parameters..."],
+    es: ["Inicializando motor ICP...", "Cargando malla superficial...", "Descomposición triangular en curso...", "Calculando normales de cara...", "Identificando scanbodies primarios...", "Buscando rotación óptima (0°–360°)...", "Matching húngaro inter-centroide...", "Minimizando coste de asignación...", "Alineación pre-registro...", "Estimando centroides geométricos...", "Aplicando transformación rígida...", "Iteración Kabsch n.1...", "Iteración Kabsch n.2...", "Iteración Kabsch n.3...", "Convergencia SVD en curso...", "Descomposición en valores singulares...", "Calculando matriz de covarianza...", "Optimizando rotación 3D...", "Verificando estabilidad numérica...", "Refinamiento ICP iterativo...", "Minimizando error cuadrático medio...", "Análisis de componentes principales...", "Construyendo KD-tree espacial...", "Búsqueda del vecino más próximo...", "Proyectando ejes cilíndricos...", "Calculando desviaciones axiales...", "Estimando vectores normales superficiales...", "Clustering geométrico automático...", "Separando malla scanbody/mucosa...", "Filtrando valores atípicos...", "Corrigiendo offset global...", "Calculando distancias inter-centroide...", "Analizando dispersión de puntos...", "Verificando consistencia topológica...", "Interpolando superficie de referencia...", "Estimando error residual de registro...", "Calculando RMSD tridimensional...", "Analizando componente XY...", "Analizando componente Z...", "Estimando ángulo de inclinación axial...", "Comparando perfil detectado...", "Identificación de implante: escaneando...", "Matching base de datos geométrica...", "Verificando tolerancias ISO 14801...", "Calculando norma L6 ponderada...", "Aplicando peso componente lateral...", "Aplicando peso componente vertical...", "Calculando eficiencia combinada...", "Conversión unidades: mm → μm...", "Redondeando valores clínicos...", "Generando matriz de transformación final...", "Validando resultados...", "Calculando intervalos de confianza...", "Estimando incertidumbre de medición...", "Verificando repetibilidad intra-sesión...", "Analizando simetría de malla...", "Calculando baricentro global...", "Alineando sistema de referencia...", "Optimizando parámetros de escala...", "Verificando integridad del archivo STL...", "Parseando cabecera binaria...", "Comprobando consistencia de normales...", "Detectando superficies degeneradas...", "Corrigiendo orientación de caras...", "Analizando curvatura local...", "Estimando tamaño del scanbody...", "Clasificando forma geométrica...", "Mapeando superficie cilíndrica...", "Extrayendo eje longitudinal...", "Calculando ángulo de divergencia...", "Proyectando plano oclusal...", "Alineando plano de referencia...", "Estimando paralelismo implantario...", "Evaluando concordancia angular...", "Aplicando función de puntuación...", "Calculando eficiencia hiperbólica...", "Generando mapa de color...", "Renderizando salida gráfica...", "Formateando valores numéricos...", "Preparando estructura PDF...", "Insertando leyenda colorimétrica...", "Generando tarjeta de desviación...", "Componiendo gráfico inter-centroide...", "Finalizando diseño de página...", "Aplicando firma digital...", "Archivando resultado...", "Actualizando base de datos de análisis...", "Preparando entrada en clasificación...", "Calculando ranking global...", "Aplicando filtros de precisión...", "Verificando consistencia de datos...", "Generando ID de sesión único...", "Cifrando token de resultado...", "Preparando visualización 3D...", "Generando tabla de desviaciones...", "Calculando gráfico de convergencia...", "Finalizando análisis ICP...", "Procesamiento completado.",
+    "Reticulando splines...", "Invirtiendo la matriz de adyacencia...", "Alineando matrices de covarianza...", "Parametrizando superficies no euclídeas...", "Calculando vectores de flujo...", "Normalizando coeficientes de probabilidad...", "Resolviendo ecuaciones diferenciales del caos...", "Iterando algoritmos de pathfinding...", "Hasheando cadenas de identidad...", "Optimizando buffers de renderizado...", "Calculando densidad de niebla...", "Sincronizando velocidades de reloj...", "Sintetizando muestras de ruido...", "Inicializando motores de cálculo...", "Calibrando parámetros de simulación..."],
+    fr: ["Initialisation moteur ICP...", "Chargement maillage surfacique...", "Décomposition triangulaire en cours...", "Calcul des normales de face...", "Identification des scanbodies primaires...", "Recherche rotation optimale (0°–360°)...", "Matching hongrois inter-centroïde...", "Minimisation cout affectation...", "Alignement pré-registration...", "Estimation centroïdes géométriques...", "Application transformation rigide...", "Itération Kabsch n.1...", "Itération Kabsch n.2...", "Itération Kabsch n.3...", "Convergence SVD en cours...", "Décomposition en valeurs singulières...", "Calcul matrice de covariance...", "Optimisation rotation 3D...", "Vérification stabilité numérique...", "Raffinement ICP itératif...", "Minimisation erreur quadratique moyenne...", "Analyse composantes principales...", "Construction KD-tree spatial...", "Recherche voisin le plus proche...", "Projection axes cylindriques...", "Calcul déviations axiales...", "Estimation vecteurs normaux surfaciques...", "Clustering géométrique automatique...", "Séparation maillage scanbody/muqueuse...", "Filtrage valeurs aberrantes...", "Correction offset global...", "Calcul distances inter-centroïde...", "Analyse dispersion des points...", "Vérification cohérence topologique...", "Interpolation surface de référence...", "Estimation erreur résiduelle...", "Calcul RMSD tridimensionnel...", "Analyse composante XY...", "Analyse composante Z...", "Estimation angle inclinaison axiale...", "Comparaison profil détecté...", "Identification implant: scan en cours...", "Matching base données géométrique...", "Vérification tolérances ISO 14801...", "Calcul norme L6 pondérée...", "Application poids composante latérale...", "Application poids composante verticale...", "Calcul efficacité combinée...", "Conversion unités: mm → μm...", "Arrondi valeurs cliniques...", "Génération matrice transformation finale...", "Validation résultats...", "Calcul intervalles de confiance...", "Estimation incertitude de mesure...", "Vérification répétabilité intra-session...", "Analyse symétrie du maillage...", "Calcul barycentre global...", "Alignement système de référence...", "Optimisation parametres echelle...", "Vérification intégrité fichier STL...", "Parsing en-tête binaire...", "Contrôle cohérence des normales...", "Détection surfaces dégénérées...", "Correction orientation des faces...", "Analyse courbure locale...", "Estimation taille scanbody...", "Classification forme géométrique...", "Cartographie surface cylindrique...", "Extraction axe longitudinal...", "Calcul angle de divergence...", "Projection plan occlusal...", "Alignement plan de référence...", "Estimation parallélisme implantaire...", "Évaluation concordance angulaire...", "Application fonction de score...", "Calcul efficacité hyperbolique...", "Génération carte de couleur...", "Rendu sortie graphique...", "Formatage valeurs numériques...", "Préparation structure PDF...", "Insertion légende colorimétrique...", "Génération carte de déviation...", "Composition graphique inter-centroïde...", "Finalisation mise en page...", "Application signature numérique...", "Archivage résultat...", "Mise à jour base données analyses...", "Préparation entrée classement...", "Calcul classement global...", "Application filtres de précision...", "Vérification cohérence données...", "Génération ID session unique...", "Chiffrement token résultat...", "Préparation visualisation 3D...", "Génération tableau déviations...", "Calcul graphique convergence...", "Finalisation analyse ICP...", "Traitement terminé.",
+    "Réticulation des splines...", "Inversion de la matrice d'adjacence...", "Alignement des matrices de covariance...", "Paramétrisation des surfaces non euclidiennes...", "Calcul des vecteurs de flux...", "Normalisation des coefficients de probabilité...", "Résolution des équations différentielles du chaos...", "Itération des algorithmes de recherche de chemin...", "Hachage des chaînes d'identité...", "Optimisation des tampons de rendu...", "Calcul de la densité du brouillard...", "Synchronisation des vitesses des horloges...", "Synthèse des échantillons de bruit...", "Initialisation des moteurs de calcul...", "Calibration des paramètres de simulation..."],
+    de: ["ICP-Engine wird initialisiert...", "Oberflächengitter wird geladen...", "Dreieckszerlegung läuft...", "Flächennormalen werden berechnet...", "Primäre Scanbodies werden identifiziert...", "Optimale Rotation suchen (0°–360°)...", "Ungarisches Inter-Zentroid-Matching...", "Zuweisungskosten minimieren...", "Vorregistrierungs-Ausrichtung...", "Geometrische Zentroide schätzen...", "Starre Transformation anwenden...", "Kabsch-Iteration n.1...", "Kabsch-Iteration n.2...", "Kabsch-Iteration n.3...", "SVD-Konvergenz läuft...", "Singulärwertzerlegung...", "Kovarianzmatrix berechnen...", "3D-Rotation optimieren...", "Numerische Stabilität prüfen...", "Iterative ICP-Verfeinerung...", "Mittleren quadratischen Fehler minimieren...", "Hauptkomponentenanalyse...", "Räumlichen KD-Baum aufbauen...", "Nächster-Nachbar-Suche...", "Zylindrische Achsen projizieren...", "Axiale Abweichungen berechnen...", "Oberflächennormalvektoren schätzen...", "Automatisches geometrisches Clustering...", "Scanbody/Mukosa-Gitter trennen...", "Statistische Ausreißer filtern...", "Globalen Offset korrigieren...", "Inter-Zentroid-Abstände berechnen...", "Punktdispersion analysieren...", "Topologische Konsistenz prüfen...", "Referenzoberfläche interpolieren...", "Restregistrierungsfehler schätzen...", "3D-RMSD berechnen...", "XY-Komponente analysieren...", "Z-Komponente analysieren...", "Axialen Neigungswinkel schätzen...", "Erkanntes Profil vergleichen...", "Implantat-Identifikation: Scannen...", "Geometrische Datenbank abgleichen...", "ISO 14801-Toleranzen prüfen...", "Gewichtete L6-Norm berechnen...", "Laterales Komponentengewicht anwenden...", "Vertikales Komponentengewicht anwenden...", "Kombinierte Effizienz berechnen...", "Einheiten umrechnen: mm → μm...", "Klinische Werte runden...", "Finale Transformationsmatrix generieren...", "Ergebnisse validieren...", "Konfidenzintervalle berechnen...", "Messunsicherheit schätzen...", "Intra-Session-Wiederholbarkeit prüfen...", "Gittersymmetrie analysieren...", "Globalen Schwerpunkt berechnen...", "Referenzsystem ausrichten...", "Skalierungsparameter optimieren...", "STL-Datei-Integrität prüfen...", "Binären Header parsen...", "Normalkonsistenz prüfen...", "Degenerierte Flächen erkennen...", "Flächenorientierung korrigieren...", "Lokale Krümmung analysieren...", "Scanbody-Größe schätzen...", "Geometrische Form klassifizieren...", "Zylindrische Oberfläche kartieren...", "Längsachse extrahieren...", "Divergenzwinkel berechnen...", "Okklusalebene projizieren...", "Referenzebene ausrichten...", "Implant-Parallelismus schätzen...", "Winkelübereinstimmung bewerten...", "Bewertungsfunktion anwenden...", "Hyperbolische Effizienz berechnen...", "Farbkarte generieren...", "Grafische Ausgabe rendern...", "Numerische Werte formatieren...", "PDF-Struktur vorbereiten...", "Kolorimetrische Legende einfügen...", "Abweichungskarte generieren...", "Inter-Zentroid-Diagramm erstellen...", "Seitenlayout finalisieren...", "Digitale Signatur anwenden...", "Ergebnis archivieren...", "Analysedatenbank aktualisieren...", "Ranglisten-Eintrag vorbereiten...", "Globales Ranking berechnen...", "Präzisionsfilter anwenden...", "Datenkonsistenz prüfen...", "Eindeutige Sitzungs-ID generieren...", "Ergebnis-Token verschlüsseln...", "3D-Visualisierung vorbereiten...", "Abweichungstabelle generieren...", "Konvergenzdiagramm berechnen...", "ICP-Analyse abschließen...", "Verarbeitung abgeschlossen.",
+    "Splines retikulieren...", "Adjazenzmatrix invertieren...", "Kovarianzmatrizen ausrichten...", "Nicht-euklidische Flächen parametrisieren...", "Flussvektoren berechnen...", "Wahrscheinlichkeitskoeffizienten normalisieren...", "Chaotische Differentialgleichungen lösen...", "Pfadfindungsalgorithmen iterieren...", "Identitäts-Strings hashen...", "Rendering-Puffer optimieren...", "Nebeldichte berechnen...", "Uhrengeschwindigkeiten synchronisieren...", "Rauschproben synthetisieren...", "Berechnungsmotoren initialisieren...", "Simulationsparameter kalibrieren..."]
+  };
+  var _phrasesArr = _phrases[typeof _lang!=='undefined'?_lang:'it'] || _phrases.it
+
+  // Mescola le frasi (Fisher-Yates)
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  function start() {
+    var el = document.getElementById('analysis-progress');
+    var bar = document.getElementById('ap-bar');
+    var phrase = document.getElementById('ap-phrase');
+    var pct = document.getElementById('ap-pct');
+    if (!el) return;
+
+    el.style.display = 'block';
+    _idx = 0;
+    _pct = 0;
+    _targetPct = 0;
+    var shuffled = shuffle(_phrases[typeof _lang!=="undefined"?_lang:"it"] || _phrases.it);
+    var totalPhrases = shuffled.length;
+
+    // Avanza la percentuale lentamente, si ferma al 92% in attesa del server
+    function advancePct() {
+      if (_pct < _targetPct) {
+        _pct = Math.min(_pct + 0.8, _targetPct);
+        if (bar) bar.style.width = _pct + '%';
+        if (pct) pct.textContent = Math.round(_pct) + '%';
+      }
+      _barTimer = setTimeout(advancePct, 40);
+    }
+    advancePct();
+
+    function nextPhrase() {
+      if (!document.getElementById('analysis-progress')) return;
+      if (phrase) phrase.classList.add('fade');
+      setTimeout(function() {
+        if (!phrase) return;
+        var p = shuffled[_idx % totalPhrases];
+        phrase.textContent = p;
+        phrase.classList.remove('fade');
+        _idx++;
+        // Avanza target percentuale proporzionalmente (max 92%)
+        _targetPct = Math.min(92, (_idx / 24) * 92);
+      }, 400);
+      var delay = 4000 + Math.random() * 2000; // 4-6 secondi
+      _timer = setTimeout(nextPhrase, delay);
+    }
+    nextPhrase();
+  }
+
+  function finish() {
+    clearTimeout(_timer);
+    clearTimeout(_barTimer);
+    var el = document.getElementById('analysis-progress');
+    var bar = document.getElementById('ap-bar');
+    var pct_el = document.getElementById('ap-pct');
+    var phrase = document.getElementById('ap-phrase');
+    if (bar) bar.style.width = '100%';
+    if (pct_el) pct_el.textContent = '100%';
+    if (phrase) phrase.textContent = 'Elaborazione completata.';
+    setTimeout(function() {
+      if (el) el.style.display = 'none';
+    }, 800);
+  }
+
+  function error() {
+    clearTimeout(_timer);
+    clearTimeout(_barTimer);
+    var el = document.getElementById('analysis-progress');
+    if (el) el.style.display = 'none';
+  }
+
+  return { start: start, finish: finish, error: error };
+})();
+
+
+</script>
+
+
+<script>
+// ── AM: Alignment Manager con Arcball ────────────────────────────────────────
+var AM = (function() {
+  // Helper traduzione -- usa T() globale se disponibile
+  function _t(key, fallback) {
+    try { var v=window.T&&window.T(key); return v||fallback; } catch(e){ return fallback; }
+  }
+
+  var _enabled = false;
+  var _trisA = null, _trisB = null;
+  var _ptsA = [], _ptsB = [];
+  var _step = 0, _maxSteps = 6;
+
+  // Camera per ogni viewer
+  var _cam = {
+    A: { rotX:Math.PI/2, rotY:0, rotZ:0, zoom:1, panX:0, panY:0 },
+    B: { rotX:Math.PI/2, rotY:0, rotZ:0, zoom:1, panX:0, panY:0 }
+  };
+
+  // Stato drag
+  var _pipData = { side:null, px:0, py:0, n:0, alpha:1.0, timer:null };
+  var _drag = { active:false, side:null, mode:'arc', sx:0, sy:0,
+                startRotX:0, startRotY:0, startRotZ:0, startPanX:0, startPanY:0,
+                arcAxis:null }; // 'x','y','z' o null=free
+
+  // ── Toggle ──────────────────────────────────────────────────────────────
+  function onToggle(checked) {
+    _enabled = !checked;
+    var panel = document.getElementById('align-panel');
+    if (!panel) return;
+    if (_enabled) {
+      panel.classList.add('visible');
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        _initViewer('A'); _initViewer('B');
+        var fA = window.FILES && window.FILES.A;
+        var fB = window.FILES && window.FILES.B;
+        if (fA && !_trisA) onFileLoaded('A', fA);
+        if (fB && !_trisB) onFileLoaded('B', fB);
+        if (_trisA) _render('A');
+        if (_trisB) _render('B');
+        _updateHint();
+      }); });
+    } else {
+      panel.classList.remove('visible');
+    }
+  }
+
+  // ── File loading ─────────────────────────────────────────────────────────
+  function onFileLoaded(side, file) {
+    if (!_enabled) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var buf = e.target.result;
+      var tris = _parseSTL(buf);
+      if (side === 'A') _trisA = tris; else _trisB = tris;
+      _cam[side] = { rotX:Math.PI/2, rotY:0, rotZ:0, zoom:1, panX:0, panY:0 };
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        _initViewer(side);
+        _render(side);
+        _updateHint();
+      }); });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ── Parser STL binario + ASCII ───────────────────────────────────────────
+  function _parseSTL(buf) {
+    var dv = new DataView(buf);
+    var probe = '';
+    for (var ci=0; ci<Math.min(256,buf.byteLength); ci++)
+      probe += String.fromCharCode(dv.getUint8(ci));
+    if (probe.trimStart().startsWith('solid') && probe.indexOf('facet')!==-1)
+      return _parseASCII(buf);
+    return _parseBinary(buf);
+  }
+
+  function _parseBinary(buf) {
+    var dv = new DataView(buf);
+    var n = dv.getUint32(80,true);
+    var n_real = Math.min(n, Math.floor((buf.byteLength-84)/50));
+    var caps=[], walls=[];
+    for (var i=0; i<n_real; i++) {
+      var off = 84+i*50;
+      var nx=dv.getFloat32(off,true), ny=dv.getFloat32(off+4,true), nz=dv.getFloat32(off+8,true);
+      var nl=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+      if (Math.abs(nz/nl)>0.5) caps.push(i); else walls.push(i);
+    }
+    var MAX_W=8000, ws=walls.length>MAX_W?Math.ceil(walls.length/MAX_W):1;
+    var sel=caps.slice();
+    for (var k=0;k<walls.length;k+=ws) sel.push(walls[k]);
+    var out=new Float32Array(sel.length*9), j=0;
+    for (var si=0;si<sel.length;si++){
+      var off=84+sel[si]*50+12;
+      out[j++]=dv.getFloat32(off,true);   out[j++]=dv.getFloat32(off+4,true);  out[j++]=dv.getFloat32(off+8,true);
+      out[j++]=dv.getFloat32(off+12,true);out[j++]=dv.getFloat32(off+16,true);out[j++]=dv.getFloat32(off+20,true);
+      out[j++]=dv.getFloat32(off+24,true);out[j++]=dv.getFloat32(off+28,true);out[j++]=dv.getFloat32(off+32,true);
+    }
+    return {tris:out.subarray(0,j), n:j/9};
+  }
+
+  function _parseASCII(buf) {
+    var uint8=new Uint8Array(buf), text='', C=65536;
+    for (var s=0;s<uint8.length;s+=C)
+      text+=String.fromCharCode.apply(null,uint8.subarray(s,Math.min(s+C,uint8.length)));
+    var lines=text.split(/\n/), allT=[], cur=null;
+    for (var li=0;li<lines.length;li++){
+      var ln=lines[li].trim();
+      if (ln.startsWith('facet normal')){
+        var p=ln.split(/\s+/);
+        cur={nx:+p[2],ny:+p[3],nz:+p[4],v:[]};
+      } else if (ln.startsWith('vertex')&&cur){
+        var p=ln.split(/\s+/);
+        cur.v.push([+p[1],+p[2],+p[3]]);
+      } else if (ln.startsWith('endfacet')&&cur&&cur.v.length===3){
+        allT.push(cur); cur=null;
+      }
+    }
+    var caps=[],walls=[];
+    for (var i=0;i<allT.length;i++){
+      var t=allT[i], nl2=Math.sqrt(t.nx*t.nx+t.ny*t.ny+t.nz*t.nz)||1;
+      if (Math.abs(t.nz/nl2)>0.5) caps.push(i); else walls.push(i);
+    }
+    var MAX_W=8000, ws=walls.length>MAX_W?Math.ceil(walls.length/MAX_W):1;
+    var sel=caps.slice();
+    for (var k=0;k<walls.length;k+=ws) sel.push(walls[k]);
+    var out=new Float32Array(sel.length*9), j=0;
+    for (var si=0;si<sel.length;si++){
+      var t=allT[sel[si]];
+      out[j++]=t.v[0][0];out[j++]=t.v[0][1];out[j++]=t.v[0][2];
+      out[j++]=t.v[1][0];out[j++]=t.v[1][1];out[j++]=t.v[1][2];
+      out[j++]=t.v[2][0];out[j++]=t.v[2][1];out[j++]=t.v[2][2];
+    }
+    return {tris:out.subarray(0,j), n:j/9};
+  }
+
+  // ── Render Canvas 2D ─────────────────────────────────────────────────────
+  function _project(cam, px, py, pz, W, H) {
+    var x=px, y=py, z=pz;
+    // Rot Y (yaw)
+    var cy=Math.cos(cam.rotY), sy=Math.sin(cam.rotY);
+    var x1=x*cy+z*sy, z1=-x*sy+z*cy;
+    // Rot X (pitch)
+    var cx=Math.cos(cam.rotX), sx=Math.sin(cam.rotX);
+    var y2=y*cx-z1*sx, z2=y*sx+z1*cx;
+    // Rot Z (roll)
+    var cz=Math.cos(cam.rotZ||0), sz=Math.sin(cam.rotZ||0);
+    var x3=x1*cz-y2*sz, y3=x1*sz+y2*cz;
+    var d=200.0, w=d+z2; if(w<0.1) w=0.1;
+    var fill=0.42;
+    return [
+      (x3/w)*d*cam.zoom*fill*W + W/2 + cam.panX*W/2,
+      (-y3/w)*d*cam.zoom*fill*H + H/2 - cam.panY*H/2,
+      z2
+    ];
+  }
+
+  function _render(side) {
+    var tObj = side==='A' ? _trisA : _trisB;
+    var cvId = side==='A' ? 'cv3dA' : 'cv3dB';
+    var cv = document.getElementById(cvId);
+    if (!cv) return;
+    var parent = cv.parentElement;
+    var W = parent ? (parent.offsetWidth||400) : 400;
+    var H = 240;
+    cv.width=W; cv.height=H;
+    var ctx=cv.getContext('2d');
+    if (!ctx) return;
+
+    // Sfondo scuro
+    ctx.fillStyle='#f4f7fb'; ctx.fillRect(0,0,W,H);
+
+    if (!tObj) {
+      ctx.fillStyle='rgba(0,50,120,.28)'; ctx.font='13px sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(_t('alignLoad','Carica un file STL'), W/2, H/2); return;
+    }
+
+    var cam=_cam[side], tris=tObj.tris, n=tObj.n;
+    // BBox per normalizzare
+    var mnx=1e9,mny=1e9,mnz=1e9, mxx=-1e9,mxy=-1e9,mxz=-1e9;
+    for (var i=0;i<tris.length;i+=3){
+      if(tris[i]<mnx)mnx=tris[i]; if(tris[i]>mxx)mxx=tris[i];
+      if(tris[i+1]<mny)mny=tris[i+1]; if(tris[i+1]>mxy)mxy=tris[i+1];
+      if(tris[i+2]<mnz)mnz=tris[i+2]; if(tris[i+2]>mxz)mxz=tris[i+2];
+    }
+    var cx=(mnx+mxx)/2, cy=(mny+mxy)/2, cz2=(mnz+mxz)/2;
+    var maxD=Math.max(mxx-mnx,mxy-mny,mxz-mnz,0.001);
+    var sc=2/maxD; // normalizza in [-1,1]
+
+    var colBase = side==='A' ? [40,140,220] : [220,120,20];
+    var front=[];
+    for (var i=0;i<n;i++){
+      var b=i*9;
+      var ax=tris[b]-cx, ay=tris[b+1]-cy, az=tris[b+2]-cz2;
+      var bx2=tris[b+3]-cx,by2=tris[b+4]-cy,bz2=tris[b+5]-cz2;
+      var cx2=tris[b+6]-cx,cy2=tris[b+7]-cy,cz3=tris[b+8]-cz2;
+      ax*=sc;ay*=sc;az*=sc; bx2*=sc;by2*=sc;bz2*=sc; cx2*=sc;cy2*=sc;cz3*=sc;
+      var p0=_project(cam,ax,ay,az,W,H);
+      var p1=_project(cam,bx2,by2,bz2,W,H);
+      var p2=_project(cam,cx2,cy2,cz3,W,H);
+      // Backface
+      var ex=p1[0]-p0[0],ey=p1[1]-p0[1], fx=p2[0]-p0[0],fy=p2[1]-p0[1];
+      if (ex*fy-ey*fx>0) continue;
+      // Normal 3D per shading
+      var enx=tris[b+3]-tris[b],eny=tris[b+4]-tris[b+1],enz=tris[b+5]-tris[b+2];
+      var fnx=tris[b+6]-tris[b],fny=tris[b+7]-tris[b+1],fnz=tris[b+8]-tris[b+2];
+      var nnx=eny*fnz-enz*fny, nny=enz*fnx-enx*fnz, nnz=enx*fny-eny*fnx;
+      var nl=Math.sqrt(nnx*nnx+nny*nny+nnz*nnz)||1;
+      var diff=Math.max(0,(nnx*0.5+nny*0.7+nnz*0.5)/nl/1.03);
+      front.push({p0,p1,p2,diff,d:(p0[2]+p1[2]+p2[2])/3});
+    }
+    front.sort(function(a,b){return a.d-b.d;});
+    var amb=0.38;
+    for (var i=0;i<front.length;i++){
+      var f=front[i], br=amb+(1-amb)*f.diff;
+      var r=Math.min(255,Math.round(colBase[0]*br));
+      var g=Math.min(255,Math.round(colBase[1]*br));
+      var bl=Math.min(255,Math.round(colBase[2]*br));
+      ctx.beginPath();
+      ctx.moveTo(f.p0[0],f.p0[1]); ctx.lineTo(f.p1[0],f.p1[1]); ctx.lineTo(f.p2[0],f.p2[1]);
+      ctx.closePath(); ctx.fillStyle='rgb('+r+','+g+','+bl+')'; ctx.fill();
+    }
+
+    // Salva info per raycast
+    cv._ri = {cx:cx,cy:cy,cz:cz2,sc:sc,cam:cam,W:W,H:H,tris:tris,n:n};
+
+    _drawMarkers(side, ctx, W, H, cx, cy, cz2, sc, cam);
+    // Cattura buffer per PIP PRIMA di disegnarla (evita feedback loop)
+    var _cvPIP = document.getElementById(side==='A'?'cv3dA':'cv3dB');
+    if (_cvPIP) _capturePIPBuffer(side, _cvPIP);
+    // Disegna PIP con fade
+    _drawPIP(side, ctx, W, H);
+    _drawArcball(side, W, H);
+  }
+
+  // ── Assi XYZ nell'angolo ──────────────────────────────────────────────────
+  function _drawArcball(side, W, H) {
+    var ov = document.getElementById('ab_'+side);
+    if (!ov) return;
+    ov.width=W; ov.height=H;
+    var ctx=ov.getContext('2d');
+    ctx.clearRect(0,0,W,H);
+    var cam=_cam[side];
+    // Origine nell'angolo in basso a sinistra
+    var ox=38, oy=H-38, axLen=28;
+    var axes=[
+      {dir:[1,0,0], color:'#e53e3e', lbl:'X'},
+      {dir:[0,1,0], color:'#38a169', lbl:'Y'},
+      {dir:[0,0,1], color:'#3182ce', lbl:'Z'}
+    ];
+    // Sfondo semitrasparente per leggibilità
+    ctx.beginPath(); ctx.arc(ox,oy,36,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,.65)'; ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.08)'; ctx.lineWidth=1; ctx.stroke();
+
+    axes.forEach(function(ax){
+      // Proietta il vettore unità nella vista corrente
+      var p=_projectPt(cam, ax.dir[0], ax.dir[1], ax.dir[2], W, H);
+      // Scala verso l'origine in basso a sx
+      var dx=p[0]-W/2, dy=p[1]-H/2;
+      var len=Math.sqrt(dx*dx+dy*dy)||1;
+      var ex2=ox+dx/len*axLen, ey2=oy+dy/len*axLen;
+      ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ex2,ey2);
+      ctx.strokeStyle=ax.color; ctx.lineWidth=2.5; ctx.stroke();
+      // Punta freccia
+      var ang=Math.atan2(ey2-oy,ex2-ox);
+      ctx.beginPath();
+      ctx.moveTo(ex2,ey2);
+      ctx.lineTo(ex2-7*Math.cos(ang-0.4), ey2-7*Math.sin(ang-0.4));
+      ctx.lineTo(ex2-7*Math.cos(ang+0.4), ey2-7*Math.sin(ang+0.4));
+      ctx.closePath(); ctx.fillStyle=ax.color; ctx.fill();
+      // Label
+      ctx.fillStyle=ax.color; ctx.font='bold 9px monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(ax.lbl, ex2+Math.cos(ang)*9, ey2+Math.sin(ang)*9);
+    });
+  }
+
+  function _projectPt(cam, px, py, pz, W, H, offcx, offcy, offcz, sc2) {
+    // Proietta punto nel sistema camera, usato per gli assi
+    var cy2=Math.cos(cam.rotY), sy2=Math.sin(cam.rotY);
+    var x1=px*cy2+pz*sy2, z1=-px*sy2+pz*cy2;
+    var cx2=Math.cos(cam.rotX), sx2=Math.sin(cam.rotX);
+    var y2=py*cx2-z1*sx2, z2=py*sx2+z1*cx2;
+    var cz2=Math.cos(cam.rotZ||0), sz2=Math.sin(cam.rotZ||0);
+    var x3=x1*cz2-y2*sz2, y3=x1*sz2+y2*cz2;
+    var d=200, w=d+z2; if(w<0.1)w=0.1;
+    return [(x3/w)*d*cam.zoom*0.42*W+W/2, (-y3/w)*d*cam.zoom*0.42*H+H/2];
+  }
+
+  // ── Marker repere ─────────────────────────────────────────────────────────
+  function _drawMarkers(side, ctx, W, H, cx, cy, cz, sc, cam) {
+    var pts = side==='A' ? _ptsA : _ptsB;
+    var colFill   = side==='A' ? '#1d4ed8' : '#b45309';
+    var colStroke = side==='A' ? '#bfdbfe' : '#fde68a';
+    var colRing   = side==='A' ? '#2563eb' : '#d97706';
+
+    pts.forEach(function(p,i){
+      var px = (p.sx !== undefined) ? p.sx*W : W/2;
+      var py = (p.sy !== undefined) ? p.sy*H : H/2;
+
+      // Anello esterno pulsante
+      ctx.beginPath(); ctx.arc(px,py,19,0,Math.PI*2);
+      ctx.strokeStyle=colRing; ctx.lineWidth=2; ctx.globalAlpha=0.35; ctx.stroke();
+      ctx.globalAlpha=1;
+
+      // Croce di mira
+      var cs=8;
+      ctx.strokeStyle=colFill; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(px-cs,py); ctx.lineTo(px+cs,py); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px,py-cs); ctx.lineTo(px,py+cs); ctx.stroke();
+
+      // Badge numerato
+      ctx.beginPath(); ctx.arc(px,py,13,0,Math.PI*2);
+      ctx.fillStyle=colFill; ctx.fill();
+      ctx.strokeStyle=colStroke; ctx.lineWidth=2.5; ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='bold 12px monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(i+1,px,py);
+    });
+
+  }
+
+  // ── Canvas buffer per PIP (cattura la mesh PRIMA di disegnare la PIP) ────
+  var _pipBuffer = {};  // {A: HTMLCanvasElement, B: HTMLCanvasElement}
+
+  function _capturePIPBuffer(side, srcCanvas) {
+    // Copia il canvas corrente in un buffer offscreen PRIMA di disegnare PIP
+    if (!_pipBuffer[side]) {
+      _pipBuffer[side] = document.createElement('canvas');
+    }
+    var buf = _pipBuffer[side];
+    buf.width = srcCanvas.width; buf.height = srcCanvas.height;
+    buf.getContext('2d').drawImage(srcCanvas, 0, 0);
+  }
+
+  function _triggerPIP(side, px, py, n) {
+    // Registra dati PIP e avvia timer fade-out
+    _pipData.side = side;
+    _pipData.px = px; _pipData.py = py;
+    _pipData.n = n; _pipData.alpha = 1.0;
+    if (_pipData.timer) clearTimeout(_pipData.timer);
+    // Dopo 3s inizia fade; a 3.5s scompare
+    _pipData.timer = setTimeout(function() {
+      _fadePIP(side);
+    }, 3000);
+  }
+
+  function _fadePIP(side) {
+    _pipData.alpha -= 0.08;
+    if (_pipData.alpha <= 0) {
+      _pipData.alpha = 0;
+      _pipData.side = null;
+      return;
+    }
+    _render(side);  // ri-renderizza per aggiornare alpha
+    setTimeout(function(){ _fadePIP(side); }, 40);
+  }
+
+  function _drawPIP(side, ctx, W, H) {
+    if (_pipData.side !== side || _pipData.alpha <= 0) return;
+    var clickX = _pipData.px, clickY = _pipData.py;
+    var markerN = _pipData.n, alpha = _pipData.alpha;
+    var colFill   = side==='A' ? '#1d4ed8' : '#b45309';
+    var colStroke = side==='A' ? '#bfdbfe' : '#fde68a';
+
+    var PW=150, PH=150, PAD=8, ZOOM=2.0, r=10;
+    var PX = W - PW - PAD, PY = PAD;
+    var srcW = PW/ZOOM, srcH = PH/ZOOM;
+    var srcX = Math.max(0, Math.min(W - srcW, clickX - srcW/2));
+    var srcY = Math.max(0, Math.min(H - srcH, clickY - srcH/2));
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // Ombra
+    ctx.shadowColor='rgba(0,0,0,0.25)'; ctx.shadowBlur=10; ctx.shadowOffsetY=3;
+
+    // Clip area arrotondata
+    ctx.beginPath();
+    ctx.moveTo(PX+r,PY); ctx.lineTo(PX+PW-r,PY);
+    ctx.arcTo(PX+PW,PY,PX+PW,PY+r,r); ctx.lineTo(PX+PW,PY+PH-r);
+    ctx.arcTo(PX+PW,PY+PH,PX+PW-r,PY+PH,r); ctx.lineTo(PX+r,PY+PH);
+    ctx.arcTo(PX,PY+PH,PX,PY+PH-r,r); ctx.lineTo(PX,PY+r);
+    ctx.arcTo(PX,PY,PX+r,PY,r); ctx.closePath();
+    ctx.fillStyle='#f4f7fb'; ctx.fill();
+    ctx.clip();
+    ctx.shadowColor='transparent';
+
+    // Disegna dalla copia buffer (catturata prima del render PIP)
+    var buf = _pipBuffer[side];
+    if (buf && buf.width > 0) {
+      ctx.drawImage(buf, srcX, srcY, srcW, srcH, PX, PY, PW, PH);
+    }
+
+    // Mirino centrale
+    var cx2=PX+PW/2, cy2=PY+PH/2;
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(cx2,cy2,20,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle=colFill; ctx.lineWidth=1.5;
+    [[-26,0,-15,0],[15,0,26,0],[0,-26,0,-15],[0,15,0,26]].forEach(function(l){
+      ctx.beginPath(); ctx.moveTo(cx2+l[0],cy2+l[1]); ctx.lineTo(cx2+l[2],cy2+l[3]); ctx.stroke();
+    });
+    // Badge numero
+    ctx.beginPath(); ctx.arc(cx2,cy2,13,0,Math.PI*2);
+    ctx.fillStyle=colFill; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold 12px monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(markerN, cx2, cy2);
+
+    ctx.restore();
+
+    // Bordo esterno (fuori dal clip)
+    ctx.save(); ctx.globalAlpha=alpha;
+    ctx.beginPath();
+    ctx.moveTo(PX+r,PY); ctx.lineTo(PX+PW-r,PY);
+    ctx.arcTo(PX+PW,PY,PX+PW,PY+r,r); ctx.lineTo(PX+PW,PY+PH-r);
+    ctx.arcTo(PX+PW,PY+PH,PX+PW-r,PY+PH,r); ctx.lineTo(PX+r,PY+PH);
+    ctx.arcTo(PX,PY+PH,PX,PY+PH-r,r); ctx.lineTo(PX,PY+r);
+    ctx.arcTo(PX,PY,PX+r,PY,r); ctx.closePath();
+    ctx.strokeStyle=colFill; ctx.lineWidth=2.5; ctx.stroke();
+    // Label
+    ctx.fillStyle=colFill; ctx.font='bold 9px monospace';
+    ctx.textAlign='right'; ctx.textBaseline='top';
+    ctx.fillText('2×', PX+PW-6, PY+5);
+    ctx.restore();
+  }
+
+  // ── Interazione mouse ─────────────────────────────────────────────────────
+  function _initViewer(side) {
+    var cv = document.getElementById(side==='A'?'cv3dA':'cv3dB');
+    var ab = document.getElementById('ab_'+side);
+    if (!cv || cv._amInited) return;
+    cv._amInited = true;
+
+    function getXY(e) {
+      var rect=cv.getBoundingClientRect();
+      var touch = e.touches ? e.touches[0] : e;
+      return [(touch.clientX-rect.left)*(cv.width/rect.width),
+              (touch.clientY-rect.top)*(cv.height/rect.height)];
+    }
+
+    function onDown(e) {
+      var xy=getXY(e), x=xy[0], y=xy[1];
+      var cam=_cam[side];
+      var mode = e.shiftKey ? 'pan' : 'rot';
+      _drag={active:true,side:side,mode:mode,sx:x,sy:y,
+             startRotX:cam.rotX,startRotY:cam.rotY,startRotZ:cam.rotZ||0,
+             startPanX:cam.panX,startPanY:cam.panY,moved:false};
+      e.preventDefault();
+    }
+
+    function onMove(e) {
+      if (!_drag.active || _drag.side!==side) return;
+      var xy=getXY(e), dx=(xy[0]-_drag.sx)/cv.width, dy=(xy[1]-_drag.sy)/cv.height;
+      if (Math.abs(dx)>0.005||Math.abs(dy)>0.005) _drag.moved=true;
+      var cam=_cam[side];
+      if (_drag.mode==='pan') {
+        cam.panX=_drag.startPanX+dx*2;
+        cam.panY=_drag.startPanY-dy*2;
+      } else {
+        cam.rotY=_drag.startRotY+dx*Math.PI*2;
+        cam.rotX=_drag.startRotX+dy*Math.PI*2;
+      }
+      _render(side); e.preventDefault();
+    }
+
+    function onUp(e) {
+      if (!_drag.active||_drag.side!==side) return;
+      if (!_drag.moved) _onClick(side, e);
+      _drag.active=false;
+      // Se drag brevissimo = click: non cancellare (già gestito in _onClick)
+    }
+
+    cv.addEventListener('mousedown', onDown);
+    cv.addEventListener('mousemove', onMove);
+    cv.addEventListener('mouseup', onUp);
+    cv.addEventListener('wheel', function(e){
+      _cam[side].zoom *= e.deltaY>0?0.88:1.12;
+      _cam[side].zoom=Math.max(0.1,Math.min(10,_cam[side].zoom));
+      _render(side); e.preventDefault();
+    },{passive:false});
+    cv.addEventListener('touchstart', function(e){ onDown(e.touches[0]||e); },{passive:false});
+    cv.addEventListener('touchmove', function(e){ onMove(e.touches[0]||e); },{passive:false});
+    cv.addEventListener('touchend', onUp);
+  }
+
+  function _onClick(side, e) {
+    if (!_enabled) return;
+    var cv=document.getElementById(side==='A'?'cv3dA':'cv3dB');
+    if (!cv||!cv._ri) return;
+    var rect=cv.getBoundingClientRect();
+    var touch=e.touches?e.touches[0]:e;
+    var ex=(touch.clientX-rect.left)*(cv.width/rect.width);
+    var ey=(touch.clientY-rect.top)*(cv.height/rect.height);
+    var expectedSide=_step%2===0?'A':'B';
+    if (side!==expectedSide){_flash(side);return;}
+    if (_step>=_maxSteps) return;
+    var pt=_unproject(side,ex,ey);
+    if (!pt) return;
+    if (side==='A') _ptsA.push(pt); else _ptsB.push(pt);
+    _step++;
+    // Attiva PIP: mostra zoom del punto cliccato per 3.5s
+    _triggerPIP(side, ex, ey, side==='A' ? _ptsA.length : _ptsB.length);
+    _updateUI(); _render('A'); _render('B');
+    if (_step>=_maxSteps) _onAllPointsSet();
+  }
+
+  function _unproject(side, ex, ey) {
+    var cv=document.getElementById(side==='A'?'cv3dA':'cv3dB');
+    if (!cv||!cv._ri) return {x:0,y:0,z:0,sx:ex,sy:ey};
+    var ri=cv._ri, cam=ri.cam, W=ri.W, H=ri.H;
+
+    // ── Raycasting 3D: trova il triangolo più vicino al pixel cliccato ──
+    var d=200.0, fill=0.42, zoom=cam.zoom;
+    // Direzione del raggio nello spazio camera normalizzato
+    var rx=(ex-W/2-cam.panX*W/2)/(d*zoom*fill*W);
+    var ry=-(ey-H/2+cam.panY*H/2)/(d*zoom*fill*H);
+    // Il raggio parte da (0,0,-d) in camera space e punta verso (rx*d, ry*d, 0)
+    // Inverti rotazione camera per portare il raggio in object space
+    var cz2=Math.cos(cam.rotZ||0), sz2=Math.sin(cam.rotZ||0);
+    var cx2=Math.cos(cam.rotX), sx2=Math.sin(cam.rotX);
+    var cy3=Math.cos(cam.rotY), sy3=Math.sin(cam.rotY);
+
+    // Matrici di rotazione inverse (trasposte)
+    function invRot(px, py, pz) {
+      // Inverti rotZ
+      var tx=px*cz2+py*sz2, ty=-px*sz2+py*cz2, tz=pz;
+      // Inverti rotX
+      var tx2=tx, ty2=ty*cx2+tz*sx2, tz2=-ty*sx2+tz*cx2;
+      // Inverti rotY
+      var tx3=tx2*cy3-tz2*sy3, ty3=ty2, tz3=tx2*sy3+tz2*cy3;
+      return [tx3, ty3, tz3];
+    }
+
+    // Punto di click in camera space (piano z=0, prospettiva)
+    var pt_cam = invRot(rx, ry, 0);
+    // Origine camera in object space
+    var orig_cam = invRot(0, 0, -1.0/zoom);
+    // Direzione raggio = pt_click - origin
+    var rdx=pt_cam[0]-orig_cam[0], rdy=pt_cam[1]-orig_cam[1], rdz=pt_cam[2]-orig_cam[2];
+    var rlen=Math.sqrt(rdx*rdx+rdy*rdy+rdz*rdz)||1;
+    rdx/=rlen; rdy/=rlen; rdz/=rlen;
+
+    // Moller-Trumbore ray-triangle intersection
+    var best_t=1e9, best_cx=ri.cx, best_cy=ri.cy, best_cz=ri.cz;
+    var EPS=1e-7, sc=ri.sc;
+    var tris=ri.tris, n=ri.n;
+    for (var i=0;i<n;i++) {
+      var b=i*9;
+      // Vertici in coordinate normalizzate
+      var ax=(tris[b  ]-ri.cx)*sc, ay=(tris[b+1]-ri.cy)*sc, az=(tris[b+2]-ri.cz)*sc;
+      var bx=(tris[b+3]-ri.cx)*sc, by=(tris[b+4]-ri.cy)*sc, bz=(tris[b+5]-ri.cz)*sc;
+      var cx=(tris[b+6]-ri.cx)*sc, cy=(tris[b+7]-ri.cy)*sc, cz=(tris[b+8]-ri.cz)*sc;
+      // Edge vectors
+      var e1x=bx-ax,e1y=by-ay,e1z=bz-az;
+      var e2x=cx-ax,e2y=cy-ay,e2z=cz-az;
+      // h = ray_dir x e2
+      var hx=rdy*e2z-rdz*e2y, hy=rdz*e2x-rdx*e2z, hz=rdx*e2y-rdy*e2x;
+      var a2=e1x*hx+e1y*hy+e1z*hz;
+      if (a2>-EPS&&a2<EPS) continue; // parallelo
+      var f=1.0/a2;
+      var sx3=orig_cam[0]-ax, sy3=orig_cam[1]-ay, sz3=orig_cam[2]-az;
+      var u=f*(sx3*hx+sy3*hy+sz3*hz);
+      if (u<0||u>1) continue;
+      var qx=sy3*e1z-sz3*e1y, qy=sz3*e1x-sx3*e1z, qz=sx3*e1y-sy3*e1x;
+      var v=f*(rdx*qx+rdy*qy+rdz*qz);
+      if (v<0||u+v>1) continue;
+      var t=f*(e2x*qx+e2y*qy+e2z*qz);
+      if (t>EPS&&t<best_t) {
+        best_t=t;
+        // Punto di intersezione in object space normalizzato
+        var hpx=orig_cam[0]+rdx*t, hpy=orig_cam[1]+rdy*t, hpz=orig_cam[2]+rdz*t;
+        // Converti in world coords
+        best_cx = hpx/sc + ri.cx;
+        best_cy = hpy/sc + ri.cy;
+        best_cz = hpz/sc + ri.cz;
+      }
+    }
+    return {x:best_cx, y:best_cy, z:best_cz, sx:ex/W, sy:ey/W};
+  }
+
+  function _flash(side) {
+    var vw=document.getElementById('vw'+side);
+    if(!vw) return;
+    vw.style.outline='3px solid #ef4444';
+    setTimeout(function(){vw.style.outline='';},400);
+  }
+
+  // ── Rotazione via pulsanti ────────────────────────────────────────────────
+  function rotate(side, dir) {
+    var cam=_cam[side], S=Math.PI/12;
+    if (dir==='top')  { cam.rotX=Math.PI/2; cam.rotY=0; cam.rotZ=0; cam.panX=0; cam.panY=0; }
+    else if (dir==='front') { cam.rotX=0; cam.rotY=0; cam.rotZ=0; cam.panX=0; cam.panY=0; }
+    else {
+      switch(dir){
+        case 'yL': cam.rotY-=S; break; case 'yR': cam.rotY+=S; break;
+        case 'xU': cam.rotX-=S; break; case 'xD': cam.rotX+=S; break;
+        case 'zL': cam.rotZ=(cam.rotZ||0)-S; break;
+        case 'zR': cam.rotZ=(cam.rotZ||0)+S; break;
+      }
+    }
+    _render(side);
+  }
+
+  // ── UI update ─────────────────────────────────────────────────────────────
+  function _updateUI() {
+    var n=Math.floor(_step/2), waitA=_step%2===0;
+    for (var i=0;i<3;i++) {
+      var el=document.getElementById('as'+i);
+      if(el) el.className='align-step'+(i<n?' done':i===n?' active':'');
+    }
+    var vwA=document.getElementById('vwA'), vwB=document.getElementById('vwB');
+    if(vwA) vwA.className='av-canvas-wrap'+(waitA&&_step<_maxSteps?' waiting-click':'');
+    if(vwB) vwB.className='av-canvas-wrap'+(!waitA&&_step<_maxSteps?' waiting-click':'');
+    _updateHint();
+  }
+
+  function _updateHint() {
+    var hA=document.getElementById('avh-hintA'), hB=document.getElementById('avh-hintB');
+    var h=document.getElementById('align-hint');
+    var ok=!!_trisA&&!!_trisB;
+    if (!ok){
+      if(hA) hA.textContent=_trisA?'✅ caricato':_t('alignLoad','in attesa...');
+      if(hB) hB.textContent=_trisB?'✅ caricato':'in attesa...';
+      if(h) h.innerHTML='Carica entrambi i file STL.'; return;
+    }
+    if (_step>=_maxSteps){
+      if(hA) hA.textContent=_t('alignDone','✅ ok');
+      if(hB) hB.textContent='✅ 3 repere ok';
+      if(h) h.innerHTML=_t('alignDone','✅ Analizza');
+      return;
+    }
+    var n=Math.floor(_step/2)+1, wA=_step%2===0;
+    if(hA) hA.textContent=wA?_t('alignClickA','👆 Repere #')+n:(_ptsA.length+'/3 ✅');
+    if(hB) hB.textContent=!wA?'👆 clicca Repere #'+n:(_ptsB.length+'/3 ✅');
+    if(h) h.innerHTML=_t('alignClickA','Repere #')+n+': '+(wA?'<strong>'+_t('alignFileA','File A')+'</strong>':'<strong>'+_t('alignFileB','File B')+'</strong>');
+  }
+
+  function _onAllPointsSet() {
+    var btn=document.getElementById('run');
+    if(btn&&window.FILES&&window.FILES.A&&window.FILES.B){
+      btn.disabled=false; btn.classList.add('on');
+      btn.textContent='Analizza con repere';
+    }
+  }
+
+  // ── Public ────────────────────────────────────────────────────────────────
+  function resetAll() {
+    _ptsA=[]; _ptsB=[]; _step=0;
+    _cam.A={rotX:Math.PI/2,rotY:0,rotZ:0,zoom:1,panX:0,panY:0};
+    _cam.B={rotX:Math.PI/2,rotY:0,rotZ:0,zoom:1,panX:0,panY:0};
+    _updateUI(); _render('A'); _render('B');
+  }
+
+  function undoLast() {
+    if(!_step) return;
+    _step--;
+    if(_step%2===0) _ptsA.pop(); else _ptsB.pop();
+    _updateUI(); _render('A'); _render('B');
+  }
+
+  function getLandmarks() {
+    if(_ptsA.length<3||_ptsB.length<3) return null;
+    return {a:_ptsA.slice(0,3),b:_ptsB.slice(0,3)};
+  }
+
+  function isManualMode() { return _enabled&&_step>=_maxSteps; }
+
+  return {onToggle,onFileLoaded,resetAll,undoLast,getLandmarks,isManualMode,rotate,_refreshHint:_updateHint};
+})();
+
+</script>
+</body>
 </html>
