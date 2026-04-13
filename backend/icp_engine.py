@@ -781,45 +781,43 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     tris_b_aligned = apply_transform_tris(tris_b + offset, R_pre, t_pre)
 
     # ── ICP sui soli scanbody (come Exocad ma robusto) ───────────────────────
-    # Usa SOLO i triangoli degli scanbody (non i tessuti molli che differiscono
-    # tra scanner). Questo evita minimi locali errati causati dai tessuti.
-    try:
-        # Estrai triangoli scanbody da A e B (già separati da partition_comps)
-        _scan_idx_a = [ti for comp in scan_a for ti in comp]
-        _scan_idx_b = [ti for comp in scan_b for ti in comp]
-        _tsa = tris_a[_scan_idx_a]   # scanbody A originale
-        _tsb = tris_b[_scan_idx_b]   # scanbody B (già flippato se necessario)
-        # Normali degli scanbody calcolate geometricamente
-        def _geom_nm(t):
-            v0,v1,v2=t[:,0],t[:,1],t[:,2]
-            e1,e2=v1-v0,v2-v0
-            nx=e1[:,1]*e2[:,2]-e1[:,2]*e2[:,1]
-            ny=e1[:,2]*e2[:,0]-e1[:,0]*e2[:,2]
-            nz=e1[:,0]*e2[:,1]-e1[:,1]*e2[:,0]
-            nl=np.sqrt(nx**2+ny**2+nz**2).clip(1e-9)
-            return np.stack([nx/nl,ny/nl,nz/nl],axis=1)
-        _nma = _geom_nm(_tsa)
-        _nmb = _geom_nm(_tsb)
-        # Applica pre-align a B
-        _tsb_pre = apply_transform_tris(_tsb + offset, R_pre, t_pre)
-        _nmb_pre = (R_pre @ _nmb.T).T
-        # ICP solo sugli scanbody — usa tutti i punti (pochi triangoli)
-        _n = min(len(_tsa), len(_tsb_pre), 8000)
-        _mesh = icp_full_mesh(_tsa, _nma, _tsb_pre, _nmb_pre,
-                              n_sample=_n, max_iter=100)
-        R_mesh, t_mesh = _mesh["R"], _mesh["t"]
-        # Accetta il risultato solo se migliora il RMSD
-        _ct_a_before = np.array([cap_centroid(tris_a, c) for c in scan_a])
-        _ct_b_before = (R_pre @ raw_ct_b_shifted.T).T + t_pre
-        _ct_b_after  = (R_mesh @ _ct_b_before.T).T + t_mesh
-        D_before = np.linalg.norm(_ct_a_before[:,None]-_ct_b_before[None,:], axis=2).min(axis=1).mean()
-        D_after  = np.linalg.norm(_ct_a_before[:,None]-_ct_b_after[None,:],  axis=2).min(axis=1).mean()
-        if D_after < D_before * 1.05:   # accetta se migliora o non peggiora molto
-            R_pre = R_mesh @ R_pre
-            t_pre = R_mesh @ t_pre + t_mesh
-            tris_b_aligned = apply_transform_tris(tris_b_aligned, R_mesh, t_mesh)
-    except Exception:
-        pass  # fallback: usa solo pre-align centroidi
+    # Salta se landmarks manuali: l'utente ha già fornito la trasformazione.
+    # Usa SOLO i triangoli degli scanbody evitando i tessuti molli che
+    # differiscono tra scanner (causano minimi locali errati).
+    if method_pre != "landmark":
+        try:
+            _scan_idx_a = [ti for comp in scan_a for ti in comp]
+            _scan_idx_b = [ti for comp in scan_b for ti in comp]
+            _tsa = tris_a[_scan_idx_a]
+            _tsb = tris_b[_scan_idx_b]
+            def _geom_nm(t):
+                v0,v1,v2=t[:,0],t[:,1],t[:,2]
+                e1,e2=v1-v0,v2-v0
+                nx=e1[:,1]*e2[:,2]-e1[:,2]*e2[:,1]
+                ny=e1[:,2]*e2[:,0]-e1[:,0]*e2[:,2]
+                nz=e1[:,0]*e2[:,1]-e1[:,1]*e2[:,0]
+                nl=np.sqrt(nx**2+ny**2+nz**2).clip(1e-9)
+                return np.stack([nx/nl,ny/nl,nz/nl],axis=1)
+            _nma = _geom_nm(_tsa)
+            _nmb = _geom_nm(_tsb)
+            _tsb_pre = apply_transform_tris(_tsb + offset, R_pre, t_pre)
+            _nmb_pre = (R_pre @ _nmb.T).T
+            _n = min(len(_tsa), len(_tsb_pre), 8000)
+            _mesh = icp_full_mesh(_tsa, _nma, _tsb_pre, _nmb_pre,
+                                  n_sample=_n, max_iter=100)
+            R_mesh, t_mesh = _mesh["R"], _mesh["t"]
+            # Accetta solo se migliora il RMSD sui centroidi cap
+            _ct_a_chk = np.array([cap_centroid(tris_a, c) for c in scan_a])
+            _ct_b_bef = (R_pre @ raw_ct_b_shifted.T).T + t_pre
+            _ct_b_aft = (R_mesh @ _ct_b_bef.T).T + t_mesh
+            D_bef = np.linalg.norm(_ct_a_chk[:,None]-_ct_b_bef[None,:], axis=2).min(axis=1).mean()
+            D_aft = np.linalg.norm(_ct_a_chk[:,None]-_ct_b_aft[None,:], axis=2).min(axis=1).mean()
+            if D_aft < D_bef * 1.05:
+                R_pre = R_mesh @ R_pre
+                t_pre = R_mesh @ t_pre + t_mesh
+                tris_b_aligned = apply_transform_tris(tris_b_aligned, R_mesh, t_mesh)
+        except Exception:
+            pass
 
     # ── Clustering finale su B allineato + hungarian matching ────────────────
     thresh_b2 = auto_thresh(raw_ct_b_aligned)
