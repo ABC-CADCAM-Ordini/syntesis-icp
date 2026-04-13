@@ -144,10 +144,7 @@
     <div class="siri-inner">
       <div class="app-header" style="position:relative;">
         <img class="logo-img" style="cursor:pointer;height:56px;width:auto;" onclick="resetApp()" src="https://static.wixstatic.com/media/1c4258_239bb73388704a21899687c05f21f50c~mv2.png">
-        <span style="position:absolute;left:84px;bottom:6px;font-size:9px;font-weight:700;
-  color:#94a3b8;letter-spacing:.06em;font-family:monospace;background:rgba(0,0,0,.04);
-  padding:2px 6px;border-radius:6px;border:1px solid #e2e8f0;">v7.2.0.012</span>
-<div class="header-right">
+        <div class="header-right">
           <div class="lang-sel" id="lang-sel"></div>
           <div class="nav-tabs">
             <button class="nav-tab active" data-tab="analisi" onclick="switchTab('analisi',this)" id="tab-analisi">Analisi STL</button>
@@ -4093,9 +4090,8 @@ function paintViewCyl(cv, triA_cyl, triB_cyl, ax1, ax2, axD, title, cylIdx){
     ctx.fillStyle=col;
     ctx.fill();
     // Very subtle edge (only for definition, not wireframe look)
-    ctx.strokeStyle='rgba(0,0,0,0.12)';
-    ctx.lineWidth=0.4;
-    ctx.stroke();
+    // No edge -- il bordo crea la texture pixellata a scacchi
+    // ctx.stroke();  // rimosso per rendering solido pulito
   });
 
   // Centroid markers
