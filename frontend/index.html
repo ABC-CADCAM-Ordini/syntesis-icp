@@ -4524,21 +4524,117 @@ var AM = (function() {
   // ── Marker repere ─────────────────────────────────────────────────────────
   function _drawMarkers(side, ctx, W, H, cx, cy, cz, sc, cam) {
     var pts = side==='A' ? _ptsA : _ptsB;
-    var colFill = side==='A' ? '#2563eb' : '#d97706';
-    var colStroke = side==='A' ? '#93c5fd' : '#fcd34d';
+    var colFill   = side==='A' ? '#1d4ed8' : '#b45309';
+    var colStroke = side==='A' ? '#bfdbfe' : '#fde68a';
+    var colRing   = side==='A' ? '#2563eb' : '#d97706';
+
     pts.forEach(function(p,i){
-      // Usa coordinate schermo salvate al click (robuste, non dipendono dalla rotazione)
       var px = (p.sx !== undefined) ? p.sx*W : W/2;
       var py = (p.sy !== undefined) ? p.sy*H : H/2;
-      // Cerchio pieno
+
+      // Anello esterno pulsante
+      ctx.beginPath(); ctx.arc(px,py,19,0,Math.PI*2);
+      ctx.strokeStyle=colRing; ctx.lineWidth=2; ctx.globalAlpha=0.35; ctx.stroke();
+      ctx.globalAlpha=1;
+
+      // Croce di mira
+      var cs=8;
+      ctx.strokeStyle=colFill; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(px-cs,py); ctx.lineTo(px+cs,py); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px,py-cs); ctx.lineTo(px,py+cs); ctx.stroke();
+
+      // Badge numerato
       ctx.beginPath(); ctx.arc(px,py,13,0,Math.PI*2);
       ctx.fillStyle=colFill; ctx.fill();
-      ctx.strokeStyle=colStroke; ctx.lineWidth=3; ctx.stroke();
-      // Numero
-      ctx.fillStyle='#fff'; ctx.font='bold 11px monospace';
+      ctx.strokeStyle=colStroke; ctx.lineWidth=2.5; ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='bold 12px monospace';
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(i+1,px,py);
     });
+
+    // PIP: mostra zoom dell'ultimo punto cliccato
+    if (pts.length > 0) {
+      var last = pts[pts.length-1];
+      var lpx = (last.sx !== undefined) ? last.sx*W : W/2;
+      var lpy = (last.sy !== undefined) ? last.sy*H : H/2;
+      _drawPIP(side, ctx, W, H, lpx, lpy, pts.length, colFill, colStroke);
+    }
+  }
+
+  function _drawPIP(side, ctx, W, H, clickX, clickY, markerN, colFill, colStroke) {
+    // Dimensioni e posizione PIP (angolo in alto a destra)
+    var PW=140, PH=140, PAD=8;
+    var PX = W - PW - PAD;
+    var PY = PAD;
+    var ZOOM = 4.0;
+
+    // Crop source: area intorno al click (prima che sia renderizzata la PIP stessa)
+    var srcW = PW / ZOOM, srcH = PH / ZOOM;
+    var srcX = Math.max(0, Math.min(W - srcW, clickX - srcW/2));
+    var srcY = Math.max(0, Math.min(H - srcH, clickY - srcH/2));
+
+    // Copia l'area del canvas corrente (già renderizzata senza PIP)
+    ctx.save();
+    // Clip PIP area con bordo arrotondato
+    ctx.beginPath();
+    var r=10;
+    ctx.moveTo(PX+r,PY); ctx.lineTo(PX+PW-r,PY);
+    ctx.arcTo(PX+PW,PY,PX+PW,PY+r,r);
+    ctx.lineTo(PX+PW,PY+PH-r);
+    ctx.arcTo(PX+PW,PY+PH,PX+PW-r,PY+PH,r);
+    ctx.lineTo(PX+r,PY+PH);
+    ctx.arcTo(PX,PY+PH,PX,PY+PH-r,r);
+    ctx.lineTo(PX,PY+r);
+    ctx.arcTo(PX,PY,PX+r,PY,r);
+    ctx.closePath();
+
+    // Sfondo
+    ctx.fillStyle='#f0f4f8'; ctx.fill();
+    ctx.clip();
+
+    // Disegna zoom della scena (usando drawImage sul canvas stesso)
+    var cv = document.getElementById(side==='A'?'cv3dA':'cv3dB');
+    if (cv) {
+      ctx.drawImage(cv, srcX, srcY, srcW, srcH, PX, PY, PW, PH);
+    }
+
+    // Mirino al centro della PIP (dove è il click)
+    var cx2=PX+PW/2, cy2=PY+PH/2;
+    // Cerchio esterno
+    ctx.beginPath(); ctx.arc(cx2,cy2,18,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=1.5; ctx.stroke();
+    // Linee di mira
+    ctx.strokeStyle=colFill; ctx.lineWidth=1.5;
+    [[-22,0,-14,0],[14,0,22,0],[0,-22,0,-14],[0,14,0,22]].forEach(function(l){
+      ctx.beginPath(); ctx.moveTo(cx2+l[0],cy2+l[1]); ctx.lineTo(cx2+l[2],cy2+l[3]); ctx.stroke();
+    });
+    // Badge numero
+    ctx.beginPath(); ctx.arc(cx2,cy2,12,0,Math.PI*2);
+    ctx.fillStyle=colFill; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold 11px monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(markerN, cx2, cy2);
+
+    ctx.restore();
+
+    // Bordo PIP
+    ctx.beginPath();
+    ctx.moveTo(PX+r,PY); ctx.lineTo(PX+PW-r,PY);
+    ctx.arcTo(PX+PW,PY,PX+PW,PY+r,r);
+    ctx.lineTo(PX+PW,PY+PH-r);
+    ctx.arcTo(PX+PW,PY+PH,PX+PW-r,PY+PH,r);
+    ctx.lineTo(PX+r,PY+PH);
+    ctx.arcTo(PX,PY+PH,PX,PY+PH-r,r);
+    ctx.lineTo(PX,PY+r);
+    ctx.arcTo(PX,PY,PX+r,PY,r);
+    ctx.closePath();
+    ctx.strokeStyle=colFill; ctx.lineWidth=2; ctx.stroke();
+
+    // Label "ZOOM 4x"
+    ctx.fillStyle=colFill; ctx.font='bold 9px monospace';
+    ctx.textAlign='right'; ctx.textBaseline='top';
+    ctx.fillText('4×', PX+PW-5, PY+4);
   }
 
   // ── Interazione mouse ─────────────────────────────────────────────────────
