@@ -3205,160 +3205,104 @@ function pdf(){
     }
   }catch(e){}
 
-  // ── BADGE IMAGE - render score card directly onto offscreen canvas ─
-  // Replica exacta di drawShareCard ma sincrona, senza DOM share-canvas
-  var badgePng='';
+  // ── NASA-style score section ────────────────────────────────────────
+  // Logo (top-left)
   try{
-    var _bcv=document.createElement('canvas');
-    _bcv.width=1080;_bcv.height=1080;
-    var _bctx=_bcv.getContext('2d');
-    var _bW=1080,_bH=1080,_bCX=540,_bCY=360;
-    // Background gradient
-    var _bg=_bctx.createLinearGradient(0,0,_bW,_bH);
-    _bg.addColorStop(0,'#0d1b2a');_bg.addColorStop(.5,'#12253d');_bg.addColorStop(1,'#0d1b2a');
-    _bctx.fillStyle=_bg;_bctx.fillRect(0,0,_bW,_bH);
-    // Glow effects
-    function _glow(x,y,r,c){var g=_bctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,c);g.addColorStop(1,'transparent');_bctx.fillStyle=g;_bctx.beginPath();_bctx.arc(x,y,r,0,Math.PI*2);_bctx.fill();}
-    _glow(_bW*.85,_bH*.08,380,'rgba(245,158,11,.18)');
-    _glow(_bW*.15,_bH*.92,300,'rgba(245,158,11,.12)');
-    _glow(_bCX,_bCY*.95,260,'rgba('+lvRGB.join(',')+',.08)');
-    // Gold top bar
-    var _topGrad=_bctx.createLinearGradient(0,0,_bW,0);
-    _topGrad.addColorStop(0,'transparent');_topGrad.addColorStop(.3,'rgba(245,158,11,.7)');
-    _topGrad.addColorStop(.5,'rgba(255,215,0,.9)');_topGrad.addColorStop(.7,'rgba(245,158,11,.7)');_topGrad.addColorStop(1,'transparent');
-    _bctx.fillStyle=_topGrad;_bctx.fillRect(0,0,_bW,5);
-    // Score ring
-    var _r=208,_lw=28,_sa=-Math.PI/2;
-    _bctx.beginPath();_bctx.arc(_bCX,_bCY,_r,0,Math.PI*2);
-    _bctx.strokeStyle='rgba(255,255,255,.06)';_bctx.lineWidth=_lw;_bctx.stroke();
-    var _ag=_bctx.createLinearGradient(_bCX-_r,_bCY-_r,_bCX+_r,_bCY+_r);
-    _ag.addColorStop(0,'#FFD700');_ag.addColorStop(.5,lv.col);_ag.addColorStop(1,'#F59E0B');
-    _bctx.shadowColor='rgba(245,158,11,.6)';_bctx.shadowBlur=32;
-    _bctx.beginPath();_bctx.arc(_bCX,_bCY,_r,_sa,_sa+(score/100)*Math.PI*2);
-    _bctx.strokeStyle=_ag;_bctx.lineWidth=_lw;_bctx.lineCap='round';_bctx.stroke();
-    _bctx.shadowBlur=0;
-    // Score number
-    _bctx.shadowColor='rgba(245,158,11,.4)';_bctx.shadowBlur=20;
-    _bctx.fillStyle='#fff';_bctx.font='900 172px sans-serif';
-    _bctx.textAlign='center';_bctx.textBaseline='middle';
-    _bctx.fillText(score.toFixed(2),_bCX,_bCY-16);_bctx.shadowBlur=0;
-    _bctx.fillStyle='rgba(255,215,0,.55)';_bctx.font='600 40px sans-serif';
-    _bctx.fillText('/100',_bCX,_bCY+76);
-    // Score label pill
-    var _py=_bCY+_r+42,_pw=340,_ph=62;
-    var _pg=_bctx.createLinearGradient(_bCX-_pw/2,_py,_bCX+_pw/2,_py+_ph);
-    _pg.addColorStop(0,'rgba(245,158,11,.22)');_pg.addColorStop(1,'rgba(255,215,0,.12)');
-    _bctx.fillStyle=_pg;
-    _bctx.beginPath();_bctx.roundRect(_bCX-_pw/2,_py,_pw,_ph,31);_bctx.fill();
-    var _pb=_bctx.createLinearGradient(_bCX-_pw/2,_py,_bCX+_pw/2,_py);
-    _pb.addColorStop(0,'rgba(245,158,11,.2)');_pb.addColorStop(.5,'rgba(255,215,0,.8)');_pb.addColorStop(1,'rgba(245,158,11,.2)');
-    _bctx.strokeStyle=_pb;_bctx.lineWidth=1.5;
-    _bctx.beginPath();_bctx.roundRect(_bCX-_pw/2,_py,_pw,_ph,31);_bctx.stroke();
-    _bctx.shadowColor='rgba(245,158,11,.5)';_bctx.shadowBlur=12;
-    _bctx.fillStyle='#FFD700';_bctx.font='800 30px sans-serif';_bctx.textBaseline='middle';
-    _bctx.fillText(lv.label.toUpperCase(),_bCX,_py+_ph/2);_bctx.shadowBlur=0;
-    // Divider line
-    var _dy=_py+_ph+52;
-    var _dg=_bctx.createLinearGradient(80,_dy,_bW-80,_dy);
-    _dg.addColorStop(0,'transparent');_dg.addColorStop(.3,'rgba(245,158,11,.5)');
-    _dg.addColorStop(.5,'rgba(255,215,0,.8)');_dg.addColorStop(.7,'rgba(245,158,11,.5)');_dg.addColorStop(1,'transparent');
-    _bctx.strokeStyle=_dg;_bctx.lineWidth=1;
-    _bctx.beginPath();_bctx.moveTo(120,_dy);_bctx.lineTo(_bW-120,_dy);_bctx.stroke();
-    // File names row
-    var _ny=_dy+72;
-    _bctx.fillStyle='#fff';_bctx.font='700 48px sans-serif';_bctx.textBaseline='middle';
-    var _nA=(p.nA||'').replace(/\.stl$/i,'').slice(0,22);
-    var _nB=(p.nB||'').replace(/\.stl$/i,'').slice(0,22);
-    _bctx.fillText(_nA,_bCX,_ny);
-    _bctx.fillStyle='rgba(255,215,0,.6)';_bctx.font='500 28px sans-serif';
-    _bctx.fillText(_nA+' → '+_nB,_bCX,_ny+62);
-    // Bottom bar + footer
-    _bctx.fillStyle=_topGrad;_bctx.fillRect(0,_bH-5,_bW,5);
-    _bctx.fillStyle='rgba(255,255,255,.18)';_bctx.font='500 22px sans-serif';_bctx.textBaseline='middle';
-    _bctx.fillText('syntesis-icp.com · Precision Scanner',_bCX,1045);
-    // Logo bianco (preload sincrono da data URI)
-    try{
-      var _li=new Image();_li.src=LOGO_DATA;
-      if(_li.complete&&_li.naturalWidth>0){
-        var _lh=90,_lw2=_lh*(_li.naturalWidth/_li.naturalHeight);
-        _bctx.fillStyle='rgba(255,255,255,.07)';
-        _bctx.beginPath();_bctx.roundRect(_bCX-_lw2/2-20,_ny+110,_lw2+40,_lh+28,16);_bctx.fill();
-        _bctx.globalAlpha=.92;_bctx.drawImage(_li,_bCX-_lw2/2,_ny+124,_lw2,_lh);_bctx.globalAlpha=1;
-      }
-    }catch(_le){}
-    badgePng=_bcv.toDataURL('image/png');
-  }catch(_be){badgePng='';}
+    if(LOGO_DATA&&LOGO_DATA.length>100){
+      doc.addImage(LOGO_DATA,'PNG',ml,8,70,19);
+    }
+  }catch(e){}
 
-  // Badge position: centered, filling upper half of page
-  var badgeSize=110; // mm - grande, occupa bene la copertina
-  var badgeX=(W-badgeSize)/2;
-  var badgeY=28; // below the logo
+  // Right-aligned document title
+  doc.setFont('helvetica','bold');doc.setFontSize(11);
+  doc.setTextColor(0,82,163);
+  doc.text('Syntesis-ICP',W-mr,11,{align:'right'});
+  doc.setFont('helvetica','normal');doc.setFontSize(8);
+  doc.setTextColor(100,116,139);
+  doc.text('Precision Scanner Report',W-mr,16,{align:'right'});
 
-  if(badgePng){
-    doc.addImage(badgePng,'PNG',badgeX,badgeY,badgeSize,badgeSize);
-  } else {
-    // Last-resort fallback: simple ring
-    var cx2=W/2,cy2=badgeY+badgeSize/2,r2=36,lw2=6;
-    doc.setDrawColor(20,35,55);doc.setLineWidth(lw2+2);doc.circle(cx2,cy2,r2,'S');
-    var startA=-90,endA=startA+(score/100*360);
-    pdfArc(cx2,cy2,r2,startA,endA,lw2,lvRGB);
-    doc.setFont('helvetica','bold');doc.setFontSize(26);setTxt(lv.col);
-    doc.text(score.toFixed(2),cx2,cy2+4,{align:'center'});
-    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(120,144,164);
-    doc.text('/100',cx2,cy2+12,{align:'center'});
-  }
+  // Thin rule under header
+  doc.setDrawColor(0,82,163);doc.setLineWidth(0.5);
+  doc.line(ml,29,W-mr,29);
 
-  // ── Info row (directly after badge - pill already in badge card) ───
-  var iy2=badgeY+badgeSize+6;
-  // Divider line (gold)
-  doc.setDrawColor(245,158,11);doc.setLineWidth(0.4);
-  doc.line(ml+10,iy2-3,W-mr-10,iy2-3);
+  // ── SCORE: large number, NASA-style ──────────────────────────────
+  var scoreY=42;
+  // Large score number (left column)
+  doc.setFont('helvetica','bold');doc.setFontSize(64);
+  doc.setTextColor(lvRGB[0],lvRGB[1],lvRGB[2]);
+  doc.text(score.toFixed(2),ml,scoreY+16);
+  // /100
+  doc.setFont('helvetica','normal');doc.setFontSize(16);
+  doc.setTextColor(148,163,184);
+  doc.text('/100',ml+doc.getTextWidth(score.toFixed(2))+1,scoreY+16);
+  // Status label
+  doc.setFont('helvetica','bold');doc.setFontSize(14);
+  doc.setTextColor(lvRGB[0],lvRGB[1],lvRGB[2]);
+  doc.text(lv.label.toUpperCase(),ml,scoreY+27);
 
-  // Tronca i nomi file in modo intelligente (max 28 chars + ellipsis)
-  function truncate(s,n){return s.length>n?s.slice(0,n-1)+'…':s;}
+  // Score bar (right of score number)
+  var barX=ml+76, barY=scoreY, barW=cw-76, barH=6;
+  // Background
+  doc.setFillColor(241,245,249);doc.rect(barX,barY,barW,barH,'F');
+  // Filled portion
+  var fillW=barW*(score/100);
+  doc.setFillColor(lvRGB[0],lvRGB[1],lvRGB[2]);
+  doc.rect(barX,barY,fillW,barH,'F');
+  // Score range labels
+  doc.setFont('helvetica','normal');doc.setFontSize(6);
+  doc.setTextColor(148,163,184);
+  doc.text('0',barX,barY+barH+4);
+  doc.text('50',barX+barW/2,barY+barH+4,{align:'center'});
+  doc.text('100',barX+barW,barY+barH+4,{align:'right'});
 
-  var infos=[
-    ['File A - Riferimento', truncate(p.nA,30)],
-    ['File B - Confronto',   truncate(p.nB,30)],
-    ['N deg cilindri',          p.cA+''],
-    ['RMSD ICP',             p.icpRmsd.toFixed(4)+' mm'],
-    ['Data analisi',         new Date().toLocaleDateString('it-IT')]
-  ];
+  // ── Info table ──────────────────────────────────────────────────
+  var iy2=scoreY+40;
+  function truncate(s,n){return s.length>n?s.slice(0,n-1)+'\u2026':s;}
 
-  // Layout su 2 righe: [0,1,2] poi [3,4] - 3 colonne / 2 colonne
-  [[0,1,2],[3,4]].forEach(function(row,ri){
-    var nCols=row.length;
-    row.forEach(function(ii,ci){
-      if(ii>=infos.length)return;
-      var colW2=cw/nCols;
-      var ix=ml+ci*colW2+colW2/2;
-      var rowY=iy2+ri*14;
-      // Label
+  doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
+  doc.line(ml,iy2,W-mr,iy2);
+
+  var infoCols=[[
+    ['File A — Riferimento', truncate(p.nA,32)],
+    ['File B — Confronto',   truncate(p.nB,32)]
+  ],[
+    ['N. cilindri', p.cA+''],
+    ['RMSD ICP',   p.icpRmsd.toFixed(4)+' mm']
+  ],[
+    ['Data analisi', new Date().toLocaleDateString('it-IT')],
+    ['Profilo rilevato', p.detected||'—']
+  ]];
+
+  var colW3=cw/3;
+  iy2+=6;
+  infoCols.forEach(function(col,ci2){
+    var ix=ml+ci2*colW3;
+    col.forEach(function(row,ri2){
+      var ry=iy2+ri2*11;
       doc.setFont('helvetica','normal');doc.setFontSize(6.5);
-      doc.setTextColor(120,144,164);
-      doc.text(infos[ii][0],ix,rowY,{align:'center'});
-      // Value - check overflow and reduce size if needed
-      doc.setFont('helvetica','bold');doc.setFontSize(8);
-      doc.setTextColor(240,247,255);
-      var val=infos[ii][1];
-      var valW=doc.getTextWidth(val);
-      if(valW>colW2-4){
-        // Scale font down to fit
-        doc.setFontSize(Math.max(5.5, 8*(colW2-4)/valW));
-      }
-      doc.text(val,ix,rowY+6,{align:'center'});
-      doc.setFontSize(8); // reset
+      doc.setTextColor(100,116,139);
+      doc.text(row[0].toUpperCase(),ix,ry);
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);
+      doc.setTextColor(15,23,42);
+      doc.text(row[1],ix,ry+5.5);
     });
   });
 
-  // ── Colorimetric map ────────────────────────────────────────────────
+  iy2+=28;
+  doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
+  doc.line(ml,iy2,W-mr,iy2);
+  iy2+=4;
+
+    // ── Colorimetric map ────────────────────────────────────────────────
   var mapY2=iy2+32; // info rows + margin
   // Assicura che non vada fuori pagina
   if(mapY2>195) mapY2=195;
   // Section label
-  doc.setFont('helvetica','bold');doc.setFontSize(7.5);
-  doc.setTextColor(255,215,0);
-  doc.text('MAPPA COLORIMETRICA - POSIZIONI SCANBODY',ml,mapY2);
+  doc.setFont('helvetica','bold');doc.setFontSize(7);
+  doc.setTextColor(0,82,163);
+  doc.text('MAPPA COLORIMETRICA — POSIZIONI SCANBODY',ml,mapY2);
+  doc.setDrawColor(0,82,163);doc.setLineWidth(0.3);
+  doc.line(ml,mapY2+1.5,W-mr,mapY2+1.5);
 
   // Calcola altezza mappa in modo che non sbordi dalla pagina
   var availH=H-16-(mapY2+4)-12; // spazio disponibile fino al footer
@@ -3384,17 +3328,17 @@ function pdf(){
       doc.setFillColor(cRGB2[0],cRGB2[1],cRGB2[2]);
       doc.rect(lx,legY2,lw3-1,3,'F');
       doc.setFont('helvetica','normal');doc.setFontSize(6);
-      doc.setTextColor(180,190,200);
+      doc.setTextColor(71,85,105);
       doc.text(cl.label,lx+1,legY2+7);
     });
   }
 
-  // ── Bottom bar (gold) + footer ──────────────────────────────────────
-  doc.setFillColor(255,215,0);doc.rect(0,H-3,W,3,'F');
-  doc.setFillColor(245,158,11);doc.rect(0,H-4.5,W,1.5,'F');
-  doc.setFont('helvetica','bold');doc.setFontSize(7);
-  doc.setTextColor(120,144,164);
-  doc.text('Syntesis-ICP · STL Cylinder Comparator v7 · Biaggini Medical Devices S.r.l.',W/2,H-6,{align:'center'});
+  // ── NASA footer copertina ────────────────────────────────────────────
+  doc.setFillColor(0,82,163);doc.rect(0,H-2.5,W,2.5,'F');
+  doc.setFont('helvetica','normal');doc.setFontSize(6.5);
+  doc.setTextColor(100,116,139);
+  doc.text('Syntesis-ICP v7.2.0.012 · Biaggini Medical Devices S.r.l. · '+new Date().toLocaleDateString('it-IT'),ml,H-5);
+  doc.text('syntesis-icp.com',W-mr,H-5,{align:'right'});
 
   // ══════════════════════════════════════════════════════════════════
   //  ONE PAGE PER CYLINDER
@@ -3415,30 +3359,57 @@ function pdf(){
     var axInfo=p.cylAxes&&p.cylAxes[ci]&&p.cylAxes[ci].angleDeg!==null?p.cylAxes[ci]:null;
     var axRGB=axInfo?hexRGB(clinAxis(axInfo.angleDeg).col):[100,100,100];
 
-    // ── Header bar ─────────────────────────────────────────────────
-    doc.setFillColor(clBgRGB[0],clBgRGB[1],clBgRGB[2]);
-    doc.rect(0,0,W,16,'F');
-    doc.setFillColor(clRGB[0],clRGB[1],clRGB[2]);doc.rect(0,0,5,16,'F');
-    doc.setFont('helvetica','bold');doc.setFontSize(14);
-    doc.setTextColor(clFgRGB[0],clFgRGB[1],clFgRGB[2]);
-    doc.text('Cilindro #'+(ci+1),ml+2,10.5);
-    doc.setFontSize(9);
-    var cylHdr=clv.label+' - '+d3um+' um  |D3D|';
-    doc.setFontSize(Math.min(9, 9*60/Math.max(60,doc.getTextWidth(cylHdr)*1.2)));
-    doc.text(cylHdr,ml+2,15);
-    doc.setFontSize(9);
-    // Score on right
-    var sc2=score; // global score already computed
-    doc.setFont('helvetica','bold');doc.setFontSize(11);
-    doc.text('Voto globale: '+score.toFixed(2)+'/100',W-mr,10.5,{align:'right'});
-    doc.setFontSize(8);doc.setFont('helvetica','normal');
-    doc.text(p.nA+' vs '+p.nB,W-mr,15,{align:'right'});
+    // ── NASA running header ─────────────────────────────────────────
+    // Blue top bar
+    doc.setFillColor(0,82,163);doc.rect(0,0,W,3,'F');
+    // Running header text
+    doc.setFont('helvetica','bold');doc.setFontSize(7);
+    doc.setTextColor(0,82,163);
+    doc.text('Syntesis-ICP',ml,8);
+    doc.setFont('helvetica','normal');doc.setFontSize(7);
+    doc.setTextColor(100,116,139);
+    doc.text('Cilindro #'+(ci+1)+' di '+p.pairs.length, W/2,8,{align:'center'});
+    doc.text('Pag. '+(ci+2)+' / '+(p.pairs.length+1+(p.dists?p.dists.length:0)),W-mr,8,{align:'right'});
+    // Thin rule
+    doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
+    doc.line(ml,10.5,W-mr,10.5);
 
-    y=20;
+    // ── Cylinder title ────────────────────────────────────────────
+    y=14;
+    // Number + status dot
+    doc.setFont('helvetica','bold');doc.setFontSize(22);
+    doc.setTextColor(15,23,42);
+    doc.text('Cilindro #'+(ci+1),ml,y+9);
+    // Status badge (small pill)
+    var titleW=doc.getTextWidth('Cilindro #'+(ci+1));
+    doc.setFillColor(clRGB[0],clRGB[1],clRGB[2]);
+    doc.roundedRect(ml+titleW+4,y+1,28,6,1.5,1.5,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(7);
+    doc.setTextColor(255,255,255);
+    doc.text(clv.label.toUpperCase(),ml+titleW+18,y+5.5,{align:'center'});
+    // D3D value
+    doc.setFont('helvetica','bold');doc.setFontSize(10);
+    doc.setTextColor(clRGB[0],clRGB[1],clRGB[2]);
+    doc.text(d3um+' µm  |D3D|',ml+titleW+36,y+5.5);
+    // Right: global score
+    doc.setFont('helvetica','bold');doc.setFontSize(9);
+    doc.setTextColor(0,82,163);
+    doc.text('Score: '+score.toFixed(2)+'/100',W-mr,y+4,{align:'right'});
+    doc.setFont('helvetica','normal');doc.setFontSize(7);
+    doc.setTextColor(100,116,139);
+    doc.text(p.nA+' vs '+p.nB,W-mr,y+9,{align:'right'});
+    // Separator
+    doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);
+    doc.line(ml,y+12,W-mr,y+12);
+
+    y=y+16;
 
     // ── 3 views (XY / XZ / YZ) - filled triangles ─────────────────
-    doc.setFont('helvetica','bold');doc.setFontSize(8);setTxt('#0065B3');
+    doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+    doc.setTextColor(0,82,163);
     doc.text('VISUALIZZAZIONE MESH 3D',ml,y);
+    doc.setDrawColor(0,82,163);doc.setLineWidth(0.2);
+    doc.line(ml+doc.getTextWidth('VISUALIZZAZIONE MESH 3D')+2,y-0.8,W-mr,y-0.8);
     y+=3;
 
     // Find which triangles belong to this cylinder
@@ -3468,8 +3439,12 @@ function pdf(){
     y+=viewH+8;
 
     // ── Deviation card (gauge + compass + bars) ────────────────────
-    doc.setFont('helvetica','bold');doc.setFontSize(8);setTxt('#0065B3');
-    doc.text('ANALISI DEVIAZIONE',ml,y);y+=3;
+    doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+    doc.setTextColor(0,82,163);
+    doc.text('ANALISI DEVIAZIONE',ml,y);
+    doc.setDrawColor(0,82,163);doc.setLineWidth(0.2);
+    doc.line(ml+doc.getTextWidth('ANALISI DEVIAZIONE')+2,y-0.8,W-mr,y-0.8);
+    y+=3;
 
     var cardW=cw,cardH=52;
     var devPng=cvPng(720,200,function(cv){
@@ -3479,8 +3454,12 @@ function pdf(){
     y+=cardH+6;
 
     // ── Measurements table ─────────────────────────────────────────
-    doc.setFont('helvetica','bold');doc.setFontSize(8);setTxt('#0065B3');
-    doc.text('TABELLA MISURAZIONI',ml,y);y+=2;
+    doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+    doc.setTextColor(0,82,163);
+    doc.text('TABELLA MISURAZIONI',ml,y);
+    doc.setDrawColor(0,82,163);doc.setLineWidth(0.2);
+    doc.line(ml+doc.getTextWidth('TABELLA MISURAZIONI')+2,y-0.8,W-mr,y-0.8);
+    y+=2;
 
     var rows=[
       ['|D| 3D totale', d3um+'um', clv.label, ''],
@@ -3502,14 +3481,14 @@ function pdf(){
       head:[['Parametro','Valore','Valutazione','']],
       body:rows,
       styles:{font:'helvetica',fontSize:8,cellPadding:2,lineColor:[214,228,240],lineWidth:.2,valign:'middle'},
-      headStyles:{fillColor:[0,101,179],textColor:255,fontStyle:'bold',fontSize:7,halign:'left'},
+      headStyles:{fillColor:[15,23,42],textColor:255,fontStyle:'bold',fontSize:6.5,halign:'left'},
       columnStyles:{
-        0:{cellWidth:72,fontStyle:'bold',textColor:[15,25,35]},
+        0:{cellWidth:72,fontStyle:'bold',textColor:[30,41,59]},
         1:{cellWidth:44,halign:'center',font:'courier',fontStyle:'bold',textColor:clRGB},
-        2:{cellWidth:40,halign:'center',textColor:[100,100,100]},
+        2:{cellWidth:40,halign:'center',textColor:[71,85,105],fontSize:7},
         3:{cellWidth:16}
       },
-      alternateRowStyles:{fillColor:[245,250,255]},
+      alternateRowStyles:{fillColor:[248,250,252]},
       didParseCell:function(data){
         if(data.column.index===1&&data.section==='body'){
           // Color value cell by clinical level
@@ -3604,11 +3583,14 @@ function pdf(){
       }
     }
 
-    // Footer
-    doc.setFont('helvetica','normal');doc.setFontSize(7);setTxt('#7A90A4');
-    doc.line(ml,H-8,W-mr,H-8);
-    doc.text('Syntesis-ICP · Cilindro #'+(ci+1)+' di '+p.pairs.length,ml,H-4);
-    doc.text('Pag. '+(ci+2)+' / '+(p.pairs.length+1),W-mr,H-4,{align:'right'});
+    // ── NASA footer ─────────────────────────────────────────────────
+    doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
+    doc.line(ml,H-10,W-mr,H-10);
+    doc.setFont('helvetica','normal');doc.setFontSize(6);
+    doc.setTextColor(148,163,184);
+    doc.text('Syntesis-ICP v7.2.0.012  ·  Cilindro #'+(ci+1)+' di '+p.pairs.length,ml,H-6.5);
+    doc.text('Pag. '+(ci+2)+' / '+(p.pairs.length+1),W-mr,H-6.5,{align:'right'});
+    doc.setFillColor(0,82,163);doc.rect(0,H-2.5,W,2.5,'F');
   });
 
   // ── Pagine Distanze Inter-Centroide (una pagina per coppia) ──────────
