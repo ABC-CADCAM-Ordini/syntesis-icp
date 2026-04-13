@@ -272,6 +272,13 @@ def robust_pre_align(ct_a: np.ndarray, ct_b: np.ndarray) -> dict:
     n = min(na, nb)
     A, B = ct_a[:n], ct_b[:n]
 
+    # Con N<3 non si può fare Kabsch 3D -- solo traslazione centroide
+    if n < 3:
+        ca, cb = A.mean(0), B.mean(0)
+        t = ca - cb
+        aligned = ct_b + t
+        return {"aligned": aligned, "R": np.eye(3), "t": t, "method": "centroid_only"}
+
     # ── 1. Matching per firma distanze (invariante a roto-traslazione) ────────
     def sig(pts, i):
         return np.sort([np.linalg.norm(pts[i]-pts[j]) for j in range(len(pts)) if j!=i])
@@ -595,6 +602,8 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
 
     ct_a_pre = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a_pre])
     ct_b_pre6 = np.array([raw_ct_b_shifted[[c for c in cl]].mean(0) for cl in clust_b_pre])
+    # Log per debug: quanti cluster trovati
+    # (con 3-4 impianti ci aspettiamo 3-4 cluster, non 6)
 
     # ── Pre-allineamento sui centroidi clusterizzati ──────────────────────────
     if landmarks and len(landmarks.get("a", [])) >= 3 and len(landmarks.get("b", [])) >= 3:
