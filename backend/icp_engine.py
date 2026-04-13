@@ -600,13 +600,14 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     clust_a_pre = cluster_comps(raw_ct_a, thresh_pre)
     clust_b_pre = cluster_comps(raw_ct_b_shifted, thresh_pre)
 
-    # Sanity check: se il clustering ha UNITO troppi componenti
-    # (thresh troppo grande → cilindri distanti raggruppati insieme)
-    # allora usa i componenti originali non clusterizzati (1 per cilindro)
     na_orig, nb_orig = len(raw_ct_a), len(raw_ct_b_shifted)
-    if len(clust_a_pre) < max(1, na_orig // 3):
+    # Sanity check: se il clustering ha unito cilindri distinti
+    # (thresh troppo grande), usa ogni componente come cluster separato.
+    # Regola: se il numero di cluster < metà dei componenti originali,
+    # il clustering è andato fuori controllo -- ripristina 1 cluster per comp.
+    if len(clust_a_pre) * 2 < na_orig:
         clust_a_pre = [[i] for i in range(na_orig)]
-    if len(clust_b_pre) < max(1, nb_orig // 3):
+    if len(clust_b_pre) * 2 < nb_orig:
         clust_b_pre = [[i] for i in range(nb_orig)]
 
     ct_a_pre = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a_pre])
@@ -639,10 +640,10 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     clust_a = cluster_comps(raw_ct_a, thresh2)
     clust_b = cluster_comps(raw_ct_b_aligned, thresh2)
 
-    # Sanity check: evita over-clustering (unione di cilindri diversi)
-    if len(clust_a) < max(1, na_orig // 3):
+    # Sanity check clustering finale
+    if len(clust_a) * 2 < na_orig:
         clust_a = [[i] for i in range(na_orig)]
-    if len(clust_b) < max(1, nb_orig // 3):
+    if len(clust_b) * 2 < nb_orig:
         clust_b = [[i] for i in range(nb_orig)]
 
     ct_a_cl = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a])
