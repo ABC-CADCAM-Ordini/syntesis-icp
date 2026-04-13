@@ -730,7 +730,8 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     # ── Misura LOCALE per ogni coppia (sistema di riferimento del cilindro A) ─
     # Per ogni coppia: dXY=deviazione radiale, dZ=deviazione assiale
     def _cap_axis(tris_comp):
-        """Asse del cilindro: normale media delle facce orizzontali (cap)."""        if len(tris_comp) == 0:
+        # Asse del cilindro: normale media delle facce orizzontali
+        if len(tris_comp) == 0:
             return np.array([0,0,1], dtype=float)
         v0,v1,v2 = tris_comp[:,0], tris_comp[:,1], tris_comp[:,2]
         e1,e2 = v1-v0, v2-v0
@@ -748,7 +749,8 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         return ax
 
     def _cap_center(tris_comp):
-        """Centroide delle facce cap del cilindro."""        if len(tris_comp) == 0:
+        # Centroide delle facce cap del cilindro
+        if len(tris_comp) == 0:
             return np.zeros(3)
         v0,v1,v2 = tris_comp[:,0], tris_comp[:,1], tris_comp[:,2]
         e1,e2 = v1-v0, v2-v0
