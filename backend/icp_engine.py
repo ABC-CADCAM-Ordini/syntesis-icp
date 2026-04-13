@@ -664,6 +664,24 @@ def icp_full_mesh(tris_a: np.ndarray, nm_a: np.ndarray,
     return {"R": R_acc, "t": t_acc, "rmsd": prev_rmsd, "iter": _it + 1}
 
 
+def mean_cap_normal_z(tris: np.ndarray) -> float:
+    """Restituisce la componente Z media delle normali delle facce cap (|nz|>0.5).
+    Positivo = cap puntano verso +Z (orientamento corretto).
+    Negativo = cap puntano verso -Z (file da flippare).
+    """
+    v0, v1, v2 = tris[:, 0], tris[:, 1], tris[:, 2]
+    e1, e2 = v1 - v0, v2 - v0
+    nz = e1[:, 0]*e2[:, 1] - e1[:, 1]*e2[:, 0]
+    nl = np.sqrt((e1[:, 1]*e2[:, 2]-e1[:, 2]*e2[:, 1])**2 +
+                 (e1[:, 2]*e2[:, 0]-e1[:, 0]*e2[:, 2])**2 +
+                 nz**2).clip(1e-9)
+    nz_norm = nz / nl
+    cap_mask = np.abs(nz_norm) > 0.5
+    if cap_mask.sum() < 3:
+        return 1.0  # nessuna cap trovata → assume già corretto
+    return float(nz_norm[cap_mask].mean())
+
+
 def analyze_stl_pair(data_a: bytes, data_b: bytes,
                      name_a: str = "A.stl", name_b: str = "B.stl",
                      landmarks: dict = None) -> dict:
@@ -703,15 +721,32 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
 
     # Auto-flip Z se le mesh sono specchiate (es. scanner intraorali con Z negativa)
     # Condizione: centroidi Z di segno opposto E distanza Z grande
-    z_dist = abs(gc_a[2] - gc_b[2])
-    z_same_sign = (gc_a[2] * gc_b[2]) > 0
+    # ── Orientamento Z basato sulle normali delle cap ────────────────────────
+    # Le normali delle cap puntano sempre verso il sensore (verso "sopra").
+    # Normalizziamo entrambi i file in modo che le cap puntino verso +Z.
+    # Questo è più robusto del segno del centroide Z.
     z_flipped = False
-    if not z_same_sign and z_dist > 5.0:
+    nz_a = mean_cap_normal_z(tris_a[sum(scan_a, [])])
+    nz_b = mean_cap_normal_z(tris_b[sum(scan_b, [])])
+
+    # Flip A se le sue cap puntano in -Z
+    if nz_a < 0:
+        tris_a = tris_a.copy()
+        tris_a[:, :, 2] *= -1
+        raw_ct_a = np.array([cap_centroid(tris_a, c) for c in scan_a])
+        gc_a = global_centroid(tris_a)
+
+    # Flip B se le sue cap puntano in -Z
+    if nz_b < 0:
         tris_b = tris_b.copy()
         tris_b[:, :, 2] *= -1
         gc_b = global_centroid(tris_b)
         raw_ct_b = np.array([cap_centroid(tris_b, c) for c in scan_b])
         z_flipped = True
+
+    # Ricalcola centroidi dopo eventuali flip
+    gc_a = global_centroid(tris_a)
+    gc_b = global_centroid(tris_b)
 
     offset = gc_a - gc_b
     raw_ct_b_shifted = raw_ct_b + offset
