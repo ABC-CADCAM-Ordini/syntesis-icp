@@ -115,20 +115,29 @@ def _generate_reportlab(record: dict) -> bytes:
                              leftMargin=20*mm, rightMargin=20*mm,
                              topMargin=20*mm, bottomMargin=20*mm)
 
-    BLUE     = HexColor("#0065B3")
-    BLUE_L   = HexColor("#E8F4FF")
-    DARK     = HexColor("#0F1923")
-    GRAY     = HexColor("#7A90A4")
-    GREEN    = HexColor("#0D9E6E")
-    RED      = HexColor("#DC2626")
-    GOLD     = HexColor("#F59E0B")
-    PEARL    = HexColor("#F0F5FA")
+    # ── Palette professionale ──────────────────────────────────────────────
+    BLUE     = HexColor("#0052A3")   # Primary brand
+    BLUE_L   = HexColor("#EBF4FF")   # Light bg
+    BLUE_MID = HexColor("#1A6DC8")   # Accent
+    DARK     = HexColor("#0D1B2A")   # Near-black
+    SLATE    = HexColor("#334155")   # Headers text
+    GRAY     = HexColor("#64748B")   # Muted text
+    GRAY_L   = HexColor("#F8FAFC")   # Zebra light
+    GREEN    = HexColor("#059669")   # Ottimo
+    AMBER    = HexColor("#D97706")   # Accettabile
+    RED      = HexColor("#DC2626")   # Critico
+    GOLD     = HexColor("#F59E0B")   # Warning
+    PEARL    = HexColor("#F1F5F9")   # Alternating row
+    TEAL     = HexColor("#0E7490")   # Section header
+    white    = colors.white
 
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("title", fontName="Helvetica-Bold",
-                                  fontSize=18, textColor=BLUE, spaceAfter=4)
-    sub_style   = ParagraphStyle("sub",   fontName="Helvetica",
-                                  fontSize=9,  textColor=GRAY, spaceAfter=12)
+                                  fontSize=20, textColor=BLUE,
+                                  spaceAfter=2, spaceBefore=0)
+    sub_style   = ParagraphStyle("sub", fontName="Helvetica",
+                                  fontSize=8.5, textColor=GRAY,
+                                  spaceAfter=10)
     label_style = ParagraphStyle("lbl",   fontName="Helvetica-Bold",
                                   fontSize=8,  textColor=GRAY, spaceBefore=6)
     body_style  = ParagraphStyle("body",  fontName="Helvetica",
@@ -171,12 +180,14 @@ def _generate_reportlab(record: dict) -> bytes:
     ]]
     st = TableStyle([
         ("BACKGROUND",  (0,0), (-1,-1), BLUE_L),
-        ("ROUNDEDCORNERS", (0,0), (-1,-1), [6]),
-        ("BOX",         (0,0), (-1,-1), 0.5, BLUE),
-        ("TOPPADDING",  (0,0), (-1,-1), 10),
-        ("BOTTOMPADDING",(0,0),(-1,-1), 10),
-        ("LEFTPADDING", (0,0), (-1,-1), 12),
-        ("RIGHTPADDING",(0,0), (-1,-1), 12),
+        ("BACKGROUND",  (0,0), (0,-1), HexColor("#F0F7FF")),
+        ("BOX",         (0,0), (-1,-1), 1.0, BLUE),
+        ("LINEAFTER",   (0,0), (0,-1), 0.5, HexColor("#CBD5E1")),
+        ("LINEAFTER",   (1,0), (1,-1), 0.5, HexColor("#CBD5E1")),
+        ("TOPPADDING",  (0,0), (-1,-1), 12),
+        ("BOTTOMPADDING",(0,0),(-1,-1), 12),
+        ("LEFTPADDING", (0,0), (-1,-1), 14),
+        ("RIGHTPADDING",(0,0), (-1,-1), 14),
         ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
     ])
     t = Table(score_data, colWidths=[40*mm, 80*mm, 60*mm])
@@ -210,15 +221,18 @@ def _generate_reportlab(record: dict) -> bytes:
     col_w = [10*mm, 22*mm, 22*mm, 22*mm, 22*mm, 24*mm, 14*mm, 18*mm]
     tbl = Table(rows, colWidths=col_w)
     tbl.setStyle(TableStyle([
-        ("BACKGROUND",    (0,0), (-1,0), BLUE),
+        ("BACKGROUND",    (0,0), (-1,0), DARK),
         ("TEXTCOLOR",     (0,0), (-1,0), white),
         ("FONTNAME",      (0,0), (-1,0), "Helvetica-Bold"),
-        ("FONTSIZE",      (0,0), (-1,-1), 7),
+        ("FONTSIZE",      (0,0), (-1,0), 7),
+        ("FONTSIZE",      (0,1), (-1,-1), 7.5),
         ("FONTNAME",      (0,1), (-1,-1), "Courier"),
         ("ALIGN",         (0,0), (-1,-1), "RIGHT"),
         ("ALIGN",         (0,0), (0,-1), "CENTER"),
-        ("ROWBACKGROUNDS",(0,1), (-1,-1), [PEARL, white]),
-        ("GRID",          (0,0), (-1,-1), 0.3, HexColor("#D6E4F0")),
+        ("ROWBACKGROUNDS",(0,1), (-1,-1), [GRAY_L, white]),
+        ("LINEBELOW",     (0,0), (-1,0), 0, BLUE_MID),
+        ("LINEBELOW",     (0,1), (-1,-2), 0.2, HexColor("#E2E8F0")),
+        ("BOX",           (0,0), (-1,-1), 0.5, HexColor("#CBD5E1")),
         ("TOPPADDING",    (0,0), (-1,-1), 4),
         ("BOTTOMPADDING", (0,0), (-1,-1), 4),
     ]))
