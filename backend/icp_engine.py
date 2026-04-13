@@ -597,6 +597,73 @@ def cluster_comps(cents: np.ndarray, thresh: float) -> list[list[int]]:
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
+
+def parse_stl_with_normals(data: bytes):
+    """Restituisce (tris, normals) shape (N,3,3) e (N,3)."""
+    if len(data) < 84:
+        raise ValueError("STL troppo corto.")
+    n_tri = struct.unpack_from("<I", data, 80)[0]
+    expected = 84 + n_tri * 50
+    if expected == len(data) and n_tri > 0:
+        raw = np.frombuffer(data, dtype="<f4",
+                            count=n_tri * 12, offset=84).reshape(n_tri, 12)
+        return raw[:, 3:12].reshape(n_tri, 3, 3).copy(), raw[:, :3].copy()
+    tris, nms, cur = [], [], None
+    for line in data.decode("utf-8", errors="ignore").splitlines():
+        line = line.strip()
+        if line.startswith("facet normal"):
+            p = line.split(); cur = {"n": [float(p[2]),float(p[3]),float(p[4])], "v": []}
+        elif line.startswith("vertex") and cur:
+            p = line.split(); cur["v"].append([float(p[1]),float(p[2]),float(p[3])])
+        elif line.startswith("endfacet") and cur and len(cur["v"]) == 3:
+            tris.append(cur["v"]); nms.append(cur["n"]); cur = None
+    return np.array(tris, dtype=np.float32), np.array(nms, dtype=np.float32)
+
+
+def icp_full_mesh(tris_a: np.ndarray, nm_a: np.ndarray,
+                  tris_b: np.ndarray, nm_b: np.ndarray,
+                  n_sample: int = 5000, max_iter: int = 80,
+                  tol: float = 1e-8) -> dict:
+    """ICP point-to-point su mesh subsampled (stratified: 40% cap + 60% resto).
+    Usa scipy.spatial.cKDTree. Ritorna {R, t, rmsd, iter}.
+    """
+    from scipy.spatial import cKDTree as _KDT
+    nl_a = np.linalg.norm(nm_a, axis=1).clip(1e-9)
+    nl_b = np.linalg.norm(nm_b, axis=1).clip(1e-9)
+    cap_a = np.abs(nm_a[:, 2] / nl_a) > 0.5
+    cap_b = np.abs(nm_b[:, 2] / nl_b) > 0.5
+    cents_a = tris_a.mean(1); cents_b = tris_b.mean(1)
+    n_cap = min(int(n_sample * 0.4), int(cap_a.sum()), int(cap_b.sum()))
+    n_rest = n_sample - n_cap
+    rng = np.random.default_rng(42)
+    idx_ca = rng.choice(np.where(cap_a)[0], n_cap, replace=False)
+    idx_ra = rng.choice(np.where(~cap_a)[0], min(n_rest, int((~cap_a).sum())), replace=False)
+    pts_a = np.vstack([cents_a[idx_ca], cents_a[idx_ra]])
+    idx_cb = rng.choice(np.where(cap_b)[0], n_cap, replace=False)
+    idx_rb = rng.choice(np.where(~cap_b)[0], min(n_rest, int((~cap_b).sum())), replace=False)
+    pts_b = np.vstack([cents_b[idx_cb], cents_b[idx_rb]]).copy()
+    R_acc = np.eye(3); t_acc = np.zeros(3)
+    tree_a = _KDT(pts_a); prev_rmsd = float("inf")
+    for _it in range(max_iter):
+        dists, inds = tree_a.query(pts_b, k=1)
+        med = float(np.median(dists))
+        mask = dists < med * 2.5
+        if mask.sum() < 10: break
+        ma = pts_a[inds[mask]]; mb = pts_b[mask]
+        ca, cb = ma.mean(0), mb.mean(0)
+        H = (mb - cb).T @ (ma - ca)
+        U, S, Vt = np.linalg.svd(H)
+        R = Vt.T @ U.T
+        if np.linalg.det(R) < 0: Vt[-1] *= -1; R = Vt.T @ U.T
+        t = ca - R @ cb
+        pts_b = (R @ pts_b.T).T + t
+        R_acc = R @ R_acc; t_acc = R @ t_acc + t
+        rmsd = float(np.sqrt(np.mean(dists[mask] ** 2)))
+        if abs(prev_rmsd - rmsd) < tol: break
+        prev_rmsd = rmsd
+    return {"R": R_acc, "t": t_acc, "rmsd": prev_rmsd, "iter": _it + 1}
+
+
 def analyze_stl_pair(data_a: bytes, data_b: bytes,
                      name_a: str = "A.stl", name_b: str = "B.stl",
                      landmarks: dict = None) -> dict:
@@ -710,7 +777,27 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
 
     # Applica R_pre/t_pre a raw_ct_b_shifted e a tris_b
     raw_ct_b_aligned = (R_pre @ raw_ct_b_shifted.T).T + t_pre
+    # Pre-allineamento centroidi → applica a tris_b
     tris_b_aligned = apply_transform_tris(tris_b + offset, R_pre, t_pre)
+
+    # ── ICP sull'intera mesh (come Exocad) ──────────────────────────────────
+    # Affina rx/ry/rz usando tutta la geometria della superficie.
+    try:
+        _ta, _na = parse_stl_with_normals(data_a)
+        _tb, _nb = parse_stl_with_normals(data_b)
+        if z_flipped:
+            _tb[:, :, 2] *= -1
+            _nb[:, 2] *= -1
+        _tb_pre = apply_transform_tris(_tb + offset, R_pre, t_pre)
+        _nb_pre = (R_pre @ _nb.T).T
+        _mesh   = icp_full_mesh(_ta, _na, _tb_pre, _nb_pre,
+                                n_sample=5000, max_iter=80)
+        R_mesh, t_mesh = _mesh["R"], _mesh["t"]
+        R_pre = R_mesh @ R_pre
+        t_pre = R_mesh @ t_pre + t_mesh
+        tris_b_aligned = apply_transform_tris(tris_b_aligned, R_mesh, t_mesh)
+    except Exception:
+        pass  # fallback: usa solo pre-align centroidi
 
     # ── Clustering finale su B allineato + hungarian matching ────────────────
     thresh_b2 = auto_thresh(raw_ct_b_aligned)
