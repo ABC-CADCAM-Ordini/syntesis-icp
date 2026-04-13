@@ -693,13 +693,118 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     offset = np.zeros(3)  # già incluso in tris_b_aligned
     pre = {"R": R_pre, "t": t_pre, "method": method_pre}
 
-    # ICP
-    icp = run_icp(ct_a, ct_b_raw, max_iter=80)
-    pairs = match_pairs(ct_a, icp["aligned"])
+    # ── Allineamento MINIMO: solo rotZ + traslazione 3D (no pitch/roll) ─────
+    # Obiettivo: sovrapposizione minima per identificare coppie,
+    # senza distorcere le misure con rotazioni fittizie di inclinazione.
+    from scipy.optimize import minimize as _min_opt
+    def _cost_rzt(p):
+        rz2,tx2,ty2,tz2 = p
+        cz2,sz2 = math.cos(rz2), math.sin(rz2)
+        Rz2 = np.array([[cz2,-sz2,0],[sz2,cz2,0],[0,0,1]])
+        B2 = (Rz2 @ ct_b_raw.T).T + [tx2,ty2,tz2]
+        return float(np.sum((ct_a - B2)**2))
+
+    # Guess iniziale: stima da PCA XY
+    ct_diff = ct_a.mean(0) - ct_b_raw.mean(0)
+    _res = _min_opt(_cost_rzt, [0.0, ct_diff[0], ct_diff[1], ct_diff[2]],
+                    method='Nelder-Mead',
+                    options={'xatol':1e-7,'fatol':1e-7,'maxiter':100000})
+    # Affina con piu' angoli di partenza
+    for _rz0 in np.linspace(0, 2*math.pi, 12, endpoint=False):
+        _r2 = _min_opt(_cost_rzt, [_rz0, ct_diff[0], ct_diff[1], ct_diff[2]],
+                       method='Nelder-Mead',
+                       options={'xatol':1e-7,'fatol':1e-7,'maxiter':100000})
+        if _r2.fun < _res.fun:
+            _res = _r2
+    rz_min, tx_min, ty_min, tz_min = _res.x
+    cz_m, sz_m = math.cos(rz_min), math.sin(rz_min)
+    R_min = np.array([[cz_m,-sz_m,0],[sz_m,cz_m,0],[0,0,1]])
+    t_min_v = np.array([tx_min, ty_min, tz_min])
+    ct_b_aligned = (R_min @ ct_b_raw.T).T + t_min_v
+
+    # Abbinamento finale hungarian
+    from scipy.optimize import linear_sum_assignment as _hung
+    D_final = np.linalg.norm(ct_a[:,None] - ct_b_aligned[None,:], axis=2)
+    ra, ca_idx = _hung(D_final)
+
+    # ── Misura LOCALE per ogni coppia (sistema di riferimento del cilindro A) ─
+    # Per ogni coppia: dXY=deviazione radiale, dZ=deviazione assiale
+    def _cap_axis(tris_comp):
+        """Asse del cilindro: normale media delle facce orizzontali (cap)."""        if len(tris_comp) == 0:
+            return np.array([0,0,1], dtype=float)
+        v0,v1,v2 = tris_comp[:,0], tris_comp[:,1], tris_comp[:,2]
+        e1,e2 = v1-v0, v2-v0
+        nx = e1[:,1]*e2[:,2]-e1[:,2]*e2[:,1]
+        ny = e1[:,2]*e2[:,0]-e1[:,0]*e2[:,2]
+        nz = e1[:,0]*e2[:,1]-e1[:,1]*e2[:,0]
+        nl = np.sqrt(nx**2+ny**2+nz**2).clip(1e-9)
+        cap_mask = np.abs(nz/nl) > 0.5
+        if cap_mask.sum() < 3:
+            return np.array([0,0,1], dtype=float)
+        nxm,nym,nzm = nx[cap_mask].mean(), ny[cap_mask].mean(), nz[cap_mask].mean()
+        ax = np.array([nxm,nym,nzm])
+        ax /= np.linalg.norm(ax).clip(1e-9)
+        if ax[2] < 0: ax = -ax
+        return ax
+
+    def _cap_center(tris_comp):
+        """Centroide delle facce cap del cilindro."""        if len(tris_comp) == 0:
+            return np.zeros(3)
+        v0,v1,v2 = tris_comp[:,0], tris_comp[:,1], tris_comp[:,2]
+        e1,e2 = v1-v0, v2-v0
+        nz_c = e1[:,0]*e2[:,1]-e1[:,1]*e2[:,0]
+        nl_c = np.sqrt(((e1[:,1]*e2[:,2]-e1[:,2]*e2[:,1])**2 +
+                       (e1[:,2]*e2[:,0]-e1[:,0]*e2[:,2])**2 + nz_c**2)).clip(1e-9)
+        cap_mask = np.abs(nz_c/nl_c) > 0.5
+        if cap_mask.sum() < 3:
+            return tris_comp.reshape(-1,3).mean(0)
+        return tris_comp[cap_mask].mean(axis=1).mean(axis=0)
+
+    # Build pairs with LOCAL measurements
+    import math as _math
+    pairs = []
+    for _ki in range(len(ra)):
+        _ai, _bi = ra[_ki], ca_idx[_ki]
+        # Triangoli del cilindro A_ai e B_bi (dopo trasformazione minima)
+        _ta_idx = [ti for ci in clust_a_sorted[_ai] for ti in scan_a[ci]] if _ai < len(clust_a_sorted) else []
+        _tb_idx = [ti for ci in clust_b_sorted[_bi] for ti in scan_b[ci]] if _bi < len(clust_b_sorted) else []
+        _tris_a_i = tris_a[_ta_idx] if _ta_idx else np.empty((0,3,3),dtype=np.float32)
+        # tris_b dopo R_min+t_min (allineamento minimo per avere le coord comparabili)
+        _tris_b_i_raw = tris_b[_tb_idx] if _tb_idx else np.empty((0,3,3),dtype=np.float32)
+        if len(_tris_b_i_raw) > 0:
+            _tris_b_i = apply_transform_tris(_tris_b_i_raw, R_min, t_min_v)
+        else:
+            _tris_b_i = _tris_b_i_raw
+
+        # Sistema locale del cilindro A_ai
+        _O_a = _cap_center(_tris_a_i)
+        _Z_local = _cap_axis(_tris_a_i)
+        # Centro cap di B_bi nelle coordinate globali (dopo allineamento minimo)
+        _O_b = _cap_center(_tris_b_i)
+        # Vettore di spostamento nel sistema locale
+        _d = _O_b - _O_a
+        _dZ = float(np.dot(_d, _Z_local))
+        _d_radiale = _d - _dZ * _Z_local
+        _dXY = float(np.linalg.norm(_d_radiale))
+        _d3 = float(np.linalg.norm(_d))
+
+        pairs.append({
+            "a": _O_a.tolist(), "b": _O_b.tolist(),
+            "dx": float(_d_radiale[0]), "dy": float(_d_radiale[1]), "dz": _dZ,
+            "dxy": _dXY, "d3": _d3
+        })
+
+    # ICP sui centroidi per compatibilità (RMSD e angolo)
+    icp = run_icp(ct_a, ct_b_aligned, max_iter=80)
+    # Override tris_b_all con allineamento minimo (per visualizzazione corretta)
+    _R_icp_min = R_min
+    _t_icp_min = t_min_v
+
 
     # Trasforma tutte le mesh B
     # tris_b è già pre-allineato (R_pre+t_pre applicati sopra)
-    tris_b_all = apply_transform_tris(tris_b, icp["R"], icp["t"])
+    # tris_b_all: allineamento minimo (rotZ+t) per visualizzazione senza distorsione
+    tris_b_all = apply_transform_tris(tris_b, R_min, t_min_v)
 
     # Assi cilindri
     # Costruisci mappa pi -> triangoli usando clust_a/b_sorted
