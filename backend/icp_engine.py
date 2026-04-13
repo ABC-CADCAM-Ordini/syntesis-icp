@@ -592,7 +592,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     offset = gc_a - gc_b
     raw_ct_b_shifted = raw_ct_b + offset
 
-    # ── Clustering preliminare per avere N centroidi per il pre-align ─────────
+    # ── Clustering preliminare: raggruppa parti dello stesso scanbody ──────────
     thresh_a_pre = auto_thresh(raw_ct_a)
     thresh_b_pre = auto_thresh(raw_ct_b_shifted)
     thresh_pre = min(thresh_a_pre, thresh_b_pre)
@@ -600,10 +600,17 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     clust_a_pre = cluster_comps(raw_ct_a, thresh_pre)
     clust_b_pre = cluster_comps(raw_ct_b_shifted, thresh_pre)
 
+    # Sanity check: se il clustering ha UNITO troppi componenti
+    # (thresh troppo grande → cilindri distanti raggruppati insieme)
+    # allora usa i componenti originali non clusterizzati (1 per cilindro)
+    na_orig, nb_orig = len(raw_ct_a), len(raw_ct_b_shifted)
+    if len(clust_a_pre) < max(1, na_orig // 3):
+        clust_a_pre = [[i] for i in range(na_orig)]
+    if len(clust_b_pre) < max(1, nb_orig // 3):
+        clust_b_pre = [[i] for i in range(nb_orig)]
+
     ct_a_pre = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a_pre])
     ct_b_pre6 = np.array([raw_ct_b_shifted[[c for c in cl]].mean(0) for cl in clust_b_pre])
-    # Log per debug: quanti cluster trovati
-    # (con 3-4 impianti ci aspettiamo 3-4 cluster, non 6)
 
     # ── Pre-allineamento sui centroidi clusterizzati ──────────────────────────
     if landmarks and len(landmarks.get("a", [])) >= 3 and len(landmarks.get("b", [])) >= 3:
@@ -631,6 +638,12 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     thresh2 = min(thresh_a_pre, thresh_b2)
     clust_a = cluster_comps(raw_ct_a, thresh2)
     clust_b = cluster_comps(raw_ct_b_aligned, thresh2)
+
+    # Sanity check: evita over-clustering (unione di cilindri diversi)
+    if len(clust_a) < max(1, na_orig // 3):
+        clust_a = [[i] for i in range(na_orig)]
+    if len(clust_b) < max(1, nb_orig // 3):
+        clust_b = [[i] for i in range(nb_orig)]
 
     ct_a_cl = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a])
     ct_b_cl = np.array([raw_ct_b_aligned[[c for c in cl]].mean(0) for cl in clust_b])
