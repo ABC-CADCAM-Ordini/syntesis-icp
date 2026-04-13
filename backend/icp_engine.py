@@ -605,9 +605,25 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     # (thresh troppo grande), usa ogni componente come cluster separato.
     # Regola: se il numero di cluster < metà dei componenti originali,
     # il clustering è andato fuori controllo -- ripristina 1 cluster per comp.
-    if len(clust_a_pre) * 2 < na_orig:
+    # Se ogni componente ha già una sola parte (es. cilindro intero),
+    # il clustering non deve unire cilindri diversi.
+    # Regola: se n_cluster < n_componenti E n_cluster non è circa n_comp/2
+    # (che sarebbe il caso legittimo anello+corpo), usa 1 cluster per componente.
+    # Caso legittimo: 12 componenti -> 6 cluster (ratio ~0.5) = anello+corpo
+    # Caso sbagliato: 4 componenti  -> 2 cluster (ratio ~0.5) = ha unito cilindri
+    # Distinzione: se ogni cluster ha >1 componente E la distanza intra-cluster
+    # è < 8mm (distanza anello-corpo tipica), è legittimo. Altrimenti no.
+    def _cluster_ok(clust, cents, max_intra_mm=8.0):
+        for cl in clust:
+            if len(cl) > 1:
+                pts = cents[cl]
+                d = float(np.linalg.norm(pts.max(0) - pts.min(0)))
+                if d > max_intra_mm:
+                    return False
+        return True
+    if not _cluster_ok(clust_a_pre, raw_ct_a):
         clust_a_pre = [[i] for i in range(na_orig)]
-    if len(clust_b_pre) * 2 < nb_orig:
+    if not _cluster_ok(clust_b_pre, raw_ct_b_shifted):
         clust_b_pre = [[i] for i in range(nb_orig)]
 
     ct_a_pre = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a_pre])
@@ -640,10 +656,17 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     clust_a = cluster_comps(raw_ct_a, thresh2)
     clust_b = cluster_comps(raw_ct_b_aligned, thresh2)
 
-    # Sanity check clustering finale
-    if len(clust_a) * 2 < na_orig:
+    def _cluster_ok2(clust, cents, max_intra_mm=8.0):
+        for cl in clust:
+            if len(cl) > 1:
+                pts = cents[cl]
+                d = float(np.linalg.norm(pts.max(0) - pts.min(0)))
+                if d > max_intra_mm:
+                    return False
+        return True
+    if not _cluster_ok2(clust_a, raw_ct_a):
         clust_a = [[i] for i in range(na_orig)]
-    if len(clust_b) * 2 < nb_orig:
+    if not _cluster_ok2(clust_b, raw_ct_b_aligned):
         clust_b = [[i] for i in range(nb_orig)]
 
     ct_a_cl = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a])
