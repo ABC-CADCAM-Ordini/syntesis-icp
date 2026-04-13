@@ -4257,6 +4257,7 @@ var AM = (function() {
   };
 
   // Stato drag
+  var _pipData = { side:null, px:0, py:0, n:0, alpha:1.0, timer:null };
   var _drag = { active:false, side:null, mode:'arc', sx:0, sy:0,
                 startRotX:0, startRotY:0, startRotZ:0, startPanX:0, startPanY:0,
                 arcAxis:null }; // 'x','y','z' o null=free
@@ -4463,6 +4464,11 @@ var AM = (function() {
     cv._ri = {cx:cx,cy:cy,cz:cz2,sc:sc,cam:cam,W:W,H:H,tris:tris,n:n};
 
     _drawMarkers(side, ctx, W, H, cx, cy, cz2, sc, cam);
+    // Cattura buffer per PIP PRIMA di disegnarla (evita feedback loop)
+    var _cvPIP = document.getElementById(side==='A'?'cv3dA':'cv3dB');
+    if (_cvPIP) _capturePIPBuffer(side, _cvPIP);
+    // Disegna PIP con fade
+    _drawPIP(side, ctx, W, H);
     _drawArcball(side, W, H);
   }
 
@@ -4552,89 +4558,112 @@ var AM = (function() {
       ctx.fillText(i+1,px,py);
     });
 
-    // PIP: mostra zoom dell'ultimo punto cliccato
-    if (pts.length > 0) {
-      var last = pts[pts.length-1];
-      var lpx = (last.sx !== undefined) ? last.sx*W : W/2;
-      var lpy = (last.sy !== undefined) ? last.sy*H : H/2;
-      _drawPIP(side, ctx, W, H, lpx, lpy, pts.length, colFill, colStroke);
-    }
   }
 
-  function _drawPIP(side, ctx, W, H, clickX, clickY, markerN, colFill, colStroke) {
-    // Dimensioni e posizione PIP (angolo in alto a destra)
-    var PW=140, PH=140, PAD=8;
-    var PX = W - PW - PAD;
-    var PY = PAD;
-    var ZOOM = 4.0;
+  // ── Canvas buffer per PIP (cattura la mesh PRIMA di disegnare la PIP) ────
+  var _pipBuffer = {};  // {A: HTMLCanvasElement, B: HTMLCanvasElement}
 
-    // Crop source: area intorno al click (prima che sia renderizzata la PIP stessa)
-    var srcW = PW / ZOOM, srcH = PH / ZOOM;
+  function _capturePIPBuffer(side, srcCanvas) {
+    // Copia il canvas corrente in un buffer offscreen PRIMA di disegnare PIP
+    if (!_pipBuffer[side]) {
+      _pipBuffer[side] = document.createElement('canvas');
+    }
+    var buf = _pipBuffer[side];
+    buf.width = srcCanvas.width; buf.height = srcCanvas.height;
+    buf.getContext('2d').drawImage(srcCanvas, 0, 0);
+  }
+
+  function _triggerPIP(side, px, py, n) {
+    // Registra dati PIP e avvia timer fade-out
+    _pipData.side = side;
+    _pipData.px = px; _pipData.py = py;
+    _pipData.n = n; _pipData.alpha = 1.0;
+    if (_pipData.timer) clearTimeout(_pipData.timer);
+    // Dopo 3s inizia fade; a 3.5s scompare
+    _pipData.timer = setTimeout(function() {
+      _fadePIP(side);
+    }, 3000);
+  }
+
+  function _fadePIP(side) {
+    _pipData.alpha -= 0.08;
+    if (_pipData.alpha <= 0) {
+      _pipData.alpha = 0;
+      _pipData.side = null;
+      return;
+    }
+    _render(side);  // ri-renderizza per aggiornare alpha
+    setTimeout(function(){ _fadePIP(side); }, 40);
+  }
+
+  function _drawPIP(side, ctx, W, H) {
+    if (_pipData.side !== side || _pipData.alpha <= 0) return;
+    var clickX = _pipData.px, clickY = _pipData.py;
+    var markerN = _pipData.n, alpha = _pipData.alpha;
+    var colFill   = side==='A' ? '#1d4ed8' : '#b45309';
+    var colStroke = side==='A' ? '#bfdbfe' : '#fde68a';
+
+    var PW=150, PH=150, PAD=8, ZOOM=2.0, r=10;
+    var PX = W - PW - PAD, PY = PAD;
+    var srcW = PW/ZOOM, srcH = PH/ZOOM;
     var srcX = Math.max(0, Math.min(W - srcW, clickX - srcW/2));
     var srcY = Math.max(0, Math.min(H - srcH, clickY - srcH/2));
 
-    // Copia l'area del canvas corrente (già renderizzata senza PIP)
     ctx.save();
-    // Clip PIP area con bordo arrotondato
+    ctx.globalAlpha = alpha;
+
+    // Ombra
+    ctx.shadowColor='rgba(0,0,0,0.25)'; ctx.shadowBlur=10; ctx.shadowOffsetY=3;
+
+    // Clip area arrotondata
     ctx.beginPath();
-    var r=10;
     ctx.moveTo(PX+r,PY); ctx.lineTo(PX+PW-r,PY);
-    ctx.arcTo(PX+PW,PY,PX+PW,PY+r,r);
-    ctx.lineTo(PX+PW,PY+PH-r);
-    ctx.arcTo(PX+PW,PY+PH,PX+PW-r,PY+PH,r);
-    ctx.lineTo(PX+r,PY+PH);
-    ctx.arcTo(PX,PY+PH,PX,PY+PH-r,r);
-    ctx.lineTo(PX,PY+r);
-    ctx.arcTo(PX,PY,PX+r,PY,r);
-    ctx.closePath();
-
-    // Sfondo
-    ctx.fillStyle='#f0f4f8'; ctx.fill();
+    ctx.arcTo(PX+PW,PY,PX+PW,PY+r,r); ctx.lineTo(PX+PW,PY+PH-r);
+    ctx.arcTo(PX+PW,PY+PH,PX+PW-r,PY+PH,r); ctx.lineTo(PX+r,PY+PH);
+    ctx.arcTo(PX,PY+PH,PX,PY+PH-r,r); ctx.lineTo(PX,PY+r);
+    ctx.arcTo(PX,PY,PX+r,PY,r); ctx.closePath();
+    ctx.fillStyle='#f4f7fb'; ctx.fill();
     ctx.clip();
+    ctx.shadowColor='transparent';
 
-    // Disegna zoom della scena (usando drawImage sul canvas stesso)
-    var cv = document.getElementById(side==='A'?'cv3dA':'cv3dB');
-    if (cv) {
-      ctx.drawImage(cv, srcX, srcY, srcW, srcH, PX, PY, PW, PH);
+    // Disegna dalla copia buffer (catturata prima del render PIP)
+    var buf = _pipBuffer[side];
+    if (buf && buf.width > 0) {
+      ctx.drawImage(buf, srcX, srcY, srcW, srcH, PX, PY, PW, PH);
     }
 
-    // Mirino al centro della PIP (dove è il click)
+    // Mirino centrale
     var cx2=PX+PW/2, cy2=PY+PH/2;
-    // Cerchio esterno
-    ctx.beginPath(); ctx.arc(cx2,cy2,18,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=1.5; ctx.stroke();
-    // Linee di mira
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(cx2,cy2,20,0,Math.PI*2); ctx.stroke();
     ctx.strokeStyle=colFill; ctx.lineWidth=1.5;
-    [[-22,0,-14,0],[14,0,22,0],[0,-22,0,-14],[0,14,0,22]].forEach(function(l){
+    [[-26,0,-15,0],[15,0,26,0],[0,-26,0,-15],[0,15,0,26]].forEach(function(l){
       ctx.beginPath(); ctx.moveTo(cx2+l[0],cy2+l[1]); ctx.lineTo(cx2+l[2],cy2+l[3]); ctx.stroke();
     });
     // Badge numero
-    ctx.beginPath(); ctx.arc(cx2,cy2,12,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(cx2,cy2,13,0,Math.PI*2);
     ctx.fillStyle=colFill; ctx.fill();
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
-    ctx.fillStyle='#fff'; ctx.font='bold 11px monospace';
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold 12px monospace';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(markerN, cx2, cy2);
 
     ctx.restore();
 
-    // Bordo PIP
+    // Bordo esterno (fuori dal clip)
+    ctx.save(); ctx.globalAlpha=alpha;
     ctx.beginPath();
     ctx.moveTo(PX+r,PY); ctx.lineTo(PX+PW-r,PY);
-    ctx.arcTo(PX+PW,PY,PX+PW,PY+r,r);
-    ctx.lineTo(PX+PW,PY+PH-r);
-    ctx.arcTo(PX+PW,PY+PH,PX+PW-r,PY+PH,r);
-    ctx.lineTo(PX+r,PY+PH);
-    ctx.arcTo(PX,PY+PH,PX,PY+PH-r,r);
-    ctx.lineTo(PX,PY+r);
-    ctx.arcTo(PX,PY,PX+r,PY,r);
-    ctx.closePath();
-    ctx.strokeStyle=colFill; ctx.lineWidth=2; ctx.stroke();
-
-    // Label "ZOOM 4x"
+    ctx.arcTo(PX+PW,PY,PX+PW,PY+r,r); ctx.lineTo(PX+PW,PY+PH-r);
+    ctx.arcTo(PX+PW,PY+PH,PX+PW-r,PY+PH,r); ctx.lineTo(PX+r,PY+PH);
+    ctx.arcTo(PX,PY+PH,PX,PY+PH-r,r); ctx.lineTo(PX,PY+r);
+    ctx.arcTo(PX,PY,PX+r,PY,r); ctx.closePath();
+    ctx.strokeStyle=colFill; ctx.lineWidth=2.5; ctx.stroke();
+    // Label
     ctx.fillStyle=colFill; ctx.font='bold 9px monospace';
     ctx.textAlign='right'; ctx.textBaseline='top';
-    ctx.fillText('4×', PX+PW-5, PY+4);
+    ctx.fillText('2×', PX+PW-6, PY+5);
+    ctx.restore();
   }
 
   // ── Interazione mouse ─────────────────────────────────────────────────────
@@ -4680,6 +4709,7 @@ var AM = (function() {
       if (!_drag.active||_drag.side!==side) return;
       if (!_drag.moved) _onClick(side, e);
       _drag.active=false;
+      // Se drag brevissimo = click: non cancellare (già gestito in _onClick)
     }
 
     cv.addEventListener('mousedown', onDown);
@@ -4710,6 +4740,8 @@ var AM = (function() {
     if (!pt) return;
     if (side==='A') _ptsA.push(pt); else _ptsB.push(pt);
     _step++;
+    // Attiva PIP: mostra zoom del punto cliccato per 3.5s
+    _triggerPIP(side, ex, ey, side==='A' ? _ptsA.length : _ptsB.length);
     _updateUI(); _render('A'); _render('B');
     if (_step>=_maxSteps) _onAllPointsSet();
   }
