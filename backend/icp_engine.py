@@ -646,7 +646,8 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         if np.linalg.det(R_pre) < 0:
             Vt_lm[-1] *= -1; R_pre = Vt_lm.T @ U_lm.T
         t_pre = ca_lm - R_pre @ cb_lm
-        method_pre = "landmark"  else:
+        method_pre = "landmark"
+    else:
         pa = robust_pre_align(ct_a_pre, ct_b_pre6)
         R_pre, t_pre = pa["R"], pa["t"]
         method_pre = pa.get("method", "auto")
