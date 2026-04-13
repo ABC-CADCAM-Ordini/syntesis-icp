@@ -4455,7 +4455,7 @@ var AM = (function() {
     }
 
     // Salva info per raycast
-    cv._ri = {cx:cx,cy:cy,cz:cz2,sc:sc,cam:cam,W:W,H:H};
+    cv._ri = {cx:cx,cy:cy,cz:cz2,sc:sc,cam:cam,W:W,H:H,tris:tris,n:n};
 
     _drawMarkers(side, ctx, W, H, cx, cy, cz2, sc, cam);
     _drawArcball(side, W, H);
@@ -4617,19 +4617,74 @@ var AM = (function() {
     var cv=document.getElementById(side==='A'?'cv3dA':'cv3dB');
     if (!cv||!cv._ri) return {x:0,y:0,z:0,sx:ex,sy:ey};
     var ri=cv._ri, cam=ri.cam, W=ri.W, H=ri.H;
-    var d=200, fill=0.42, zoom=cam.zoom;
-    // Proiezione inversa sul piano medio (z_norm=0)
-    var x3n=(ex-W/2-cam.panX*W/2)/(d*zoom*fill*W);
-    var y3n=-(ey-H/2+cam.panY*H/2)/(d*zoom*fill*H);
-    var cz=Math.cos(cam.rotZ||0), sz=Math.sin(cam.rotZ||0);
-    var x1n=x3n*cz+y3n*sz, y2n=-x3n*sz+y3n*cz;
+
+    // ── Raycasting 3D: trova il triangolo più vicino al pixel cliccato ──
+    var d=200.0, fill=0.42, zoom=cam.zoom;
+    // Direzione del raggio nello spazio camera normalizzato
+    var rx=(ex-W/2-cam.panX*W/2)/(d*zoom*fill*W);
+    var ry=-(ey-H/2+cam.panY*H/2)/(d*zoom*fill*H);
+    // Il raggio parte da (0,0,-d) in camera space e punta verso (rx*d, ry*d, 0)
+    // Inverti rotazione camera per portare il raggio in object space
+    var cz2=Math.cos(cam.rotZ||0), sz2=Math.sin(cam.rotZ||0);
     var cx2=Math.cos(cam.rotX), sx2=Math.sin(cam.rotX);
-    var yn=y2n*cx2;
-    var cy2=Math.cos(cam.rotY), sy2=Math.sin(cam.rotY);
-    var xn=x1n*cy2;
-    // Salva anche le coordinate schermo normalizzate per il disegno
-    return {x:xn/ri.sc+ri.cx, y:yn/ri.sc+ri.cy, z:ri.cz,
-            sx:ex/W, sy:ey/H};  // coords schermo normalizzate
+    var cy3=Math.cos(cam.rotY), sy3=Math.sin(cam.rotY);
+
+    // Matrici di rotazione inverse (trasposte)
+    function invRot(px, py, pz) {
+      // Inverti rotZ
+      var tx=px*cz2+py*sz2, ty=-px*sz2+py*cz2, tz=pz;
+      // Inverti rotX
+      var tx2=tx, ty2=ty*cx2+tz*sx2, tz2=-ty*sx2+tz*cx2;
+      // Inverti rotY
+      var tx3=tx2*cy3-tz2*sy3, ty3=ty2, tz3=tx2*sy3+tz2*cy3;
+      return [tx3, ty3, tz3];
+    }
+
+    // Punto di click in camera space (piano z=0, prospettiva)
+    var pt_cam = invRot(rx, ry, 0);
+    // Origine camera in object space
+    var orig_cam = invRot(0, 0, -1.0/zoom);
+    // Direzione raggio = pt_click - origin
+    var rdx=pt_cam[0]-orig_cam[0], rdy=pt_cam[1]-orig_cam[1], rdz=pt_cam[2]-orig_cam[2];
+    var rlen=Math.sqrt(rdx*rdx+rdy*rdy+rdz*rdz)||1;
+    rdx/=rlen; rdy/=rlen; rdz/=rlen;
+
+    // Moller-Trumbore ray-triangle intersection
+    var best_t=1e9, best_cx=ri.cx, best_cy=ri.cy, best_cz=ri.cz;
+    var EPS=1e-7, sc=ri.sc;
+    var tris=ri.tris, n=ri.n;
+    for (var i=0;i<n;i++) {
+      var b=i*9;
+      // Vertici in coordinate normalizzate
+      var ax=(tris[b  ]-ri.cx)*sc, ay=(tris[b+1]-ri.cy)*sc, az=(tris[b+2]-ri.cz)*sc;
+      var bx=(tris[b+3]-ri.cx)*sc, by=(tris[b+4]-ri.cy)*sc, bz=(tris[b+5]-ri.cz)*sc;
+      var cx=(tris[b+6]-ri.cx)*sc, cy=(tris[b+7]-ri.cy)*sc, cz=(tris[b+8]-ri.cz)*sc;
+      // Edge vectors
+      var e1x=bx-ax,e1y=by-ay,e1z=bz-az;
+      var e2x=cx-ax,e2y=cy-ay,e2z=cz-az;
+      // h = ray_dir x e2
+      var hx=rdy*e2z-rdz*e2y, hy=rdz*e2x-rdx*e2z, hz=rdx*e2y-rdy*e2x;
+      var a2=e1x*hx+e1y*hy+e1z*hz;
+      if (a2>-EPS&&a2<EPS) continue; // parallelo
+      var f=1.0/a2;
+      var sx3=orig_cam[0]-ax, sy3=orig_cam[1]-ay, sz3=orig_cam[2]-az;
+      var u=f*(sx3*hx+sy3*hy+sz3*hz);
+      if (u<0||u>1) continue;
+      var qx=sy3*e1z-sz3*e1y, qy=sz3*e1x-sx3*e1z, qz=sx3*e1y-sy3*e1x;
+      var v=f*(rdx*qx+rdy*qy+rdz*qz);
+      if (v<0||u+v>1) continue;
+      var t=f*(e2x*qx+e2y*qy+e2z*qz);
+      if (t>EPS&&t<best_t) {
+        best_t=t;
+        // Punto di intersezione in object space normalizzato
+        var hpx=orig_cam[0]+rdx*t, hpy=orig_cam[1]+rdy*t, hpz=orig_cam[2]+rdz*t;
+        // Converti in world coords
+        best_cx = hpx/sc + ri.cx;
+        best_cy = hpy/sc + ri.cy;
+        best_cz = hpz/sc + ri.cz;
+      }
+    }
+    return {x:best_cx, y:best_cy, z:best_cz, sx:ex/W, sy:ey/W};
   }
 
   function _flash(side) {
