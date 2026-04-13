@@ -228,7 +228,7 @@ def _generate_reportlab(record: dict) -> bytes:
     # Footer
     story.append(HRFlowable(width="100%", thickness=0.5, color=HexColor("#D6E4F0")))
     story.append(Paragraph(
-        "© Francesco Biaggini — Biaggini Medical Devices S.r.l. · Documento generato automaticamente · Non modificare.",
+        "Syntesis-ICP v7.2.0.012 (2026-04-13) · © Francesco Biaggini — Biaggini Medical Devices S.r.l. · Documento generato automaticamente · Non modificare.",
         ParagraphStyle("footer", fontName="Helvetica", fontSize=7, textColor=GRAY, alignment=TA_CENTER, spaceBefore=6)
     ))
 
