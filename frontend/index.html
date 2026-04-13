@@ -8,7 +8,7 @@
      Software concesso in licenza a Biaggini Medical Devices S.r.l.
      Riproduzione o distribuzione non autorizzata è vietata. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP — Precision Scanner</title>
+<title>Syntesis-ICP v7.2.0.012 — Precision Scanner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -142,9 +142,12 @@
   <div class="siri-wrapper offline" id="siri-wrapper">
     <div class="status-badge offline" id="status-badge">⬤ Offline</div>
     <div class="siri-inner">
-      <div class="app-header">
+      <div class="app-header" style="position:relative;">
         <img class="logo-img" style="cursor:pointer;height:56px;width:auto;" onclick="resetApp()" src="https://static.wixstatic.com/media/1c4258_239bb73388704a21899687c05f21f50c~mv2.png">
-        <div class="header-right">
+        <span style="position:absolute;left:84px;bottom:6px;font-size:9px;font-weight:700;
+  color:#94a3b8;letter-spacing:.06em;font-family:monospace;background:rgba(0,0,0,.04);
+  padding:2px 6px;border-radius:6px;border:1px solid #e2e8f0;">v7.2.0.012</span>
+<div class="header-right">
           <div class="lang-sel" id="lang-sel"></div>
           <div class="nav-tabs">
             <button class="nav-tab active" data-tab="analisi" onclick="switchTab('analisi',this)" id="tab-analisi">Analisi STL</button>
@@ -341,12 +344,16 @@
     </div>
   </div>
   <div class="app-footer">
-    <div class="brand-sub-footer" id="footer-sub">STL Cylinder Comparator v7 · Biaggini Medical Devices S.r.l.</div>
+    <div class="brand-sub-footer" id="footer-sub">Syntesis-ICP v7.2.0.012 · Biaggini Medical Devices S.r.l.</div>
     <div class="footer-legal" id="footer-url">syntesis-icp.com</div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 
+<script>
+var SYNTESIS_VERSION="7.2.0.012";
+var SYNTESIS_BUILD_DATE="2026-04-13";
+</script>
 <script>
 // ── i18n ──────────────────────────────────────────────────────────────────
 var LANGS = ['it','en','es','fr','de'];
@@ -684,7 +691,7 @@ function applyLangToDOM(){
     btn.textContent=btn.disabled?T('btnRun'):T('btnAnalyze');
   }
   // Footer
-  t=document.getElementById('footer-sub'); if(t)t.textContent='STL Cylinder Comparator v7 · Biaggini Medical Devices S.r.l.';
+  t=document.getElementById('footer-sub'); if(t)t.textContent='Syntesis-ICP v7.2.0.012 · Biaggini Medical Devices S.r.l.';
   // LB headers
   t=document.getElementById('lbl-lb-loc'); if(t)t.textContent=T('scanA')==='Scanbody A'?'Posizione':'Location';
 
