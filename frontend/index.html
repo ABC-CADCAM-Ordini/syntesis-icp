@@ -3217,58 +3217,81 @@ function pdf(){
   doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);
   doc.line(ml,27,W-mr,27);
 
-  // ── Badge circolare score ────────────────────────────────────────
+  // ── Badge circolare score — stile dark navy con glow ────────────
   function truncate(s,n){return s.length>n?s.slice(0,n-1)+'\u2026':s;}
   var badgePng2='';
   try{
+    var _bSZ=900;
     var _bc=document.createElement('canvas');
-    _bc.width=500;_bc.height=500;
-    var _bx=_bc.getContext('2d'),_bCX=250,_bCY=250,_bR=195,_bLW=26;
-    _bx.fillStyle='#ffffff';_bx.fillRect(0,0,500,500);
-    // Ring bg
+    _bc.width=_bSZ;_bc.height=_bSZ;
+    var _bx=_bc.getContext('2d');
+    var _bCX=_bSZ/2,_bCY=_bSZ/2,_bR=340,_bLW=46;
+    // Sfondo navy con gradiente
+    var _bgG=_bx.createLinearGradient(0,0,_bSZ,_bSZ);
+    _bgG.addColorStop(0,'#0d1b2a');_bgG.addColorStop(.5,'#12253d');_bgG.addColorStop(1,'#0d1b2a');
+    _bx.fillStyle=_bgG;_bx.fillRect(0,0,_bSZ,_bSZ);
+    // Glow radiali decorativi
+    function _glow(x,y,r,c){var g=_bx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,c);g.addColorStop(1,'transparent');_bx.fillStyle=g;_bx.beginPath();_bx.arc(x,y,r,0,Math.PI*2);_bx.fill();}
+    _glow(_bSZ*.85,_bSZ*.08,320,'rgba(245,158,11,.20)');
+    _glow(_bSZ*.15,_bSZ*.92,240,'rgba(245,158,11,.13)');
+    var _lvRgb=lv.col.replace('#','').match(/../g).map(function(h){return parseInt(h,16);});
+    _glow(_bCX,_bCY,280,'rgba('+_lvRgb[0]+','+_lvRgb[1]+','+_lvRgb[2]+',.10)');
+    // Barra oro in cima
+    var _topG=_bx.createLinearGradient(0,0,_bSZ,0);
+    _topG.addColorStop(0,'transparent');_topG.addColorStop(.3,'rgba(245,158,11,.7)');
+    _topG.addColorStop(.5,'rgba(255,215,0,.9)');_topG.addColorStop(.7,'rgba(245,158,11,.7)');_topG.addColorStop(1,'transparent');
+    _bx.fillStyle=_topG;_bx.fillRect(0,0,_bSZ,8);
+    // Ring sfondo
     _bx.beginPath();_bx.arc(_bCX,_bCY,_bR,0,Math.PI*2);
-    _bx.strokeStyle='#f1f5f9';_bx.lineWidth=_bLW;_bx.stroke();
-    // Ring score
-    var _sa=-Math.PI/2, _ea=_sa+(score/100)*Math.PI*2;
-    _bx.beginPath();_bx.arc(_bCX,_bCY,_bR,_sa,_ea);
-    _bx.strokeStyle=lv.col;_bx.lineWidth=_bLW;_bx.lineCap='round';_bx.stroke();
-    // Score
+    _bx.strokeStyle='rgba(255,255,255,.07)';_bx.lineWidth=_bLW;_bx.stroke();
+    // Ring score con gradiente oro -> colore livello
+    var _sa=-Math.PI/2;
+    var _ag=_bx.createLinearGradient(_bCX-_bR,_bCY-_bR,_bCX+_bR,_bCY+_bR);
+    _ag.addColorStop(0,'#FFD700');_ag.addColorStop(.5,lv.col);_ag.addColorStop(1,'#F59E0B');
+    _bx.shadowColor='rgba(245,158,11,.6)';_bx.shadowBlur=55;
+    _bx.beginPath();_bx.arc(_bCX,_bCY,_bR,_sa,_sa+(score/100)*Math.PI*2);
+    _bx.strokeStyle=_ag;_bx.lineWidth=_bLW;_bx.lineCap='round';_bx.stroke();
+    _bx.shadowBlur=0;
+    // Score numerico
     _bx.textAlign='center';_bx.textBaseline='middle';
-    _bx.fillStyle=lv.col;_bx.font='bold 108px Helvetica,Arial,sans-serif';
-    _bx.fillText(score.toFixed(1),_bCX,_bCY-18);
-    _bx.fillStyle='#94a3b8';_bx.font='300 36px Helvetica,Arial,sans-serif';
-    _bx.fillText('/100',_bCX,_bCY+44);
-    _bx.fillStyle=lv.col;_bx.font='bold 40px Helvetica,Arial,sans-serif';
-    _bx.fillText(lv.label.toUpperCase(),_bCX,_bCY+96);
+    _bx.shadowColor='rgba(245,158,11,.4)';_bx.shadowBlur=30;
+    _bx.fillStyle='#ffffff';_bx.font='900 190px Helvetica,Arial,sans-serif';
+    _bx.fillText(score.toFixed(2),_bCX,_bCY-22);_bx.shadowBlur=0;
+    _bx.fillStyle='rgba(255,215,0,.55)';_bx.font='500 58px Helvetica,Arial,sans-serif';
+    _bx.fillText('/100',_bCX,_bCY+108);
+    // Label pill oro
+    var _py=_bCY+_bR+62,_pw=480,_ph=88;
+    var _pg=_bx.createLinearGradient(_bCX-_pw/2,_py,_bCX+_pw/2,_py+_ph);
+    _pg.addColorStop(0,'rgba(245,158,11,.22)');_pg.addColorStop(1,'rgba(255,215,0,.12)');
+    _bx.beginPath();_bx.roundRect(_bCX-_pw/2,_py,_pw,_ph,44);_bx.fillStyle=_pg;_bx.fill();
+    var _pb=_bx.createLinearGradient(_bCX-_pw/2,_py,_bCX+_pw/2,_py);
+    _pb.addColorStop(0,'rgba(245,158,11,.2)');_pb.addColorStop(.5,'rgba(255,215,0,.8)');_pb.addColorStop(1,'rgba(245,158,11,.2)');
+    _bx.strokeStyle=_pb;_bx.lineWidth=2;_bx.beginPath();_bx.roundRect(_bCX-_pw/2,_py,_pw,_ph,44);_bx.stroke();
+    _bx.shadowColor='rgba(245,158,11,.5)';_bx.shadowBlur=18;
+    _bx.fillStyle='#FFD700';_bx.font='800 44px Helvetica,Arial,sans-serif';
+    _bx.textBaseline='middle';_bx.fillText(lv.label.toUpperCase(),_bCX,_py+_ph/2);_bx.shadowBlur=0;
+    // Divider
+    var _dy=_py+_ph+70;
+    var _dg=_bx.createLinearGradient(80,_dy,_bSZ-80,_dy);
+    _dg.addColorStop(0,'transparent');_dg.addColorStop(.3,'rgba(245,158,11,.5)');
+    _dg.addColorStop(.5,'rgba(255,215,0,.8)');_dg.addColorStop(.7,'rgba(245,158,11,.5)');_dg.addColorStop(1,'transparent');
+    _bx.strokeStyle=_dg;_bx.lineWidth=1.5;_bx.beginPath();_bx.moveTo(120,_dy);_bx.lineTo(_bSZ-120,_dy);_bx.stroke();
+    // Nomi file A e B
+    var _ny=_dy+72;
+    _bx.fillStyle='#ffffff';_bx.font='700 52px Helvetica,Arial,sans-serif';_bx.textBaseline='middle';
+    _bx.fillText(truncate(p.nA,22),_bCX,_ny);
+    _bx.fillStyle='rgba(255,215,0,.6)';_bx.font='400 36px Helvetica,Arial,sans-serif';
+    _bx.fillText(truncate(p.nA,22)+' \u2192 '+truncate(p.nB,22),_bCX,_ny+66);
+    // Barra oro in fondo
+    _bx.fillStyle=_topG;_bx.fillRect(0,_bSZ-8,_bSZ,8);
     badgePng2=_bc.toDataURL('image/png');
   }catch(e2){}
 
-  // Badge: centrato in alto
-  var bW=72,bH=72,bX=(W-bW)/2,bY=31;
+  // Badge: centrato, 130x130mm
+  var bW=130,bH=130,bX=(W-bW)/2,bY=29;
   if(badgePng2) doc.addImage(badgePng2,'PNG',bX,bY,bW,bH);
 
-  // ── File A e File B (ai lati del badge) ─────────────────────────
-  // Sinistra: File A
-  doc.setFont('helvetica','normal');doc.setFontSize(6);
-  doc.setTextColor(100,116,139);
-  doc.text('FILE A — RIFERIMENTO',ml,37);
-  doc.setFont('helvetica','bold');doc.setFontSize(9.5);
-  doc.setTextColor(15,23,42);
-  doc.text(truncate(p.nA,20),ml,43);
-  doc.setFont('helvetica','normal');doc.setFontSize(6.5);
-  doc.setTextColor(100,116,139);
-  doc.text(p.cA+' cilindri',ml,48.5);
-
-  // Destra: File B
-  doc.setFont('helvetica','normal');doc.setFontSize(6);
-  doc.setTextColor(100,116,139);
-  doc.text('FILE B — CONFRONTO',W-mr,37,{align:'right'});
-  doc.setFont('helvetica','bold');doc.setFontSize(9.5);
-  doc.setTextColor(15,23,42);
-  doc.text(truncate(p.nB,20),W-mr,43,{align:'right'});
-  doc.setFont('helvetica','normal');doc.setFontSize(6.5);
-  doc.setTextColor(100,116,139);
-  doc.text('RMSD: '+p.icpRmsd.toFixed(3)+' mm',W-mr,48.5,{align:'right'});
+  // ── File A e File B (gia nel canvas del badge) ───────────────────
 
   // ── Studio / Laboratorio ─────────────────────────────────────────
   var labY=bY+bH+10;
