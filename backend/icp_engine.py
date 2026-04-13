@@ -1076,12 +1076,30 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     detected = dominant_profile(scan_a + scan_b)
 
     # Prepara triangoli mesh per anteprime (subsample se troppo grandi)
-    def tris_to_list(t, max_tris=4000):
+    def tris_to_list(t, max_tris=6000):
         arr = np.asarray(t)
-        if len(arr) > max_tris:
-            idx = np.linspace(0, len(arr)-1, max_tris, dtype=int)
-            arr = arr[idx]
-        return arr.tolist()
+        if len(arr) == 0:
+            return []
+        if len(arr) <= max_tris:
+            return arr.tolist()
+        # Campionamento stratificato: cap al 100% + pareti uniformi
+        v0, v1, v2 = arr[:, 0], arr[:, 1], arr[:, 2]
+        e1, e2 = v1 - v0, v2 - v0
+        nz = e1[:, 0]*e2[:, 1] - e1[:, 1]*e2[:, 0]
+        nl = np.sqrt((e1[:, 1]*e2[:, 2]-e1[:, 2]*e2[:, 1])**2 +
+                     (e1[:, 2]*e2[:, 0]-e1[:, 0]*e2[:, 2])**2 +
+                     nz**2).clip(1e-9)
+        cap_m = np.abs(nz / nl) > 0.5
+        cap_idx  = np.where(cap_m)[0]
+        wall_idx = np.where(~cap_m)[0]
+        n_wall = max(0, max_tris - len(cap_idx))
+        if len(wall_idx) > n_wall and n_wall > 0:
+            step = max(1, len(wall_idx) // n_wall)
+            wall_sel = wall_idx[::step][:n_wall]
+        else:
+            wall_sel = wall_idx
+        sel = np.concatenate([cap_idx, wall_sel])
+        return arr[sel].tolist()
 
     # Background triangoli di A
     bg_tris_a = []
