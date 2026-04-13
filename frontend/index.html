@@ -2753,7 +2753,13 @@ var C = (function(){
       },120);
     },
 
-    pdf: function(){ if(window.C_pdf) window.C_pdf(); }
+    pdf: function(){
+      if(!window.C_pdf) return;
+      // Mostra modal nome studio prima di generare il PDF
+      var m = document.getElementById('pdf-lab-modal');
+      if(m){ m.style.display='flex'; return; }
+      window.C_pdf();
+    }
   };
 })();
 
@@ -3194,104 +3200,107 @@ function pdf(){
   var goldBar=doc.setFillColor(255,215,0);doc.rect(0,0,W,3,'F');
   doc.setFillColor(245,158,11);doc.rect(0,3,W,1.5,'F');
 
-  // ── LOGO (top-left) ────────────────────────────────────────────────
-  try{
-    // Use LOGO_DATA directly (jsPDF supports base64 PNG)
-    if(LOGO_DATA&&LOGO_DATA.length>100){
-      // Logo dimensions: estimate height from natural PNG aspect ratio
-      // PNG is landscape ~2.75:1 ratio approx
-      var logoW=72,logoH=20;
-      doc.addImage(LOGO_DATA,'PNG',ml,8,logoW,logoH);
-    }
-  }catch(e){}
-
-  // ── NASA-style score section ────────────────────────────────────────
-  // Logo (top-left)
+  // ── LOGO ────────────────────────────────────────────────────────────
   try{
     if(LOGO_DATA&&LOGO_DATA.length>100){
-      doc.addImage(LOGO_DATA,'PNG',ml,8,70,19);
+      doc.addImage(LOGO_DATA,'PNG',ml,8,68,18);
     }
   }catch(e){}
-
-  // Right-aligned document title
-  doc.setFont('helvetica','bold');doc.setFontSize(11);
+  // Intestazione destra
+  doc.setFont('helvetica','bold');doc.setFontSize(8);
   doc.setTextColor(0,82,163);
-  doc.text('Syntesis-ICP',W-mr,11,{align:'right'});
-  doc.setFont('helvetica','normal');doc.setFontSize(8);
+  doc.text('Precision Scanner Report',W-mr,10,{align:'right'});
+  doc.setFont('helvetica','normal');doc.setFontSize(7);
   doc.setTextColor(100,116,139);
-  doc.text('Precision Scanner Report',W-mr,16,{align:'right'});
+  doc.text(new Date().toLocaleDateString('it-IT'),W-mr,15.5,{align:'right'});
+  // Regola
+  doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);
+  doc.line(ml,27,W-mr,27);
 
-  // Thin rule under header
-  doc.setDrawColor(0,82,163);doc.setLineWidth(0.5);
-  doc.line(ml,29,W-mr,29);
-
-  // ── SCORE: large number, NASA-style ──────────────────────────────
-  var scoreY=42;
-  // Large score number (left column)
-  doc.setFont('helvetica','bold');doc.setFontSize(64);
-  doc.setTextColor(lvRGB[0],lvRGB[1],lvRGB[2]);
-  doc.text(score.toFixed(2),ml,scoreY+16);
-  // /100
-  doc.setFont('helvetica','normal');doc.setFontSize(16);
-  doc.setTextColor(148,163,184);
-  doc.text('/100',ml+doc.getTextWidth(score.toFixed(2))+1,scoreY+16);
-  // Status label
-  doc.setFont('helvetica','bold');doc.setFontSize(14);
-  doc.setTextColor(lvRGB[0],lvRGB[1],lvRGB[2]);
-  doc.text(lv.label.toUpperCase(),ml,scoreY+27);
-
-  // Score bar (right of score number)
-  var barX=ml+76, barY=scoreY, barW=cw-76, barH=6;
-  // Background
-  doc.setFillColor(241,245,249);doc.rect(barX,barY,barW,barH,'F');
-  // Filled portion
-  var fillW=barW*(score/100);
-  doc.setFillColor(lvRGB[0],lvRGB[1],lvRGB[2]);
-  doc.rect(barX,barY,fillW,barH,'F');
-  // Score range labels
-  doc.setFont('helvetica','normal');doc.setFontSize(6);
-  doc.setTextColor(148,163,184);
-  doc.text('0',barX,barY+barH+4);
-  doc.text('50',barX+barW/2,barY+barH+4,{align:'center'});
-  doc.text('100',barX+barW,barY+barH+4,{align:'right'});
-
-  // ── Info table ──────────────────────────────────────────────────
-  var iy2=scoreY+40;
+  // ── Badge circolare score ────────────────────────────────────────
   function truncate(s,n){return s.length>n?s.slice(0,n-1)+'\u2026':s;}
+  var badgePng2='';
+  try{
+    var _bc=document.createElement('canvas');
+    _bc.width=500;_bc.height=500;
+    var _bx=_bc.getContext('2d'),_bCX=250,_bCY=250,_bR=195,_bLW=26;
+    _bx.fillStyle='#ffffff';_bx.fillRect(0,0,500,500);
+    // Ring bg
+    _bx.beginPath();_bx.arc(_bCX,_bCY,_bR,0,Math.PI*2);
+    _bx.strokeStyle='#f1f5f9';_bx.lineWidth=_bLW;_bx.stroke();
+    // Ring score
+    var _sa=-Math.PI/2, _ea=_sa+(score/100)*Math.PI*2;
+    _bx.beginPath();_bx.arc(_bCX,_bCY,_bR,_sa,_ea);
+    _bx.strokeStyle=lv.col;_bx.lineWidth=_bLW;_bx.lineCap='round';_bx.stroke();
+    // Score
+    _bx.textAlign='center';_bx.textBaseline='middle';
+    _bx.fillStyle=lv.col;_bx.font='bold 108px Helvetica,Arial,sans-serif';
+    _bx.fillText(score.toFixed(1),_bCX,_bCY-18);
+    _bx.fillStyle='#94a3b8';_bx.font='300 36px Helvetica,Arial,sans-serif';
+    _bx.fillText('/100',_bCX,_bCY+44);
+    _bx.fillStyle=lv.col;_bx.font='bold 40px Helvetica,Arial,sans-serif';
+    _bx.fillText(lv.label.toUpperCase(),_bCX,_bCY+96);
+    badgePng2=_bc.toDataURL('image/png');
+  }catch(e2){}
 
+  // Badge: centrato in alto
+  var bW=72,bH=72,bX=(W-bW)/2,bY=31;
+  if(badgePng2) doc.addImage(badgePng2,'PNG',bX,bY,bW,bH);
+
+  // ── File A e File B (ai lati del badge) ─────────────────────────
+  // Sinistra: File A
+  doc.setFont('helvetica','normal');doc.setFontSize(6);
+  doc.setTextColor(100,116,139);
+  doc.text('FILE A — RIFERIMENTO',ml,37);
+  doc.setFont('helvetica','bold');doc.setFontSize(9.5);
+  doc.setTextColor(15,23,42);
+  doc.text(truncate(p.nA,20),ml,43);
+  doc.setFont('helvetica','normal');doc.setFontSize(6.5);
+  doc.setTextColor(100,116,139);
+  doc.text(p.cA+' cilindri',ml,48.5);
+
+  // Destra: File B
+  doc.setFont('helvetica','normal');doc.setFontSize(6);
+  doc.setTextColor(100,116,139);
+  doc.text('FILE B — CONFRONTO',W-mr,37,{align:'right'});
+  doc.setFont('helvetica','bold');doc.setFontSize(9.5);
+  doc.setTextColor(15,23,42);
+  doc.text(truncate(p.nB,20),W-mr,43,{align:'right'});
+  doc.setFont('helvetica','normal');doc.setFontSize(6.5);
+  doc.setTextColor(100,116,139);
+  doc.text('RMSD: '+p.icpRmsd.toFixed(3)+' mm',W-mr,48.5,{align:'right'});
+
+  // ── Studio / Laboratorio ─────────────────────────────────────────
+  var labY=bY+bH+10;
   doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
-  doc.line(ml,iy2,W-mr,iy2);
+  doc.line(ml,labY,W-mr,labY);
+  labY+=5;
 
-  var infoCols=[[
-    ['File A — Riferimento', truncate(p.nA,32)],
-    ['File B — Confronto',   truncate(p.nB,32)]
-  ],[
-    ['N. cilindri', p.cA+''],
-    ['RMSD ICP',   p.icpRmsd.toFixed(4)+' mm']
-  ],[
-    ['Data analisi', new Date().toLocaleDateString('it-IT')],
-    ['Profilo rilevato', p.detected||'—']
-  ]];
+  var labName=(p.labName||'').trim();
+  var opName=(p.operatorName||'').trim();
+  if(labName){
+    doc.setFont('helvetica','normal');doc.setFontSize(6.5);
+    doc.setTextColor(100,116,139);
+    doc.text('STUDIO / LABORATORIO',ml,labY);
+    doc.setFont('helvetica','bold');doc.setFontSize(13);
+    doc.setTextColor(0,82,163);
+    doc.text(labName,ml,labY+8);
+    if(opName){
+      doc.setFont('helvetica','normal');doc.setFontSize(8);
+      doc.setTextColor(71,85,105);
+      doc.text(opName,ml,labY+16);
+    }
+    doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
+    doc.line(ml,labY+21,W-mr,labY+21);
+    labY+=26;
+  } else {
+    labY+=2;
+    doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
+    doc.line(ml,labY,W-mr,labY);
+    labY+=4;
+  }
 
-  var colW3=cw/3;
-  iy2+=6;
-  infoCols.forEach(function(col,ci2){
-    var ix=ml+ci2*colW3;
-    col.forEach(function(row,ri2){
-      var ry=iy2+ri2*11;
-      doc.setFont('helvetica','normal');doc.setFontSize(6.5);
-      doc.setTextColor(100,116,139);
-      doc.text(row[0].toUpperCase(),ix,ry);
-      doc.setFont('helvetica','bold');doc.setFontSize(8.5);
-      doc.setTextColor(15,23,42);
-      doc.text(row[1],ix,ry+5.5);
-    });
-  });
-
-  iy2+=28;
-  doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
-  doc.line(ml,iy2,W-mr,iy2);
-  iy2+=4;
+  var iy2=labY;
 
     // ── Colorimetric map ────────────────────────────────────────────────
   var mapY2=iy2+32; // info rows + margin
@@ -4901,6 +4910,56 @@ var AM = (function() {
 })();
 
 </script>
+
+<!-- ── Modal Nome Studio per PDF ───────────────────────────────────────── -->
+<div id="pdf-lab-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+  z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;padding:28px 32px;width:360px;max-width:92vw;
+    box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:sans-serif;">
+    <div style="font-size:18px;font-weight:700;color:#0052A3;margin-bottom:4px;">
+      📄 Genera Report PDF
+    </div>
+    <div style="font-size:12px;color:#64748b;margin-bottom:20px;">
+      Questi dati appariranno sulla copertina del report.
+    </div>
+    <label style="display:block;font-size:11px;font-weight:600;color:#475569;
+      text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">
+      Nome Studio / Laboratorio
+    </label>
+    <input id="pdf-lab-name" type="text" placeholder="es. Studio Dentistico Rossi"
+      style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e2e8f0;
+      border-radius:8px;font-size:13px;outline:none;margin-bottom:14px;
+      font-family:inherit;"
+      onfocus="this.style.borderColor='#0052A3'" onblur="this.style.borderColor='#e2e8f0'">
+    <label style="display:block;font-size:11px;font-weight:600;color:#475569;
+      text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">
+      Operatore (opzionale)
+    </label>
+    <input id="pdf-op-name" type="text" placeholder="es. Dr. Mario Rossi"
+      style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e2e8f0;
+      border-radius:8px;font-size:13px;outline:none;margin-bottom:20px;
+      font-family:inherit;"
+      onfocus="this.style.borderColor='#0052A3'" onblur="this.style.borderColor='#e2e8f0'">
+    <div style="display:flex;gap:10px;">
+      <button onclick="document.getElementById('pdf-lab-modal').style.display='none'"
+        style="flex:1;padding:10px;border:1.5px solid #e2e8f0;background:#f8fafc;
+        border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;">
+        Annulla
+      </button>
+      <button onclick="(function(){
+        var lab=document.getElementById('pdf-lab-name').value.trim();
+        var op=document.getElementById('pdf-op-name').value.trim();
+        if(window._LR){ window._LR.labName=lab||''; window._LR.operatorName=op||''; }
+        document.getElementById('pdf-lab-modal').style.display='none';
+        if(window.C_pdf) window.C_pdf();
+      })()"
+        style="flex:2;padding:10px;background:#0052A3;color:#fff;border:none;
+        border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">
+        Genera PDF →
+      </button>
+    </div>
+  </div>
+</div>
 </body>
 </html  // ── Full-page dark navy background (matches badge style) ──────────
   doc.setFillColor(13,27,42);doc.rect(0,0,W,H,'F');
