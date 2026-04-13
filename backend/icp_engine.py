@@ -779,11 +779,13 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         _tb_idx = [ti for ci in clust_b_sorted[_bi] for ti in scan_b[ci]] if _bi < len(clust_b_sorted) else []
         _tris_a_i = tris_a[_ta_idx] if _ta_idx else np.empty((0,3,3),dtype=np.float32)
         # tris_b dopo R_min+t_min (allineamento minimo per avere le coord comparabili)
-        _tris_b_i_raw = tris_b[_tb_idx] if _tb_idx else np.empty((0,3,3),dtype=np.float32)
-        if len(_tris_b_i_raw) > 0:
-            _tris_b_i = apply_transform_tris(_tris_b_i_raw, R_min, t_min_v)
+        # Usa tris_b_aligned (gia' con pre-align R_pre+t_pre applicato)
+        # poi applica R_min+t_min calcolato sugli stessi centroidi
+        _tris_b_i_pre = tris_b_aligned[_tb_idx] if _tb_idx else np.empty((0,3,3),dtype=np.float32)
+        if len(_tris_b_i_pre) > 0:
+            _tris_b_i = apply_transform_tris(_tris_b_i_pre, R_min, t_min_v)
         else:
-            _tris_b_i = _tris_b_i_raw
+            _tris_b_i = _tris_b_i_pre
 
         # Sistema locale del cilindro A_ai
         _O_a = _cap_center(_tris_a_i)
@@ -813,7 +815,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     # Trasforma tutte le mesh B
     # tris_b è già pre-allineato (R_pre+t_pre applicati sopra)
     # tris_b_all: allineamento minimo (rotZ+t) per visualizzazione senza distorsione
-    tris_b_all = apply_transform_tris(tris_b, R_min, t_min_v)
+    tris_b_all = apply_transform_tris(tris_b_aligned, R_min, t_min_v)
 
     # Assi cilindri
     # Costruisci mappa pi -> triangoli usando clust_a/b_sorted
