@@ -171,6 +171,62 @@ def cap_centroid(tris: np.ndarray, indices: list[int]) -> np.ndarray:
     # Centroide delle cap (media dei centri dei triangoli)
     return cap_tris.mean(axis=1).mean(axis=0)
 
+def get_cap_clusters(tris: np.ndarray, nm: np.ndarray, n_clusters: int = 6):
+    """Trova N cluster di cap e restituisce (centroidi, normali).
+    Usa solo i triangoli con |nz|>0.5 (facce orizzontali = dischi superiori).
+    """
+    nl = np.linalg.norm(nm, axis=1).clip(1e-9)
+    cap_mask = np.abs(nm[:, 2] / nl) > 0.5
+    if cap_mask.sum() < n_clusters * 3:
+        cap_mask = np.ones(len(tris), dtype=bool)  # fallback
+
+    cap_idx = np.where(cap_mask)[0]
+    cap_cents = tris[cap_idx].mean(axis=1)  # centri dei triangoli cap
+
+    from sklearn.cluster import KMeans
+    km = KMeans(n_clusters, random_state=0, n_init=20, max_iter=500).fit(cap_cents)
+
+    centroids = []
+    normals = []
+    cluster_idx = []
+    for ci in range(n_clusters):
+        mask_ci = km.labels_ == ci
+        local_idx = cap_idx[mask_ci]
+        tc = tris[local_idx]
+        # Centroide della cap i = media dei centri dei triangoli
+        cent = tc.mean(axis=1).mean(axis=0)
+        # Normale media = direzione dell'asse del cilindro
+        nxi = nm[local_idx, 0] / nl[local_idx]
+        nyi = nm[local_idx, 1] / nl[local_idx]
+        nzi = nm[local_idx, 2] / nl[local_idx]
+        normal = np.array([nxi.mean(), nyi.mean(), nzi.mean()])
+        nlen = np.linalg.norm(normal)
+        normal = normal / nlen if nlen > 1e-9 else np.array([0.0, 0.0, 1.0])
+        if normal[2] < 0:
+            normal = -normal
+        centroids.append(cent)
+        normals.append(normal)
+        cluster_idx.append(local_idx)
+    return np.array(centroids), np.array(normals), cluster_idx
+
+
+def local_deviation(cent_A: np.ndarray, normal_A: np.ndarray,
+                    cent_B: np.ndarray) -> tuple:
+    """Misura la deviazione di B rispetto ad A nel sistema locale di A.
+    Origine = centroide cap A_i
+    Z_locale = normale alla cap A_i (asse del cilindro)
+    Ritorna (dXY, dZ, d3D) in mm.
+    """
+    delta = cent_B - cent_A
+    # Proietta lungo l'asse del cilindro
+    dz = float(np.dot(delta, normal_A))
+    # Componente radiale (perpendicolare all'asse)
+    delta_rad = delta - dz * normal_A
+    dxy = float(np.linalg.norm(delta_rad))
+    d3d = float(np.linalg.norm(delta))
+    return dxy, dz, d3d
+
+
 def global_centroid(tris: np.ndarray) -> np.ndarray:
     return tris.reshape(-1, 3).mean(axis=0)
 
@@ -779,13 +835,11 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         _tb_idx = [ti for ci in clust_b_sorted[_bi] for ti in scan_b[ci]] if _bi < len(clust_b_sorted) else []
         _tris_a_i = tris_a[_ta_idx] if _ta_idx else np.empty((0,3,3),dtype=np.float32)
         # tris_b dopo R_min+t_min (allineamento minimo per avere le coord comparabili)
-        # Usa tris_b_aligned (gia' con pre-align R_pre+t_pre applicato)
-        # poi applica R_min+t_min calcolato sugli stessi centroidi
-        _tris_b_i_pre = tris_b_aligned[_tb_idx] if _tb_idx else np.empty((0,3,3),dtype=np.float32)
-        if len(_tris_b_i_pre) > 0:
-            _tris_b_i = apply_transform_tris(_tris_b_i_pre, R_min, t_min_v)
+        _tris_b_i_raw = tris_b[_tb_idx] if _tb_idx else np.empty((0,3,3),dtype=np.float32)
+        if len(_tris_b_i_raw) > 0:
+            _tris_b_i = apply_transform_tris(_tris_b_i_raw, R_min, t_min_v)
         else:
-            _tris_b_i = _tris_b_i_pre
+            _tris_b_i = _tris_b_i_raw
 
         # Sistema locale del cilindro A_ai
         _O_a = _cap_center(_tris_a_i)
@@ -815,7 +869,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     # Trasforma tutte le mesh B
     # tris_b è già pre-allineato (R_pre+t_pre applicati sopra)
     # tris_b_all: allineamento minimo (rotZ+t) per visualizzazione senza distorsione
-    tris_b_all = apply_transform_tris(tris_b_aligned, R_min, t_min_v)
+    tris_b_all = apply_transform_tris(tris_b, R_min, t_min_v)
 
     # Assi cilindri
     # Costruisci mappa pi -> triangoli usando clust_a/b_sorted
