@@ -3439,7 +3439,7 @@ function pdf(){
 
     // Find which triangles belong to this cylinder
     // Use sortA[ci] indices to get A tris, match B tris by proximity
-    var viewW=60,viewH=56,gap=3;
+    var viewW=64,viewH=64,gap=4;
     var views=[
       {label:'Vista XY (dall\'alto)',ax1:0,ax2:1,axD:2},
       {label:'Vista XZ (frontale)', ax1:0,ax2:2,axD:1},
@@ -3452,7 +3452,7 @@ function pdf(){
       var vx=ml+vi*(viewW+gap);
       var cylA=p.cylTrisA&&p.cylTrisA[ci]?p.cylTrisA[ci]:[];
       var cylB=p.cylTrisB&&p.cylTrisB[ci]?p.cylTrisB[ci]:[];
-      var png=cvPng(viewW*5,viewH*5,function(cv){
+      var png=cvPng(viewW*8,viewH*8,function(cv){
         paintViewCyl(cv,cylA,cylB,v.ax1,v.ax2,v.axD,v.label,ci);
       });
       doc.addImage(png,'PNG',vx,y,viewW,viewH);
@@ -4028,7 +4028,8 @@ function paintViewCyl(cv, triA_cyl, triB_cyl, ax1, ax2, axD, title, cylIdx){
 
   // Lighting: define a light direction for pseudo-3D shading
   // Light from top-left-front: normalized vector
-  var lightDir=[0.4,0.6,0.7]; // in 3D space
+  // Luce da top-front-right per una visione solida
+  var lightDir=[0.35, 0.65, 0.65]; // in 3D space
   var lLen=Math.sqrt(lightDir[0]*lightDir[0]+lightDir[1]*lightDir[1]+lightDir[2]*lightDir[2]);
   lightDir=[lightDir[0]/lLen,lightDir[1]/lLen,lightDir[2]/lLen];
 
@@ -4044,9 +4045,13 @@ function paintViewCyl(cv, triA_cyl, triB_cyl, ax1, ax2, axD, title, cylIdx){
   function shade(t, baseR, baseG, baseB){
     var n=faceNormal(t);
     var diff=Math.max(0, n[0]*lightDir[0]+n[1]*lightDir[1]+n[2]*lightDir[2]);
-    var ambient=0.35, diffuse=0.65;
-    var intensity=ambient+diffuse*diff;
-    // Fresnel-like: darker edges
+    // Luce secondaria da sotto-destra per rim lighting
+    var diff2=Math.max(0,-n[0]*0.3+n[1]*0.2-n[2]*0.4)*0.25;
+    // Specular highlight (Phong, shininess 16)
+    var rx2=2*n[0]*diff-lightDir[0], ry2=2*n[1]*diff-lightDir[1], rz2=2*n[2]*diff-lightDir[2];
+    var spec=Math.pow(Math.max(0,rz2),12)*0.18; // viewer da +Z
+    var ambient=0.30, diffuse=0.55;
+    var intensity=Math.min(1, ambient+diffuse*diff+diff2+spec);
     var r=Math.min(255,Math.round(baseR*intensity));
     var g=Math.min(255,Math.round(baseG*intensity));
     var b=Math.min(255,Math.round(baseB*intensity));
@@ -4081,8 +4086,8 @@ function paintViewCyl(cv, triA_cyl, triB_cyl, ax1, ax2, axD, title, cylIdx){
     ctx.fillStyle=col;
     ctx.fill();
     // Very subtle edge (only for definition, not wireframe look)
-    ctx.strokeStyle='rgba(0,0,0,0.04)';
-    ctx.lineWidth=0.2;
+    ctx.strokeStyle='rgba(0,0,0,0.12)';
+    ctx.lineWidth=0.4;
     ctx.stroke();
   });
 
