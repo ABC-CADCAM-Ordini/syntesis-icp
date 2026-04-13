@@ -3303,8 +3303,7 @@ function pdf(){
   var iy2=labY;
 
     // ── Colorimetric map ────────────────────────────────────────────────
-  var mapY2=iy2+32; // info rows + margin
-  // Assicura che non vada fuori pagina
+  var mapY2=iy2+2; // segue direttamente dopo il blocco studio
   if(mapY2>195) mapY2=195;
   // Section label
   doc.setFont('helvetica','bold');doc.setFontSize(7);
@@ -3681,27 +3680,46 @@ function pdf(){
       doc.addPage();
 
       // ── Header pagina ────────────────────────────────────────────
-      setFill('#0F1923');doc.rect(0,0,W,22,'F');
-      setFill('#1a5f9e');doc.rect(0,22,W,2,'F');
-      doc.setFont('helvetica','bold');doc.setFontSize(13);setTxt('#FFFFFF');
-      doc.text('Distanza Inter-Centroide #'+(hi+1)+'-#'+(hj+1),ml,14);
-      doc.setFontSize(8);doc.setFont('helvetica','normal');setTxt('#7A90A4');
-      var coppiaStr='Coppia '+(pageIdx+1)+'/'+nTotal+'  A (rif.) vs B (post-ICP)';
-      doc.text(coppiaStr,ml,19);
+      // ── NASA running header ─────────────────────────────────────────
+      doc.setFillColor(0,82,163);doc.rect(0,0,W,3,'F');
+      doc.setFont('helvetica','bold');doc.setFontSize(7);
+      doc.setTextColor(0,82,163);
+      doc.text('Syntesis-ICP',ml,8);
+      doc.setFont('helvetica','normal');doc.setFontSize(7);
+      doc.setTextColor(100,116,139);
+      doc.text('Distanza #'+(hi+1)+'-#'+(hj+1)+'  ·  Coppia '+(pageIdx+1)+'/'+nTotal,W/2,8,{align:'center'});
+      doc.text('Pag.'+(p.pairs.length+1+pageIdx+1),W-mr,8,{align:'right'});
+      doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
+      doc.line(ml,10.5,W-mr,10.5);
 
-      // Badge Δ in header a destra
+      // ── Titolo + badge Δ ─────────────────────────────────────────
+      doc.setFont('helvetica','bold');doc.setFontSize(18);
+      doc.setTextColor(15,23,42);
+      doc.text('Distanza Inter-Centroide #'+(hi+1)+'-#'+(hj+1),ml,22);
+      doc.setFont('helvetica','normal');doc.setFontSize(7.5);
+      doc.setTextColor(100,116,139);
+      doc.text('A (rif.) vs B (post-ICP)',ml,27.5);
+
       if(diff!==null){
-        doc.setFillColor(lvRGB2[0],lvRGB2[1],lvRGB2[2]);
-        doc.rect(W-mr-40,5,40,12,'F');
-        doc.setTextColor(lvFG[0],lvFG[1],lvFG[2]);
-        doc.setFont('helvetica','bold');doc.setFontSize(9);
-        var _ds2=diff!==null?(diff>=0?'+':'')+diff.toFixed(1)+'um':'N/A';
-        doc.text(_ds2,W-mr-20,10,{align:'center'});
-        doc.setFontSize(7);doc.setFont('helvetica','normal');
-        doc.text(label,W-mr-20,16,{align:'center'});
+        // Badge Δ a destra (colorato in base al livello)
+        var _badgeRGB=hexRGB(lv2.col);
+        var _badgeBgRGB=hexRGB(lv2.bg);
+        doc.setFillColor(_badgeBgRGB[0],_badgeBgRGB[1],_badgeBgRGB[2]);
+        doc.roundedRect(W-mr-48,12,48,16,3,3,'F');
+        doc.setDrawColor(_badgeRGB[0],_badgeRGB[1],_badgeRGB[2]);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(W-mr-48,12,48,16,3,3,'D');
+        doc.setFont('helvetica','bold');doc.setFontSize(11);
+        doc.setTextColor(_badgeRGB[0],_badgeRGB[1],_badgeRGB[2]);
+        var _ds2=(diff>=0?'+':'')+diff.toFixed(1)+'um';
+        doc.text(_ds2,W-mr-24,19.5,{align:'center'});
+        doc.setFontSize(6.5);doc.setFont('helvetica','normal');
+        doc.text(label,W-mr-24,25.5,{align:'center'});
       }
+      doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);
+      doc.line(ml,30,W-mr,30);
 
-      var curY2=28;
+      var curY2=33;
 
       // ── Mappa dedicata per questa coppia ──────────────────────────
       // Usa stessa logica di drawPairMap, ma off-screen per jsPDF
@@ -3963,12 +3981,15 @@ function pdf(){
         });
       }
 
-      // ── Footer pagina ────────────────────────────────────────────
-      doc.setFont('helvetica','normal');doc.setFontSize(7);setTxt('#7A90A4');
-      doc.line(ml,H-8,W-mr,H-8);
-      doc.text('Syntesis-ICP · Distanza inter-centroide #'+(hi+1)+'-#'+(hj+1),ml,H-4);
+      // ── NASA footer ─────────────────────────────────────────────────
+      doc.setDrawColor(203,213,225);doc.setLineWidth(0.2);
+      doc.line(ml,H-10,W-mr,H-10);
+      doc.setFont('helvetica','normal');doc.setFontSize(6);
+      doc.setTextColor(148,163,184);
       var totPages=p.pairs.length+1+nTotal;
-      doc.text('Pag. '+(p.pairs.length+1+pageIdx+1)+' / '+totPages,W-mr,H-4,{align:'right'});
+      doc.text('Syntesis-ICP v7.2.0.012  ·  Distanza #'+(hi+1)+'-#'+(hj+1),ml,H-6.5);
+      doc.text('Pag. '+(p.pairs.length+1+pageIdx+1)+' / '+totPages,W-mr,H-6.5,{align:'right'});
+      doc.setFillColor(0,82,163);doc.rect(0,H-2.5,W,2.5,'F');
     });
   }
 
