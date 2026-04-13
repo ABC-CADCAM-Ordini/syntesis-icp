@@ -582,12 +582,13 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     # Condizione: centroidi Z di segno opposto E distanza Z grande
     z_dist = abs(gc_a[2] - gc_b[2])
     z_same_sign = (gc_a[2] * gc_b[2]) > 0
+    z_flipped = False
     if not z_same_sign and z_dist > 5.0:
-        # Flippa Z di tris_b per allinearla al sistema di riferimento di tris_a
         tris_b = tris_b.copy()
         tris_b[:, :, 2] *= -1
         gc_b = global_centroid(tris_b)
-        raw_ct_b = np.array([centroid(tris_b, c) for c in scan_b])
+        raw_ct_b = np.array([cap_centroid(tris_b, c) for c in scan_b])
+        z_flipped = True
 
     offset = gc_a - gc_b
     raw_ct_b_shifted = raw_ct_b + offset
@@ -633,6 +634,11 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     if landmarks and len(landmarks.get("a", [])) >= 3 and len(landmarks.get("b", [])) >= 3:
         pts_a_lm = np.array([[p["x"], p["y"], p["z"]] for p in landmarks["a"][:3]], dtype=np.float64)
         pts_b_lm = np.array([[p["x"], p["y"], p["z"]] for p in landmarks["b"][:3]], dtype=np.float64)
+        # Applica le stesse trasformazioni usate su tris_b
+        if z_flipped:
+            pts_b_lm[:, 2] *= -1
+        pts_b_lm = pts_b_lm + offset
+        # Kabsch 3D nello stesso spazio di raw_ct_b_shifted
         ca_lm, cb_lm = pts_a_lm.mean(0), pts_b_lm.mean(0)
         H_lm = (pts_b_lm - cb_lm).T @ (pts_a_lm - ca_lm)
         U_lm, _, Vt_lm = np.linalg.svd(H_lm)
@@ -640,8 +646,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         if np.linalg.det(R_pre) < 0:
             Vt_lm[-1] *= -1; R_pre = Vt_lm.T @ U_lm.T
         t_pre = ca_lm - R_pre @ cb_lm
-        method_pre = "landmark"
-    else:
+        method_pre = "landmark"  else:
         pa = robust_pre_align(ct_a_pre, ct_b_pre6)
         R_pre, t_pre = pa["R"], pa["t"]
         method_pre = pa.get("method", "auto")
