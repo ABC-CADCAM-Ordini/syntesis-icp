@@ -694,28 +694,35 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     pre = {"R": R_pre, "t": t_pre, "method": method_pre}
 
     # ── Allineamento MINIMO: solo rotZ + traslazione 3D (no pitch/roll) ─────
-    # Obiettivo: sovrapposizione minima per identificare coppie,
-    # senza distorcere le misure con rotazioni fittizie di inclinazione.
+    # Obiettivo: sovrapposizione minima senza distorcere con pitch/roll fittizi.
     from scipy.optimize import minimize as _min_opt
     def _cost_rzt(p):
         rz2,tx2,ty2,tz2 = p
         cz2,sz2 = math.cos(rz2), math.sin(rz2)
         Rz2 = np.array([[cz2,-sz2,0],[sz2,cz2,0],[0,0,1]])
-        B2 = (Rz2 @ ct_b_raw.T).T + [tx2,ty2,tz2]
-        return float(np.sum((ct_a - B2)**2))
+        D2 = np.linalg.norm(ct_a[:,None] - ((Rz2 @ ct_b_raw.T).T + [tx2,ty2,tz2])[None,:], axis=2)
+        from scipy.optimize import linear_sum_assignment as _h2
+        _r,_c = _h2(D2)
+        return float(np.sum(D2[_r,_c]**2))
 
-    # Guess iniziale: stima da PCA XY
-    ct_diff = ct_a.mean(0) - ct_b_raw.mean(0)
-    _res = _min_opt(_cost_rzt, [0.0, ct_diff[0], ct_diff[1], ct_diff[2]],
+    # Cerca il miglior angolo rz su 72 candidati (ogni 5 gradi)
+    _best_cost, _best_rz = 1e18, 0.0
+    _ca, _cb = ct_a.mean(0), ct_b_raw.mean(0)
+    for _rz0 in np.linspace(0, 2*math.pi, 72, endpoint=False):
+        _cz0, _sz0 = math.cos(_rz0), math.sin(_rz0)
+        _Rz0 = np.array([[_cz0,-_sz0,0],[_sz0,_cz0,0],[0,0,1]])
+        _t0 = _ca - _Rz0 @ _cb
+        _c2 = _cost_rzt([_rz0, _t0[0], _t0[1], _t0[2]])
+        if _c2 < _best_cost:
+            _best_cost = _c2; _best_rz = _rz0
+
+    # Affina con Nelder-Mead partendo dal miglior guess
+    _cz0, _sz0 = math.cos(_best_rz), math.sin(_best_rz)
+    _Rz0 = np.array([[_cz0,-_sz0,0],[_sz0,_cz0,0],[0,0,1]])
+    _t0 = _ca - _Rz0 @ _cb
+    _res = _min_opt(_cost_rzt, [_best_rz, _t0[0], _t0[1], _t0[2]],
                     method='Nelder-Mead',
-                    options={'xatol':1e-7,'fatol':1e-7,'maxiter':100000})
-    # Affina con piu' angoli di partenza
-    for _rz0 in np.linspace(0, 2*math.pi, 12, endpoint=False):
-        _r2 = _min_opt(_cost_rzt, [_rz0, ct_diff[0], ct_diff[1], ct_diff[2]],
-                       method='Nelder-Mead',
-                       options={'xatol':1e-7,'fatol':1e-7,'maxiter':100000})
-        if _r2.fun < _res.fun:
-            _res = _r2
+                    options={'xatol':1e-8,'fatol':1e-8,'maxiter':100000})
     rz_min, tx_min, ty_min, tz_min = _res.x
     cz_m, sz_m = math.cos(rz_min), math.sin(rz_min)
     R_min = np.array([[cz_m,-sz_m,0],[sz_m,cz_m,0],[0,0,1]])
