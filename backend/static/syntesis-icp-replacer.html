@@ -644,7 +644,7 @@ function makeViewer(id){
   const r=new THREE.WebGLRenderer({canvas:c,antialias:true});
   r.setPixelRatio(window.devicePixelRatio);r.setClearColor(0x06080d,1);
   const sc=new THREE.Scene();
-  const cam=new THREE.PerspectiveCamera(45,2,.01,5000);
+  const cam=new THREE.PerspectiveCamera(28,2,.01,5000);
   sc.add(new THREE.AmbientLight(0xffffff,.45));
   const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(1,2,3);sc.add(dl);
   const dl2=new THREE.DirectionalLight(0x4488ff,.2);dl2.position.set(-2,-1,-2);sc.add(dl2);
