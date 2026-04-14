@@ -1047,13 +1047,19 @@ function alignIsland(islPts, refPts, maxIter, thr, maxSamp, tipPoint){
     const ax = vnorm(vsub(tipPoint, cIsl));
     islAxes = [ax]; // only one candidate
   } else {
-    // PCA: try both orientations of main axis
+    // PCA: try all 3 eigenvectors (both orientations) as axis candidates
+    // This fixes the case where a scan body is flipped or tilted oddly
     const centered = islS.map(p=>vsub(p,cIsl));
     const cov = [[0,0,0],[0,0,0],[0,0,0]];
     for(const p of centered)for(let i=0;i<3;i++)for(let j=0;j<3;j++)cov[i][j]+=p[i]*p[j];
     for(let i=0;i<3;i++)for(let j=0;j<3;j++)cov[i][j]/=islS.length;
-    const main = vnorm(jacobiEig(cov)[0].vec);
-    islAxes = [main, [-main[0],-main[1],-main[2]]];
+    const evecs = jacobiEig(cov);
+    islAxes = [];
+    for(const ev of evecs){
+      const v = vnorm(ev.vec);
+      islAxes.push(v);
+      islAxes.push([-v[0],-v[1],-v[2]]);
+    }
   }
 
   let bestRmse=Infinity, bestR=null, bestT=null;
@@ -1067,8 +1073,8 @@ function alignIsland(islPts, refPts, maxIter, thr, maxSamp, tipPoint){
     // refS_prepped[i] = preR * (refS[i] - cRef) + cIsl
     const refPrepped = refS.map(p => vadd(mmv(preR, vsub(p, cRef)), cIsl));
 
-    // Try 8 in-plane rotations
-    for(let deg=0; deg<360; deg+=45){
+    // Try 16 in-plane rotations (22.5° step — better coverage for tilted scan bodies)
+    for(let deg=0; deg<360; deg+=22.5){
       const Rz = rotAxis(aAxis, deg*Math.PI/180);
       // Rotate refPrepped around cIsl
       const cand = refPrepped.map(p => vadd(mmv(Rz, vsub(p, cIsl)), cIsl));
