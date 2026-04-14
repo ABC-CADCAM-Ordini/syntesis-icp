@@ -435,32 +435,15 @@ input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-glow)}
 
 <script>
 'use strict';
-
-// ── Navigazione ──────────────────────────────────────────
-function goBack(){
-  // Torna alla splash di Syntesis-ICP
-  if(document.referrer && document.referrer !== window.location.href){
-    history.back();
-  } else {
-    window.location.href = 'https://syntesis-icp-production-40e1.up.railway.app/';
-  }
-}
-
-// Simula stato server online (il replacer è client-side)
-document.addEventListener('DOMContentLoaded', function(){
-  var sw = document.getElementById('siri-wrapper');
-  if(sw){ sw.className = 'siri-wrapper online'; }
-});
-
-// ── Globals ──────────────────────────────────────────
+// ── Globals ──────────────────────────────────────
 let V1=null, V2=null;
 let dA=null, dB=null, dM=null;
 let rawIslands=[], islands=[], curIdx=-1;
 let resultTris=[], resultTransforms=[];
-let tipPoints={};
+let tipPoints={};        // idx → THREE.Vector3 world point
 let clickMode=false;
-let cursorDot=null;
-let castMeshes=[];
+let cursorDot=null;      // red sphere that follows mouse
+let castMeshes=[];       // meshes of current island for raycasting
 let mouseDownPos={x:0,y:0};
 
 document.addEventListener('DOMContentLoaded',function(){
@@ -470,7 +453,7 @@ document.addEventListener('DOMContentLoaded',function(){
   wireMouse();
 });
 
-// ── File loading ──────────────────────────────────────
+// ── File loading ──────────────────────────────────
 function wireFiles(){
   ['A','B','M'].forEach(w=>{
     document.getElementById('in'+w).addEventListener('change',function(e){
@@ -486,7 +469,7 @@ function loadFile(file,w){
       const tris=parseSTL(buf);
       if(!tris||!tris.length){setStatus('Nessun triangolo in '+file.name,'err');return;}
       const pts=t2p(tris);
-      document.getElementById('fs'+w).classList.add('loaded');
+      document.getElementById('fs'+w).classList.add('ld');
       show('fn'+w,file.name); show('fi'+w,tris.length.toLocaleString()+' tri · '+(file.size/1024).toFixed(1)+' KB');
       setStatus(w+': '+file.name+' — '+tris.length.toLocaleString()+' tri','ok');
       if(w==='A'){dA={tris,pts,file};doMerge();}
@@ -507,7 +490,7 @@ function fallback(file,ok,fail){
 function show(id,txt){const el=document.getElementById(id);el.textContent=txt;el.style.display='block';}
 function setStatus(msg,type){const el=document.getElementById('fstatus');el.textContent=msg;el.className='fstatus'+(type?' '+type:'');}
 
-// ── STL parser ────────────────────────────────────────
+// ── STL parser ────────────────────────────────────
 function parseSTL(buf){
   if(looksLikeBinary(buf)){const t=parseBin(buf);if(t&&t.length)return t;}
   const t=parseAsc(buf); if(t&&t.length)return t;
@@ -535,7 +518,7 @@ function parseAsc(buf){
   return t.length?t:null;
 }
 
-// ── Segmentation ──────────────────────────────────────
+// ── Segmentation ──────────────────────────────────
 function segmentRaw(tris){
   const N=tris.length,vm=new Map();
   const vid=v=>{const k=v[0].toFixed(4)+','+v[1].toFixed(4)+','+v[2].toFixed(4);if(!vm.has(k))vm.set(k,vm.size);return vm.get(k);};
@@ -600,7 +583,7 @@ function checkReady(){
   document.getElementById('btnMerge').disabled=!rawIslands.length;
 }
 
-// ── Queue UI ──────────────────────────────────────────
+// ── Queue UI ──────────────────────────────────────
 function buildQ(){
   const q=document.getElementById('sbQ');q.innerHTML='';
   if(!islands.length){q.innerHTML='<div class="qe">Nessun scan body trovato</div>';return;}
@@ -620,7 +603,7 @@ function updQI(i){
   const isBig=isl.tooBig;
   el.className='qi'+(i===curIdx?' cur':'')+(isl.state==='accepted'?' acc':isl.state==='skipped'?' skip':'')+(isBig?' toobi':'');
   const n=document.getElementById('qin_'+i);
-  if(n){n.style.background=isBig?'var(--err)':isl.state==='accepted'?'var(--acc)':i===curIdx?'var(--blue)':'var(--border)';n.style.color=isBig||isl.state==='accepted'||i===curIdx?'#fff':'var(--mid)';}
+  if(n){n.style.background=isBig?'var(--err)':isl.state==='accepted'?'var(--ok)':i===curIdx?'var(--acc)':'var(--brd)';n.style.color=isBig||isl.state==='accepted'||i===curIdx?'#000':'var(--mut)';}
   const b=el.querySelector('.qibadge');
   if(b){if(isBig){b.className='qibadge x';b.textContent='escluso';}else{b.className='qibadge'+(isl.state==='accepted'?' a':isl.state==='skipped'?' s':' p');b.textContent=isl.state==='accepted'?'✓':isl.state==='skipped'?'✗':'—';}}
 }
@@ -628,43 +611,102 @@ function updateCnt(){const acc=islands.filter(i=>i.state==='accepted').length;do
 function acceptAll(){islands.forEach(i=>{if(!i.tooBig)i.state='accepted';});buildQ();updateCnt();}
 function resetAll(){islands.forEach(i=>i.state='pending');tipPoints={};buildQ();updateCnt();}
 
-// ── Three.js viewer ───────────────────────────────────
+// ── Three.js viewer ───────────────────────────────
 function makeViewer(id){
   const c=document.getElementById(id);
   const r=new THREE.WebGLRenderer({canvas:c,antialias:true});
-  r.setPixelRatio(window.devicePixelRatio);r.setClearColor(0x0A0F1A,1);
+  r.setPixelRatio(window.devicePixelRatio);r.setClearColor(0x06080d,1);
   const sc=new THREE.Scene();
   const cam=new THREE.PerspectiveCamera(45,2,.01,5000);
   sc.add(new THREE.AmbientLight(0xffffff,.45));
   const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(1,2,3);sc.add(dl);
   const dl2=new THREE.DirectionalLight(0x4488ff,.2);dl2.position.set(-2,-1,-2);sc.add(dl2);
+  // target = orbit center (what we look at)
   const target=new THREE.Vector3(0,0,0);
   let drag=false,lm={x:0,y:0},dragBtn=0;
   function upd(){
+    // Camera orbits around target using spherical coords
     const sp=cam.userData.sph||{th:.5,ph:1.2,r:50};
-    cam.position.set(target.x+sp.r*Math.sin(sp.ph)*Math.sin(sp.th),target.y+sp.r*Math.cos(sp.ph),target.z+sp.r*Math.sin(sp.ph)*Math.cos(sp.th));
+    cam.position.set(
+      target.x+sp.r*Math.sin(sp.ph)*Math.sin(sp.th),
+      target.y+sp.r*Math.cos(sp.ph),
+      target.z+sp.r*Math.sin(sp.ph)*Math.cos(sp.th)
+    );
     cam.lookAt(target);
   }
   cam.userData.sph={th:.5,ph:1.2,r:50};
-  c.addEventListener('mousedown',e=>{drag=true;dragBtn=e.button;lm={x:e.clientX,y:e.clientY};});
+
+  // Get world point under mouse via raycasting against a large sphere
+  function getWorldPointUnderMouse(e){
+    const rect=c.getBoundingClientRect();
+    const mx=((e.clientX-rect.left)/rect.width)*2-1;
+    const my=-((e.clientY-rect.top)/rect.height)*2+1;
+    const rc=new THREE.Raycaster();
+    rc.setFromCamera(new THREE.Vector2(mx,my),cam);
+    // Intersect with a plane at the target depth
+    const plane=new THREE.Plane();
+    plane.setFromNormalAndCoplanarPoint(cam.getWorldDirection(new THREE.Vector3()).negate(),target);
+    const pt=new THREE.Vector3();
+    rc.ray.intersectPlane(plane,pt);
+    return pt;
+  }
+
+  c.addEventListener('mousedown',e=>{
+    drag=true;dragBtn=e.button;
+    lm={x:e.clientX,y:e.clientY};
+  });
   window.addEventListener('mouseup',()=>drag=false);
   c.addEventListener('mousemove',e=>{
     if(!drag)return;
     const dx=e.clientX-lm.x,dy=e.clientY-lm.y;
     const sp=cam.userData.sph;
-    if(dragBtn===0&&!(e.buttons&(2|4))){sp.th-=dx*0.008;sp.ph=Math.max(0.05,Math.min(Math.PI-0.05,sp.ph-dy*0.008));}
-    else{const rect=c.getBoundingClientRect(),panSpeed=sp.r/rect.height*1.8;const right=new THREE.Vector3();const up=new THREE.Vector3();cam.getWorldDirection(new THREE.Vector3());right.crossVectors(cam.getWorldDirection(new THREE.Vector3()).negate(),new THREE.Vector3(0,1,0)).normalize();if(right.length()<0.01)right.set(1,0,0);up.crossVectors(right,cam.getWorldDirection(new THREE.Vector3())).normalize();target.addScaledVector(right,-dx*panSpeed);target.addScaledVector(up,dy*panSpeed);}
-    lm={x:e.clientX,y:e.clientY};upd();
+    if(dragBtn===0&&!(e.buttons&(2|4))){
+      // LEFT drag = orbit around target
+      sp.th-=dx*0.008;
+      sp.ph=Math.max(0.05,Math.min(Math.PI-0.05,sp.ph-dy*0.008));
+    } else {
+      // RIGHT/MIDDLE drag = pan (move target in screen plane)
+      const rect=c.getBoundingClientRect();
+      const panSpeed=sp.r/rect.height*1.8;
+      // Build right and up vectors in world space
+      const right=new THREE.Vector3();
+      const up=new THREE.Vector3();
+      cam.getWorldDirection(new THREE.Vector3()); // ensure matrix updated
+      right.crossVectors(cam.getWorldDirection(new THREE.Vector3()).negate(),new THREE.Vector3(0,1,0)).normalize();
+      // if nearly vertical, use camera up
+      if(right.length()<0.01)right.set(1,0,0);
+      up.crossVectors(right,cam.getWorldDirection(new THREE.Vector3())).normalize();
+      target.addScaledVector(right,-dx*panSpeed);
+      target.addScaledVector(up,dy*panSpeed);
+    }
+    lm={x:e.clientX,y:e.clientY};
+    upd();
   });
+
   c.addEventListener('wheel',e=>{
     e.preventDefault();
-    const sp=cam.userData.sph,zoomFactor=Math.exp(e.deltaY*0.001);
-    const rect=c.getBoundingClientRect(),mx=((e.clientX-rect.left)/rect.width)*2-1,my=-((e.clientY-rect.top)/rect.height)*2+1;
-    const rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2(mx,my),cam);
-    const plane=new THREE.Plane();plane.setFromNormalAndCoplanarPoint(cam.getWorldDirection(new THREE.Vector3()).negate(),target);
+    const sp=cam.userData.sph;
+    // Zoom toward the point under mouse
+    const zoomFactor=Math.exp(e.deltaY*0.001);
+    const rect=c.getBoundingClientRect();
+    const mx=((e.clientX-rect.left)/rect.width)*2-1;
+    const my=-((e.clientY-rect.top)/rect.height)*2+1;
+    const rc=new THREE.Raycaster();
+    rc.setFromCamera(new THREE.Vector2(mx,my),cam);
+    // Find world point under mouse
+    const plane=new THREE.Plane();
+    plane.setFromNormalAndCoplanarPoint(
+      cam.getWorldDirection(new THREE.Vector3()).negate(), target
+    );
     const mousePt=new THREE.Vector3();
-    if(rc.ray.intersectPlane(plane,mousePt)){const shift=new THREE.Vector3().subVectors(mousePt,target);target.addScaledVector(shift,(1-zoomFactor)*0.6);}
-    sp.r=Math.max(0.1,sp.r*zoomFactor);upd();
+    if(rc.ray.intersectPlane(plane,mousePt)){
+      // Move target toward/away from mouse world point
+      const shift=new THREE.Vector3().subVectors(mousePt,target);
+      const moveAmt=1-zoomFactor;
+      target.addScaledVector(shift,moveAmt*0.6);
+    }
+    sp.r=Math.max(0.1,sp.r*zoomFactor);
+    upd();
   },{passive:false});
   c.addEventListener('contextmenu',e=>e.preventDefault());
   new ResizeObserver(()=>{const w=c.clientWidth,h=c.clientHeight;r.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();}).observe(c);
@@ -673,81 +715,135 @@ function makeViewer(id){
   function setGroup(g,fitObj){
     if(grp){sc.remove(grp);grp.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}
     grp=g;if(!g)return;sc.add(g);
-    if(fitObj){const box=new THREE.Box3().setFromObject(fitObj),c2=box.getCenter(new THREE.Vector3()),sz=box.getSize(new THREE.Vector3()).length();target.copy(c2);cam.userData.sph.r=sz*1.8;upd();}
+    if(fitObj){
+      const box=new THREE.Box3().setFromObject(fitObj);
+      const c2=box.getCenter(new THREE.Vector3()),sz=box.getSize(new THREE.Vector3()).length();
+      target.copy(c2);
+      cam.userData.sph.r=sz*1.8;
+      upd();
+    }
   }
   function fitOn(obj,close){
-    const box=new THREE.Box3().setFromObject(obj),c2=box.getCenter(new THREE.Vector3()),sz=box.getSize(new THREE.Vector3()).length();
-    target.copy(c2);const sp=cam.userData.sph;sp.r=sz*(close?1.1:2.0);if(close)sp.ph=0.9;upd();
+    const box=new THREE.Box3().setFromObject(obj);
+    const c2=box.getCenter(new THREE.Vector3()),sz=box.getSize(new THREE.Vector3()).length();
+    target.copy(c2);
+    const sp=cam.userData.sph;
+    sp.r=sz*(close?1.1:2.0);
+    if(close)sp.ph=0.9;
+    upd();
   }
   (function loop(){requestAnimationFrame(loop);r.render(sc,cam);})();
   return{scene:sc,camera:cam,setGroup,fitOn,target,sph:cam.userData.sph,upd};
 }
 
-// ── Mouse / raycast ───────────────────────────────────
+// ── Mouse / raycast ───────────────────────────────
 function wireMouse(){
   const c=document.getElementById('c3d');
   c.addEventListener('mousedown',e=>{mouseDownPos={x:e.clientX,y:e.clientY};});
   c.addEventListener('mousemove',onMouseMove);
   c.addEventListener('click',onMouseClick);
 }
+
 function getMouseNDC(e){
   const c=document.getElementById('c3d'),rect=c.getBoundingClientRect();
   return new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);
 }
+
 function raycastPt(e){
   if(!castMeshes.length)return null;
-  const rc=new THREE.Raycaster();rc.setFromCamera(getMouseNDC(e),V1.camera);
+  const rc=new THREE.Raycaster();
+  rc.setFromCamera(getMouseNDC(e),V1.camera);
   const hits=rc.intersectObjects(castMeshes,false);
   if(!hits.length)return null;const p=hits[0].point;return new THREE.Vector3(p.x,p.y,p.z);
 }
+
 function onMouseMove(e){
   if(!clickMode)return;
   const pt=raycastPt(e);
   const lbl=document.getElementById('clabel');
   if(pt){
-    lbl.className='clabel show';lbl.textContent='('+pt.x.toFixed(2)+', '+pt.y.toFixed(2)+', '+pt.z.toFixed(2)+')';
-    if(!cursorDot){cursorDot=new THREE.Mesh(new THREE.SphereGeometry(0.35,10,10),new THREE.MeshBasicMaterial({color:0xff2200}));V1.scene.add(cursorDot);}
-    cursorDot.position.set(pt.x,pt.y,pt.z);cursorDot.visible=true;
-  }else{lbl.className='clabel';if(cursorDot)cursorDot.visible=false;}
+    lbl.className='clabel show';
+    lbl.textContent='('+pt.x.toFixed(2)+', '+pt.y.toFixed(2)+', '+pt.z.toFixed(2)+')';
+    if(!cursorDot){
+      cursorDot=new THREE.Mesh(new THREE.SphereGeometry(0.35,10,10),new THREE.MeshBasicMaterial({color:0xff2200}));
+      
+      V1.scene.add(cursorDot);
+    }
+    cursorDot.position.set(pt.x,pt.y,pt.z);
+    cursorDot.visible=true;
+  }else{
+    lbl.className='clabel';
+    if(cursorDot)cursorDot.visible=false;
+  }
 }
+
 function onMouseClick(e){
   if(!clickMode)return;
+  // Ignore if it was a drag
   const dx=Math.abs(e.clientX-mouseDownPos.x),dy=Math.abs(e.clientY-mouseDownPos.y);
   if(dx>5||dy>5)return;
-  const pt=raycastPt(e);if(!pt)return;
+  const pt=raycastPt(e);
+  if(!pt)return;
+  // Save tip point
   tipPoints[curIdx]=[pt.x,pt.y,pt.z];
+  // Visual feedback
   const lbl=document.getElementById('clabel');
-  lbl.className='clabel show ok';lbl.textContent='✓ Cima salvata! ('+pt.x.toFixed(1)+', '+pt.y.toFixed(1)+', '+pt.z.toFixed(1)+')';
+  lbl.className='clabel show ok';
+  lbl.textContent='✓ Cima salvata! ('+pt.x.toFixed(1)+', '+pt.y.toFixed(1)+', '+pt.z.toFixed(1)+')';
   if(cursorDot){cursorDot.material.color.setHex(0x00ff88);setTimeout(()=>{if(cursorDot)cursorDot.material.color.setHex(0xff2200);},600);}
   setTimeout(()=>{lbl.className='clabel';},1400);
-  islands[curIdx].state='accepted';updQI(curIdx);updateCnt();
+  // Accept and advance
+  islands[curIdx].state='accepted';
+  updQI(curIdx);updateCnt();
   const next=nextPend(curIdx);
-  if(next>=0){setTimeout(()=>selectIsl(next),400);setTimeout(()=>checkAllTipped(),500);}
-  else{exitClick();buildQ();setTimeout(()=>checkAllTipped(),300);}
+  if(next>=0){
+    setTimeout(()=>selectIsl(next),400);
+    setTimeout(()=>checkAllTipped(),500);
+  }else{
+    exitClick();buildQ();
+    setTimeout(()=>checkAllTipped(),300);
+  }
 }
+
 function enterClick(){
-  clickMode=true;document.getElementById('cbanner').classList.add('show');
-  document.getElementById('c3d').style.cursor='crosshair';document.getElementById('vbH').textContent='🎯 Clicca la cima';
-  document.getElementById('bAcc').style.display='none';document.getElementById('bSkip').style.display='none';
+  clickMode=true;
+  document.getElementById('cbanner').classList.add('show');
+  document.getElementById('c3d').style.cursor='crosshair';
+  document.getElementById('vbH').textContent='🎯 Clicca la cima del cilindro';
+  document.getElementById('bAcc').style.display='none';
+  document.getElementById('bSkip').style.display='none';
+  // hide legend during click mode to avoid confusion
   document.getElementById('hudTR').style.display='none';
 }
 function exitClick(){
-  clickMode=false;document.getElementById('cbanner').classList.remove('show');
-  document.getElementById('clabel').className='clabel';document.getElementById('c3d').style.cursor='';
-  document.getElementById('vbH').textContent='← → naviga';document.getElementById('bAcc').style.display='';
-  document.getElementById('bSkip').style.display='';document.getElementById('hudTR').style.display='';
+  clickMode=false;
+  document.getElementById('cbanner').classList.remove('show');
+  document.getElementById('clabel').className='clabel';
+  document.getElementById('c3d').style.cursor='';
+  document.getElementById('vbH').textContent='← → naviga';
+  document.getElementById('bAcc').style.display='';
+  document.getElementById('bSkip').style.display='';
+  document.getElementById('hudTR').style.display='';
   if(cursorDot)cursorDot.visible=false;
 }
 function doSkipIsland(){
-  if(curIdx<0)return;islands[curIdx].state='skipped';updQI(curIdx);updateCnt();exitClick();
-  const next=nextPend(curIdx);if(next>=0)setTimeout(()=>selectIsl(next),200);else{buildQ();setTimeout(()=>checkAllTipped(),300);}
+  // Mark current island as skipped (not tooBig, just user-excluded)
+  if(curIdx<0)return;
+  islands[curIdx].state='skipped';
+  updQI(curIdx);updateCnt();
+  exitClick();
+  const next=nextPend(curIdx);
+  if(next>=0)setTimeout(()=>selectIsl(next),200);
+  else{buildQ();setTimeout(()=>checkAllTipped(),300);}
 }
 function skipClick(){
   if(curIdx>=0&&!islands[curIdx].tooBig){islands[curIdx].state='accepted';updQI(curIdx);updateCnt();}
-  const next=nextPend(curIdx);if(next>=0)selectIsl(next);else{exitClick();buildQ();}
+  const next=nextPend(curIdx);
+  if(next>=0)selectIsl(next);
+  else{exitClick();buildQ();}
 }
 
-// ── Island selection ──────────────────────────────────
+// ── Island selection + render ─────────────────────
 function selectIsl(idx){
   if(idx<0||idx>=islands.length)return;
   const prev=curIdx;curIdx=idx;
@@ -763,10 +859,15 @@ function selectIsl(idx){
   document.getElementById('hudS').textContent=isl.count.toLocaleString()+' tri · '+sz;
   document.getElementById('hudP').textContent=isl.parts.length>1?isl.parts.length+' parti fuse':'';
   document.getElementById('hudE').style.display='none';
-  document.getElementById('bAcc').disabled=isl.tooBig;document.getElementById('bSkip').disabled=false;
-  document.getElementById('bPrev').disabled=idx===0;document.getElementById('bNext').disabled=idx===islands.length-1;
-  if(!isl.tooBig&&isl.state==='pending'){if(!clickMode)enterClick();}else{exitClick();}
+  document.getElementById('bAcc').disabled=isl.tooBig;
+  document.getElementById('bSkip').disabled=false;
+  document.getElementById('bPrev').disabled=idx===0;
+  document.getElementById('bNext').disabled=idx===islands.length-1;
+  // Enter click mode for pending non-big islands
+  if(!isl.tooBig&&isl.state==='pending'){if(!clickMode)enterClick();}
+  else{exitClick();}
 }
+
 function renderReview(idx){
   if(!V1)return;
   castMeshes=[];
@@ -776,16 +877,26 @@ function renderReview(idx){
     const isAct=i===idx;
     const sg=new THREE.Group();
     isl.parts.forEach((part,pi)=>{
-      const col=isl.tooBig?0x442222:isAct?(pi===0?0x0077CC:0xF59E0B):0x1e3050;
+      const col=isl.tooBig?0x442222:isAct?(pi===0?0x00d4aa:0xffa94d):0x1e3050;
       const geo=mkGeo(part.tris);
       const mesh=new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:col,specular:0x223355,shininess:25,side:THREE.DoubleSide,transparent:!isAct,opacity:isAct?1:.18}));
-      sg.add(mesh);if(isAct)castMeshes.push(mesh);
+      sg.add(mesh);
+      if(isAct)castMeshes.push(mesh);
     });
-    if(tipPoints[i]){const tp=tipPoints[i];const sp=new THREE.Mesh(new THREE.SphereGeometry(0.4,10,10),new THREE.MeshBasicMaterial({color:0x00ff88}));sp.position.set(tp[0],tp[1],tp[2]);sg.add(sp);}
+    // Show saved tip as green sphere
+    if(tipPoints[i]){
+      const tp=tipPoints[i];
+      const sp=new THREE.Mesh(new THREE.SphereGeometry(0.4,10,10),new THREE.MeshBasicMaterial({color:0x00ff88}));
+      
+      sp.position.set(tp[0],tp[1],tp[2]);
+      sg.add(sp);
+    }
     grp.add(sg);if(isAct)activeObj=sg;
   });
-  V1.setGroup(grp,null);if(activeObj)V1.fitOn(activeObj,clickMode);
+  V1.setGroup(grp,null); // show all, no auto-fit
+  if(activeObj) V1.fitOn(activeObj, clickMode); // close zoom in click mode
 }
+
 function doAccept(){if(curIdx<0||islands[curIdx].tooBig)return;islands[curIdx].state='accepted';updQI(curIdx);updateCnt();const n=nextPend(curIdx);if(n>=0)selectIsl(n);else{exitClick();buildQ();}}
 function doSkip(){if(curIdx<0)return;islands[curIdx].state='skipped';updQI(curIdx);updateCnt();const n=nextPend(curIdx);if(n>=0)selectIsl(n);else exitClick();}
 function nav(d){const n=curIdx+d;if(n>=0&&n<islands.length)selectIsl(n);}
@@ -798,7 +909,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Escape'){if(clickMode)skipClick();else doSkip();}
 });
 
-// ── Math ──────────────────────────────────────────────
+// ── Math ─────────────────────────────────────────
 function t2p(tris){const p=[];for(const t of tris)for(const v of t)p.push(v);return p;}
 function cen(pts){let x=0,y=0,z=0;for(const p of pts){x+=p[0];y+=p[1];z+=p[2];}return[x/pts.length,y/pts.length,z/pts.length];}
 function bbox(pts){let x0=Infinity,y0=Infinity,z0=Infinity,x1=-Infinity,y1=-Infinity,z1=-Infinity;for(const p of pts){if(p[0]<x0)x0=p[0];if(p[0]>x1)x1=p[0];if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];if(p[2]<z0)z0=p[2];if(p[2]>z1)z1=p[2];}return{minX:x0,minY:y0,minZ:z0,maxX:x1,maxY:y1,maxZ:z1};}
@@ -813,12 +924,50 @@ function eye3(){return[[1,0,0],[0,1,0],[0,0,1]];}
 function dist2(a,b){const dx=a[0]-b[0],dy=a[1]-b[1],dz=a[2]-b[2];return dx*dx+dy*dy+dz*dz;}
 function det3(M){return M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1])-M[0][1]*(M[1][0]*M[2][2]-M[1][2]*M[2][0])+M[0][2]*(M[1][0]*M[2][1]-M[1][1]*M[2][0]);}
 function samp(pts,n){if(pts.length<=n)return pts;const s=pts.length/n,o=[];for(let i=0;i<n;i++)o.push(pts[Math.floor(i*s)]);return o;}
-function rotVtoV(v,u){const vn=vnorm(v),un=vnorm(u),d=vdot(vn,un);if(Math.abs(d-1)<1e-6)return eye3();if(Math.abs(d+1)<1e-6){const perp=vnorm(vcross(vn,Math.abs(vn[0])<.9?[1,0,0]:[0,1,0]));return rotAxis(perp,Math.PI);}return rotAxis(vnorm(vcross(vn,un)),Math.acos(Math.max(-1,Math.min(1,d))));}
-function rotAxis(k,th){const[kx,ky,kz]=vnorm(k),c=Math.cos(th),s=Math.sin(th),t=1-c;return[[t*kx*kx+c,t*kx*ky-s*kz,t*kx*kz+s*ky],[t*kx*ky+s*kz,t*ky*ky+c,t*ky*kz-s*kx],[t*kx*kz-s*ky,t*ky*kz+s*kx,t*kz*kz+c]];}
-function jacobiEig(A){let V=eye3(),S=A.map(r=>[...r]);for(let it=0;it<80;it++){let p=0,q=1,mx=Math.abs(S[0][1]);for(const[i,j,v]of[[0,2,Math.abs(S[0][2])],[1,2,Math.abs(S[1][2])]]){if(v>mx){mx=v;p=i;q=j;}}if(mx<1e-12)break;const th=(S[q][q]-S[p][p])/(2*S[p][q]),t2=Math.sign(th)/(Math.abs(th)+Math.sqrt(1+th*th)),c=1/Math.sqrt(1+t2*t2),s=t2*c;const nS=S.map(r=>[...r]);nS[p][p]=c*c*S[p][p]-2*c*s*S[p][q]+s*s*S[q][q];nS[q][q]=s*s*S[p][p]+2*c*s*S[p][q]+c*c*S[q][q];nS[p][q]=nS[q][p]=0;for(let r=0;r<3;r++){if(r!==p&&r!==q){nS[r][p]=nS[p][r]=c*S[r][p]-s*S[r][q];nS[r][q]=nS[q][r]=s*S[r][p]+c*S[r][q];}}S=nS;const nV=V.map(r=>[...r]);for(let r=0;r<3;r++){nV[r][p]=c*V[r][p]-s*V[r][q];nV[r][q]=s*V[r][p]+c*V[r][q];}V=nV;}const ev=[S[0][0],S[1][1],S[2][2]];return[0,1,2].sort((a,b)=>ev[b]-ev[a]).map(i=>({vec:[V[0][i],V[1][i],V[2][i]],val:ev[i]}));}
-function svd3(H){const Ht=[[H[0][0],H[1][0],H[2][0]],[H[0][1],H[1][1],H[2][1]],[H[0][2],H[1][2],H[2][2]]];const Vt=jacobiEig(mmm(Ht,H)).map(e=>e.vec);const U=[[0,0,0],[0,0,0],[0,0,0]];for(let k=0;k<3;k++){const hv=mmv(H,Vt[k]),nl=Math.sqrt(hv[0]**2+hv[1]**2+hv[2]**2)||1;for(let i=0;i<3;i++)U[i][k]=hv[i]/nl;}return{U,Vt};}
 
-// ── ICP core ──────────────────────────────────────────
+// Rodrigues: rotate vector v onto u
+function rotVtoV(v,u){
+  const vn=vnorm(v),un=vnorm(u),d=vdot(vn,un);
+  if(Math.abs(d-1)<1e-6)return eye3();
+  if(Math.abs(d+1)<1e-6){
+    const perp=vnorm(vcross(vn,Math.abs(vn[0])<.9?[1,0,0]:[0,1,0]));
+    return rotAxis(perp,Math.PI);
+  }
+  return rotAxis(vnorm(vcross(vn,un)),Math.acos(Math.max(-1,Math.min(1,d))));
+}
+function rotAxis(k,th){
+  const[kx,ky,kz]=vnorm(k),c=Math.cos(th),s=Math.sin(th),t=1-c;
+  return[[t*kx*kx+c,t*kx*ky-s*kz,t*kx*kz+s*ky],[t*kx*ky+s*kz,t*ky*ky+c,t*ky*kz-s*kx],[t*kx*kz-s*ky,t*ky*kz+s*kx,t*kz*kz+c]];
+}
+
+function jacobiEig(A){
+  let V=eye3(),S=A.map(r=>[...r]);
+  for(let it=0;it<80;it++){
+    let p=0,q=1,mx=Math.abs(S[0][1]);
+    for(const[i,j,v]of[[0,2,Math.abs(S[0][2])],[1,2,Math.abs(S[1][2])]]){if(v>mx){mx=v;p=i;q=j;}}
+    if(mx<1e-12)break;
+    const th=(S[q][q]-S[p][p])/(2*S[p][q]),t2=Math.sign(th)/(Math.abs(th)+Math.sqrt(1+th*th)),c=1/Math.sqrt(1+t2*t2),s=t2*c;
+    const nS=S.map(r=>[...r]);
+    nS[p][p]=c*c*S[p][p]-2*c*s*S[p][q]+s*s*S[q][q];nS[q][q]=s*s*S[p][p]+2*c*s*S[p][q]+c*c*S[q][q];nS[p][q]=nS[q][p]=0;
+    for(let r=0;r<3;r++){if(r!==p&&r!==q){nS[r][p]=nS[p][r]=c*S[r][p]-s*S[r][q];nS[r][q]=nS[q][r]=s*S[r][p]+c*S[r][q];}}
+    S=nS;const nV=V.map(r=>[...r]);
+    for(let r=0;r<3;r++){nV[r][p]=c*V[r][p]-s*V[r][q];nV[r][q]=s*V[r][p]+c*V[r][q];}V=nV;
+  }
+  const ev=[S[0][0],S[1][1],S[2][2]];
+  return[0,1,2].sort((a,b)=>ev[b]-ev[a]).map(i=>({vec:[V[0][i],V[1][i],V[2][i]],val:ev[i]}));
+}
+
+function svd3(H){
+  const Ht=[[H[0][0],H[1][0],H[2][0]],[H[0][1],H[1][1],H[2][1]],[H[0][2],H[1][2],H[2][2]]];
+  const Vt=jacobiEig(mmm(Ht,H)).map(e=>e.vec);
+  const U=[[0,0,0],[0,0,0],[0,0,0]];
+  for(let k=0;k<3;k++){const hv=mmv(H,Vt[k]),nl=Math.sqrt(hv[0]**2+hv[1]**2+hv[2]**2)||1;for(let i=0;i<3;i++)U[i][k]=hv[i]/nl;}
+  return{U,Vt};
+}
+
+// ── ICP core ─────────────────────────────────────
+// Operates on point arrays, returns {R, t, rmse}
+// Both R and t transform SRC points → REF points
 function icpOnce(srcPts,refPts,maxIter,thr){
   let src=[...srcPts],R=eye3(),t=[0,0,0],prev=Infinity;
   for(let it=0;it<maxIter;it++){
@@ -832,102 +981,124 @@ function icpOnce(srcPts,refPts,maxIter,thr){
     let Ri=mmm(VtT,Ut);
     if(det3(Ri)<0){const Vm=[...VtT];Vm[2]=Vm[2].map(x=>-x);Ri=mmm(Vm,Ut);}
     const ti=vsub(cM,mmv(Ri,cS));
-    src=src.map(p=>vadd(mmv(Ri,p),ti));t=vadd(mmv(Ri,t),ti);R=mmm(Ri,R);
+    src=src.map(p=>vadd(mmv(Ri,p),ti));
+    t=vadd(mmv(Ri,t),ti);R=mmm(Ri,R);
     const rmse=Math.sqrt(src.reduce((s,p,i)=>s+dist2(p,matched[i]),0)/src.length);
     if(Math.abs(prev-rmse)<thr)break;prev=rmse;
   }
   return{R,t,rmse:prev};
 }
 
-// ── Local Reference Extraction ───────────────────────────────────────────
-// Estrae i punti di refMesh entro un raggio dal centroide dell'isola.
-// Questo è il fix critico: invece di allineare su tutta la mascella,
-// si lavora solo sulla regione locale intorno al foro.
-function localRef(isl, refMesh, radiusMult) {
-  const c = isl.c;
-  // Stima il raggio dell'isola (metà diagonale bbox)
-  const bb = isl.bb;
-  const islR = Math.sqrt(
-    Math.pow(bb.maxX-bb.minX,2)+Math.pow(bb.maxY-bb.minY,2)+Math.pow(bb.maxZ-bb.minZ,2)
-  ) / 2;
-  // Cerca punti di dA entro radiusMult * islR dal centroide
-  let radius = islR * radiusMult;
-  const r2 = radius * radius;
-  let localPts = refMesh.pts.filter(p =>
-    Math.pow(p[0]-c[0],2)+Math.pow(p[1]-c[1],2)+Math.pow(p[2]-c[2],2) <= r2
-  );
-  // Se troppo pochi, allarga progressivamente
-  let mult = radiusMult;
-  while (localPts.length < 80 && mult < radiusMult * 8) {
-    mult *= 1.5;
-    const r2b = Math.pow(islR * mult, 2);
-    localPts = refMesh.pts.filter(p =>
-      Math.pow(p[0]-c[0],2)+Math.pow(p[1]-c[1],2)+Math.pow(p[2]-c[2],2) <= r2b
-    );
-  }
-  // Fallback totale: usa tutti i punti (comportamento originale)
-  if (localPts.length < 30) return refMesh.pts;
-  return localPts;
-}
+// ── Main alignment ────────────────────────────────
+// SIMPLE and CORRECT:
+// 1. Pre-translate: move src centroid → ref centroid
+// 2. Determine axis:
+//    - if tipPoint: islAxis = normalize(tip - islCentroid)
+//    - else: PCA, try both orientations
+// 3. aAxis = A's +Z direction (known: A's top is maxZ region)
+// 4. Pre-rotate: islAxis → aAxis  (Rodrigues, exact)
+// 5. Try 8 in-plane rotations around aAxis
+// 6. For each: run ICP, keep best RMSE
+// 7. The final R,t for B are computed by tracking how refPts transform
+function alignIsland(islPts, refPts, maxIter, thr, maxSamp, tipPoint){
+  const islS = samp(islPts, maxSamp);
+  const refS = samp(refPts, maxSamp);
+  const cIsl = cen(islS);
+  const cRef = cen(refS);
 
-function alignIsland(islPts,refPts,maxIter,thr,maxSamp,tipPoint){
-  const islS=samp(islPts,maxSamp),refS=samp(refPts,maxSamp);
-  const cIsl=cen(islS),cRef=cen(refS);
-  const refBb=bbox(refS),topThresh=refBb.minZ+(refBb.maxZ-refBb.minZ)*0.75;
-  const topPts=refS.filter(p=>p[2]>=topThresh),cTop=cen(topPts.length>3?topPts:refS);
-  const aAxis=vnorm(vsub(cTop,cRef));
+  // A's axis direction = from centroid toward the high-Z region (cima)
+  // A has +Z axis, so top is maxZ
+  const refBb = bbox(refS);
+  const topThresh = refBb.minZ + (refBb.maxZ-refBb.minZ)*0.75;
+  const topPts = refS.filter(p=>p[2]>=topThresh);
+  const cTop = cen(topPts.length>3 ? topPts : refS);
+  const aAxis = vnorm(vsub(cTop, cRef));  // A: from centroid toward top
+
+  // Island axis
   let islAxes;
-  if(tipPoint){islAxes=[vnorm(vsub(tipPoint,cIsl))];}
-  else{const centered=islS.map(p=>vsub(p,cIsl));const cov=[[0,0,0],[0,0,0],[0,0,0]];for(const p of centered)for(let i=0;i<3;i++)for(let j=0;j<3;j++)cov[i][j]+=p[i]*p[j];for(let i=0;i<3;i++)for(let j=0;j<3;j++)cov[i][j]/=islS.length;const main=vnorm(jacobiEig(cov)[0].vec);islAxes=[main,[-main[0],-main[1],-main[2]]];}
-  let bestRmse=Infinity,bestR=null,bestT=null;
+  if(tipPoint){
+    const ax = vnorm(vsub(tipPoint, cIsl));
+    islAxes = [ax]; // only one candidate
+  } else {
+    // PCA: try both orientations of main axis
+    const centered = islS.map(p=>vsub(p,cIsl));
+    const cov = [[0,0,0],[0,0,0],[0,0,0]];
+    for(const p of centered)for(let i=0;i<3;i++)for(let j=0;j<3;j++)cov[i][j]+=p[i]*p[j];
+    for(let i=0;i<3;i++)for(let j=0;j<3;j++)cov[i][j]/=islS.length;
+    const main = vnorm(jacobiEig(cov)[0].vec);
+    islAxes = [main, [-main[0],-main[1],-main[2]]];
+  }
+
+  let bestRmse=Infinity, bestR=null, bestT=null;
+
   for(const islAxis of islAxes){
-    const preR=rotVtoV(islAxis,aAxis);
-    const refPrepped=refS.map(p=>vadd(mmv(preR,vsub(p,cRef)),cIsl));
-    for(let deg=0;deg<360;deg+=45){
-      const Rz=rotAxis(aAxis,deg*Math.PI/180);
-      const rotRefPrepped=refPrepped.map(p=>vadd(mmv(Rz,vsub(p,cIsl)),cIsl));
-      const{R,t,rmse}=icpOnce(islS,rotRefPrepped,maxIter,thr);
-      if(rmse<bestRmse){bestRmse=rmse;
-        const Rfull=mmm(R,mmm(Rz,preR));
-        const tOff=vsub(cRef,mmv(Rfull,cRef));
-        const tFull=vadd(t,vadd(tOff,vsub(cIsl,mmv(R,cIsl))));
-        bestR=Rfull;bestT=tFull;
+    // Pre-rotation: islAxis → aAxis
+    const preR = rotVtoV(islAxis, aAxis);
+
+    // Pre-translated + pre-rotated version of refS at island centroid
+    // We transform refS so it's positioned at islCentroid with islAxis aligned to aAxis
+    // refS_prepped[i] = preR * (refS[i] - cRef) + cIsl
+    const refPrepped = refS.map(p => vadd(mmv(preR, vsub(p, cRef)), cIsl));
+
+    // Try 8 in-plane rotations
+    for(let deg=0; deg<360; deg+=45){
+      const Rz = rotAxis(aAxis, deg*Math.PI/180);
+      // Rotate refPrepped around cIsl
+      const cand = refPrepped.map(p => vadd(mmv(Rz, vsub(p, cIsl)), cIsl));
+      // ICP: align cand (ref at island position) onto islS
+      const{R:Ricp, t:Ticp, rmse} = icpOnce(cand, islS, maxIter, thr);
+      if(rmse < bestRmse){
+        bestRmse = rmse;
+        // Combined transform for B vertices (live at cRef):
+        // v_out = Ricp*(Rz*(preR*(v - cRef) + cIsl)) + Ticp
+        //       = Ricp*Rz*preR*v  +  Ricp*(cIsl - Rz*preR*cRef) + Ticp
+        const Rcomb = mmm(Ricp, mmm(Rz, preR));
+        const RzPreRcRef = mmv(mmm(Rz, preR), cRef);
+        const Tfinal = vadd(mmv(Ricp, vsub(cIsl, RzPreRcRef)), Ticp);
+        bestR = Rcomb;
+        bestT = Tfinal;
       }
     }
   }
-  return{R:bestR,t:bestT,rmse:bestRmse};
+
+  return{R:bestR, t:bestT, rmse:bestRmse};
 }
+
 function applyT(tris,R,t){return tris.map(tri=>tri.map(v=>vadd(mmv(R,v),t)));}
 function rotAngle(R){return Math.acos(Math.max(-1,Math.min(1,(R[0][0]+R[1][1]+R[2][2]-1)/2)))*180/Math.PI;}
+
 function mkAxes(R,t,scale){
   const grp=new THREE.Group();
-  [[1,0,0,0x44ff44],[0,1,0,0x4466ff],[0,0,1,0xff4444]].forEach(([x,y,z,col])=>{
-    const dir=new THREE.Vector3(...mmv(R,[x,y,z])).normalize();
-    const origin=new THREE.Vector3(...t);
-    const end=origin.clone().addScaledVector(dir,scale);
-    const geo=new THREE.BufferGeometry().setFromPoints([origin,end]);
-    grp.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:col,linewidth:2})));
+  [[R[0][0],R[1][0],R[2][0],0x33ff33],[R[0][1],R[1][1],R[2][1],0x3366ff],[R[0][2],R[1][2],R[2][2],0xff3333]].forEach(([dx,dy,dz,col])=>{
+    grp.add(new THREE.ArrowHelper(new THREE.Vector3(dx,dy,dz).normalize(),new THREE.Vector3(t[0],t[1],t[2]),scale,col,scale*.28,scale*.14));
   });
   return grp;
 }
 
-// ── Check all tipped ──────────────────────────────────
+
+// ── Confirm popup ─────────────────────────────────
 function checkAllTipped(){
+  // Show popup ONLY when there are no more pending islands to click
   const stillPending=islands.some(i=>!i.tooBig&&i.state==='pending');
-  if(stillPending)return;
+  if(stillPending)return; // still more to do — don't show yet
   const accepted=islands.filter(i=>i.state==='accepted'&&!i.tooBig);
   if(!accepted.length)return;
+  // Build summary
   const lines=accepted.map(isl=>{
-    const i=islands.indexOf(isl),tp=tipPoints[i];
+    const i=islands.indexOf(isl);
+    const tp=tipPoints[i];
     const tipStr=tp?'🎯 ('+tp[0].toFixed(1)+', '+tp[1].toFixed(1)+', '+tp[2].toFixed(1)+')':'PCA auto';
     return 'SB '+(i+1)+': '+tipStr;
   });
   document.getElementById('confirmSummary').innerHTML=lines.join('<br>');
   document.getElementById('confirmBg').classList.add('show');
 }
-function confirmAndRun(){document.getElementById('confirmBg').classList.remove('show');runICP(true);}
+function confirmAndRun(){
+  document.getElementById('confirmBg').classList.remove('show');
+  runICP(true); // true = auto-open preview when done
+}
 
-// ── Run ICP ───────────────────────────────────────────
+// ── Run ICP ───────────────────────────────────────
 async function runICP(autoPreview){
   const accepted=islands.filter(i=>i.state==='accepted'&&!i.tooBig);
   if(!accepted.length||!dA||!dB)return;
@@ -952,48 +1123,57 @@ async function runICP(autoPreview){
     await sleep(0);
     try{
       const tip=tipPoints[islands.indexOf(isl)]||null;
-      const localRefPts=localRef(isl,dA,3.5);
-      mlog('info','SB '+islIdx+': '+localRefPts.length+' punti locali (raggio '+Math.round(3.5)+'× SB)');
-      const{R,t,rmse}=alignIsland(isl.pts,localRefPts,maxIter,thr,maxSamp,tip);
+      const{R,t,rmse}=alignIsland(isl.pts,dA.pts,maxIter,thr,maxSamp,tip);
       if(!R||!t)throw new Error('Allineamento fallito');
-      resultTris.push(...applyT(dB.tris,R,t));resultTransforms.push({R,t});
+      resultTris.push(...applyT(dB.tris,R,t));
+      resultTransforms.push({R,t});
       const ang=rotAngle(R);
       mlog('ok','SB '+islIdx+': RMSE='+rmse.toFixed(5)+' mm · rot='+ang.toFixed(1)+'°'+(tip?' 🎯':' (PCA)'));
       rows.push({idx:islIdx,rmse,ang,tip:!!tip,ok:true});
-    }catch(err){mlog('err','SB '+islIdx+': '+err.message);rows.push({idx:islIdx,rmse:null,ok:false,tip:false});}
+    }catch(err){
+      mlog('err','SB '+islIdx+': '+err.message);
+      rows.push({idx:islIdx,rmse:null,ok:false,tip:false});
+    }
   }
   msetProg(100,'Completato');
   document.getElementById('mSub2').textContent='Completato — '+resultTris.length.toLocaleString()+' triangoli';
   const body=document.getElementById('mRepB');
   for(const r of rows){
     const tr=document.createElement('tr');
-    if(r.ok){const col=r.rmse<0.05?'var(--green)':r.rmse<0.2?'var(--warn)':'var(--err)';tr.innerHTML='<td>'+r.idx+'</td><td style="color:'+col+'">'+r.rmse.toFixed(5)+'</td><td>'+r.ang.toFixed(1)+'</td><td>'+(r.tip?'<span style="color:var(--green)">🎯</span>':'PCA')+'</td><td style="color:var(--green)">✓</td>';}
+    if(r.ok){const col=r.rmse<0.05?'var(--ok)':r.rmse<0.2?'var(--warn)':'var(--err)';tr.innerHTML='<td>'+r.idx+'</td><td style="color:'+col+'">'+r.rmse.toFixed(5)+'</td><td>'+r.ang.toFixed(1)+'</td><td>'+(r.tip?'<span style="color:var(--ok)">🎯</span>':'PCA')+'</td><td style="color:var(--ok)">✓</td>';}
     else{tr.innerHTML='<td>'+r.idx+'</td><td colspan="3">—</td><td style="color:var(--err)">✗</td>';}
     body.appendChild(tr);
   }
   document.getElementById('mRep').style.display='table';
   document.getElementById('mPvBtn').style.display='inline-block';
   document.getElementById('mCl').style.display='inline-block';
-  if(autoPreview){setTimeout(()=>{closeMod();openPv();},600);}
+  if(autoPreview){
+    setTimeout(()=>{closeMod();openPv();},600);
+  }
 }
 
-// ── Preview ───────────────────────────────────────────
+// ── Preview ───────────────────────────────────────
 function openPv(){
-  closeMod();document.getElementById('pvEl').classList.add('show');
+  closeMod();
+  document.getElementById('pvEl').classList.add('show');
   const acc=islands.filter(i=>i.state==='accepted').length;
   document.getElementById('pvSub').textContent=acc+' SB · '+resultTris.length.toLocaleString()+' tri B · '+dM.tris.length.toLocaleString()+' tri Multi-A';
   const showAxes=document.getElementById('tAxes').classList.contains('on');
   document.getElementById('pvAxesLeg').style.display=showAxes?'block':'none';
   const grp=new THREE.Group();
   grp.add(new THREE.Mesh(mkGeo(dM.tris),new THREE.MeshPhongMaterial({color:0x263048,specular:0x111111,shininess:8,side:THREE.DoubleSide,transparent:true,opacity:0.5})));
-  if(resultTris.length>0){grp.add(new THREE.Mesh(mkGeo(resultTris),new THREE.MeshPhongMaterial({color:0x0077CC,specular:0x334466,shininess:50,side:THREE.DoubleSide})));}
-  if(showAxes&&resultTransforms.length>0){const bb=bbox(dB.pts),axScale=Math.max(bb.maxX-bb.minX,bb.maxY-bb.minY,bb.maxZ-bb.minZ)*1.0;resultTransforms.forEach(({R,t})=>grp.add(mkAxes(R,t,axScale)));}
+  if(resultTris.length>0){const gB=mkGeo(resultTris);grp.add(new THREE.Mesh(gB,new THREE.MeshPhongMaterial({color:0x00d4aa,specular:0x334466,shininess:50,side:THREE.DoubleSide})));}
+  if(showAxes&&resultTransforms.length>0){
+    const bb=bbox(dB.pts);
+    const axScale=Math.max(bb.maxX-bb.minX,bb.maxY-bb.minY,bb.maxZ-bb.minZ)*1.0;
+    resultTransforms.forEach(({R,t})=>grp.add(mkAxes(R,t,axScale)));
+  }
   V2.setGroup(grp);
 }
 function closePv(){document.getElementById('pvEl').classList.remove('show');}
 function closeMod(){document.getElementById('mBg').classList.remove('show');}
 
-// ── Output ────────────────────────────────────────────
+// ── Output ────────────────────────────────────────
 function dlOutput(){
   if(!resultTris.length)return;
   const bin=document.getElementById('tBin').classList.contains('on');
@@ -1004,7 +1184,7 @@ function dlOutput(){
 }
 function wBin(tris){
   const buf=new ArrayBuffer(84+tris.length*50),v=new DataView(buf);
-  const h='Syntesis-ICP Replacer v1.0';for(let i=0;i<h.length;i++)v.setUint8(i,h.charCodeAt(i));
+  const h='STL ICP Replacer v5.1';for(let i=0;i<h.length;i++)v.setUint8(i,h.charCodeAt(i));
   v.setUint32(80,tris.length,true);let o=84;
   for(const[v0,v1,v2]of tris){
     const ax=v1[0]-v0[0],ay=v1[1]-v0[1],az=v1[2]-v0[2],bx=v2[0]-v0[0],by=v2[1]-v0[1],bz=v2[2]-v0[2];
@@ -1034,7 +1214,8 @@ function mkGeo(tris){
     const nx=ay*bz-az*by,ny=az*bx-ax*bz,nz=ax*by-ay*bx,nl=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
     for(const v of[v0,v1,v2]){pos[k]=v[0];pos[k+1]=v[1];pos[k+2]=v[2];nrm[k]=nx/nl;nrm[k+1]=ny/nl;nrm[k+2]=nz/nl;k+=3;}
   }
-  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('normal',new THREE.BufferAttribute(nrm,3));
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('normal',new THREE.BufferAttribute(nrm,3));
   return geo;
 }
 function mlog(type,msg){
@@ -1046,6 +1227,15 @@ function mlog(type,msg){
 }
 function msetProg(pct,l){document.getElementById('mPf').style.width=pct+'%';document.getElementById('mPs').textContent=l;document.getElementById('mPp').textContent=Math.round(pct)+'%';}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+// ── Torna al hub ─────────────────────────────────────────────────────────────
+function goBack(){
+  if(document.referrer&&document.referrer!==window.location.href){
+    history.back();
+  }else{
+    window.location.href='https://syntesis-icp-production-40e1.up.railway.app/';
+  }
+}
+
 </script>
 </body>
 </html>
