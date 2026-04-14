@@ -304,6 +304,11 @@ input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-glow)}
             <div class="fstatus" id="fstatus">In attesa dei file…</div>
           </div>
 
+          <div class="acc-header" onclick="toggleAcc()" id="accHeader">
+            <span class="acc-label">Impostazioni</span>
+            <span class="acc-arrow" id="accArrow">▼</span>
+          </div>
+          <div class="acc-body" id="accBody">
           <div class="sb-sect">
             <div class="sec-t">Raggruppamento disco+cilindro</div>
             <div class="pg">
@@ -321,8 +326,6 @@ input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-glow)}
             <div class="mst" id="mStat">—</div>
           </div>
 
-          <div class="sb-q" id="sbQ"><div class="qe">Carica il file Multi-A</div></div>
-
           <div class="sb-icp">
             <div class="sec-t">Parametri ICP</div>
             <div class="pg">
@@ -333,6 +336,8 @@ input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-glow)}
             </div>
             <div class="tr"><button class="tog on" id="tBin" onclick="this.classList.toggle('on')"></button><label class="tl" onclick="document.getElementById('tBin').click()">Output STL binario</label></div>
             <div class="tr"><button class="tog on" id="tAxes" onclick="this.classList.toggle('on')"></button><label class="tl" onclick="document.getElementById('tAxes').click()">Mostra assi XYZ</label></div>
+          </div><!-- /acc-body -->
+
           </div>
           </div><!-- /acc-body -->
         </div>
