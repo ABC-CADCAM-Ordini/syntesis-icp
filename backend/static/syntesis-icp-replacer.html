@@ -838,6 +838,38 @@ function icpOnce(srcPts,refPts,maxIter,thr){
   }
   return{R,t,rmse:prev};
 }
+
+// ── Local Reference Extraction ───────────────────────────────────────────
+// Estrae i punti di refMesh entro un raggio dal centroide dell'isola.
+// Questo è il fix critico: invece di allineare su tutta la mascella,
+// si lavora solo sulla regione locale intorno al foro.
+function localRef(isl, refMesh, radiusMult) {
+  const c = isl.c;
+  // Stima il raggio dell'isola (metà diagonale bbox)
+  const bb = isl.bb;
+  const islR = Math.sqrt(
+    Math.pow(bb.maxX-bb.minX,2)+Math.pow(bb.maxY-bb.minY,2)+Math.pow(bb.maxZ-bb.minZ,2)
+  ) / 2;
+  // Cerca punti di dA entro radiusMult * islR dal centroide
+  let radius = islR * radiusMult;
+  const r2 = radius * radius;
+  let localPts = refMesh.pts.filter(p =>
+    Math.pow(p[0]-c[0],2)+Math.pow(p[1]-c[1],2)+Math.pow(p[2]-c[2],2) <= r2
+  );
+  // Se troppo pochi, allarga progressivamente
+  let mult = radiusMult;
+  while (localPts.length < 80 && mult < radiusMult * 8) {
+    mult *= 1.5;
+    const r2b = Math.pow(islR * mult, 2);
+    localPts = refMesh.pts.filter(p =>
+      Math.pow(p[0]-c[0],2)+Math.pow(p[1]-c[1],2)+Math.pow(p[2]-c[2],2) <= r2b
+    );
+  }
+  // Fallback totale: usa tutti i punti (comportamento originale)
+  if (localPts.length < 30) return refMesh.pts;
+  return localPts;
+}
+
 function alignIsland(islPts,refPts,maxIter,thr,maxSamp,tipPoint){
   const islS=samp(islPts,maxSamp),refS=samp(refPts,maxSamp);
   const cIsl=cen(islS),cRef=cen(refS);
@@ -920,7 +952,9 @@ async function runICP(autoPreview){
     await sleep(0);
     try{
       const tip=tipPoints[islands.indexOf(isl)]||null;
-      const{R,t,rmse}=alignIsland(isl.pts,dA.pts,maxIter,thr,maxSamp,tip);
+      const localRefPts=localRef(isl,dA,3.5);
+      mlog('info','SB '+islIdx+': '+localRefPts.length+' punti locali (raggio '+Math.round(3.5)+'× SB)');
+      const{R,t,rmse}=alignIsland(isl.pts,localRefPts,maxIter,thr,maxSamp,tip);
       if(!R||!t)throw new Error('Allineamento fallito');
       resultTris.push(...applyT(dB.tris,R,t));resultTransforms.push({R,t});
       const ang=rotAngle(R);
