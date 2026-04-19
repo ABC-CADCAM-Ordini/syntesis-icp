@@ -1,9 +1,7 @@
 // ─────────────────────────────────────────────────────────────
-// Syntesis-ICP — Precision Scanner
+// Syntesis-ICP — supabase-ui.js
+// Estratto da index.html (script #2)
 // Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
-// Proprieta' esclusiva di Francesco Biaggini.
-// Software concesso in licenza a Biaggini Medical Devices S.r.l.
-// Riproduzione o distribuzione non autorizzata e' vietata.
 // ─────────────────────────────────────────────────────────────
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
@@ -83,21 +81,6 @@ function scoreLabel(s){
 }
 
 // ── Clinical thresholds (v6 compatible) ──────────────────────────────────────
-var CLIN=[
-  {max:50,label:'Ottimo',bg:'#EAF3DE',fg:'#3B6D11',col:'#639922'},
-  {max:100,label:'Accettabile',bg:'#FEFCE8',fg:'#854D0E',col:'#D97706'},
-  {max:150,label:'Rischioso',bg:'#FFF3E0',fg:'#9A3412',col:'#F97316'},
-  {max:250,label:'Tensione',bg:'#FEE2E2',fg:'#991B1B',col:'#EF4444'},
-  {max:9999,label:'Fuori posizione',bg:'#F3E0F7',fg:'#6B21A8',col:'#A855F7'}
-];
-function clinLevel(um){for(var i=0;i<CLIN.length;i++)if(um<CLIN[i].max)return CLIN[i];return CLIN[4];}
-var CLIN_AX=[
-  {max:0.5,label:'Ottimo',col:'#639922'},{max:1.5,label:'Accettabile',col:'#D97706'},
-  {max:3,label:'Rischioso',col:'#F97316'},{max:6,label:'Tensione',col:'#EF4444'},
-  {max:9999,label:'Fuori',col:'#A855F7'}
-];
-function clinAxis(d){for(var i=0;i<CLIN_AX.length;i++)if(d<CLIN_AX[i].max)return CLIN_AX[i];return CLIN_AX[4];}
-
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(name,btn){
   document.querySelectorAll('.section').forEach(function(s){s.classList.remove('active');});
