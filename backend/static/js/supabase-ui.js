@@ -1,7 +1,9 @@
 // ─────────────────────────────────────────────────────────────
-// Syntesis-ICP — supabase-ui.js
-// Estratto da index.html (script #2)
+// Syntesis-ICP — Precision Scanner
 // Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
+// Proprieta' esclusiva di Francesco Biaggini.
+// Software concesso in licenza a Biaggini Medical Devices S.r.l.
+// Riproduzione o distribuzione non autorizzata e' vietata.
 // ─────────────────────────────────────────────────────────────
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
