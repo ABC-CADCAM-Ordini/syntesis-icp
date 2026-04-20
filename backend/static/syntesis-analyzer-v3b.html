@@ -35,6 +35,8 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .btn.danger{border-color:#E24B4A;color:#A32D2D}
 .btn.danger svg [stroke="#0065B3"]{stroke:#A32D2D}
 .btn.danger:hover{background:#FCEBEB;color:#A32D2D;border-color:#A32D2D}
+.btn:disabled,.btn.disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
+.btn.blue.primary:disabled,.btn.blue.primary.disabled{background:#94b5d1;border-color:#94b5d1}
 .tb-sep{width:1px;height:22px;background:var(--border);margin:0 2px;flex-shrink:0}
 .tb-spacer{flex:1}
 .reset-menu{position:absolute;top:100%;right:12px;margin-top:6px;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:5px;min-width:190px;box-shadow:0 6px 20px rgba(15,25,35,.12);z-index:100;display:none}
@@ -97,13 +99,13 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 
 .tree{font-family:var(--mono);font-size:10px}
 .tree-dark{font-family:var(--mono);font-size:10px;color:#fff}
-.tree-dark .lbl{color:#fff}
+.tree-dark .tree-node .lbl{color:#fff}
 .tree-dark .tree-node.sub .lbl{color:#B5C4D5}
-.tree-dark .chevron{color:#7A90A4}
-.tree-dark .chevron:hover{color:#fff}
-.tree-dark .del-btn{border:1px solid rgba(226,75,74,0.5);background:rgba(226,75,74,0.1);color:#F07878}
-.tree-dark .del-btn:hover{background:#E24B4A;color:#fff;border-color:#E24B4A}
-.tree-dark input[type=checkbox]{accent-color:#378ADD}
+.tree-dark .tree-node .chevron{color:#7A90A4}
+.tree-dark .tree-node .chevron:hover{color:#fff}
+.tree-dark .tree-node .del-btn{border:1px solid rgba(226,75,74,0.5);background:rgba(226,75,74,0.1);color:#F07878}
+.tree-dark .tree-node .del-btn:hover{background:#E24B4A;color:#fff;border-color:#E24B4A}
+.tree-dark .tree-node input[type=checkbox]{accent-color:#378ADD}
 .tree-node{display:flex;align-items:center;gap:6px;padding:3px 0}
 .tree-node input[type=checkbox]{accent-color:var(--blue);margin:0;cursor:pointer}
 .tree-node .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -149,7 +151,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
     </svg>
     Posiziona MUA
   </button>
-  <button class="btn blue primary" onclick="alignAll()" title="Ri-esegue il calcolo analitico del centro">
+  <button class="btn blue primary" id="btnRaffina" onclick="alignAll()" title="Ri-esegue il calcolo analitico del centro" data-base-title="Ri-esegue il calcolo analitico del centro">
     <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M5 14 A9 9 0 0 1 23 14" stroke="#0065B3" stroke-width="1.6" fill="none"/>
       <path d="M23 14 A9 9 0 0 1 5 14" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-dasharray="2 2"/>
@@ -198,6 +200,24 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
     Sezione
   </button>
   <div class="tb-spacer"></div>
+  <button class="btn" onclick="newCase()" title="Inizia un nuovo caso (cancella scansione e MUA)">
+    <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M7 3 L17 3 L23 9 L23 25 L7 25 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+      <path d="M17 3 L17 9 L23 9" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+      <line x1="15" y1="13" x2="15" y2="21" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="11" y1="17" x2="19" y2="17" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    Nuovo caso
+  </button>
+  <button class="btn" id="btnEsporta" onclick="exportCase()" title="Esporta screenshot e dati del caso">
+    <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 3 L14 18" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/>
+      <polyline points="8,13 14,19 20,13" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M4 21 L4 25 L24 25 L24 21" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Esporta
+  </button>
+  <div class="tb-sep"></div>
   <button class="btn" onclick="undoLastMUA()" title="Annulla ultimo MUA (Ctrl+Z)">
     <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M4 14 A10 10 0 1 1 8 22" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round"/>
@@ -346,7 +366,131 @@ var meanAxisLine=null,meanAxisObj=null;
 var MUA_COLORS=[0x0065B3,0xF59E0B,0x0D9E6E,0xDC2626,0x8B5CF6,0xEC4899,0x06B6D4,0x84CC16];
 
 // OrbitControls
-(function(){THREE.OrbitControls=function(cam,el){this.camera=cam;this.domElement=el;this.target=new THREE.Vector3();this.enableDamping=true;this.dampingFactor=0.08;this.rotateSpeed=0.8;this.zoomSpeed=1.2;this.panSpeed=0.6;this.minDistance=1;this.maxDistance=500;var scope=this,sph=new THREE.Spherical(),sphD=new THREE.Spherical(),panOff=new THREE.Vector3(),scale=1;var STATE={NONE:-1,ROTATE:0,ZOOM:1,PAN:2},state=STATE.NONE,rS=new THREE.Vector2(),rE=new THREE.Vector2(),pS=new THREE.Vector2(),pE=new THREE.Vector2();function gzs(){return Math.pow(0.95,scope.zoomSpeed)}function panL(d,m){var v=new THREE.Vector3();v.setFromMatrixColumn(m,0);v.multiplyScalar(-d);panOff.add(v)}function panU(d,m){var v=new THREE.Vector3();v.setFromMatrixColumn(m,1);v.multiplyScalar(d);panOff.add(v)}function pan(dx,dy){var o=new THREE.Vector3();o.copy(cam.position).sub(scope.target);var td=o.length()*Math.tan(cam.fov/2*Math.PI/180);panL(2*dx*td/el.clientHeight,cam.matrix);panU(2*dy*td/el.clientHeight,cam.matrix)}function onMD(e){e.preventDefault();if(e.button===0){state=STATE.ROTATE;rS.set(e.clientX,e.clientY)}else if(e.button===2){state=STATE.PAN;pS.set(e.clientX,e.clientY)}el.addEventListener('mousemove',onMM);el.addEventListener('mouseup',onMU)}function onMM(e){if(state===STATE.ROTATE){rE.set(e.clientX,e.clientY);var d=new THREE.Vector2().subVectors(rE,rS);sphD.theta-=2*Math.PI*d.x/el.clientHeight*scope.rotateSpeed;sphD.phi-=2*Math.PI*d.y/el.clientHeight*scope.rotateSpeed;rS.copy(rE)}else if(state===STATE.PAN){pE.set(e.clientX,e.clientY);var d=new THREE.Vector2().subVectors(pE,pS);pan(d.x,d.y);pS.copy(pE)}}function onMU(){state=STATE.NONE;el.removeEventListener('mousemove',onMM);el.removeEventListener('mouseup',onMU)}function onWh(e){e.preventDefault();if(e.deltaY<0)scale/=gzs();else scale*=gzs()}function onCM(e){e.preventDefault()}var tS=STATE.NONE,tD=0;function onTS(e){if(e.touches.length===1){tS=STATE.ROTATE;rS.set(e.touches[0].clientX,e.touches[0].clientY)}else if(e.touches.length===2){tS=STATE.ZOOM;var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;tD=Math.sqrt(dx*dx+dy*dy);pS.set((e.touches[0].clientX+e.touches[1].clientX)/2,(e.touches[0].clientY+e.touches[1].clientY)/2)}}function onTM(e){e.preventDefault();if(tS===STATE.ROTATE&&e.touches.length===1){rE.set(e.touches[0].clientX,e.touches[0].clientY);var d=new THREE.Vector2().subVectors(rE,rS);sphD.theta-=2*Math.PI*d.x/el.clientHeight*scope.rotateSpeed;sphD.phi-=2*Math.PI*d.y/el.clientHeight*scope.rotateSpeed;rS.copy(rE)}else if(tS===STATE.ZOOM&&e.touches.length===2){var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY,dist=Math.sqrt(dx*dx+dy*dy);if(dist>tD)scale/=gzs();else scale*=gzs();tD=dist;pE.set((e.touches[0].clientX+e.touches[1].clientX)/2,(e.touches[0].clientY+e.touches[1].clientY)/2);var pd=new THREE.Vector2().subVectors(pE,pS);pan(pd.x,pd.y);pS.copy(pE)}}function onTE(){tS=STATE.NONE}this.update=function(){var o=new THREE.Vector3();o.copy(cam.position).sub(scope.target);sph.setFromVector3(o);sph.theta+=sphD.theta*scope.dampingFactor;sph.phi+=sphD.phi*scope.dampingFactor;sph.phi=Math.max(0.01,Math.min(Math.PI-0.01,sph.phi));sph.radius*=scale;sph.radius=Math.max(scope.minDistance,Math.min(scope.maxDistance,sph.radius));scope.target.add(panOff);o.setFromSpherical(sph);cam.position.copy(scope.target).add(o);cam.lookAt(scope.target);sphD.theta*=(1-scope.dampingFactor);sphD.phi*=(1-scope.dampingFactor);panOff.set(0,0,0);scale=1};el.addEventListener('mousedown',onMD);el.addEventListener('wheel',onWh,{passive:false});el.addEventListener('contextmenu',onCM);el.addEventListener('touchstart',onTS,{passive:false});el.addEventListener('touchmove',onTM,{passive:false});el.addEventListener('touchend',onTE)}})();
+(function(){THREE.OrbitControls=function(cam,el){
+  this.camera=cam;this.domElement=el;
+  this.target=new THREE.Vector3();
+  this.enableDamping=true;this.dampingFactor=0.12;
+  this.rotateSpeed=0.8;this.zoomSpeed=1.2;this.panSpeed=0.6;
+  this.minDistance=1;this.maxDistance=500;
+  var scope=this;
+  // Rotazioni accumulate attorno agli assi locali della camera (trackball style)
+  // Niente phi/theta, niente gimbal lock
+  var rotVelX=0, rotVelY=0; // velocità rotazione in rad/frame (x=su/giù, y=sinistra/destra)
+  var panOff=new THREE.Vector3();
+  var scale=1;
+  var STATE={NONE:-1,ROTATE:0,ZOOM:1,PAN:2},state=STATE.NONE;
+  var rS=new THREE.Vector2(),rE=new THREE.Vector2(),pS=new THREE.Vector2(),pE=new THREE.Vector2();
+  function gzs(){return Math.pow(0.95,scope.zoomSpeed)}
+  function panL(d,m){var v=new THREE.Vector3();v.setFromMatrixColumn(m,0);v.multiplyScalar(-d);panOff.add(v)}
+  function panU(d,m){var v=new THREE.Vector3();v.setFromMatrixColumn(m,1);v.multiplyScalar(d);panOff.add(v)}
+  function pan(dx,dy){
+    var o=new THREE.Vector3();o.copy(cam.position).sub(scope.target);
+    var td=o.length()*Math.tan(cam.fov/2*Math.PI/180);
+    panL(2*dx*td/el.clientHeight,cam.matrix);
+    panU(2*dy*td/el.clientHeight,cam.matrix);
+  }
+  function onMD(e){
+    e.preventDefault();
+    if(e.button===0){state=STATE.ROTATE;rS.set(e.clientX,e.clientY)}
+    else if(e.button===2){state=STATE.PAN;pS.set(e.clientX,e.clientY)}
+    el.addEventListener('mousemove',onMM);
+    el.addEventListener('mouseup',onMU);
+  }
+  function onMM(e){
+    if(state===STATE.ROTATE){
+      rE.set(e.clientX,e.clientY);
+      var d=new THREE.Vector2().subVectors(rE,rS);
+      rotVelY -= 2*Math.PI*d.x/el.clientHeight*scope.rotateSpeed;
+      rotVelX -= 2*Math.PI*d.y/el.clientHeight*scope.rotateSpeed;
+      rS.copy(rE);
+    } else if(state===STATE.PAN){
+      pE.set(e.clientX,e.clientY);
+      var d=new THREE.Vector2().subVectors(pE,pS);
+      pan(d.x,d.y);
+      pS.copy(pE);
+    }
+  }
+  function onMU(){
+    state=STATE.NONE;
+    el.removeEventListener('mousemove',onMM);
+    el.removeEventListener('mouseup',onMU);
+  }
+  function onWh(e){e.preventDefault();if(e.deltaY<0)scale/=gzs();else scale*=gzs()}
+  function onCM(e){e.preventDefault()}
+  var tS=STATE.NONE,tD=0;
+  function onTS(e){
+    if(e.touches.length===1){tS=STATE.ROTATE;rS.set(e.touches[0].clientX,e.touches[0].clientY)}
+    else if(e.touches.length===2){
+      tS=STATE.ZOOM;
+      var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
+      tD=Math.sqrt(dx*dx+dy*dy);
+      pS.set((e.touches[0].clientX+e.touches[1].clientX)/2,(e.touches[0].clientY+e.touches[1].clientY)/2);
+    }
+  }
+  function onTM(e){
+    e.preventDefault();
+    if(tS===STATE.ROTATE&&e.touches.length===1){
+      rE.set(e.touches[0].clientX,e.touches[0].clientY);
+      var d=new THREE.Vector2().subVectors(rE,rS);
+      rotVelY -= 2*Math.PI*d.x/el.clientHeight*scope.rotateSpeed;
+      rotVelX -= 2*Math.PI*d.y/el.clientHeight*scope.rotateSpeed;
+      rS.copy(rE);
+    } else if(tS===STATE.ZOOM&&e.touches.length===2){
+      var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist>tD)scale/=gzs();else scale*=gzs();
+      tD=dist;
+      pE.set((e.touches[0].clientX+e.touches[1].clientX)/2,(e.touches[0].clientY+e.touches[1].clientY)/2);
+      var pd=new THREE.Vector2().subVectors(pE,pS);
+      pan(pd.x,pd.y);
+      pS.copy(pE);
+    }
+  }
+  function onTE(){tS=STATE.NONE}
+  this.update=function(){
+    // Applica rotazione con damping
+    var dx = rotVelX * scope.dampingFactor;
+    var dy = rotVelY * scope.dampingFactor;
+    // Ruoto camera attorno al target usando gli assi camera (no gimbal lock)
+    if(Math.abs(dx) > 1e-6 || Math.abs(dy) > 1e-6){
+      // Vettore da target a camera
+      var offset = new THREE.Vector3().subVectors(cam.position, scope.target);
+      // Asse X locale della camera (destra)
+      var camRight = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 0).normalize();
+      // Asse Y locale della camera (alto) — uso l'up corrente
+      var camUp = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 1).normalize();
+      // Rotazione attorno a up (yaw) e right (pitch)
+      var qYaw = new THREE.Quaternion().setFromAxisAngle(camUp, dy);
+      var qPitch = new THREE.Quaternion().setFromAxisAngle(camRight, dx);
+      offset.applyQuaternion(qYaw).applyQuaternion(qPitch);
+      // Aggiorno anche l'up della camera per evitare flip
+      cam.up.applyQuaternion(qYaw).applyQuaternion(qPitch);
+      cam.position.copy(scope.target).add(offset);
+    }
+    // Zoom: scala la distanza target-camera
+    if(scale !== 1){
+      var o = new THREE.Vector3().subVectors(cam.position, scope.target);
+      var r = o.length() * scale;
+      r = Math.max(scope.minDistance, Math.min(scope.maxDistance, r));
+      o.setLength(r);
+      cam.position.copy(scope.target).add(o);
+    }
+    // Pan: trasla il target e la camera insieme
+    scope.target.add(panOff);
+    cam.position.add(panOff);
+    cam.lookAt(scope.target);
+    // Damping velocità rotazione
+    rotVelX *= (1 - scope.dampingFactor);
+    rotVelY *= (1 - scope.dampingFactor);
+    panOff.set(0,0,0);
+    scale = 1;
+  };
+  el.addEventListener('mousedown',onMD);
+  el.addEventListener('wheel',onWh,{passive:false});
+  el.addEventListener('contextmenu',onCM);
+  el.addEventListener('touchstart',onTS,{passive:false});
+  el.addEventListener('touchmove',onTM,{passive:false});
+  el.addEventListener('touchend',onTE);
+}})();
 
 // STL Parser
 function parseSTL(buffer){var dv=new DataView(buffer),n=dv.getUint32(80,true);if(84+n*50===buffer.byteLength&&n>0){var geo=new THREE.BufferGeometry(),verts=new Float32Array(n*9),norms=new Float32Array(n*9);for(var i=0;i<n;i++){var off=84+i*50,nx=dv.getFloat32(off,true),ny=dv.getFloat32(off+4,true),nz=dv.getFloat32(off+8,true);for(var j=0;j<3;j++){var vi=off+12+j*12;verts[i*9+j*3]=dv.getFloat32(vi,true);verts[i*9+j*3+1]=dv.getFloat32(vi+4,true);verts[i*9+j*3+2]=dv.getFloat32(vi+8,true);norms[i*9+j*3]=nx;norms[i*9+j*3+1]=ny;norms[i*9+j*3+2]=nz}}geo.setAttribute('position',new THREE.BufferAttribute(verts,3));geo.setAttribute('normal',new THREE.BufferAttribute(norms,3));return{geometry:geo,triangles:n}}var text=new TextDecoder().decode(buffer),positions=[],normals=[],fn=[0,0,0];text.split('\n').forEach(function(line){line=line.trim();if(line.startsWith('facet normal')){var p=line.split(/\s+/);fn=[parseFloat(p[2]),parseFloat(p[3]),parseFloat(p[4])]}else if(line.startsWith('vertex')){var p=line.split(/\s+/);positions.push(parseFloat(p[1]),parseFloat(p[2]),parseFloat(p[3]));normals.push(fn[0],fn[1],fn[2])}});var geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(positions),3));geo.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(normals),3));return{geometry:geo,triangles:positions.length/9}}
@@ -364,7 +508,13 @@ function runICP(fixedPts,movingPts,maxIter,mW){maxIter=maxIter||40;var moving=mo
 // Init
 function init(){
   var vp=document.getElementById('viewport'),w=vp.clientWidth,h=vp.clientHeight;
-  scene=new THREE.Scene();scene.background=new THREE.Color(0x1a1a2e);
+  scene=new THREE.Scene();
+  if(envSettings.bgType === 'gradient'){
+    scene.background = makeGradientTexture(envSettings.bgColor, envSettings.bgColor2 || '#415A77', envSettings.bgAngle || 180);
+  } else {
+    scene.background = new THREE.Color(envSettings.bgColor);
+  }
+  vp.style.background = envBgCss();
   camera=new THREE.PerspectiveCamera(28,w/h,0.01,1000);camera.position.set(30,30,50);
   renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(w,h);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));vp.appendChild(renderer.domElement);
   controls=new THREE.OrbitControls(camera,renderer.domElement);
@@ -380,15 +530,58 @@ function init(){
   document.addEventListener('dragleave',function(e){if(e.relatedTarget===null||!document.body.contains(e.relatedTarget)){document.getElementById('dropOverlay').classList.remove('active')}});
   document.addEventListener('drop',function(e){e.preventDefault();e.stopPropagation();document.getElementById('dropOverlay').classList.remove('active');if(e.dataTransfer&&e.dataTransfer.files.length>0){var file=e.dataTransfer.files[0];if(file.name.toLowerCase().endsWith('.stl')){loadScanFile(file)}}});
   renderer.domElement.addEventListener('click',onViewportClick);
-  animate()
+  // Click puro (senza drag) cambia il pivot di rotazione al punto cliccato
+  (function(){
+    var downX=0, downY=0, downT=0, isDown=false;
+    renderer.domElement.addEventListener('mousedown', function(e){
+      if(e.button !== 0) return;
+      isDown = true;
+      downX = e.clientX;
+      downY = e.clientY;
+      downT = Date.now();
+    });
+    renderer.domElement.addEventListener('mouseup', function(e){
+      if(!isDown || e.button !== 0) return;
+      isDown = false;
+      if(placementMode) return; // il click di placement è gestito altrove
+      var dx = e.clientX - downX, dy = e.clientY - downY;
+      var dist = Math.sqrt(dx*dx + dy*dy);
+      var dt = Date.now() - downT;
+      if(dist > 4 || dt > 350) return; // è un drag o click troppo lungo
+      // Raycast su scansione + MUA (scanbody/analogo/connessione/scanbody colorato)
+      var rect = renderer.domElement.getBoundingClientRect();
+      var mouse = new THREE.Vector2(
+        ((e.clientX-rect.left)/rect.width)*2-1,
+        -((e.clientY-rect.top)/rect.height)*2+1
+      );
+      var raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+      var targets = [];
+      if(scanMesh && scanMesh.visible) targets.push(scanMesh);
+      muaObjects.forEach(function(m){
+        if(m.scanbodyMesh && m.scanbodyMesh.visible) targets.push(m.scanbodyMesh);
+        if(m.mtMesh && m.mtMesh.visible) targets.push(m.mtMesh);
+        if(m.anMesh && m.anMesh.visible) targets.push(m.anMesh);
+        if(m.scanbodyScanMesh && m.scanbodyScanMesh.visible) targets.push(m.scanbodyScanMesh);
+      });
+      if(targets.length === 0) return;
+      var hits = raycaster.intersectObjects(targets, false);
+      if(hits.length > 0){
+        // Sposto il pivot al punto cliccato mantenendo la posizione camera invariata
+        controls.target.copy(hits[0].point);
+      }
+    });
+  })();
+  animate();
+  updateRaffinaButtonState();
 }
 function animate(){requestAnimationFrame(animate);controls.update();updateDivergenceLabels();renderer.render(scene,camera)}
 
 // Load scan
 function loadScan(input){if(input.files.length>0)loadScanFile(input.files[0])}
-function loadScanFile(file){var reader=new FileReader();reader.onload=function(e){if(scanMesh){scene.remove(scanMesh)}var r=parseSTL(e.target.result);r.geometry.computeBoundingSphere();var mat=new THREE.MeshPhongMaterial({color:0x889aad,specular:0x111111,shininess:30,transparent:true,opacity:0.85,side:THREE.DoubleSide});scanMesh=new THREE.Mesh(r.geometry,mat);
+function loadScanFile(file){var reader=new FileReader();reader.onload=function(e){if(scanMesh){scene.remove(scanMesh)}var r=parseSTL(e.target.result);r.geometry.computeBoundingSphere();var mat=new THREE.MeshPhongMaterial({color:new THREE.Color(envSettings.scanColor),specular:0x111111,shininess:30,transparent:true,opacity:0.85,side:THREE.DoubleSide});scanMesh=new THREE.Mesh(r.geometry,mat);
   scanOriginalGeo = scanMesh.geometry.clone(); // backup per ricostruzione con cilindri
-  scene.add(scanMesh);var c=r.geometry.boundingSphere.center,rad=r.geometry.boundingSphere.radius;controls.target.copy(c);camera.position.set(c.x+rad*1.5,c.y+rad,c.z+rad*1.5);document.getElementById('emptyState').classList.add('hidden');var slot=document.getElementById('slotScan');slot.classList.add('loaded');slot.innerHTML='<div class="fname">'+file.name+'</div><div class="finfo">'+r.triangles.toLocaleString()+' triangoli</div>';document.getElementById('triScan').textContent=r.triangles.toLocaleString();rebuildTree();showStatus('Scansione caricata. Clicca + Posiziona MUA.')};reader.readAsArrayBuffer(file)}
+  scene.add(scanMesh);if(typeof applyRenderModeToMesh === 'function') applyRenderModeToMesh(scanMesh);var c=r.geometry.boundingSphere.center,rad=r.geometry.boundingSphere.radius;controls.target.copy(c);camera.position.set(c.x+rad*1.5,c.y+rad,c.z+rad*1.5);document.getElementById('emptyState').classList.add('hidden');var slot=document.getElementById('slotScan');slot.classList.add('loaded');slot.innerHTML='<div class="fname">'+file.name+'</div><div class="finfo">'+r.triangles.toLocaleString()+' triangoli</div>';document.getElementById('triScan').textContent=r.triangles.toLocaleString();rebuildTree();updateRaffinaButtonState();showStatus('Scansione caricata. Clicca + Posiziona MUA.')};reader.readAsArrayBuffer(file)}
 
 // Placement
 function startPlacement(){if(!scanMesh){showStatus('Carica prima una scansione.');return}placementMode=true;renderer.domElement.style.cursor='crosshair';showStatus('Clicca sullo scanbody nella scansione')}
@@ -566,7 +759,7 @@ function placeMUA(rawPoint,rawNormal){
   var group=new THREE.Group();group.name=id;
 
   // Scanbody (visibile, toggleable)
-  var sbMat=new THREE.MeshPhongMaterial({color:0xffaa44,specular:0x222222,shininess:40,transparent:true,opacity:0.5,side:THREE.DoubleSide});
+  var sbMat=new THREE.MeshPhongMaterial({color:0xffaa44,specular:0x222222,shininess:40,transparent:false,opacity:1.0,side:THREE.DoubleSide});
   var sbMesh=new THREE.Mesh(sbResult.geometry,sbMat);sbMesh.name='scanbody';group.add(sbMesh);
 
   // Matematica (solida, coerente con gli altri componenti)
@@ -589,9 +782,16 @@ function placeMUA(rawPoint,rawNormal){
   var axisLine=new THREE.Line(axisGeo,axisMat);axisLine.visible=axesVisible;scene.add(axisLine);
 
   muaObjects.push({id:id,num:muaCounter,group:group,scanbodyGeo:sbResult.geometry,scanbodyMesh:sbMesh,anMesh:anMesh,mtMesh:matMesh,color:color,axisLine:axisLine,position:point.clone(),clickPoint:point.clone(),clickNormal:n.clone(),axisDir:n.clone(),aligned:false,rmsd:null,sbVisible:true});
+  // Applico render mode corrente alle nuove mesh
+  if(typeof applyRenderModeToMesh === 'function'){
+    applyRenderModeToMesh(sbMesh);
+    applyRenderModeToMesh(matMesh);
+    applyRenderModeToMesh(anMesh);
+  }
   updateMuaPanel();document.getElementById('muaCount').textContent=muaObjects.length;
   rebuildTree();
   ensureLabelElements();
+  updateRaffinaButtonState();
   showStatus('MUA #'+muaCounter+' posizionato.');
   // Aggiorna cut view (apre automaticamente o aggiorna selezione)
   var cutOverlay = document.getElementById('cutViewOverlay');
@@ -667,6 +867,12 @@ function extractScanTopFaceNear(scanGeo, clickPos, clickNormal, radiusMm){
 
 function alignAll(){
   if(!scanMesh || muaObjects.length === 0){showStatus('Carica scansione + posiziona MUA'); return}
+  // Difesa: se c'è un taglio scansione attivo, i riferimenti geometrici sono stati rimossi.
+  var anyCut = muaObjects.some(function(m){ return m.scanbodyScanVisible === true; });
+  if(anyCut){
+    showStatus('Raffina non disponibile: disattiva il taglio scansione per ripristinare i riferimenti.');
+    return;
+  }
   showStatus('Raffinamento...');
   setTimeout(function(){
     muaObjects.forEach(function(mua){
@@ -920,7 +1126,7 @@ function showStatus(msg){var el=document.getElementById('statusMsg');el.textCont
 function rebuildTree(){
   var h='<div class="tree-node"><input type="checkbox" '+(scanMesh&&scanMesh.visible?'checked':'')+' onchange="toggleLayer(\'scan\',this.checked)"><span class="dot" style="background:#889aad"></span><span class="lbl">Scansione</span></div>';
   if(muaObjects.length > 0){
-    h += '<div class="tree-node"><input type="checkbox" '+(scanbodiesVisible?'checked':'')+' onchange="toggleAllScanbodies(this.checked)"><span class="dot" style="background:#0065B3"></span><span class="lbl">Scanbody 1T3 (tutti)</span></div>';
+    h += '<div class="tree-node"><input type="checkbox" '+(scanbodiesVisible?'checked':'')+' onchange="toggleAllScanbodies(this.checked)"><span class="dot" style="background:#ffaa44"></span><span class="lbl">Scanbody 1T3 (tutti)</span></div>';
   }
   // Conto stato toggle globali
   var cutsOn = muaObjects.filter(function(m){ return m.scanbodyScanVisible === true; }).length;
@@ -1210,6 +1416,7 @@ function removeMUA(idx){
     document.getElementById('avgDiv').textContent = '--';
   }
   ensureLabelElements();
+  updateRaffinaButtonState();
   showStatus('MUA rimosso.');
 }
 function undoLastMUA(){
@@ -1241,6 +1448,147 @@ function clearAllMUA(){
   if(document.getElementById('cutViewOverlay').style.display === 'flex') closeCutView();
   ensureLabelElements();
   showStatus('Tutti i MUA rimossi.');
+  updateRaffinaButtonState();
+}
+
+// ── STATO PULSANTE RAFFINA ─────────────────────────────────────
+// Raffina richiede i riferimenti geometrici della scansione. Quando un
+// taglio è attivo, quei triangoli sono stati rimossi da scanMesh.geometry
+// e la ri-centratura analitica non può più trovare lo scanbody.
+function updateRaffinaButtonState(){
+  var btn = document.getElementById('btnRaffina');
+  if(!btn) return;
+  var anyCut = muaObjects.some(function(m){ return m.scanbodyScanVisible === true; });
+  var noScan = !scanMesh;
+  var noMua = muaObjects.length === 0;
+  var disabled = anyCut || noScan || noMua;
+  btn.disabled = disabled;
+  btn.classList.toggle('disabled', disabled);
+  if(anyCut){
+    btn.title = 'Raffina non disponibile: taglio scansione attivo — i riferimenti ICP sono stati rimossi.';
+  } else if(noScan){
+    btn.title = 'Carica prima una scansione.';
+  } else if(noMua){
+    btn.title = 'Posiziona almeno un MUA.';
+  } else {
+    btn.title = btn.getAttribute('data-base-title') || 'Ri-esegue il calcolo analitico del centro';
+  }
+}
+
+// ── NUOVO CASO ─────────────────────────────────────────────────
+function newCase(){
+  var hasState = scanMesh || muaObjects.length > 0;
+  if(hasState){
+    if(!confirm('Iniziare un nuovo caso?\nTutti i MUA posizionati e la scansione corrente andranno persi.')) return;
+  }
+  // Rimuovi MUA senza la conferma di clearAllMUA
+  muaObjects.forEach(function(m){
+    if(m.group) scene.remove(m.group);
+    if(m.axisLine) scene.remove(m.axisLine);
+    if(m.scanbodyScanMesh) scene.remove(m.scanbodyScanMesh);
+  });
+  muaObjects = [];
+  muaCounter = 0;
+  if(meanAxisLine){ scene.remove(meanAxisLine); meanAxisLine = null; }
+  if(typeof clearDivergenceCones === 'function') clearDivergenceCones();
+  // Rimuovi scansione
+  if(scanMesh){ scene.remove(scanMesh); if(scanMesh.geometry) scanMesh.geometry.dispose(); scanMesh = null; }
+  if(scanOriginalGeo){ scanOriginalGeo.dispose(); scanOriginalGeo = null; }
+  // Reset UI
+  var slot = document.getElementById('slotScan');
+  if(slot){ slot.classList.remove('loaded'); slot.innerHTML = '<div class="fplaceholder">Clicca o trascina .stl</div>'; }
+  var empty = document.getElementById('emptyState');
+  if(empty) empty.classList.remove('hidden');
+  var triEl = document.getElementById('triScan'); if(triEl) triEl.textContent = '0';
+  var muaCountEl = document.getElementById('muaCount'); if(muaCountEl) muaCountEl.textContent = '0';
+  var maxDivEl = document.getElementById('maxDiv'); if(maxDivEl) maxDivEl.textContent = '--';
+  var avgDivEl = document.getElementById('avgDiv'); if(avgDivEl) avgDivEl.textContent = '--';
+  var angleListEl = document.getElementById('angleList');
+  if(angleListEl) angleListEl.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--gray)">Posiziona almeno 2 MUA</div>';
+  var axisInfoEl = document.getElementById('axisInfo');
+  if(axisInfoEl) axisInfoEl.innerHTML = '<span style="font-family:var(--mono);font-size:9px;color:var(--gray)">Dopo accoppiamento ICP</span>';
+  // Reset input file per consentire di ricaricare lo stesso file
+  var input = document.getElementById('inputScan'); if(input) input.value = '';
+  // Chiudi overlay eventualmente aperti
+  var cv = document.getElementById('cutViewOverlay');
+  if(cv && cv.style.display === 'flex' && typeof closeCutView === 'function') closeCutView();
+  if(typeof ensureLabelElements === 'function') ensureLabelElements();
+  if(typeof rebuildTree === 'function') rebuildTree();
+  // Reset camera alla posizione di default
+  if(controls && camera){
+    controls.target.set(0,0,0);
+    camera.position.set(60,60,60);
+    controls.update();
+  }
+  updateRaffinaButtonState();
+  showStatus('Nuovo caso: carica una scansione .stl');
+}
+
+// ── ESPORTA CASO (PNG + JSON) ──────────────────────────────────
+function exportCase(){
+  if(!scanMesh){ showStatus('Nulla da esportare: carica prima una scansione.'); return; }
+  var nameEl = document.querySelector('#slotScan .fname');
+  var scanName = nameEl ? nameEl.textContent : 'scansione';
+  var baseName = scanName.replace(/\.stl$/i,'').replace(/[^a-zA-Z0-9_-]+/g,'_') || 'caso';
+  var now = new Date();
+  var pad = function(n){ return (n<10?'0':'')+n; };
+  var ts = now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'_'+pad(now.getHours())+pad(now.getMinutes());
+  var filenameBase = baseName + '_' + ts;
+
+  // 1. Screenshot PNG del viewport
+  try {
+    renderer.render(scene, camera);
+    var pngData = renderer.domElement.toDataURL('image/png');
+    var a1 = document.createElement('a');
+    a1.href = pngData;
+    a1.download = filenameBase + '.png';
+    document.body.appendChild(a1); a1.click(); document.body.removeChild(a1);
+  } catch(err){
+    console.error('[Export] screenshot fallito:', err);
+  }
+
+  // 2. JSON con i dati del caso
+  var triEl = document.getElementById('triScan');
+  var data = {
+    tool: 'Syntesis-ICP - Analizzare MUA',
+    version: 'v3b',
+    exported_at: now.toISOString(),
+    scan: {
+      filename: scanName,
+      triangles: triEl ? triEl.textContent : null
+    },
+    miller_settings: (typeof millerSettings !== 'undefined') ? millerSettings : null,
+    clinical_constants: {
+      mua_cone_half_angle_deg: (typeof MUA_CONE_HALF_ANGLE !== 'undefined') ? MUA_CONE_HALF_ANGLE : null,
+      max_couple_divergence_deg: (typeof MAX_COUPLE_DIVERGENCE !== 'undefined') ? MAX_COUPLE_DIVERGENCE : null,
+      max_milling_angle_deg: (typeof MAX_MILLING_ANGLE !== 'undefined') ? MAX_MILLING_ANGLE : null
+    },
+    mua: muaObjects.map(function(m){
+      return {
+        num: m.num,
+        groupId: m.groupId || 0,
+        color: '#' + (m.color || 0).toString(16).padStart(6,'0'),
+        position: m.position ? [+m.position.x.toFixed(4), +m.position.y.toFixed(4), +m.position.z.toFixed(4)] : null,
+        axis: m.axisDir ? [+m.axisDir.x.toFixed(6), +m.axisDir.y.toFixed(6), +m.axisDir.z.toFixed(6)] : null,
+        divergence_deg: (m.divergence !== null && m.divergence !== undefined) ? +m.divergence.toFixed(3) : null,
+        rmsd_mm: (m.rmsd !== null && m.rmsd !== undefined) ? +m.rmsd.toFixed(4) : null,
+        aligned: !!m.aligned
+      };
+    })
+  };
+  try {
+    var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a2 = document.createElement('a');
+    a2.href = url;
+    a2.download = filenameBase + '.json';
+    document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  } catch(err){
+    console.error('[Export] JSON fallito:', err);
+  }
+
+  showStatus('Caso esportato (PNG + JSON).');
 }
 
 // Keyboard shortcut: Ctrl+Z / Cmd+Z per undo
@@ -2031,6 +2379,7 @@ function toggleAllScanbodyCuts(enabled){
   });
   rebuildScanMeshGeometry();
   rebuildTree();
+  updateRaffinaButtonState();
 }
 
 // Toggle globale MESH COLORATE scanbody scansione (tutti)
@@ -2059,6 +2408,7 @@ function toggleScanbodyCut(muaIdx, enabled){
   var m = muaObjects[muaIdx];
   m.scanbodyScanVisible = enabled; // flag usato da rebuildScanMeshGeometry
   rebuildScanMeshGeometry();
+  updateRaffinaButtonState();
 }
 
 // Toggle per MESH COLORATA scanbody scansione
@@ -2368,6 +2718,384 @@ function refreshActiveUndercutMaps(){
 
 
 
+// ── IMPOSTAZIONI AMBIENTE ───────────────────────────────────────
+var MUA_PALETTES = {
+  'syntesis': { name: 'Syntesis', colors: [0x0065B3, 0xF59E0B, 0x0D9E6E, 0xDC2626, 0x8B5CF6, 0xEC4899, 0x06B6D4, 0x84CC16] },
+  'vivid':    { name: 'Vivida',   colors: [0xFF006E, 0xFB5607, 0xFFBE0B, 0x3A86FF, 0x8338EC, 0x06B6D4, 0x10B981, 0xEF4444] },
+  'pastel':   { name: 'Pastello', colors: [0xA8DADC, 0xE63946, 0x457B9D, 0x1D3557, 0xF1C40F, 0xE67E22, 0x9B59B6, 0x2ECC71] },
+  'monoblue': { name: 'Mono blu', colors: [0x042C53, 0x0C447C, 0x185FA5, 0x378ADD, 0x85B7EB, 0xB5D4F4, 0x0065B3, 0x5DCAA5] }
+};
+
+var envSettings = {
+  bgType: 'solid',    // 'solid' | 'gradient'
+  bgColor: '#1a1a2e',
+  bgColor2: '#415A77', // secondo colore (usato solo se bgType=gradient)
+  bgAngle: 180,        // gradiente, 0=top, 90=right, 180=bottom, 270=left
+  scanColor: '#889aad',
+  palette: 'syntesis',
+  renderMode: 'solid' // 'solid' | 'wireframe' | 'both'
+};
+
+// Backup per Annulla
+var envSettingsBackup = null;
+var millerSettingsBackup = null;
+
+try {
+  var savedEnv = localStorage.getItem('syntesis_env_settings');
+  if(savedEnv){
+    var parsedEnv = JSON.parse(savedEnv);
+    if(parsedEnv && parsedEnv.bgColor){
+      envSettings = parsedEnv;
+      if(!MUA_PALETTES[envSettings.palette]) envSettings.palette = 'syntesis';
+    }
+  }
+} catch(e){}
+
+// MUA_COLORS viene sincronizzato con la palette attiva
+function syncMuaColorsFromPalette(){
+  var pal = MUA_PALETTES[envSettings.palette] || MUA_PALETTES['syntesis'];
+  MUA_COLORS = pal.colors.slice();
+}
+syncMuaColorsFromPalette();
+
+// ── RENDER MODE (Solid / Wireframe / Both) ──────────────────────
+// Per "both" aggiungo un LineSegments overlay al mesh con WireframeGeometry
+function applyRenderModeToMesh(mesh){
+  if(!mesh || !mesh.material) return;
+  var mode = envSettings.renderMode || 'solid';
+  // Rimuovo overlay precedente se esiste
+  if(mesh.userData && mesh.userData.wireframeOverlay){
+    mesh.remove(mesh.userData.wireframeOverlay);
+    if(mesh.userData.wireframeOverlay.geometry) mesh.userData.wireframeOverlay.geometry.dispose();
+    if(mesh.userData.wireframeOverlay.material) mesh.userData.wireframeOverlay.material.dispose();
+    mesh.userData.wireframeOverlay = null;
+  }
+  if(mode === 'wireframe'){
+    mesh.material.wireframe = true;
+    mesh.material.needsUpdate = true;
+  } else if(mode === 'both'){
+    mesh.material.wireframe = false;
+    mesh.material.needsUpdate = true;
+    // Aggiungo overlay wireframe con colore scuro sottile
+    try {
+      var wireGeo = new THREE.WireframeGeometry(mesh.geometry);
+      var wireMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthTest: true });
+      var wireLines = new THREE.LineSegments(wireGeo, wireMat);
+      wireLines.name = '_wireOverlay';
+      mesh.add(wireLines);
+      if(!mesh.userData) mesh.userData = {};
+      mesh.userData.wireframeOverlay = wireLines;
+    } catch(e){}
+  } else { // solid
+    mesh.material.wireframe = false;
+    mesh.material.needsUpdate = true;
+  }
+}
+
+function applyRenderModeToScene(){
+  // Scansione
+  if(typeof scanMesh !== 'undefined' && scanMesh){
+    applyRenderModeToMesh(scanMesh);
+  }
+  // MUA (scanbody + connessione + analogo + scanbody scansione colorato)
+  if(typeof muaObjects !== 'undefined'){
+    muaObjects.forEach(function(m){
+      if(m.scanbodyMesh) applyRenderModeToMesh(m.scanbodyMesh);
+      if(m.mtMesh) applyRenderModeToMesh(m.mtMesh);
+      if(m.anMesh) applyRenderModeToMesh(m.anMesh);
+      if(m.scanbodyScanMesh) applyRenderModeToMesh(m.scanbodyScanMesh);
+    });
+  }
+}
+
+// Crea una CanvasTexture lineare con due colori e angolo
+function makeGradientTexture(c1, c2, angleDeg){
+  var size = 256;
+  var cnv = document.createElement('canvas');
+  cnv.width = size; cnv.height = size;
+  var ctx = cnv.getContext('2d');
+  // Angolo in radianti (0=top, 90=right, 180=bottom, 270=left)
+  // Converto in coordinate canvas: x=sin, y=-cos (0=top → y negativa)
+  var rad = angleDeg * Math.PI / 180;
+  var cx = size/2, cy = size/2;
+  var dx = Math.sin(rad) * size/2;
+  var dy = -Math.cos(rad) * size/2;
+  var x1 = cx - dx, y1 = cy - dy;
+  var x2 = cx + dx, y2 = cy + dy;
+  var grd = ctx.createLinearGradient(x1, y1, x2, y2);
+  grd.addColorStop(0, c1);
+  grd.addColorStop(1, c2);
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, size, size);
+  var tex = new THREE.CanvasTexture(cnv);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Genera CSS background per il viewport (<div>) — stesso risultato della texture Three
+function envBgCss(){
+  if(envSettings.bgType === 'gradient'){
+    return 'linear-gradient(' + envSettings.bgAngle + 'deg, ' + envSettings.bgColor + ', ' + envSettings.bgColor2 + ')';
+  }
+  return envSettings.bgColor;
+}
+
+// Applica impostazioni ambiente in tempo reale (scene + scanMesh + MUA esistenti)
+function applyEnvToScene(){
+  if(typeof scene !== 'undefined' && scene){
+    if(envSettings.bgType === 'gradient'){
+      scene.background = makeGradientTexture(envSettings.bgColor, envSettings.bgColor2, envSettings.bgAngle);
+    } else {
+      scene.background = new THREE.Color(envSettings.bgColor);
+    }
+  }
+  var vp = document.getElementById('viewport');
+  if(vp) vp.style.background = envBgCss();
+  if(typeof scanMesh !== 'undefined' && scanMesh && scanMesh.material){
+    scanMesh.material.color = new THREE.Color(envSettings.scanColor);
+    scanMesh.material.needsUpdate = true;
+  }
+  // Ricoloro MUA esistenti secondo la palette corrente
+  syncMuaColorsFromPalette();
+  if(typeof muaObjects !== 'undefined' && muaObjects.length > 0){
+    muaObjects.forEach(function(m, i){
+      var newCol = MUA_COLORS[i % MUA_COLORS.length];
+      m.color = newCol;
+      var threeCol = new THREE.Color(newCol);
+      if(m.mtMesh && m.mtMesh.material){ m.mtMesh.material.color = threeCol; m.mtMesh.material.needsUpdate = true; }
+      if(m.anMesh && m.anMesh.material){ m.anMesh.material.color = threeCol; m.anMesh.material.needsUpdate = true; }
+      if(m.axisLine && m.axisLine.material){ m.axisLine.material.color = threeCol; m.axisLine.material.needsUpdate = true; }
+    });
+    if(typeof rebuildTree === 'function') rebuildTree();
+    if(typeof updateMuaPanel === 'function') updateMuaPanel();
+    if(typeof updateDivergenceLabels === 'function') updateDivergenceLabels();
+  }
+  // Riapplico render mode (perché potrebbero esserci nuovi overlay da rigenerare)
+  applyRenderModeToScene();
+}
+
+function onEnvBgPickerChange(val){
+  // Se siamo in modalità gradient, cambia il primo colore del gradiente (non esce dal gradiente)
+  if(envSettings.bgType === 'gradient'){
+    envSettings.bgColor = val;
+    document.getElementById('settingsBgHex').textContent = 'gradiente';
+    var c1 = document.getElementById('settingsCustomColor1');
+    if(c1) c1.value = val;
+    applyEnvToScene();
+    updateCustomPreview();
+  } else {
+    onEnvBgChange(val);
+  }
+}
+
+function onEnvBgChange(val){
+  // Chiamata dai swatch preset e dal color picker principale: imposta solido
+  envSettings.bgType = 'solid';
+  envSettings.bgColor = val;
+  var picker = document.getElementById('settingsBgColor');
+  if(picker && picker.value.toLowerCase() !== val.toLowerCase()) picker.value = val;
+  document.getElementById('settingsBgHex').textContent = val;
+  // Nascondo box custom se aperto
+  var custom = document.getElementById('settingsBgCustomBox');
+  if(custom) custom.style.display = 'none';
+  applyEnvToScene();
+  updateEnvSwatchBorders();
+  updateCustomPreview();
+}
+
+function onEnvBgCustomOpen(){
+  // Apre il pannello custom. Se siamo ancora in "solid" normale,
+  // mantiene il colore corrente come primo colore e imposta un secondo di default.
+  envSettings.bgType = envSettings.bgType === 'gradient' ? 'gradient' : 'solid';
+  if(!envSettings.bgColor2) envSettings.bgColor2 = '#415A77';
+  if(typeof envSettings.bgAngle !== 'number') envSettings.bgAngle = 180;
+  var box = document.getElementById('settingsBgCustomBox');
+  if(box) box.style.display = 'block';
+  // Sincronizzo i controlli interni
+  document.getElementById('settingsCustomColor1').value = envSettings.bgColor;
+  document.getElementById('settingsCustomColor2').value = envSettings.bgColor2;
+  document.getElementById('settingsCustomAngle').value = envSettings.bgAngle;
+  document.getElementById('settingsCustomAngleVal').textContent = envSettings.bgAngle + '°';
+  var rSolid = document.getElementById('settingsCustomSolid');
+  var rGrad = document.getElementById('settingsCustomGradient');
+  rSolid.checked = (envSettings.bgType === 'solid');
+  rGrad.checked = (envSettings.bgType === 'gradient');
+  updateCustomModeUI();
+  applyEnvToScene();
+  updateEnvSwatchBorders();
+  updateCustomPreview();
+}
+
+function onEnvCustomModeChange(mode){
+  envSettings.bgType = mode;
+  updateCustomModeUI();
+  applyEnvToScene();
+  updateCustomPreview();
+  updateEnvSwatchBorders();
+}
+
+function updateCustomModeUI(){
+  var gradRow = document.getElementById('settingsCustomGradientRow');
+  if(gradRow) gradRow.style.display = envSettings.bgType === 'gradient' ? 'flex' : 'none';
+}
+
+function onEnvBgCustomPrimary(val){
+  envSettings.bgColor = val;
+  document.getElementById('settingsBgColor').value = val;
+  document.getElementById('settingsBgHex').textContent = envSettings.bgType === 'gradient' ? 'gradiente' : val;
+  applyEnvToScene();
+  updateCustomPreview();
+}
+
+function onEnvBgCustomSecondary(val){
+  envSettings.bgColor2 = val;
+  applyEnvToScene();
+  updateCustomPreview();
+}
+
+function onEnvBgAngleChange(val){
+  envSettings.bgAngle = parseInt(val);
+  document.getElementById('settingsCustomAngleVal').textContent = envSettings.bgAngle + '°';
+  applyEnvToScene();
+  updateCustomPreview();
+}
+
+function updateCustomPreview(){
+  var prev = document.getElementById('settingsCustomPreview');
+  if(!prev) return;
+  prev.style.background = envBgCss();
+  var hint = document.getElementById('settingsCustomHint');
+  if(hint){
+    if(envSettings.bgType === 'gradient'){
+      var a = envSettings.bgAngle;
+      var dir = (a >= 337 || a < 23) ? "dall'alto" :
+                (a < 68)  ? "obliquo in alto a destra" :
+                (a < 113) ? "da destra" :
+                (a < 158) ? "obliquo in basso a destra" :
+                (a < 203) ? "dal basso" :
+                (a < 248) ? "obliquo in basso a sinistra" :
+                (a < 293) ? "da sinistra" : "obliquo in alto a sinistra";
+      hint.textContent = 'anteprima · ' + dir;
+    } else {
+      hint.textContent = 'anteprima · solido';
+    }
+  }
+}
+
+function onEnvScanColorChange(val){
+  envSettings.scanColor = val;
+  var picker = document.getElementById('settingsScanColor');
+  if(picker && picker.value.toLowerCase() !== val.toLowerCase()) picker.value = val;
+  document.getElementById('settingsScanHex').textContent = val;
+  applyEnvToScene();
+  updateEnvSwatchBorders();
+}
+
+function onEnvPaletteChange(key){
+  if(!MUA_PALETTES[key]) return;
+  envSettings.palette = key;
+  applyEnvToScene();
+  buildPaletteGrid();
+}
+
+function onEnvRenderModeChange(mode){
+  if(mode !== 'solid' && mode !== 'wireframe' && mode !== 'both') return;
+  envSettings.renderMode = mode;
+  applyRenderModeToScene();
+  updateRenderModeUI();
+}
+
+function updateRenderModeUI(){
+  ['solid','wireframe','both'].forEach(function(m){
+    var btn = document.getElementById('settingsRender_' + m);
+    if(!btn) return;
+    if(envSettings.renderMode === m){
+      btn.style.background = 'var(--blue)';
+      btn.style.color = '#fff';
+      btn.style.borderColor = 'var(--blue)';
+    } else {
+      btn.style.background = '#fff';
+      btn.style.color = 'var(--dark)';
+      btn.style.borderColor = '#ccc';
+    }
+  });
+}
+
+function updateEnvSwatchBorders(){
+  // Evidenzia il swatch corrispondente
+  var presetBgValues = ['#1a1a2e','#0a0a0f','#243447','#f0f5fa','#ffffff'];
+  var inPreset = envSettings.bgType === 'solid' &&
+                 presetBgValues.indexOf(envSettings.bgColor.toLowerCase()) !== -1;
+  var isCustom = !inPreset; // gradient o colore fuori preset → evidenzia "+"
+  
+  var swatchesBg = document.querySelectorAll('.env-swatch');
+  swatchesBg.forEach(function(s){
+    var val = s.getAttribute('data-value');
+    if(val === 'custom'){
+      s.style.border = isCustom ? '1.5px solid var(--blue)' : '1px solid #D6E4F0';
+    } else if(val && inPreset && val.toLowerCase() === envSettings.bgColor.toLowerCase()){
+      s.style.border = '1.5px solid var(--blue)';
+    } else {
+      s.style.border = '1px solid #D6E4F0';
+    }
+  });
+  var swatchesScan = document.querySelectorAll('.env-swatch-scan');
+  swatchesScan.forEach(function(s){
+    if(s.getAttribute('data-value') && s.getAttribute('data-value').toLowerCase() === envSettings.scanColor.toLowerCase()){
+      s.style.border = '1.5px solid var(--blue)';
+    } else {
+      s.style.border = '1px solid #D6E4F0';
+    }
+  });
+}
+
+function buildPaletteGrid(){
+  var grid = document.getElementById('settingsPaletteGrid');
+  if(!grid) return;
+  var html = '';
+  Object.keys(MUA_PALETTES).forEach(function(key){
+    var pal = MUA_PALETTES[key];
+    var isActive = (key === envSettings.palette);
+    var border = isActive ? '1.5px solid var(--blue)' : '1px solid #D6E4F0';
+    html += '<div onclick="onEnvPaletteChange(\''+key+'\')" style="padding:10px;border:'+border+';border-radius:6px;cursor:pointer">';
+    html += '<div style="font-family:var(--mono);font-size:10px;color:var(--dark);font-weight:500;margin-bottom:5px">'+pal.name+'</div>';
+    html += '<div style="display:flex;gap:3px">';
+    pal.colors.slice(0,5).forEach(function(c){
+      var hex = '#' + c.toString(16).padStart(6,'0');
+      html += '<span style="width:16px;height:16px;background:'+hex+';border-radius:50%;display:inline-block"></span>';
+    });
+    html += '</div></div>';
+  });
+  grid.innerHTML = html;
+}
+
+function switchSettingsTab(which){
+  var envTab = document.getElementById('settingsTabEnv');
+  var machTab = document.getElementById('settingsTabMach');
+  var envBtn = document.getElementById('settingsTabEnvBtn');
+  var machBtn = document.getElementById('settingsTabMachBtn');
+  if(which === 'env'){
+    envTab.style.display = 'block';
+    machTab.style.display = 'none';
+    envBtn.style.color = 'var(--blue)';
+    envBtn.style.fontWeight = '800';
+    envBtn.style.borderBottom = '2px solid var(--blue)';
+    machBtn.style.color = 'var(--gray)';
+    machBtn.style.fontWeight = 'normal';
+    machBtn.style.borderBottom = 'none';
+  } else {
+    envTab.style.display = 'none';
+    machTab.style.display = 'block';
+    machBtn.style.color = 'var(--blue)';
+    machBtn.style.fontWeight = '800';
+    machBtn.style.borderBottom = '2px solid var(--blue)';
+    envBtn.style.color = 'var(--gray)';
+    envBtn.style.fontWeight = 'normal';
+    envBtn.style.borderBottom = 'none';
+  }
+}
+
+
 // ── IMPOSTAZIONI FRESATORE ──────────────────────────────────────
 var MILLER_PRESETS = {
   'custom':        { axes: 5, bAxis: 30, desc: 'Configurazione personalizzata' },
@@ -2400,7 +3128,31 @@ try {
 } catch(e){}
 
 function openSettings(){
-  // Popola il dialog con lo stato corrente
+  // Backup per Annulla
+  envSettingsBackup = JSON.parse(JSON.stringify(envSettings));
+  millerSettingsBackup = JSON.parse(JSON.stringify(millerSettings));
+
+  // Popola controlli tab AMBIENTE
+  document.getElementById('settingsBgColor').value = envSettings.bgColor;
+  document.getElementById('settingsBgHex').textContent = envSettings.bgType === 'gradient' ? 'gradiente' : envSettings.bgColor;
+  document.getElementById('settingsScanColor').value = envSettings.scanColor;
+  document.getElementById('settingsScanHex').textContent = envSettings.scanColor;
+  // Ripopolo campi custom
+  document.getElementById('settingsCustomColor1').value = envSettings.bgColor;
+  document.getElementById('settingsCustomColor2').value = envSettings.bgColor2 || '#415A77';
+  document.getElementById('settingsCustomAngle').value = envSettings.bgAngle || 180;
+  document.getElementById('settingsCustomAngleVal').textContent = (envSettings.bgAngle || 180) + '°';
+  document.getElementById('settingsCustomSolid').checked = (envSettings.bgType !== 'gradient');
+  document.getElementById('settingsCustomGradient').checked = (envSettings.bgType === 'gradient');
+  // Apro box custom se in gradient, altrimenti lo chiudo
+  document.getElementById('settingsBgCustomBox').style.display = (envSettings.bgType === 'gradient') ? 'block' : 'none';
+  updateCustomModeUI();
+  updateCustomPreview();
+  updateEnvSwatchBorders();
+  buildPaletteGrid();
+  updateRenderModeUI();
+
+  // Popola controlli tab MACCHINE
   document.getElementById('settingsPreset').value = millerSettings.preset || 'custom';
   var radios = document.getElementsByName('settingsAxes');
   for(var i = 0; i < radios.length; i++){
@@ -2409,11 +3161,28 @@ function openSettings(){
   document.getElementById('settingsBAxisSlider').value = millerSettings.bAxis;
   document.getElementById('settingsBAxisValue').textContent = millerSettings.bAxis + '°';
   updateSettingsUIState();
+
+  // Apri sul tab Ambiente
+  switchSettingsTab('env');
   document.getElementById('settingsDialog').style.display = 'flex';
 }
 
 function closeSettings(){
   document.getElementById('settingsDialog').style.display = 'none';
+}
+
+function cancelSettings(){
+  // Ripristino lo stato precedente all'apertura
+  if(envSettingsBackup){
+    envSettings = JSON.parse(JSON.stringify(envSettingsBackup));
+    applyEnvToScene();
+  }
+  if(millerSettingsBackup){
+    millerSettings = JSON.parse(JSON.stringify(millerSettingsBackup));
+    MAX_MILLING_ANGLE = millerSettings.bAxis;
+    if(typeof computeClinicalAnalysis === 'function') computeClinicalAnalysis();
+  }
+  closeSettings();
 }
 
 function applyMillerPreset(){
@@ -2467,13 +3236,12 @@ function saveSettings(){
   var bAxis = parseInt(document.getElementById('settingsBAxisSlider').value);
   var preset = document.getElementById('settingsPreset').value;
   millerSettings = { preset: preset, axes: axes, bAxis: bAxis };
-  // Aggiorna MAX_MILLING_ANGLE
   MAX_MILLING_ANGLE = bAxis;
-  // Salva in localStorage
   try { localStorage.setItem('syntesis_miller_settings', JSON.stringify(millerSettings)); } catch(e){}
+  // Salvo anche envSettings
+  try { localStorage.setItem('syntesis_env_settings', JSON.stringify(envSettings)); } catch(e){}
   closeSettings();
-  showStatus('Impostazioni fresatore salvate: ' + axes + ' assi, limite ' + bAxis + '°.');
-  // Ricalcola analisi clinica
+  showStatus('Impostazioni salvate.');
   if(typeof computeClinicalAnalysis === 'function') computeClinicalAnalysis();
 }
 
@@ -2495,58 +3263,170 @@ window.addEventListener('DOMContentLoaded',init);
 </div>
 
 
-<!-- Dialog impostazioni fresatore -->
+<!-- Dialog impostazioni -->
 <div id="settingsDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
-    <div style="font-family:var(--mono);font-size:14px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px">Impostazioni fresatore</div>
-    
-    <!-- Preset -->
-    <div style="margin-bottom:14px">
-      <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Preset macchina</label>
-      <select id="settingsPreset" onchange="applyMillerPreset()" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:11px">
-        <option value="custom">Personalizzato</option>
-        <option value="generic3">Generico 3 assi</option>
-        <option value="generic4">Generico 4 assi</option>
-        <option value="generic5">Generico 5 assi</option>
-        <option value="roland_dwx52">Roland DWX-52DC (3+ assi, pivot 20°)</option>
-        <option value="vhf_s1">vhf S1 / S2 (5 assi, B ±30°)</option>
-        <option value="imes_550i">Imes-Icore CORiTEC 550i (5 assi, B ±35°)</option>
-        <option value="yenadent_d43">Yenadent D43 (5 assi, B ±60°)</option>
-      </select>
+  <div style="background:#fff;border-radius:12px;padding:22px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+    <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Impostazioni</div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:2px;border-bottom:1px solid #E2E8F0;margin-bottom:18px">
+      <div id="settingsTabEnvBtn" onclick="switchSettingsTab('env')" style="padding:8px 14px;font-family:var(--mono);font-size:11px;color:var(--blue);font-weight:800;border-bottom:2px solid var(--blue);margin-bottom:-1px;cursor:pointer;letter-spacing:.03em">Ambiente</div>
+      <div id="settingsTabMachBtn" onclick="switchSettingsTab('mach')" style="padding:8px 14px;font-family:var(--mono);font-size:11px;color:var(--gray);cursor:pointer;letter-spacing:.03em">Macchine</div>
     </div>
-    
-    <!-- Tipo macchina -->
-    <div style="margin-bottom:14px">
-      <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Tipo macchina</label>
-      <div style="display:flex;gap:8px">
-        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:11px">
-          <input type="radio" name="settingsAxes" value="3" onchange="updateMillerSettings()"> 3 assi
-        </label>
-        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:11px">
-          <input type="radio" name="settingsAxes" value="4" onchange="updateMillerSettings()"> 4 assi
-        </label>
-        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:11px">
-          <input type="radio" name="settingsAxes" value="5" onchange="updateMillerSettings()" checked> 5 assi
-        </label>
+
+    <!-- === TAB AMBIENTE === -->
+    <div id="settingsTabEnv">
+      <!-- Sfondo viewport -->
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Sfondo viewport</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="color" id="settingsBgColor" value="#1a1a2e" oninput="onEnvBgPickerChange(this.value)" style="width:36px;height:32px;padding:0;border:1px solid #ccc;border-radius:5px;cursor:pointer">
+          <div id="settingsBgSwatches" style="display:flex;gap:4px">
+            <span class="env-swatch" data-value="#1a1a2e" onclick="onEnvBgChange('#1a1a2e')" style="width:26px;height:26px;background:#1a1a2e;border:1.5px solid var(--blue);border-radius:5px;cursor:pointer;display:inline-block" title="Notte (default)"></span>
+            <span class="env-swatch" data-value="#0a0a0f" onclick="onEnvBgChange('#0a0a0f')" style="width:26px;height:26px;background:#0a0a0f;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Nero profondo"></span>
+            <span class="env-swatch" data-value="#243447" onclick="onEnvBgChange('#243447')" style="width:26px;height:26px;background:#243447;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Navy"></span>
+            <span class="env-swatch" data-value="#f0f5fa" onclick="onEnvBgChange('#f0f5fa')" style="width:26px;height:26px;background:#f0f5fa;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Chiaro"></span>
+            <span class="env-swatch" data-value="#ffffff" onclick="onEnvBgChange('#ffffff')" style="width:26px;height:26px;background:#ffffff;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Bianco"></span>
+            <span class="env-swatch" data-value="custom" onclick="onEnvBgCustomOpen()" style="width:26px;height:26px;background:linear-gradient(135deg,#fff 0% 50%,#0065B3 50% 100%);border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:14px;font-weight:500;text-shadow:0 0 2px rgba(0,0,0,0.5);line-height:1" title="Personalizzato / Sfumatura">+</span>
+          </div>
+          <span id="settingsBgHex" style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-left:auto">#1a1a2e</span>
+        </div>
+        <div id="settingsBgCustomBox" style="display:none;margin-top:10px;padding:10px 12px;background:#F7F9FC;border:1px dashed #D6E4F0;border-radius:6px">
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <label style="flex:1;display:flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:10px">
+              <input type="radio" id="settingsCustomSolid" name="settingsBgMode" value="solid" onchange="onEnvCustomModeChange('solid')" checked> Solido
+            </label>
+            <label style="flex:1;display:flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:10px">
+              <input type="radio" id="settingsCustomGradient" name="settingsBgMode" value="gradient" onchange="onEnvCustomModeChange('gradient')"> Sfumatura
+            </label>
+          </div>
+          <div id="settingsCustomGradientRow" style="display:none;gap:10px;align-items:center;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="font-family:var(--mono);font-size:9px;color:var(--gray)">A</span>
+              <input type="color" id="settingsCustomColor1" value="#1a1a2e" oninput="onEnvBgCustomPrimary(this.value)" style="width:28px;height:26px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer">
+            </div>
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="font-family:var(--mono);font-size:9px;color:var(--gray)">B</span>
+              <input type="color" id="settingsCustomColor2" value="#415A77" oninput="onEnvBgCustomSecondary(this.value)" style="width:28px;height:26px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer">
+            </div>
+            <div style="flex:1;display:flex;align-items:center;gap:6px">
+              <span style="font-family:var(--mono);font-size:9px;color:var(--gray)">ANG</span>
+              <input type="range" id="settingsCustomAngle" min="0" max="360" step="1" value="180" oninput="onEnvBgAngleChange(this.value)" style="flex:1;accent-color:#0065B3">
+              <span id="settingsCustomAngleVal" style="font-family:var(--mono);font-size:10px;color:var(--dark);min-width:32px;text-align:right">180°</span>
+            </div>
+          </div>
+          <div id="settingsCustomPreview" style="width:100%;height:36px;background:#1a1a2e;border-radius:5px;border:1px solid #D6E4F0"></div>
+          <div id="settingsCustomHint" style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-top:6px;text-align:center">anteprima · solido</div>
+        </div>
+      </div>
+
+      <!-- Colore scansione -->
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Colore scansione</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="color" id="settingsScanColor" value="#889aad" oninput="onEnvScanColorChange(this.value)" style="width:36px;height:32px;padding:0;border:1px solid #ccc;border-radius:5px;cursor:pointer">
+          <div style="display:flex;gap:4px">
+            <span class="env-swatch-scan" data-value="#889aad" onclick="onEnvScanColorChange('#889aad')" style="width:26px;height:26px;background:#889aad;border:1.5px solid var(--blue);border-radius:5px;cursor:pointer;display:inline-block" title="Azzurro grigio (default)"></span>
+            <span class="env-swatch-scan" data-value="#e8e4d8" onclick="onEnvScanColorChange('#e8e4d8')" style="width:26px;height:26px;background:#e8e4d8;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Beige"></span>
+            <span class="env-swatch-scan" data-value="#f5e6d3" onclick="onEnvScanColorChange('#f5e6d3')" style="width:26px;height:26px;background:#f5e6d3;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Crema"></span>
+            <span class="env-swatch-scan" data-value="#b8a090" onclick="onEnvScanColorChange('#b8a090')" style="width:26px;height:26px;background:#b8a090;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Marroncino"></span>
+            <span class="env-swatch-scan" data-value="#d4d4d4" onclick="onEnvScanColorChange('#d4d4d4')" style="width:26px;height:26px;background:#d4d4d4;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Grigio"></span>
+          </div>
+          <span id="settingsScanHex" style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-left:auto">#889aad</span>
+        </div>
+      </div>
+
+      <!-- Palette MUA -->
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Palette colori MUA</label>
+        <div id="settingsPaletteGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+      </div>
+
+      <!-- Render mode -->
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Visualizzazione oggetti</label>
+        <div style="display:flex;gap:6px">
+          <button id="settingsRender_solid" onclick="onEnvRenderModeChange('solid')" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:10px;font-weight:800;background:#fff;color:var(--dark);display:flex;flex-direction:column;align-items:center;gap:5px">
+            <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+              <ellipse cx="14" cy="8" rx="8" ry="2.5" stroke="currentColor" stroke-width="1.6" fill="currentColor" fill-opacity="0.2"/>
+              <path d="M6 8 L6 20 M22 8 L22 20" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M6 20 Q14 23 22 20" stroke="currentColor" stroke-width="1.6" fill="currentColor" fill-opacity="0.2"/>
+            </svg>
+            <span>Solid</span>
+          </button>
+          <button id="settingsRender_wireframe" onclick="onEnvRenderModeChange('wireframe')" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:10px;font-weight:800;background:#fff;color:var(--dark);display:flex;flex-direction:column;align-items:center;gap:5px">
+            <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+              <ellipse cx="14" cy="8" rx="8" ry="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/>
+              <path d="M6 8 L6 20 M22 8 L22 20 M14 10.5 L14 22.5" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M6 20 Q14 23 22 20" stroke="currentColor" stroke-width="1.4" fill="none"/>
+              <path d="M10 9 L10 21 M18 9 L18 21" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5 1.5"/>
+            </svg>
+            <span>Wireframe</span>
+          </button>
+          <button id="settingsRender_both" onclick="onEnvRenderModeChange('both')" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:10px;font-weight:800;background:#fff;color:var(--dark);display:flex;flex-direction:column;align-items:center;gap:5px">
+            <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+              <ellipse cx="14" cy="8" rx="8" ry="2.5" stroke="currentColor" stroke-width="1.6" fill="currentColor" fill-opacity="0.25"/>
+              <path d="M6 8 L6 20 M22 8 L22 20 M14 10.5 L14 22.5" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M6 20 Q14 23 22 20" stroke="currentColor" stroke-width="1.6" fill="currentColor" fill-opacity="0.25"/>
+              <path d="M10 9 L10 21 M18 9 L18 21" stroke="currentColor" stroke-width="0.9" stroke-dasharray="1.5 1.5"/>
+            </svg>
+            <span>Both</span>
+          </button>
+        </div>
+      </div>
+
+      <div style="padding:8px 12px;background:#f8f8f8;border-radius:6px;font-family:var(--mono);font-size:9px;color:var(--gray);line-height:1.5;margin-bottom:16px">
+        Le modifiche si applicano immediatamente in anteprima. Premi Salva per memorizzare o Annulla per ripristinare.
       </div>
     </div>
-    
-    <!-- Limite angolare asse B -->
-    <div id="settingsBAxisRow" style="margin-bottom:14px">
-      <label style="display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">
-        <span>Limite angolare asse B</span>
-        <span id="settingsBAxisValue" style="font-family:var(--mono);font-size:12px;color:var(--dark);font-weight:800">30°</span>
-      </label>
-      <input type="range" id="settingsBAxisSlider" min="5" max="90" step="1" value="30" oninput="updateMillerSettings()" style="width:100%;accent-color:#0065B3">
+
+    <!-- === TAB MACCHINE === -->
+    <div id="settingsTabMach" style="display:none">
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Preset macchina</label>
+        <select id="settingsPreset" onchange="applyMillerPreset()" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:11px">
+          <option value="custom">Personalizzato</option>
+          <option value="generic3">Generico 3 assi</option>
+          <option value="generic4">Generico 4 assi</option>
+          <option value="generic5">Generico 5 assi</option>
+          <option value="roland_dwx52">Roland DWX-52DC (3+ assi, pivot 20°)</option>
+          <option value="vhf_s1">vhf S1 / S2 (5 assi, B ±30°)</option>
+          <option value="imes_550i">Imes-Icore CORiTEC 550i (5 assi, B ±35°)</option>
+          <option value="yenadent_d43">Yenadent D43 (5 assi, B ±60°)</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Tipo macchina</label>
+        <div style="display:flex;gap:8px">
+          <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:11px">
+            <input type="radio" name="settingsAxes" value="3" onchange="updateMillerSettings()"> 3 assi
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:11px">
+            <input type="radio" name="settingsAxes" value="4" onchange="updateMillerSettings()"> 4 assi
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:11px">
+            <input type="radio" name="settingsAxes" value="5" onchange="updateMillerSettings()" checked> 5 assi
+          </label>
+        </div>
+      </div>
+
+      <div id="settingsBAxisRow" style="margin-bottom:14px">
+        <label style="display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">
+          <span>Limite angolare asse B</span>
+          <span id="settingsBAxisValue" style="font-family:var(--mono);font-size:12px;color:var(--dark);font-weight:800">30°</span>
+        </label>
+        <input type="range" id="settingsBAxisSlider" min="5" max="90" step="1" value="30" oninput="updateMillerSettings()" style="width:100%;accent-color:#0065B3">
+      </div>
+
+      <div id="settingsInfo" style="padding:8px 12px;background:#f8f8f8;border-radius:6px;font-family:var(--mono);font-size:9px;color:var(--gray);line-height:1.5;margin-bottom:16px">
+        Configura la macchina di fresatura utilizzata per verificare la fresabilità delle divergenze angolari.
+      </div>
     </div>
-    
-    <!-- Info / nota -->
-    <div id="settingsInfo" style="padding:8px 12px;background:#f8f8f8;border-radius:6px;font-family:var(--mono);font-size:9px;color:var(--gray);line-height:1.5;margin-bottom:16px">
-      Configura la macchina di fresatura utilizzata per verificare la fresabilità delle divergenze angolari.
-    </div>
-    
+
+    <!-- Footer -->
     <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button onclick="closeSettings()" style="padding:6px 14px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla</button>
+      <button onclick="cancelSettings()" style="padding:6px 14px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla</button>
       <button onclick="saveSettings()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:800;cursor:pointer">Salva</button>
     </div>
   </div>
