@@ -91,6 +91,14 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .divergence-item .div-val{font-weight:800}
 
 .tree{font-family:var(--mono);font-size:10px}
+.tree-dark{font-family:var(--mono);font-size:10px;color:#fff}
+.tree-dark .lbl{color:#fff}
+.tree-dark .tree-node.sub .lbl{color:#B5C4D5}
+.tree-dark .chevron{color:#7A90A4}
+.tree-dark .chevron:hover{color:#fff}
+.tree-dark .del-btn{border:1px solid rgba(226,75,74,0.5);background:rgba(226,75,74,0.1);color:#F07878}
+.tree-dark .del-btn:hover{background:#E24B4A;color:#fff;border-color:#E24B4A}
+.tree-dark input[type=checkbox]{accent-color:#378ADD}
 .tree-node{display:flex;align-items:center;gap:6px;padding:3px 0}
 .tree-node input[type=checkbox]{accent-color:var(--blue);margin:0;cursor:pointer}
 .tree-node .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -165,6 +173,17 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
     </svg>
     Mostra assi
   </button>
+  <button class="btn" id="btnLayers" onclick="toggleLayersPanel()" title="Pannello livelli visibilità (L)">
+    <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="5" width="20" height="4" rx="1" stroke="#0065B3" stroke-width="1.6" fill="none"/>
+      <rect x="4" y="12" width="20" height="4" rx="1" stroke="#0065B3" stroke-width="1.6" fill="none"/>
+      <rect x="4" y="19" width="20" height="4" rx="1" stroke="#0065B3" stroke-width="1.6" fill="none"/>
+      <circle cx="8" cy="7" r="1.3" fill="#0065B3"/>
+      <circle cx="18" cy="14" r="1.3" fill="#0065B3"/>
+      <circle cx="12" cy="21" r="1.3" fill="#0065B3"/>
+    </svg>
+    Livelli
+  </button>
   <button class="btn" onclick="openCutView()" title="Vista in sezione">
     <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="5" y="6" width="18" height="16" stroke="#0065B3" stroke-width="1.6" fill="none"/>
@@ -238,6 +257,13 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div id="clinicalBannerIcon" style="width:22px;height:22px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0"></div>
       <div id="clinicalBannerText" style="font-family:var(--mono);font-size:11px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
     </div>
+    <div id="layersPanel" style="display:none;position:absolute;top:14px;right:14px;width:240px;max-height:calc(100% - 28px);background:rgba(15,25,35,0.94);border:1px solid rgba(122,144,164,0.3);border-radius:10px;padding:12px;z-index:8;box-shadow:-8px 0 24px rgba(0,0,0,0.4);overflow-y:auto;flex-direction:column;gap:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid rgba(122,144,164,0.2);margin-bottom:10px;flex-shrink:0">
+        <div style="font-family:var(--mono);font-size:10px;font-weight:800;color:#fff;letter-spacing:.1em">LIVELLI</div>
+        <button onclick="closeLayersPanel()" title="Chiudi (L)" style="background:rgba(26,26,34,0.6);color:#fff;border:1px solid rgba(122,144,164,0.3);border-radius:3px;padding:2px 8px;cursor:pointer;font-family:var(--mono);font-size:11px;line-height:14px">✕</button>
+      </div>
+      <div id="layerTree" class="tree-dark"></div>
+    </div>
     <div class="status-msg" id="statusMsg"></div>
   </div>
 
@@ -250,10 +276,6 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <input type="file" id="inputScan" accept=".stl,.STL" style="display:none" onchange="loadScan(this)">
     </div>
 
-    <div class="panel-section">
-      <div class="panel-label">Livelli visibilita</div>
-      <div class="tree" id="layerTree"></div>
-    </div>
     <div class="panel-section">
       <div class="panel-label">MUA posizionati</div>
       <div id="muaList"><div style="font-family:var(--mono);font-size:10px;color:var(--gray)">Nessun MUA. Clicca "+ Posiziona MUA"</div></div>
@@ -856,6 +878,28 @@ function closeResetMenu(){
   var menu = document.getElementById('resetMenu');
   if(menu) menu.classList.remove('open');
 }
+function openLayersPanel(){
+  var p = document.getElementById('layersPanel');
+  if(!p) return;
+  p.style.display = 'flex';
+  var btn = document.getElementById('btnLayers');
+  if(btn) btn.classList.add('active');
+  try { localStorage.setItem('syntesis_layers_open', '1'); } catch(e){}
+}
+function closeLayersPanel(){
+  var p = document.getElementById('layersPanel');
+  if(!p) return;
+  p.style.display = 'none';
+  var btn = document.getElementById('btnLayers');
+  if(btn) btn.classList.remove('active');
+  try { localStorage.setItem('syntesis_layers_open', '0'); } catch(e){}
+}
+function toggleLayersPanel(){
+  var p = document.getElementById('layersPanel');
+  if(!p) return;
+  if(p.style.display === 'flex'){ closeLayersPanel(); }
+  else { openLayersPanel(); }
+}
 function showStatus(msg){var el=document.getElementById('statusMsg');el.textContent=msg;el.classList.add('visible');clearTimeout(el._timer);el._timer=setTimeout(function(){el.classList.remove('visible')},4000)}
 
 
@@ -1191,6 +1235,14 @@ document.addEventListener('keydown', function(e){
   if((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey){
     e.preventDefault();
     undoLastMUA();
+  }
+  // Tasto L per toggle pannello Livelli (solo se non si sta scrivendo in input/textarea)
+  if((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey){
+    var tag = document.activeElement && document.activeElement.tagName;
+    if(tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT'){
+      e.preventDefault();
+      toggleLayersPanel();
+    }
   }
 });
 
