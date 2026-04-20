@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Cache buster: incrementare per forzare il rebuild del layer sottostante
+ARG CACHEBUST=20260420_1730
+
 # Copia backend
 COPY backend/ .
 
@@ -22,3 +25,4 @@ ENV PYTHONDONTWRITEBYTECODE=1
 EXPOSE 8000
 
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+
