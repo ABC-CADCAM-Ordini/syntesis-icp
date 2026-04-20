@@ -8,8 +8,10 @@
 
 // ── Splash Screen ──────────────────────────────────────────────────────────
 var REPLACER_URL = '/replacer';
+var ANALYZER_URL = '/analizzare';
 function chooseSplash(choice) {
   if (choice === 'replace') { window.open(REPLACER_URL, '_blank'); return; }
+  if (choice === 'analyze') { window.open(ANALYZER_URL, '_blank'); return; }
   var splash = document.getElementById('splash');
   var mainApp = document.getElementById('main-app');
   if (splash) { splash.style.transition='opacity .25s'; splash.style.opacity='0'; setTimeout(function(){splash.style.display='none';},260); }
