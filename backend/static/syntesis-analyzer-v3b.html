@@ -56,7 +56,12 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .empty-state.hidden{display:none}
 .panel{width:320px;background:var(--white);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;padding:14px;display:flex;flex-direction:column;gap:10px}
 .panel-section{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--light)}
+.panel-section.clinical-section{border-width:1.5px;border-color:var(--blue);background:var(--white);box-shadow:0 2px 8px rgba(0,82,163,0.06)}
+.panel-section.clinical-section.ok{border-color:var(--green);box-shadow:0 2px 8px rgba(13,158,110,0.08)}
+.panel-section.clinical-section.warn{border-color:var(--gold);box-shadow:0 2px 8px rgba(245,158,11,0.08)}
+.panel-section.clinical-section.bad{border-color:var(--red);box-shadow:0 2px 8px rgba(220,38,38,0.08)}
 .panel-label{font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);margin-bottom:8px}
+.clinical-section .panel-label{color:var(--dark)}
 .file-slot{border:1.5px dashed var(--border);border-radius:8px;padding:12px;text-align:center;cursor:pointer;transition:all .15s}
 .file-slot:hover{border-color:var(--blue);background:rgba(0,101,179,.04)}
 .file-slot.loaded{border-style:solid;border-color:var(--green);background:rgba(13,158,110,.04)}
@@ -268,12 +273,9 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
   </div>
 
   <div class="panel">
-    <div class="panel-section">
-      <div class="panel-label">Scansione intraorale</div>
-      <div class="file-slot" id="slotScan" onclick="document.getElementById('inputScan').click()">
-        <div class="fplaceholder">Clicca o trascina .stl</div>
-      </div>
-      <input type="file" id="inputScan" accept=".stl,.STL" style="display:none" onchange="loadScan(this)">
+    <div class="panel-section clinical-section">
+      <div class="panel-label">Stato clinico</div>
+      <div id="clinicalInfo"><div style="font-family:var(--mono);font-size:10px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
     </div>
 
     <div class="panel-section">
@@ -290,9 +292,13 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div class="panel-label">Asse medio e divergenze</div>
       <div id="axisInfo"><div style="font-family:var(--mono);font-size:10px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
     </div>
+
     <div class="panel-section">
-      <div class="panel-label">Inseribilita' e produttivita'</div>
-      <div id="clinicalInfo"><div style="font-family:var(--mono);font-size:10px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
+      <div class="panel-label">Scansione intraorale</div>
+      <div class="file-slot" id="slotScan" onclick="document.getElementById('inputScan').click()">
+        <div class="fplaceholder">Clicca o trascina .stl</div>
+      </div>
+      <input type="file" id="inputScan" accept=".stl,.STL" style="display:none" onchange="loadScan(this)">
     </div>
   </div>
 </div>
@@ -736,7 +742,6 @@ function alignAll(){
 function calculateAngles(){
   var aligned=muaObjects.filter(function(m){return m.aligned});
   if(aligned.length<2){document.getElementById('angleList').innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--gray)">Servono almeno 2 MUA accoppiati</div>';return}
-  // Raggruppa per groupId
   var groupsMap = {};
   aligned.forEach(function(m){
     var g = m.groupId || 0;
@@ -753,17 +758,25 @@ function calculateAngles(){
       var bc = getGroupBadgeColor(gid);
       html += '<div style="padding:4px 0;border-bottom:1px solid #eee;margin-bottom:4px"><span style="display:inline-block;padding:2px 6px;background:'+bc+';color:#fff;font-family:var(--mono);font-size:8px;font-weight:800;border-radius:3px">G'+gid+'</span></div>';
     }
+    // Raccolgo tutte le coppie del gruppo, poi le ordino per severità decrescente
+    var pairs = [];
     for(var i=0;i<gr.length;i++){
       for(var j=i+1;j<gr.length;j++){
         var a=gr[i],b=gr[j];
         var dot=a.axisDir.x*b.axisDir.x+a.axisDir.y*b.axisDir.y+a.axisDir.z*b.axisDir.z;
-        dot=Math.max(-1,Math.min(1,dot));var angle=Math.acos(Math.abs(dot))*180/Math.PI;
+        dot=Math.max(-1,Math.min(1,dot));
+        var angle=Math.acos(Math.abs(dot))*180/Math.PI;
         maxAngle=Math.max(maxAngle,angle);
         hadPair = true;
-        var cls=angle<=5?'good':angle<=15?'warn':'bad';
-        html+='<div class="angle-row"><span class="angle-pair">#'+a.num+' - #'+b.num+'</span><span class="angle-val '+cls+'">'+angle.toFixed(1)+'&deg;</span></div>';
+        pairs.push({a:a.num, b:b.num, angle:angle});
       }
     }
+    // Sort per severità: angolo decrescente (le peggiori in cima)
+    pairs.sort(function(p1, p2){ return p2.angle - p1.angle; });
+    pairs.forEach(function(p){
+      var cls = p.angle <= 5 ? 'good' : p.angle <= 15 ? 'warn' : 'bad';
+      html += '<div class="angle-row"><span class="angle-pair">#'+p.a+' - #'+p.b+'</span><span class="angle-val '+cls+'">'+p.angle.toFixed(1)+'&deg;</span></div>';
+    });
   });
   if(!hadPair) html='<div style="font-family:var(--mono);font-size:10px;color:var(--gray)">Nessuna coppia in gruppi con 2+ MUA</div>';
   document.getElementById('angleList').innerHTML=html;
@@ -1685,6 +1698,11 @@ function toggleDivergenceLabels(on){
 // ── ANALISI CLINICA: INSERIBILITA' + FRESABILITA' ────────────────
 function updateClinicalBanner(status){
   var banner = document.getElementById('clinicalBanner');
+  // Sezione pannello destro: sincronizzo il bordo colorato con lo stato
+  var panelSection = document.querySelector('.panel-section.clinical-section');
+  if(panelSection){
+    panelSection.classList.remove('ok', 'warn', 'bad');
+  }
   if(!banner) return;
   if(!status || status.hidden){
     banner.style.display = 'none';
@@ -1697,20 +1715,23 @@ function updateClinicalBanner(status){
     bg = 'rgba(13,158,110,0.95)';
     iconColor = '#0D9E6E';
     iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><polyline points="5,13 10,18 19,7" stroke="'+iconColor+'" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+    if(panelSection) panelSection.classList.add('ok');
   } else if(status.level === 'warn'){
     bg = 'rgba(245,158,11,0.95)';
     iconColor = '#B87607';
     iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><line x1="12" y1="7" x2="12" y2="13" stroke="'+iconColor+'" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="17" r="1.4" fill="'+iconColor+'"/></svg>';
+    if(panelSection) panelSection.classList.add('warn');
   } else {
     bg = 'rgba(220,38,38,0.95)';
     iconColor = '#DC2626';
     iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><line x1="7" y1="7" x2="17" y2="17" stroke="'+iconColor+'" stroke-width="2.6" stroke-linecap="round"/><line x1="17" y1="7" x2="7" y2="17" stroke="'+iconColor+'" stroke-width="2.6" stroke-linecap="round"/></svg>';
+    if(panelSection) panelSection.classList.add('bad');
   }
   banner.style.background = bg;
   banner.style.border = '1px solid '+iconColor;
   icon.innerHTML = iconSvg;
   text.textContent = status.text;
-  text.title = status.text; // tooltip per testo troncato
+  text.title = status.text;
   banner.style.display = 'flex';
 }
 
