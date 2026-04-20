@@ -19,6 +19,7 @@ var CLIN=[
   {max:250, label:'Tensione',        bg:'#FEE2E2',fg:'#991B1B',col:'#EF4444'},
   {max:9999,label:'Fuori posizione', bg:'#F3E0F7',fg:'#6B21A8',col:'#A855F7'}
 ];
+function clinLevel(um){for(var i=0;i<CLIN.length;i++)if(um<CLIN[i].max)return CLIN[i];return CLIN[4];}
 
 // ── Canvas drawing helpers ────────────────────────────────────────────────
 function hexRGB(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
