@@ -21,16 +21,20 @@
 #splash .sp-label{font-size:9px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--blue);margin-bottom:12px}
 #splash .sp-title{font-size:26px;font-weight:800;color:var(--dark);line-height:1.2;margin-bottom:6px}
 #splash .sp-sub{font-size:13px;color:var(--gray);margin-bottom:36px;font-family:var(--mono)}
-#splash .sp-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:620px;margin:0 auto}
-@media(max-width:540px){#splash .sp-cards{grid-template-columns:1fr}}
+#splash .sp-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;max-width:940px;margin:0 auto}
+@media(max-width:900px){#splash .sp-cards{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){#splash .sp-cards{grid-template-columns:1fr}}
 #splash .sp-card{border:1.5px solid var(--border);border-radius:12px;padding:28px 22px 24px;cursor:pointer;text-align:left;transition:border-color .18s,box-shadow .18s;background:var(--white);position:relative;overflow:hidden}
 #splash .sp-card:hover{border-color:var(--blue);box-shadow:0 4px 20px rgba(0,82,163,.12)}
 #splash .sp-card.replace:hover{border-color:#3B6D11}
+#splash .sp-card.analyze:hover{border-color:#B45309}
 #splash .sp-num{font-family:var(--mono);font-size:52px;font-weight:800;line-height:1;color:var(--blue);opacity:.1;position:absolute;top:10px;right:16px;pointer-events:none}
 #splash .replace .sp-num{color:#3B6D11}
+#splash .analyze .sp-num{color:#B45309}
 #splash .sp-tag{display:inline-block;font-family:var(--mono);font-size:8px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px}
 #splash .measure .sp-tag{background:#E8F4FF;color:#0052A3}
 #splash .replace .sp-tag{background:#EAF3DE;color:#27500A}
+#splash .analyze .sp-tag{background:#FEF3C7;color:#92400E}
 #splash .sp-card-title{font-size:21px;font-weight:800;color:var(--dark);margin-bottom:6px}
 #splash .sp-card-desc{font-size:12px;color:var(--gray);line-height:1.65;font-family:var(--mono);margin-bottom:18px}
 #splash .sp-card-detail{font-size:10px;color:var(--gray);font-family:var(--mono);line-height:1.8;padding-top:14px;border-top:1px solid var(--border)}
@@ -39,6 +43,8 @@
 #splash .measure .sp-btn:hover{background:#0052A3;color:#fff}
 #splash .replace .sp-btn{border-color:#3B6D11;color:#3B6D11}
 #splash .replace .sp-btn:hover{background:#3B6D11;color:#fff}
+#splash .analyze .sp-btn{border-color:#B45309;color:#B45309}
+#splash .analyze .sp-btn:hover{background:#B45309;color:#fff}
 </style>
 </head>
 <body>
@@ -68,6 +74,14 @@
             <div class="sp-card-desc">Posizionamento e sostituzione guidata di impianti su scansione STL.</div>
             <div class="sp-card-detail">STL paziente + STL impianto<br>Allineamento ICP · Selezione<br>Export file risultante</div>
             <div><button class="sp-btn" onclick="chooseSplash('replace')">Apri modulo &#x2192;</button></div>
+          </div>
+          <div class="sp-card analyze" onclick="chooseSplash('analyze')">
+            <div class="sp-num">03</div>
+            <div class="sp-tag">Prototipo</div>
+            <div class="sp-card-title">Analizzare MUA</div>
+            <div class="sp-card-desc">Analisi angolare implantare con MUA IPD Dental Group. Verifica di inseribilità, sottosquadri e fresabilità.</div>
+            <div class="sp-card-detail">Scansione STL + posizionamento MUA<br>Accoppiamento ICP · Asse medio · Divergenze<br>Mappa sottosquadri · Impostazioni fresatore</div>
+            <div><button class="sp-btn" onclick="chooseSplash('analyze')">Apri analizzatore &#x2192;</button></div>
           </div>
         </div>
       </div>
