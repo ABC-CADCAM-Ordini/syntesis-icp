@@ -140,6 +140,13 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div class="sub">Trascina un file .stl oppure usa il pannello a destra</div>
     </div>
     <div id="labelLayer"><svg id="labelLines" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible"></svg></div>
+    <div id="undercutLegend" style="display:none;position:absolute;top:16px;left:16px;background:rgba(10,10,15,0.85);border:1px solid #333;border-radius:8px;padding:8px 12px;z-index:5;font-family:var(--mono);font-size:10px;color:#fff;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.5)">
+      <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#aaa;margin-bottom:6px">Mappa sottosquadri</div>
+      <div style="width:180px;height:14px;border-radius:3px;background:linear-gradient(to right,#0033cc 0%,#00b8ff 33%,#44ff66 55%,#ffff00 72%,#ff6b00 89%,#e60000 100%);margin-bottom:4px"></div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:#ccc"><span>0&deg;</span><span>30&deg;</span><span>60&deg;</span><span>90&deg;</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:8px;color:#999;margin-top:4px"><span>safe</span><span>warning</span><span>sottosquadro</span></div>
+      <div style="margin-top:6px;padding-top:6px;border-top:1px solid #333;font-size:8px;color:#888"><span style="display:inline-block;width:10px;height:10px;background:#bfbfc4;vertical-align:middle;margin-right:4px;border-radius:2px"></span> canale vite (escluso)</div>
+    </div>
     <div class="status-msg" id="statusMsg"></div>
   </div>
 
@@ -465,6 +472,7 @@ function placeMUA(rawPoint,rawNormal){
   muaObjects.push({id:id,num:muaCounter,group:group,scanbodyGeo:sbResult.geometry,scanbodyMesh:sbMesh,anMesh:anMesh,mtMesh:matMesh,color:color,axisLine:axisLine,position:point.clone(),clickPoint:point.clone(),clickNormal:n.clone(),axisDir:n.clone(),aligned:false,rmsd:null,sbVisible:true});
   updateMuaPanel();document.getElementById('muaCount').textContent=muaObjects.length;
   rebuildTree();
+  ensureLabelElements();
   showStatus('MUA #'+muaCounter+' posizionato.');
   // Aggiorna cut view (apre automaticamente o aggiorna selezione)
   var cutOverlay = document.getElementById('cutViewOverlay');
@@ -1224,8 +1232,9 @@ function renderCutView(){
   var uArr = [uAxis.x, uAxis.y, uAxis.z];
   var wArr = [wAxis.x, wAxis.y, wAxis.z];
 
-  // === Sezione scansione (bianca) ===
-  var scanSegs = extractCutSegments(scanMesh.geometry, null, planePoint, planeNormal);
+  // === Sezione scansione (bianca) — uso la geometria ORIGINALE, ignorando i tagli ===
+  var scanSourceGeo = scanOriginalGeo || scanMesh.geometry;
+  var scanSegs = extractCutSegments(scanSourceGeo, null, planePoint, planeNormal);
   
   // === Sezione scanbody 1T3 del MUA (arancione) ===
   mua.scanbodyMesh.updateMatrixWorld(true);
@@ -1352,6 +1361,37 @@ function classifyDivergence(angle){
   return 'bad';
 }
 
+
+// ── DIAGNOSTICA LABEL ──────────────────────────────────────────
+function syntesisDebugLabels(){
+  console.log('=== DIAGNOSTICA LABEL DIVERGENZA ===');
+  console.log('divergenceLabelsVisible:', divergenceLabelsVisible);
+  console.log('muaObjects.length:', muaObjects.length);
+  var layer = document.getElementById('labelLayer');
+  console.log('labelLayer esiste:', !!layer);
+  if(layer){
+    console.log('  children in labelLayer:', layer.children.length);
+    for(var i = 0; i < layer.children.length; i++){
+      var c = layer.children[i];
+      console.log('    ['+i+'] tag=' + c.tagName + ' class=' + c.className + ' display=' + c.style.display);
+    }
+  }
+  muaObjects.forEach(function(m, i){
+    console.log('MUA #' + m.num + ':');
+    console.log('  aligned:', m.aligned, 'divergence:', m.divergence);
+    console.log('  labelEl exists:', !!m.labelEl);
+    if(m.labelEl){
+      console.log('    display:', m.labelEl.style.display);
+      console.log('    left:', m.labelEl.style.left, 'top:', m.labelEl.style.top);
+      console.log('    text:', m.labelEl.textContent);
+    }
+  });
+  console.log('=== FINE DIAGNOSTICA ===');
+}
+// Espongo globalmente
+window.syntesisDebugLabels = syntesisDebugLabels;
+
+
 function ensureLabelElements(){
   var layer = document.getElementById('labelLayer');
   if(!layer) return;
@@ -1365,9 +1405,13 @@ function ensureLabelElements(){
       m.labelEl = el;
     }
   });
-  // Rimuovo div per MUA eliminati (ogni div senza MUA associato)
+  // Rimuovo div per MUA eliminati (PRESERVO il SVG labelLines!)
   var activeEls = new Set(muaObjects.map(function(m){ return m.labelEl; }).filter(Boolean));
   Array.from(layer.children).forEach(function(child){
+    // Salto tutti gli elementi non-DIV (es. SVG labelLines)
+    if(child.tagName !== 'DIV') return;
+    // Salto il div che non e' una divergence-label
+    if(!child.classList || !child.classList.contains('divergence-label')) return;
     if(!activeEls.has(child)) layer.removeChild(child);
   });
 }
@@ -1861,11 +1905,33 @@ var UNDERCUT_T2 = 88.0; // <= warning
 var UNDERCUT_T3 = 90.0; // <= critico
 
 // Dato un angolo (gradi), ritorna il colore RGB [r,g,b] in 0..1
+// Gradiente continuo tipo "jet": blu(0°)->ciano(30°)->verde(50°)->giallo(65°)->arancio(80°)->rosso(90°)->rossoscuro(>90°)
 function undercutColorForAngle(ang){
-  if(ang <= UNDERCUT_T1) return [0.051, 0.620, 0.431];  // #0D9E6E verde
-  if(ang <= UNDERCUT_T2) return [0.961, 0.620, 0.043];  // #F59E0B giallo
-  if(ang <= UNDERCUT_T3) return [0.976, 0.451, 0.086];  // #F97316 arancio
-  return [0.863, 0.149, 0.149];                           // #DC2626 rosso
+  // Punti chiave del gradiente (angolo, [r,g,b])
+  var stops = [
+    [  0, [0.00, 0.20, 0.80]],  // blu scuro
+    [ 30, [0.00, 0.72, 1.00]],  // ciano
+    [ 50, [0.27, 1.00, 0.40]],  // verde
+    [ 65, [1.00, 1.00, 0.00]],  // giallo
+    [ 80, [1.00, 0.42, 0.00]],  // arancio
+    [ 90, [0.90, 0.00, 0.00]]   // rosso
+  ];
+  if(ang <= 0) return stops[0][1];
+  if(ang > 90) return [0.50, 0.00, 0.00]; // rosso scuro (sottosquadro)
+  // Trova il segmento e interpola linearmente
+  for(var i = 0; i < stops.length - 1; i++){
+    var a0 = stops[i][0], a1 = stops[i+1][0];
+    if(ang >= a0 && ang <= a1){
+      var t = (ang - a0) / (a1 - a0);
+      var c0 = stops[i][1], c1 = stops[i+1][1];
+      return [
+        c0[0] + (c1[0]-c0[0])*t,
+        c0[1] + (c1[1]-c0[1])*t,
+        c0[2] + (c1[2]-c0[2])*t
+      ];
+    }
+  }
+  return stops[stops.length-1][1];
 }
 
 // Costruisce l'array colors-per-vertex per la mesh matMesh del MUA
@@ -1959,6 +2025,14 @@ function buildUndercutColors(mua){
   return colors;
 }
 
+
+// Aggiorna visibilita' leggenda mappa sottosquadri (mostra se almeno una attiva)
+function updateUndercutLegend(){
+  var any = muaObjects.some(function(m){ return m.undercutMapActive === true; });
+  var el = document.getElementById('undercutLegend');
+  if(el) el.style.display = any ? 'block' : 'none';
+}
+
 // Applica la undercut map: cambia materiale e aggiunge color attribute
 function applyUndercutMap(mua){
   if(!mua.mtMesh) return;
@@ -1983,6 +2057,7 @@ function applyUndercutMap(mua){
   });
   
   mua.undercutMapActive = true;
+  updateUndercutLegend();
 }
 
 // Ripristina materiale solido originale
@@ -1992,6 +2067,7 @@ function restoreSolidMat(mua){
     mua.mtMesh.material = mua._originalMtMat;
   }
   mua.undercutMapActive = false;
+  updateUndercutLegend();
 }
 
 // Toggle singolo
