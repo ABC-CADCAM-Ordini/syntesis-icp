@@ -10,7 +10,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Cache buster: incrementare per forzare il rebuild del layer sottostante
-ARG CACHEBUST=20260421_0751
+ARG CACHEBUST=20260421084025
 
 # Copia backend
 COPY backend/ .
