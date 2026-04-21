@@ -46,6 +46,13 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .reset-menu-item.destructive{color:#A32D2D}
 .reset-menu-item.destructive:hover{background:#FCEBEB}
 .reset-menu-sep{height:1px;background:var(--border);margin:4px 0}
+.file-menu{position:absolute;top:100%;left:0;margin-top:6px;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:5px;min-width:170px;box-shadow:0 6px 20px rgba(15,25,35,.12);z-index:100;display:none}
+.file-menu.open{display:block}
+.file-menu-item{padding:8px 12px;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--dark);cursor:pointer;transition:background .12s;display:flex;align-items:center;gap:8px}
+.file-menu-item:hover{background:var(--light)}
+.file-menu-item .fm-key{font-size:9px;color:var(--gray);margin-left:auto;font-weight:600}
+.file-menu-sep{height:1px;background:var(--border);margin:4px 0}
+.file-menu-wrapper{position:relative}
 .header{position:relative}
 .main{display:flex;flex:1;overflow:hidden}
 .viewport{flex:1;position:relative;background:#1a1a2e}
@@ -140,7 +147,38 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
     <div class="header-title">Analizzare</div>
     <div class="header-sub">Analisi angolare implantare</div>
   </div>
-  <div class="header-spacer"></div>
+  <div class="file-menu-wrapper">
+    <button class="btn" onclick="toggleFileMenu(event)" title="Menu file">
+      File <span style="font-size:8px;margin-left:-1px">▾</span>
+    </button>
+    <div class="file-menu" id="fileMenu">
+      <div class="file-menu-item" onclick="closeFileMenu();newCase()">
+        <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><path d="M7 3 L17 3 L23 9 L23 25 L7 25 Z" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M17 3 L17 9 L23 9" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linejoin="round"/><line x1="15" y1="13" x2="15" y2="21" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/><line x1="11" y1="17" x2="19" y2="17" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Nuovo
+      </div>
+      <div class="file-menu-item" onclick="closeFileMenu();document.getElementById('inputScan').click()">
+        <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><path d="M5 20 L5 24 L23 24 L23 20" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 4 L14 18" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/><polyline points="8,10 14,4 20,10" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Importa
+      </div>
+      <div class="file-menu-sep"></div>
+      <div class="file-menu-item" onclick="closeFileMenu();saveCase()">
+        <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><rect x="4" y="4" width="20" height="20" rx="2" stroke="#0065B3" stroke-width="1.8" fill="none"/><path d="M8 4 L8 11 L20 11 L20 4" stroke="#0065B3" stroke-width="1.8" fill="none"/><rect x="9" y="15" width="10" height="8" rx="1" stroke="#0065B3" stroke-width="1.6" fill="none"/></svg>
+        Salva
+        <span class="fm-key">JSON</span>
+      </div>
+      <div class="file-menu-item" onclick="closeFileMenu();exportCase()">
+        <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><path d="M14 3 L14 18" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/><polyline points="8,13 14,19 20,13" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 21 L4 25 L24 25 L24 21" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Esporta
+        <span class="fm-key">PNG+JSON</span>
+      </div>
+      <div class="file-menu-sep"></div>
+      <div class="file-menu-item" onclick="closeFileMenu();openSettings()">
+        <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><path d="M12 3 L16 3 L16.5 6 L19 7 L21.5 5 L23 7.5 L21 10 L22 12 L24.5 12.5 L24.5 16.5 L22 17 L21 19 L23 21.5 L21.5 23 L19 21 L16.5 22 L16 25 L12 25 L11.5 22 L9 21 L6.5 23 L5 21.5 L7 19 L6 17 L3.5 16.5 L3.5 12.5 L6 12 L7 10 L5 7.5 L6.5 5 L9 7 L11.5 6 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><circle cx="14" cy="14" r="3.5" stroke="#0065B3" stroke-width="1.6" fill="none"/></svg>
+        Impostazioni
+      </div>
+    </div>
+  </div>
+  <div class="tb-sep"></div>
   <button class="btn green primary" onclick="startPlacement()" title="Posiziona un nuovo MUA sulla scansione">
     <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <ellipse cx="14" cy="10" rx="7" ry="2.5" stroke="#0065B3" stroke-width="1.6" fill="none"/>
@@ -200,36 +238,12 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
     Sezione
   </button>
   <div class="tb-spacer"></div>
-  <button class="btn" onclick="newCase()" title="Inizia un nuovo caso (cancella scansione e MUA)">
-    <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M7 3 L17 3 L23 9 L23 25 L7 25 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
-      <path d="M17 3 L17 9 L23 9" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
-      <line x1="15" y1="13" x2="15" y2="21" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/>
-      <line x1="11" y1="17" x2="19" y2="17" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/>
-    </svg>
-    Nuovo caso
-  </button>
-  <button class="btn" id="btnEsporta" onclick="exportCase()" title="Esporta screenshot e dati del caso">
-    <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M14 3 L14 18" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/>
-      <polyline points="8,13 14,19 20,13" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M4 21 L4 25 L24 25 L24 21" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    Esporta
-  </button>
-  <div class="tb-sep"></div>
   <button class="btn" onclick="undoLastMUA()" title="Annulla ultimo MUA (Ctrl+Z)">
     <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M4 14 A10 10 0 1 1 8 22" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round"/>
       <polyline points="2,10 4,14 8,12" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
     Undo
-  </button>
-  <button class="btn icon-only" onclick="openSettings()" title="Impostazioni fresatore">
-    <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 3 L16 3 L16.5 6 L19 7 L21.5 5 L23 7.5 L21 10 L22 12 L24.5 12.5 L24.5 16.5 L22 17 L21 19 L23 21.5 L21.5 23 L19 21 L16.5 22 L16 25 L12 25 L11.5 22 L9 21 L6.5 23 L5 21.5 L7 19 L6 17 L3.5 16.5 L3.5 12.5 L6 12 L7 10 L5 7.5 L6.5 5 L9 7 L11.5 6 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
-      <circle cx="14" cy="14" r="3.5" stroke="#0065B3" stroke-width="1.6" fill="none"/>
-    </svg>
   </button>
   <button class="btn danger" onclick="toggleResetMenu(event)" title="Azioni di reset">
     <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1079,6 +1093,72 @@ function updateMuaPanel(){
 }
 
 function resetCamera(){if(!scanMesh)return;var c=scanMesh.geometry.boundingSphere.center,r=scanMesh.geometry.boundingSphere.radius;controls.target.copy(c);camera.position.set(c.x+r*1.5,c.y+r,c.z+r*1.5)}
+// ── FILE MENU ─────────────────────────────────────────────
+function toggleFileMenu(ev){
+  ev.stopPropagation();
+  var menu = document.getElementById('fileMenu');
+  if(!menu) return;
+  // Chiudi anche il resetMenu se aperto
+  var rm = document.getElementById('resetMenu');
+  if(rm) rm.classList.remove('open');
+  var isOpen = menu.classList.contains('open');
+  if(isOpen){ menu.classList.remove('open'); }
+  else {
+    menu.classList.add('open');
+    setTimeout(function(){
+      document.addEventListener('click', closeFileMenu, {once:true});
+    }, 0);
+  }
+}
+function closeFileMenu(){
+  var menu = document.getElementById('fileMenu');
+  if(menu) menu.classList.remove('open');
+}
+
+// ── SALVA CASO (solo JSON, niente screenshot) ─────────────
+function saveCase(){
+  if(!scanMesh){ showStatus('Nulla da salvare: carica prima una scansione.'); return; }
+  var nameEl = document.querySelector('#slotScan .fname');
+  var scanName = nameEl ? nameEl.textContent : 'scansione';
+  var baseName = scanName.replace(/\.stl$/i,'').replace(/[^a-zA-Z0-9_-]+/g,'_') || 'caso';
+  var now = new Date();
+  var pad = function(n){ return (n<10?'0':'')+n; };
+  var ts = now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'_'+pad(now.getHours())+pad(now.getMinutes());
+  var triEl = document.getElementById('triScan');
+  var data = {
+    tool: 'Syntesis-ICP - Analizzare',
+    version: 'v3b',
+    saved_at: now.toISOString(),
+    scan: { filename: scanName, triangles: triEl ? triEl.textContent : null },
+    miller_settings: (typeof millerSettings !== 'undefined') ? millerSettings : null,
+    clinical_constants: {
+      mua_cone_half_angle_deg: (typeof MUA_CONE_HALF_ANGLE !== 'undefined') ? MUA_CONE_HALF_ANGLE : null,
+      max_couple_divergence_deg: (typeof MAX_COUPLE_DIVERGENCE !== 'undefined') ? MAX_COUPLE_DIVERGENCE : null,
+      max_milling_angle_deg: (typeof MAX_MILLING_ANGLE !== 'undefined') ? MAX_MILLING_ANGLE : null
+    },
+    mua: muaObjects.map(function(m){
+      return {
+        num: m.num, groupId: m.groupId || 0,
+        color: '#' + (m.color || 0).toString(16).padStart(6,'0'),
+        position: m.position ? [+m.position.x.toFixed(4), +m.position.y.toFixed(4), +m.position.z.toFixed(4)] : null,
+        axis: m.axisDir ? [+m.axisDir.x.toFixed(6), +m.axisDir.y.toFixed(6), +m.axisDir.z.toFixed(6)] : null,
+        divergence_deg: (m.divergence !== null && m.divergence !== undefined) ? +m.divergence.toFixed(3) : null,
+        rmsd_mm: (m.rmsd !== null && m.rmsd !== undefined) ? +m.rmsd.toFixed(4) : null,
+        aligned: !!m.aligned
+      };
+    })
+  };
+  try {
+    var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = baseName + '_' + ts + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    showStatus('Caso salvato (JSON).');
+  } catch(err){ console.error('[Salva] JSON fallito:', err); }
+}
+
 function toggleResetMenu(ev){
   ev.stopPropagation();
   var menu = document.getElementById('resetMenu');
