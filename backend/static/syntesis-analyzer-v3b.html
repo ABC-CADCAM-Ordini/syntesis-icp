@@ -2727,11 +2727,11 @@ var MUA_PALETTES = {
 };
 
 var envSettings = {
-  bgType: 'solid',    // 'solid' | 'gradient'
-  bgColor: '#1a1a2e',
-  bgColor2: '#415A77', // secondo colore (usato solo se bgType=gradient)
+  bgType: 'gradient',    // 'solid' | 'gradient'
+  bgColor: '#438DD6',
+  bgColor2: '#89B2E0', // secondo colore (usato solo se bgType=gradient)
   bgAngle: 180,        // gradiente, 0=top, 90=right, 180=bottom, 270=left
-  scanColor: '#889aad',
+  scanColor: '#b8a090',
   palette: 'syntesis',
   renderMode: 'solid' // 'solid' | 'wireframe' | 'both'
 };
@@ -3280,34 +3280,34 @@ window.addEventListener('DOMContentLoaded',init);
       <div style="margin-bottom:14px">
         <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Sfondo viewport</label>
         <div style="display:flex;gap:8px;align-items:center">
-          <input type="color" id="settingsBgColor" value="#1a1a2e" oninput="onEnvBgPickerChange(this.value)" style="width:36px;height:32px;padding:0;border:1px solid #ccc;border-radius:5px;cursor:pointer">
+          <input type="color" id="settingsBgColor" value="#438DD6" oninput="onEnvBgPickerChange(this.value)" style="width:36px;height:32px;padding:0;border:1px solid #ccc;border-radius:5px;cursor:pointer">
           <div id="settingsBgSwatches" style="display:flex;gap:4px">
-            <span class="env-swatch" data-value="#1a1a2e" onclick="onEnvBgChange('#1a1a2e')" style="width:26px;height:26px;background:#1a1a2e;border:1.5px solid var(--blue);border-radius:5px;cursor:pointer;display:inline-block" title="Notte (default)"></span>
+            <span class="env-swatch" data-value="#1a1a2e" onclick="onEnvBgChange('#1a1a2e')" style="width:26px;height:26px;background:#1a1a2e;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Notte"></span>
             <span class="env-swatch" data-value="#0a0a0f" onclick="onEnvBgChange('#0a0a0f')" style="width:26px;height:26px;background:#0a0a0f;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Nero profondo"></span>
             <span class="env-swatch" data-value="#243447" onclick="onEnvBgChange('#243447')" style="width:26px;height:26px;background:#243447;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Navy"></span>
             <span class="env-swatch" data-value="#f0f5fa" onclick="onEnvBgChange('#f0f5fa')" style="width:26px;height:26px;background:#f0f5fa;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Chiaro"></span>
             <span class="env-swatch" data-value="#ffffff" onclick="onEnvBgChange('#ffffff')" style="width:26px;height:26px;background:#ffffff;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Bianco"></span>
-            <span class="env-swatch" data-value="custom" onclick="onEnvBgCustomOpen()" style="width:26px;height:26px;background:linear-gradient(135deg,#fff 0% 50%,#0065B3 50% 100%);border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:14px;font-weight:500;text-shadow:0 0 2px rgba(0,0,0,0.5);line-height:1" title="Personalizzato / Sfumatura">+</span>
+            <span class="env-swatch" data-value="custom" onclick="onEnvBgCustomOpen()" style="width:26px;height:26px;background:linear-gradient(135deg,#fff 0% 50%,#0065B3 50% 100%);border:1.5px solid var(--blue);border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:14px;font-weight:500;text-shadow:0 0 2px rgba(0,0,0,0.5);line-height:1" title="Personalizzato / Sfumatura">+</span>
           </div>
-          <span id="settingsBgHex" style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-left:auto">#1a1a2e</span>
+          <span id="settingsBgHex" style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-left:auto">gradiente</span>
         </div>
-        <div id="settingsBgCustomBox" style="display:none;margin-top:10px;padding:10px 12px;background:#F7F9FC;border:1px dashed #D6E4F0;border-radius:6px">
+        <div id="settingsBgCustomBox" style="display:block;margin-top:10px;padding:10px 12px;background:#F7F9FC;border:1px dashed #D6E4F0;border-radius:6px">
           <div style="display:flex;gap:6px;margin-bottom:10px">
             <label style="flex:1;display:flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:10px">
-              <input type="radio" id="settingsCustomSolid" name="settingsBgMode" value="solid" onchange="onEnvCustomModeChange('solid')" checked> Solido
+              <input type="radio" id="settingsCustomSolid" name="settingsBgMode" value="solid" onchange="onEnvCustomModeChange('solid')"> Solido
             </label>
             <label style="flex:1;display:flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:10px">
-              <input type="radio" id="settingsCustomGradient" name="settingsBgMode" value="gradient" onchange="onEnvCustomModeChange('gradient')"> Sfumatura
+              <input type="radio" id="settingsCustomGradient" name="settingsBgMode" value="gradient" onchange="onEnvCustomModeChange('gradient')" checked> Sfumatura
             </label>
           </div>
-          <div id="settingsCustomGradientRow" style="display:none;gap:10px;align-items:center;margin-bottom:10px">
+          <div id="settingsCustomGradientRow" style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
             <div style="display:flex;align-items:center;gap:5px">
               <span style="font-family:var(--mono);font-size:9px;color:var(--gray)">A</span>
-              <input type="color" id="settingsCustomColor1" value="#1a1a2e" oninput="onEnvBgCustomPrimary(this.value)" style="width:28px;height:26px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer">
+              <input type="color" id="settingsCustomColor1" value="#438DD6" oninput="onEnvBgCustomPrimary(this.value)" style="width:28px;height:26px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer">
             </div>
             <div style="display:flex;align-items:center;gap:5px">
               <span style="font-family:var(--mono);font-size:9px;color:var(--gray)">B</span>
-              <input type="color" id="settingsCustomColor2" value="#415A77" oninput="onEnvBgCustomSecondary(this.value)" style="width:28px;height:26px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer">
+              <input type="color" id="settingsCustomColor2" value="#89B2E0" oninput="onEnvBgCustomSecondary(this.value)" style="width:28px;height:26px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer">
             </div>
             <div style="flex:1;display:flex;align-items:center;gap:6px">
               <span style="font-family:var(--mono);font-size:9px;color:var(--gray)">ANG</span>
@@ -3315,8 +3315,8 @@ window.addEventListener('DOMContentLoaded',init);
               <span id="settingsCustomAngleVal" style="font-family:var(--mono);font-size:10px;color:var(--dark);min-width:32px;text-align:right">180°</span>
             </div>
           </div>
-          <div id="settingsCustomPreview" style="width:100%;height:36px;background:#1a1a2e;border-radius:5px;border:1px solid #D6E4F0"></div>
-          <div id="settingsCustomHint" style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-top:6px;text-align:center">anteprima · solido</div>
+          <div id="settingsCustomPreview" style="width:100%;height:36px;background:linear-gradient(180deg,#438DD6,#89B2E0);border-radius:5px;border:1px solid #D6E4F0"></div>
+          <div id="settingsCustomHint" style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-top:6px;text-align:center">anteprima · dal basso</div>
         </div>
       </div>
 
@@ -3324,15 +3324,15 @@ window.addEventListener('DOMContentLoaded',init);
       <div style="margin-bottom:14px">
         <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Colore scansione</label>
         <div style="display:flex;gap:8px;align-items:center">
-          <input type="color" id="settingsScanColor" value="#889aad" oninput="onEnvScanColorChange(this.value)" style="width:36px;height:32px;padding:0;border:1px solid #ccc;border-radius:5px;cursor:pointer">
+          <input type="color" id="settingsScanColor" value="#b8a090" oninput="onEnvScanColorChange(this.value)" style="width:36px;height:32px;padding:0;border:1px solid #ccc;border-radius:5px;cursor:pointer">
           <div style="display:flex;gap:4px">
-            <span class="env-swatch-scan" data-value="#889aad" onclick="onEnvScanColorChange('#889aad')" style="width:26px;height:26px;background:#889aad;border:1.5px solid var(--blue);border-radius:5px;cursor:pointer;display:inline-block" title="Azzurro grigio (default)"></span>
+            <span class="env-swatch-scan" data-value="#889aad" onclick="onEnvScanColorChange('#889aad')" style="width:26px;height:26px;background:#889aad;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Azzurro grigio"></span>
             <span class="env-swatch-scan" data-value="#e8e4d8" onclick="onEnvScanColorChange('#e8e4d8')" style="width:26px;height:26px;background:#e8e4d8;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Beige"></span>
             <span class="env-swatch-scan" data-value="#f5e6d3" onclick="onEnvScanColorChange('#f5e6d3')" style="width:26px;height:26px;background:#f5e6d3;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Crema"></span>
-            <span class="env-swatch-scan" data-value="#b8a090" onclick="onEnvScanColorChange('#b8a090')" style="width:26px;height:26px;background:#b8a090;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Marroncino"></span>
+            <span class="env-swatch-scan" data-value="#b8a090" onclick="onEnvScanColorChange('#b8a090')" style="width:26px;height:26px;background:#b8a090;border:1.5px solid var(--blue);border-radius:5px;cursor:pointer;display:inline-block" title="Marroncino (default)"></span>
             <span class="env-swatch-scan" data-value="#d4d4d4" onclick="onEnvScanColorChange('#d4d4d4')" style="width:26px;height:26px;background:#d4d4d4;border:1px solid #D6E4F0;border-radius:5px;cursor:pointer;display:inline-block" title="Grigio"></span>
           </div>
-          <span id="settingsScanHex" style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-left:auto">#889aad</span>
+          <span id="settingsScanHex" style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-left:auto">#b8a090</span>
         </div>
       </div>
 
