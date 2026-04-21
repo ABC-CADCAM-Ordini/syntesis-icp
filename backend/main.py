@@ -105,6 +105,13 @@ async def analyzer_page():
         return FileResponse(str(_an))
     return JSONResponse({"error": "Analyzer not found"}, status_code=404)
 
+@app.get("/calibrare", include_in_schema=False)
+async def calibrare_page():
+    _cal = _STATIC_DIR / "syntesis-calibrator-v1.html"
+    if _cal.exists():
+        return FileResponse(str(_cal))
+    return JSONResponse({"error": "Calibrare not found"}, status_code=404)
+
 @app.post("/api/analyze")
 async def analyze(
     file_a: UploadFile = File(..., description="STL riferimento"),
