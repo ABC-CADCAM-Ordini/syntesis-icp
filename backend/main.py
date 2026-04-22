@@ -110,6 +110,17 @@ async def calibrare_page():
     _cal = _STATIC_DIR / "syntesis-calibrator-v4.html"
     if _cal.exists():
         return FileResponse(str(_cal))
+    # Fallback: serve da GitHub raw se il file locale non è presente
+    import httpx
+    raw_url = "https://raw.githubusercontent.com/ABC-CADCAM-Ordini/syntesis-icp/main/backend/static/syntesis-calibrator-v4.html"
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.get(raw_url)
+            if r.status_code == 200:
+                from fastapi.responses import HTMLResponse
+                return HTMLResponse(content=r.text)
+    except Exception:
+        pass
     return JSONResponse({"error": "Calibrare not found"}, status_code=404)
 
 @app.post("/api/analyze")
