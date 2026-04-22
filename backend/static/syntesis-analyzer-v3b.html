@@ -379,6 +379,14 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
     </div>
   </div>
   <div class="tb-sep analisi-only"></div>
+  <button class="btn analisi-only" id="btnLivelli" onclick="toggleLayersPanel()" title="Mostra/nascondi albero della scena (Livelli)">
+    <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5 10 L14 5 L23 10 L14 15 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+      <path d="M5 15 L14 20 L23 15" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+      <path d="M5 20 L14 25 L23 20" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+    </svg>
+    Livelli
+  </button>
   <button class="btn green primary analisi-only" onclick="startPlacement()" title="Posiziona un nuovo MUA sulla scansione">
     <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <ellipse cx="14" cy="10" rx="7" ry="2.5" stroke="#0065B3" stroke-width="1.6" fill="none"/>
@@ -493,7 +501,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div id="clinicalBannerIcon" style="width:22px;height:22px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0"></div>
       <div id="clinicalBannerText" style="font-family:var(--mono);font-size:11px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
     </div>
-    <div id="layersPanel" style="display:none;position:absolute;top:14px;left:14px;width:240px;max-height:calc(100% - 28px);background:rgba(15,25,35,0.94);border:1px solid rgba(122,144,164,0.3);border-radius:10px;padding:12px;z-index:8;box-shadow:8px 0 24px rgba(0,0,0,0.4);overflow-y:auto;flex-direction:column;gap:0">
+    <div id="layersPanel" style="display:flex;position:absolute;top:14px;left:14px;width:240px;max-height:calc(100% - 28px);background:rgba(15,25,35,0.94);border:1px solid rgba(122,144,164,0.3);border-radius:10px;padding:12px;z-index:8;box-shadow:8px 0 24px rgba(0,0,0,0.4);overflow-y:auto;flex-direction:column;gap:0">
       <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid rgba(122,144,164,0.2);margin-bottom:10px;flex-shrink:0">
         <div style="font-family:var(--mono);font-size:10px;font-weight:800;color:#fff;letter-spacing:.1em">ALBERO SCENA</div>
       </div>
