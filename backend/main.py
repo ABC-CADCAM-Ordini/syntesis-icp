@@ -107,7 +107,7 @@ async def analyzer_page():
 
 @app.get("/calibrare", include_in_schema=False)
 async def calibrare_page():
-    _cal = _STATIC_DIR / "syntesis-calibrator-v1.html"
+    _cal = _STATIC_DIR / "syntesis-calibrator-v4.html"
     if _cal.exists():
         return FileResponse(str(_cal))
     return JSONResponse({"error": "Calibrare not found"}, status_code=404)
