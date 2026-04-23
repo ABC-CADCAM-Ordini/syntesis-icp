@@ -9195,24 +9195,23 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       return;
     }
 
-    // Trasla template sull'asse Z in modo che il centro della cap superiore
-    // coincida con l'origine. Per i template 1T3/SR/OS la cap top e' il
-    // piano che va a contatto con l'impianto (o il riferimento del marker).
-    // Analizza fa translate(0,0,-10) perche' il suo scanbody ha la faccia
-    // piatta a Z=10. I nostri template hanno top disc a Z clinica diversa:
-    //   1T3: 10.000 | SR: -2.000 | OS: 6.000
-    var TOP_Z = { '1T3': 10.000, 'SR': -2.000, 'OS': 6.000 };
-    var tplTopZ = TOP_Z[key];
-    if(tplTopZ === undefined){
-      // Custom: calcolo il Z max dal buffer
+    // Trasla template sull'asse Z in modo che la BASE (cap inferiore) del
+    // marker coincida con l'origine. La base e' la faccia che appoggia sulla
+    // scansione quando il marker e' in uso; il disco si estende verso +axis.
+    // Nei template: la base = Z min (1T3: 8.1, SR: -5.0, OS: 4.9).
+    // Traslazione = -zMin porta la base a Z=0 mantenendo il disco sopra.
+    var BASE_Z = { '1T3': 8.100, 'SR': -5.000, 'OS': 4.900 };
+    var tplBaseZ = BASE_Z[key];
+    if(tplBaseZ === undefined){
+      // Custom: calcolo il Z min dal buffer
       var pos = geo.attributes.position.array;
-      var zmax = -Infinity;
+      var zmin = Infinity;
       for(var i = 2; i < pos.length; i += 3){
-        if(pos[i] > zmax) zmax = pos[i];
+        if(pos[i] < zmin) zmin = pos[i];
       }
-      tplTopZ = zmax;
+      tplBaseZ = zmin;
     }
-    geo.translate(0, 0, -tplTopZ);
+    geo.translate(0, 0, -tplBaseZ);
 
     sostCounter++;
     var id = 'SOST_' + sostCounter;
