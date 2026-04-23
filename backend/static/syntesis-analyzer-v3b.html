@@ -9107,6 +9107,10 @@ function sostLoadScanToScene(filename){
   sostMesh.userData.sostRole = 'scan';
   scene.add(sostMesh);
 
+  // Nascondi la scritta "Carica una scansione intraorale" (condivisa con Analizza)
+  var emptyState = document.getElementById('emptyState');
+  if(emptyState) emptyState.classList.add('hidden');
+
   // Camera fit
   geo.computeBoundingSphere();
   var bs = geo.boundingSphere;
