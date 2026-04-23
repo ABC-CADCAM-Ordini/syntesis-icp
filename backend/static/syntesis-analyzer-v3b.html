@@ -9032,9 +9032,9 @@ var sostSourceTemplate = '1T3';  // tipo di marker presente nella scansione di p
 // Per posizionare il template: group.position = center - DISC_Z * axis
 // cosi' il disco del modello 3D va a coincidere con il click.
 var SOSTITUIRE_SOURCE_OFFSET = {
-  '1T3': -10.00,   // disco 1T3 a Z=10 locale
-  'SR':   -2.00,   // disco SR a Z=-2 locale (convenzione negativa)
-  'OS':   -6.00    // disco OS a Z=6 locale
+  '1T3': -10.00,   // disco 1T3 a Z=+10 locale  -> offset = -10
+  'SR':    5.00,   // disco SR  a Z=-5  locale  -> offset = +5 (sopra l'origine)
+  'OS':   -6.00    // disco OS  a Z=+6  locale  -> offset = -6
 };
 
 // --- METADATA TEMPLATE ---
