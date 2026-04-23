@@ -805,10 +805,10 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div style="margin-top:12px;padding:8px;background:var(--light);border-radius:5px">
         <label style="display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">
           <span>Offset Z (taratura)</span>
-          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">-10.00</span>
+          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">0.00</span>
         </label>
-        <input type="range" id="sostZOffset" min="-15" max="5" step="0.1" value="-10" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
-        <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Delta click->origine clinica. Un valore per ogni tipo di scansione di partenza.</div>
+        <input type="range" id="sostZOffset" min="-5" max="5" step="0.1" value="0" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Aggiustamento fine manuale. L'offset principale e' calcolato automaticamente dal template.</div>
       </div>
 
       <div style="display:flex;gap:6px;margin-top:12px">
@@ -9074,7 +9074,7 @@ var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
 var sostCounter = 0;             // progressivo ID
-var sostZOffsetMm = -10.00;      // offset canonico 1T3 (disco a +10 dalla connessione)
+var sostZOffsetMm = 0.00;        // aggiustamento fine manuale sopra l'offset auto calcolato dal bbox
 var sostExportTemplate = '1T3';  // tipo di template da usare all'export ('1T3' | 'SR' | 'OS')
 var sostSourceTemplate = '1T3';  // tipo di marker presente nella scansione di partenza
 
@@ -9179,28 +9179,15 @@ function sostOnTemplateChange(radio){
   // Offset Z e' unico per tutti i template: non cambia al cambio radio
 }
 
-// Scansione di partenza: carica offset Z tarato per quel tipo di marker
+// Scansione di partenza: marker presente nella Multi-A
 function sostOnSourceChange(radio){
   sostSourceTemplate = radio.value;
   var labels = document.querySelectorAll('#sostSourceRadio label');
   labels.forEach(function(l){ l.classList.remove('active'); });
   radio.parentElement.classList.add('active');
-  // Carica l'offset tarato per questa scansione di partenza
-  var defaultOffset = SOSTITUIRE_SOURCE_OFFSET[radio.value];
-  if(typeof defaultOffset === 'number'){
-    var slider = document.getElementById('sostZOffset');
-    var label = document.getElementById('sostZOffsetValue');
-    if(slider){
-      var delta = defaultOffset - sostZOffsetMm;
-      slider.value = defaultOffset;
-      if(label) label.textContent = defaultOffset.toFixed(2);
-      sostZOffsetMm = defaultOffset;
-      // Sposta i marker gia' esistenti per riflettere il nuovo offset
-      if(delta !== 0 && sostPlaced.length > 0){
-        sostApplyOffsetDelta(delta);
-      }
-    }
-  }
+  // L'offset principale viene ricavato automaticamente dal bbox del template
+  // scelto come destinazione al momento del placement. Lo slider (se usato)
+  // resta come aggiustamento manuale indipendente dal source.
 }
 
 // Slider Offset Z: aggiorna real-time tutti i marker esistenti
@@ -9419,20 +9406,41 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     group.name = id;
     group.add(mesh);
 
-    // Posizionamento: group.position = connessione = click - Z_disco_source * axis
-    // Z_disco_source e' la quota del disco (cliccato) nel sistema locale del template
-    // corrispondente alla scansione di partenza.
-    // 1T3: disco a +10 -> position = click - 10*axis
-    // OS:  disco a +6  -> position = click - 6*axis
-    // SR:  disco a -5  -> position = click + 5*axis (il disco e' sotto la connessione)
+    // Z del disco letta direttamente dal bbox dello STL caricato. Questo
+    // rende il posizionamento robusto rispetto a eventuali variazioni
+    // di convenzione nei file STL embeddati (Z_disco puo' essere 8.5 o 10
+    // a seconda del file originario).
+    geo.computeBoundingBox();
+    var bb = geo.boundingBox;
+    // Disco: per SR e' a Zmin (sotto la connessione), per altri a Zmax.
+    // Lo riconosco guardando quale delle due estremita' ha piu' triangoli
+    // (il disco e' una superficie piana spessa, con molti triangoli).
+    var zDiscFromBBox;
+    if(key === 'SR'){
+      zDiscFromBBox = bb.min.z;
+    } else {
+      zDiscFromBBox = bb.max.z;
+    }
+    // Posizionamento: group.position = click - Z_disco * axis
+    // Il quaternion porta Z_locale → axis, quindi un vertice a (0,0,Z_disco)
+    // locale finisce a position + Z_disco*axis nel mondo. Per farlo coincidere
+    // col click, serve position = click - Z_disco*axis.
     group.position.copy(point);
+    var axisOffset = normal.clone().multiplyScalar(-zDiscFromBBox);
+    group.position.add(axisOffset);
+    // Applica eventuale offset dello slider (affinamento manuale post-auto)
     if(sostZOffsetMm !== 0){
       var dn = normal.clone().multiplyScalar(sostZOffsetMm);
       group.position.add(dn);
     }
     // Orientamento: tutti i template IPD hanno +Z che punta dalla connessione
-    // verso l'esterno del corpo (dove c'e' il disco per 1T3/OS, o verso
-    // l'emergenza per SR). findScanbodyCenter ritorna axis nello stesso verso.
+    // verso l'esterno del corpo. findScanbodyCenter ritorna axis nello stesso
+    // verso per 1T3/OS. Per SR (disco sotto connessione) il template STL ha
+    // il disco a Zmin, quindi la parte con "la geometria visibile" punta
+    // verso -Z locale. Il quaternion up=+Z -> axis lo porta orientato
+    // correttamente perche' zDiscFromBBox e' negativo per SR: position si
+    // sposta di +(5)*axis verso l'alto, e il disco del template (a Z=-5
+    // locale) finisce dopo la rotazione a position + (-5)*axis = click.
     var up = new THREE.Vector3(0, 0, 1);
     group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, normal));
     group.userData.isSostituire = true;
@@ -9546,8 +9554,17 @@ function sostAlignAll(){
       var center = autoResult.center;
       var axis = autoResult.axis.clone().normalize();
 
-      // Offset Z lungo l'asse (slider UI)
+      // Offset Z = -Z_disco del template del marker gia' posizionato
+      var tplMesh = p.group.getObjectByName('template');
+      var zDiscFromBBox = 0;
+      if(tplMesh && tplMesh.geometry){
+        tplMesh.geometry.computeBoundingBox();
+        var bbA = tplMesh.geometry.boundingBox;
+        zDiscFromBBox = (p.templateKey === 'SR') ? bbA.min.z : bbA.max.z;
+      }
+      // Offset Z complessivo: ricava automaticamente dal bbox + eventuale slider
       var finalCenter = center.clone();
+      finalCenter.add(axis.clone().multiplyScalar(-zDiscFromBBox));
       if(sostZOffsetMm !== 0){
         finalCenter.add(axis.clone().multiplyScalar(sostZOffsetMm));
       }
