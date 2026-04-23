@@ -9418,13 +9418,14 @@ function sostRenderPlacedList(){
 // ═══════════════════════════════════════════════════════════════════
 
 // Parametri del cilindro di soppressione per ciascun template.
-// Radius = raggio template + margine laterale (per catturare bordo marker)
-// Height = dimensione lungo l'asse dal punto di click (±height)
-// Valori tarabili empiricamente se l'export mangia troppo / troppo poco
+// radius = raggio template + margine laterale (per catturare bordo marker)
+// zMin/zMax = estensione Z del template nell'origine clinica locale.
+// Il cilindro di soppressione sara' asimmetrico rispetto al click (origine
+// clinica) per coprire esattamente l'ingombro verticale del marker nel mondo.
 var SOSTITUIRE_CULL_CYL = {
-  '1T3': { radius: 2.815, height: 1.9 },   // 2.515 + 0.3 margine
-  'SR':  { radius: 2.330, height: 3.0 },   // 2.030 + 0.3
-  'OS':  { radius: 2.080, height: 1.1 }    // 1.780 + 0.3
+  '1T3': { radius: 2.815, zMin: 8.100, zMax: 10.000 },
+  'SR':  { radius: 2.330, zMin: -5.000, zMax: -2.000 },
+  'OS':  { radius: 2.080, zMin: 4.900,  zMax: 6.000 }
 };
 
 function sostExportSTL(){
@@ -9505,35 +9506,44 @@ function sostBuildExportTriangles(destGeo, destKey){
   var scanPos = sostMesh.geometry.attributes.position.array;
   var nScanTris = scanPos.length / 9;
 
-  // Pre-calcola parametri cilindri di soppressione per ogni marker
-  // (in coordinate mondo: asse = p.axisDir, centro = p.position)
-  // Uso il MAX tra cilindro originale (p.templateKey) e cilindro destinazione
-  // (destKey) per coprire entrambi i casi: sopprimere il marker scannerizzato
-  // E lasciare spazio sufficiente per il nuovo template.
-  var destCull = SOSTITUIRE_CULL_CYL[destKey] || {radius: 3.0, height: 2.0};
+  // Pre-calcola parametri cilindri di soppressione per ogni marker.
+  // Il cilindro e' ASIMMETRICO rispetto al click (centrato sull'origine
+  // clinica = p.position): copre l'UNIONE degli intervalli Z dei template
+  // origine e destinazione. Cosi' quando esporti 1T3 (Z:8-10) come OS (Z:5-6),
+  // il cilindro taglia da Z=5 a Z=10 lungo l'asse, sopprimendo sia il marker
+  // originale scannerizzato sia lo spazio dove va il nuovo template.
+  //
+  // Riferimento Z: axial_from_origin = (triangolo - p.position) . axisDir
+  //   positivo = verso la direzione uscente dallo scanbody (cap del marker)
+  //   negativo = verso l'interno del moncone
+  var destCull = SOSTITUIRE_CULL_CYL[destKey] || {radius: 3.0, zMin: -1, zMax: 1};
   var cullers = sostPlaced.map(function(p){
     var key = p.templateKey;
-    var cyl = SOSTITUIRE_CULL_CYL[key];
-    if(!cyl){
-      // Custom o fallback: usa bbox del template
+    var srcCull = SOSTITUIRE_CULL_CYL[key];
+    if(!srcCull){
+      // Custom o fallback: bbox del template nel local
       var tplMesh = p.group.getObjectByName('template');
       var bbox = null;
       if(tplMesh && tplMesh.geometry){
         tplMesh.geometry.computeBoundingBox();
         bbox = tplMesh.geometry.boundingBox;
       }
-      cyl = {
+      srcCull = {
         radius: bbox ? Math.max(bbox.max.x - bbox.min.x, bbox.max.y - bbox.min.y) / 2 + 0.3 : 3.0,
-        height: bbox ? (bbox.max.z - bbox.min.z) : 2.0
+        zMin: bbox ? bbox.min.z : -1,
+        zMax: bbox ? bbox.max.z : 1
       };
     }
-    var finalR = Math.max(cyl.radius, destCull.radius);
-    var finalH = Math.max(cyl.height, destCull.height);
+    var finalR = Math.max(srcCull.radius, destCull.radius);
+    // Unione [min, max] dei due intervalli Z + piccolo safety margin
+    var zMin = Math.min(srcCull.zMin, destCull.zMin) - 0.1;
+    var zMax = Math.max(srcCull.zMax, destCull.zMax) + 0.1;
     return {
       center: p.position,
       axis: p.axisDir.clone().normalize(),
-      radius2: (finalR + 0.1) * (finalR + 0.1),  // cache quadrato + piccolo extra safety
-      halfHeight: finalH  // +/- height mm lungo asse
+      radius2: (finalR + 0.1) * (finalR + 0.1),
+      zMin: zMin,
+      zMax: zMax
     };
   });
 
@@ -9552,7 +9562,7 @@ function sostBuildExportTriangles(destGeo, destKey){
       var cu = cullers[k];
       var dx = cx - cu.center.x, dy = cy - cu.center.y, dz = cz - cu.center.z;
       var axial = dx * cu.axis.x + dy * cu.axis.y + dz * cu.axis.z;
-      if(axial < -cu.halfHeight || axial > cu.halfHeight) continue;
+      if(axial < cu.zMin || axial > cu.zMax) continue;
       var rx = dx - axial * cu.axis.x;
       var ry = dy - axial * cu.axis.y;
       var rz = dz - axial * cu.axis.z;
