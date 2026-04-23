@@ -805,9 +805,9 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div style="margin-top:12px;padding:8px;background:var(--light);border-radius:5px">
         <label style="display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">
           <span>Offset Z (taratura)</span>
-          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">-10.00</span>
+          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">-8.50</span>
         </label>
-        <input type="range" id="sostZOffset" min="-15" max="5" step="0.1" value="-10" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
+        <input type="range" id="sostZOffset" min="-15" max="5" step="0.1" value="-8.5" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
         <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Delta click->origine clinica. Un valore per ogni tipo di scansione di partenza.</div>
       </div>
 
@@ -9020,7 +9020,7 @@ var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
 var sostCounter = 0;             // progressivo ID
-var sostZOffsetMm = -10.00;      // offset Z = -disc_Z del template corrente (default 1T3)
+var sostZOffsetMm = -8.50;       // offset Z default per 1T3 (valore tarato empiricamente)
 var sostExportTemplate = '1T3';  // tipo di template da usare all'export ('1T3' | 'SR' | 'OS')
 var sostSourceTemplate = '1T3';  // tipo di marker presente nella scansione di partenza
 
@@ -9031,18 +9031,16 @@ var sostSourceTemplate = '1T3';  // tipo di marker presente nella scansione di p
 // Quando l'utente clicca sul disco, findScanbodyCenter ritorna center.
 // Per posizionare il template: group.position = center - DISC_Z * axis
 // cosi' il disco del modello 3D va a coincidere con il click.
-// Offset Z = -Z_disco del template corrispondente alla scansione di partenza.
-// L'origine (0,0,0) dei template coincide con la CONNESSIONE implantare.
-// L'utente clicca sul disco visibile che sta a una quota Z_disco nota:
-//   1T3: disco a Z=+10 (sopra la connessione)
-//   OS:  disco a Z=+6  (sopra la connessione, 4mm piu' basso di 1T3)
-//   SR:  disco a Z=-5  (sotto la connessione, l'unico cosi')
-// Per portare l'origine del template sulla connessione: position = click - Z_disco * axis
-//   -> offset = -Z_disco
+// Offset Z tarati empiricamente da Francesco per ciascun tipo di marker
+// nella scansione di partenza. I valori teorici basati sulla specifica
+// IPD (disco a +10 per 1T3, +6 OS, -5 SR) non funzionano in pratica:
+// findScanbodyCenter ha un bias sistematico di ~1.5mm che sposta il
+// centro rilevato sotto la faccia piatta reale. Questi valori sono quelli
+// che danno il disco del modello sovrapposto alla faccia piatta scansione.
 var SOSTITUIRE_SOURCE_OFFSET = {
-  '1T3': -10.00,   // disco 1T3 a Z=+10 locale
-  'SR':    5.00,   // disco SR  a Z=-5  locale -> offset = -(-5) = +5
-  'OS':   -6.00    // disco OS  a Z=+6  locale
+  '1T3': -8.50,    // tarato visualmente (teorico -10)
+  'SR':   5.00,    // da tarare (teorico +5)
+  'OS':  -4.00     // tarato visualmente (teorico -6)
 };
 
 // --- METADATA TEMPLATE ---
