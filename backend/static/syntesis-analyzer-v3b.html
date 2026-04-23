@@ -9419,13 +9419,16 @@ function sostRenderPlacedList(){
 
 // Parametri del cilindro di soppressione per ciascun template.
 // radius = raggio template + margine laterale (per catturare bordo marker)
-// zMin/zMax = estensione Z del template nell'origine clinica locale.
-// Il cilindro di soppressione sara' asimmetrico rispetto al click (origine
-// clinica) per coprire esattamente l'ingombro verticale del marker nel mondo.
+// zMin/zMax = estensione Z del cilindro di soppressione nell'origine clinica locale.
+// Per gestire la sostituzione pulita, zMin va esteso verso il basso oltre il
+// template fisico per coprire tutto il corpo del marker scannerizzato (che
+// include il disco + il cilindro sotto).
+// Il cilindro e' asimmetrico rispetto all'origine clinica: taglia da zMin a
+// zMax lungo l'asse. Valori tarati empiricamente.
 var SOSTITUIRE_CULL_CYL = {
-  '1T3': { radius: 2.815, zMin: 8.100, zMax: 10.000 },
+  '1T3': { radius: 2.815, zMin: -2.000, zMax: 10.000 },   // corpo marker si estende fino a ~Z=0
   'SR':  { radius: 2.330, zMin: -5.000, zMax: -2.000 },
-  'OS':  { radius: 2.080, zMin: 4.900,  zMax: 6.000 }
+  'OS':  { radius: 2.080, zMin: -2.000, zMax: 6.000 }
 };
 
 function sostExportSTL(){
