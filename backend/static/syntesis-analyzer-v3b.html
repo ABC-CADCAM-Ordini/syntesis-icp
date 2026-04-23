@@ -798,10 +798,10 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div style="margin-top:12px;padding:8px;background:var(--light);border-radius:5px">
         <label style="display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">
           <span>Offset Z (mm)</span>
-          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">0.00</span>
+          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">-0.40</span>
         </label>
-        <input type="range" id="sostZOffset" min="-3" max="3" step="0.1" value="0" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
-        <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Regola la profondita' del template rispetto alla faccia piatta. Applicato in real-time a tutti i marker posizionati.</div>
+        <input type="range" id="sostZOffset" min="-3" max="3" step="0.1" value="-0.4" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Profondita' del template rispetto alla faccia piatta. Default tarato per 1T3. Applicato in real-time.</div>
       </div>
 
       <div style="display:flex;gap:6px;margin-top:12px">
@@ -8999,7 +8999,7 @@ var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
 var sostCounter = 0;             // progressivo ID
-var sostZOffsetMm = 0;           // offset Z applicato nel locale del template (slider UI)
+var sostZOffsetMm = -0.40;       // offset Z applicato nel locale del template (slider UI, default tarato per 1T3)
 
 // --- METADATA TEMPLATE ---
 var SOSTITUIRE_TEMPLATE_INFO = {
@@ -9061,6 +9061,14 @@ function sostShowStatus(msg, isError){
 }
 
 // ── Cambio template via radio ──
+// Offset Z calibrati empiricamente per ciascun template
+// Valori tarati osservando la cut view vs la faccia piatta dello scanbody scansione
+var SOSTITUIRE_Z_OFFSET_DEFAULT = {
+  '1T3': -0.40,    // tarato 2026-04-23
+  'SR':   0.00,    // da tarare
+  'OS':   0.00     // da tarare
+};
+
 function sostOnTemplateChange(radio){
   sostActiveTemplate = radio.value;
   // Aggiorna UI radio active
@@ -9071,6 +9079,18 @@ function sostOnTemplateChange(radio){
     document.getElementById('sostInputCustom').click();
   } else {
     document.getElementById('sostCustomName').style.display = 'none';
+  }
+  // Carica offset Z default per questo template nello slider
+  var defaultOffset = SOSTITUIRE_Z_OFFSET_DEFAULT[radio.value];
+  if(typeof defaultOffset === 'number'){
+    var slider = document.getElementById('sostZOffset');
+    var label = document.getElementById('sostZOffsetValue');
+    if(slider){
+      slider.value = defaultOffset;
+      if(label) label.textContent = defaultOffset.toFixed(2);
+      // Non applico ai marker esistenti: cambio template = nuovo placement
+      sostZOffsetMm = defaultOffset;
+    }
   }
 }
 
