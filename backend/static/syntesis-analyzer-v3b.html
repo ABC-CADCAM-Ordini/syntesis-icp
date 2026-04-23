@@ -2204,6 +2204,8 @@ function selectWorkflow(wf){
     misurareBtns.forEach(function(el){ el.style.display = 'none'; });
     if(layPan) layPan.style.display = 'none';
     if(stage)   stage.classList.add('hidden');
+    // Le spline di accoppiamento sono una vista propria di Analizza: rimuovi in Accoppia
+    try { clearGroupSplines(); } catch(e){}
     try { refreshMisurareList(); } catch(e){ console.warn('[Misurare] refresh fallito:', e); }
     showStatus('Workflow Accoppia: esporta e confronta accoppiamenti.');
   }
@@ -5867,6 +5869,9 @@ function updateGroupSplines(){
     if(m.material) m.material.dispose();
   });
   muaGroupSplines = [];
+  // Le spline di accoppiamento sono semantiche del workflow Analizza:
+  // in Accoppia/Misurare rimangono solo pulite (dispose sopra) e si esce.
+  if(typeof currentWorkflow !== 'undefined' && currentWorkflow !== 'analizza') return;
   if(!muaObjects || muaObjects.length < 2) return;
 
   // Raggruppa i MUA per groupId
