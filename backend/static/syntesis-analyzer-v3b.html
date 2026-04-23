@@ -1131,13 +1131,16 @@ function onViewportClick(event){
 //   1. Collect triangles within 5mm of click with normal aligned to click normal
 //   2. Their centroid is the center of the flat face
 //   3. Their average normal is the axis direction (deterministic regardless of exact click pixel)
-function findScanbodyCenter(scanGeo, clickPos, clickNormal){
+function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   // Cylinder fitting deterministico con raggio noto (scanbody 1T3: r=2.515mm)
   // 1. Trova la faccia piatta -> asse
   // 2. Proietta i punti su piano perpendicolare all'asse
   // 3. Fit di cerchio a raggio fisso (minimi quadrati) -> centro esatto
+  //
+  // Parametro opzionale opts = { radius: Number } per passare un raggio diverso
+  // (es. OS: 1.78mm, SR: 2.03mm). Default 2.515mm per backward compat Analizza.
   
-  var SCANBODY_RADIUS = 2.515; // mm (1T3: diametro 5.03mm)
+  var SCANBODY_RADIUS = (opts && typeof opts.radius === 'number') ? opts.radius : 2.515;
   var pos = scanGeo.attributes.position.array;
   var norm = scanGeo.attributes.normal.array;
   var nTri = pos.length / 9;
@@ -9298,8 +9301,12 @@ function sostPlaceTemplate(rawPoint, rawNormal){
   var key = sostActiveTemplate;
   var info = SOSTITUIRE_TEMPLATE_INFO[key] || {label:'Custom', color: 0x888888};
 
-  // Auto-centratura deterministica (stessa funzione di Analizza)
-  var autoResult = findScanbodyCenter(sostMesh.geometry, rawPoint, rawNormal);
+  // Auto-centratura deterministica (stessa funzione di Analizza).
+  // Passa il raggio del marker presente nella scansione di partenza
+  // (1T3: 2.515, SR: 2.030, OS: 1.780) per fare il fit cilindro corretto.
+  var sourceRadius = (SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {}).radius;
+  var autoResult = findScanbodyCenter(sostMesh.geometry, rawPoint, rawNormal,
+    sourceRadius ? { radius: sourceRadius } : undefined);
   var point = autoResult.center;
   var normal = autoResult.axis.clone().normalize();
 
@@ -9425,9 +9432,12 @@ function sostAlignAll(){
   }
   sostShowStatus('Raffinamento...');
   setTimeout(function(){
+    // Raggio del marker nella scansione di partenza (per fit cilindro preciso)
+    var sourceRadius = (SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {}).radius;
+    var findOpts = sourceRadius ? { radius: sourceRadius } : undefined;
     sostPlaced.forEach(function(p){
       // Ri-esegui findScanbodyCenter con il click originale (deterministico)
-      var autoResult = findScanbodyCenter(sostMesh.geometry, p.clickPoint, p.clickNormal);
+      var autoResult = findScanbodyCenter(sostMesh.geometry, p.clickPoint, p.clickNormal, findOpts);
       var center = autoResult.center;
       var axis = autoResult.axis.clone().normalize();
 
