@@ -760,7 +760,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
     <div class="panel-section" id="panelSostituire" style="display:none">
       <div class="panel-label">Sostituire scan body</div>
       <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:8px;line-height:1.5">
-        Carica la scena STL (Multi-A). Il sistema rileva i cilindri e li sostituisce con il template scelto.
+        Carica la scena STL (Multi-A). Clicca su ogni marker per posizionarvi il template scelto.
       </div>
 
       <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">Scena (Multi-A):</div>
@@ -779,17 +779,15 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <input type="file" id="sostInputCustom" accept=".stl,.STL" style="display:none" onchange="sostOnCustomPicked(event)">
       <div id="sostCustomName" style="display:none;font-family:var(--mono);font-size:9px;color:var(--dark);margin-top:4px;padding:4px 6px;background:var(--light);border-radius:4px;border:1px solid var(--border)"></div>
 
-      <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px 0;padding:6px 2px;border-top:1px solid var(--border)">
-        <input type="checkbox" id="sostICPToggle" checked onchange="sostICPEnabled=this.checked" style="margin:0;cursor:pointer;accent-color:var(--blue)">
-        <label for="sostICPToggle" style="font-family:var(--mono);font-size:10px;color:var(--dark);cursor:pointer;flex:1">Raffina con ICP (post-processing)</label>
+      <div style="display:flex;gap:6px;margin-top:12px">
+        <button id="sostBtnPlace" onclick="sostStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona</button>
+        <button id="sostBtnRefine" onclick="sostAlignAll()" style="flex:1;padding:8px 10px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase;opacity:0.5" disabled>Raffina</button>
       </div>
 
-      <div id="sostCylList" style="display:none;margin-top:8px">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">Marker rilevati:</div>
-        <div id="sostCylListItems"></div>
+      <div id="sostPlacedList" style="display:none;margin-top:10px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">Marker posizionati:</div>
+        <div id="sostPlacedItems"></div>
       </div>
-
-      <button id="sostBtnPlace" onclick="sostPlaceTemplates()" style="display:none;width:100%;margin-top:10px;padding:8px 12px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.05em;cursor:pointer;text-transform:uppercase">Posiziona templates</button>
 
       <div id="sostStatus" style="display:none;font-family:var(--mono);font-size:9px;color:var(--gray);margin-top:6px;padding:4px 6px;background:var(--light);border-radius:4px;line-height:1.45"></div>
     </div>
@@ -1069,7 +1067,20 @@ function loadScanFile(file){var reader=new FileReader();reader.onload=function(e
 
 // Placement
 function startPlacement(){if(!scanMesh){showStatus('Carica prima una scansione.');return}placementMode=true;renderer.domElement.style.cursor='crosshair';showStatus('Clicca sullo scanbody nella scansione')}
-function onViewportClick(event){if(!placementMode||!scanMesh)return;var rect=renderer.domElement.getBoundingClientRect();var mouse=new THREE.Vector2(((event.clientX-rect.left)/rect.width)*2-1,-((event.clientY-rect.top)/rect.height)*2+1);var raycaster=new THREE.Raycaster();raycaster.setFromCamera(mouse,camera);var hits=raycaster.intersectObject(scanMesh);if(hits.length>0){placeMUA(hits[0].point,hits[0].face.normal);placementMode=false;renderer.domElement.style.cursor='default'}}
+function onViewportClick(event){
+  // Dispatch a Sostituire se e' in placement mode
+  if(typeof sostOnViewportClick === 'function' && typeof sostPlacementMode !== 'undefined' && sostPlacementMode){
+    if(sostOnViewportClick(event)) return;
+  }
+  // Fallback: Analizza
+  if(!placementMode||!scanMesh)return;
+  var rect=renderer.domElement.getBoundingClientRect();
+  var mouse=new THREE.Vector2(((event.clientX-rect.left)/rect.width)*2-1,-((event.clientY-rect.top)/rect.height)*2+1);
+  var raycaster=new THREE.Raycaster();
+  raycaster.setFromCamera(mouse,camera);
+  var hits=raycaster.intersectObject(scanMesh);
+  if(hits.length>0){placeMUA(hits[0].point,hits[0].face.normal);placementMode=false;renderer.domElement.style.cursor='default'}
+}
 
 
 // Auto-detect scanbody center and axis from click position
@@ -8931,483 +8942,402 @@ var SOSTITUIRE_TEMPLATES_B64 = {
     "AQA="
 };
 
+
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  SOSTITUIRE: sostituzione scanbody via rilevamento cilindri     ║
+// ║  SOSTITUIRE: sostituzione scan body via clic manuale              ║
+// ║  Pipeline identica ad Analizza: findScanbodyCenter + placement    ║
 // ╚══════════════════════════════════════════════════════════════════╝
 //
-// Il modulo rileva automaticamente i cilindri (scanbody esistenti) in un
-// file STL "Multi-A" (scena con N impianti) e li sostituisce con un
-// template scelto dall'utente tra 3 preset (1T3, SR, OS) o un file custom.
-//
-// Algoritmo rilevamento ispirato al raggruppamento disco+cilindro del modulo
-// /replacer, semplificato per lavorare su un solo file. Key steps:
-//   1. Carica STL come mesh Three.js
-//   2. Clustering geometrico: gruppi di triangoli spazialmente connessi
-//      (flood-fill su adiacenze di vertici con soglia snap)
-//   3. Per ogni gruppo calcola bbox e centroide
-//   4. Filtro: scarta gruppi troppo grandi (la "arcata" dentale) e
-//      troppo piccoli (rumore/frammenti)
-//   5. Raggruppa cluster vicini (disco+ring+body di uno stesso scanbody
-//      potrebbero essere scollegati topologicamente ma spazialmente adiacenti)
-//   6. Per ogni gruppo finale, fit cilindro (axis + center) usando lo
-//      stesso autoCenter() di Analizza
+// L'utente carica una scansione Multi-A, sceglie il template desiderato
+// (Marker 1T3 / SR / OS / Custom), clicca "+ Posiziona" e poi clicca
+// direttamente sul marker nella scansione 3D. Il sistema usa la stessa
+// funzione findScanbodyCenter() di Analizza per ottenere centro+asse
+// deterministici, e crea un gruppo Three.js con la geometria del template
+// orientata correttamente. Il pulsante "Raffina" riesegue il calcolo.
 
 // --- STATO GLOBALE MODULO ---
 var sostStl = null;              // Uint8Array del Multi-A caricato
 var sostMesh = null;             // THREE.Mesh del Multi-A
-var sostCylinders = [];          // [{id, center:Vec3, axis:Vec3, radius, height, meshHighlight, accepted}]
 var sostActiveTemplate = '1T3';  // '1T3' | 'SR' | 'OS' | 'custom'
-var sostCustomStl = null;        // Uint8Array se template custom caricato
-var sostICPEnabled = true;       // toggle "Raffina con ICP" - default on per accuratezza
-var sostTemplateMeshes = {};     // {'1T3': Uint8Array, 'SR': ..., 'OS': ...} cache buffer template decompresso
-var sostPlacedMeshes = [];       // [THREE.Mesh] - template posizionati nella scena dopo Posiziona
+var sostCustomStlBuffer = null;  // Uint8Array del template custom
+var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
+var sostPlacementMode = false;   // true quando siamo in attesa di clic
+var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
+var sostCounter = 0;             // progressivo ID
 
 // --- METADATA TEMPLATE ---
-// Info clinica (bbox, Z del centro disco) usata per preview e UI
 var SOSTITUIRE_TEMPLATE_INFO = {
-  '1T3': { label: '1T3',  radius: 2.515, height: 1.07, zDisk: 7.97,  color: 0xffaa44 },
-  'SR':  { label: 'SR',   radius: 2.030, height: 3.00, zDisk: -3.50, color: 0x0065B3 },
-  'OS':  { label: 'OS',   radius: 1.780, height: 1.10, zDisk: 5.45,  color: 0x639922 }
+  '1T3': { label: 'Marker 1T3', radius: 2.515, color: 0xffaa44 },
+  'SR':  { label: 'Marker SR',  radius: 2.030, color: 0x0065B3 },
+  'OS':  { label: 'Marker OS',  radius: 1.780, color: 0x639922 }
 };
 
-// --- DECOMPRESSIONE TEMPLATE BASE64+GZIP ---
-// Usa DecompressionStream nativo (supportato da tutti i browser moderni)
-// per non aggiungere una libreria esterna all'analyzer. La funzione e'
-// asincrona: mantiene una cache 'sostTemplateMeshes[name]' del buffer decompresso.
+// ── Decompressione template base64+gzip (cache Uint8Array) ──
 function sostDecodeTemplate(name){
-  if(sostTemplateMeshes[name]) return Promise.resolve(sostTemplateMeshes[name]);
+  if(sostTemplateBuffers[name]) return Promise.resolve(sostTemplateBuffers[name]);
   if(typeof SOSTITUIRE_TEMPLATES_B64 === 'undefined') return Promise.resolve(null);
   var b64 = SOSTITUIRE_TEMPLATES_B64[name];
   if(!b64) return Promise.resolve(null);
-  // base64 -> Uint8Array (gzipped)
   var bin = atob(b64);
   var gz = new Uint8Array(bin.length);
   for(var i = 0; i < bin.length; i++) gz[i] = bin.charCodeAt(i);
-  // DecompressionStream API
   var stream = new Response(
     new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))
   );
   return stream.arrayBuffer().then(function(ab){
     var stl = new Uint8Array(ab);
-    sostTemplateMeshes[name] = stl;
+    sostTemplateBuffers[name] = stl;
     return stl;
   });
 }
 
-// --- PARSING STL BINARIO (stesso approccio di icp_engine) ---
-function sostParseSTL(buf){
-  // Verifica che sia binario (header 80 bytes + uint32 count)
-  if(buf.byteLength < 84) return null;
-  var view = new DataView(buf.buffer || buf, buf.byteOffset || 0, buf.byteLength);
+// ── Parsing STL binario -> THREE.BufferGeometry ──
+function sostParseSTLToGeometry(buf){
+  var view;
+  if(buf instanceof ArrayBuffer) view = new DataView(buf);
+  else if(ArrayBuffer.isView(buf)) view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  else return null;
+  if(view.byteLength < 84) return null;
   var n = view.getUint32(80, true);
-  var expected = 84 + n * 50;
-  if(expected !== buf.byteLength){
-    // Prova ASCII fallback
-    return sostParseSTLAscii(new TextDecoder().decode(buf));
-  }
-  var pos = new Float32Array(n * 9);
-  var off = 84;
+  if(84 + n * 50 !== view.byteLength) return null;
+  var positions = new Float32Array(n * 9);
   for(var i = 0; i < n; i++){
-    // skip normal (12 bytes)
-    off += 12;
-    for(var j = 0; j < 9; j++){
-      pos[i*9 + j] = view.getFloat32(off, true);
-      off += 4;
-    }
-    off += 2; // skip attribute byte count
-  }
-  return pos;
-}
-
-function sostParseSTLAscii(text){
-  var vertices = [];
-  var lines = text.split(/\r?\n/);
-  for(var i = 0; i < lines.length; i++){
-    var line = lines[i].trim();
-    if(line.indexOf('vertex') === 0){
-      var parts = line.split(/\s+/);
-      vertices.push(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
-    }
-  }
-  return new Float32Array(vertices);
-}
-
-// --- RILEVAMENTO CILINDRI (pipeline principale) ---
-// Input: Float32Array pos (9 float per triangolo, groups di 3 vertici)
-// Output: array di cluster = {pts: [[x,y,z],...], bbox: {min,max}, centroid:[x,y,z]}
-function sostDetectCylinders(pos, opts){
-  opts = opts || {};
-  var snapEps = opts.snapEps || 0.02;       // distanza snap per vertex hash (mm)
-  var maxDim = opts.maxDim || 15.0;         // scarta cluster con qualche dim > questo (arcata)
-  var minTris = opts.minTris || 50;         // scarta cluster con meno triangoli
-  var mergeDist = opts.mergeDist || 3.0;    // unisci cluster con centroidi entro X mm
-
-  var nTris = pos.length / 9;
-  if(nTris < minTris) return [];
-
-  // STEP 1: vertex hash con snap - ogni vertice va a un "indice unico"
-  // per identificare adiacenze a meno di snapEps
-  var snap = 1 / snapEps;
-  var vIdx = new Int32Array(nTris * 3);
-  var vMap = {};
-  var vList = []; // [x,y,z] per ogni indice unico
-  for(var t = 0; t < nTris; t++){
+    var off = 84 + i * 50;
     for(var k = 0; k < 3; k++){
-      var o = t*9 + k*3;
-      var x = pos[o], y = pos[o+1], z = pos[o+2];
-      var key = Math.round(x*snap) + ',' + Math.round(y*snap) + ',' + Math.round(z*snap);
-      var idx = vMap[key];
-      if(idx === undefined){
-        idx = vList.length / 3;
-        vList.push(x, y, z);
-        vMap[key] = idx;
-      }
-      vIdx[t*3 + k] = idx;
+      positions[i*9 + k*3]     = view.getFloat32(off + 12 + k*12, true);
+      positions[i*9 + k*3 + 1] = view.getFloat32(off + 16 + k*12, true);
+      positions[i*9 + k*3 + 2] = view.getFloat32(off + 20 + k*12, true);
     }
   }
-  var nVerts = vList.length / 3;
-
-  // STEP 2: adiacenza triangolo->triangolo attraverso vertici condivisi
-  var vertToTris = {};
-  for(var t = 0; t < nTris; t++){
-    for(var k = 0; k < 3; k++){
-      var vi = vIdx[t*3 + k];
-      if(!vertToTris[vi]) vertToTris[vi] = [];
-      vertToTris[vi].push(t);
-    }
-  }
-
-  // STEP 3: flood-fill per identificare componenti connesse
-  var triGroup = new Int32Array(nTris);
-  triGroup.fill(-1);
-  var groups = []; // [{tris: [triIdx,...]}]
-  for(var seed = 0; seed < nTris; seed++){
-    if(triGroup[seed] >= 0) continue;
-    var gid = groups.length;
-    var stack = [seed];
-    var groupTris = [];
-    triGroup[seed] = gid;
-    while(stack.length > 0){
-      var t = stack.pop();
-      groupTris.push(t);
-      for(var k = 0; k < 3; k++){
-        var vi = vIdx[t*3 + k];
-        var neighbors = vertToTris[vi];
-        for(var m = 0; m < neighbors.length; m++){
-          var nb = neighbors[m];
-          if(triGroup[nb] < 0){
-            triGroup[nb] = gid;
-            stack.push(nb);
-          }
-        }
-      }
-    }
-    groups.push({tris: groupTris});
-  }
-
-  // STEP 4: per ogni gruppo calcola bbox e centroide, applica filtro
-  var filtered = [];
-  for(var g = 0; g < groups.length; g++){
-    var gr = groups[g];
-    if(gr.tris.length < minTris) continue;
-    var minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
-    var cx=0,cy=0,cz=0,np=0;
-    for(var i = 0; i < gr.tris.length; i++){
-      var ti = gr.tris[i];
-      for(var k = 0; k < 3; k++){
-        var o = ti*9 + k*3;
-        var x = pos[o], y = pos[o+1], z = pos[o+2];
-        if(x<minX)minX=x; if(x>maxX)maxX=x;
-        if(y<minY)minY=y; if(y>maxY)maxY=y;
-        if(z<minZ)minZ=z; if(z>maxZ)maxZ=z;
-        cx+=x; cy+=y; cz+=z; np++;
-      }
-    }
-    var dx = maxX-minX, dy = maxY-minY, dz = maxZ-minZ;
-    // Scarta l'arcata (bbox > maxDim in qualche direzione)
-    if(Math.max(dx,dy,dz) > maxDim) continue;
-    filtered.push({
-      tris: gr.tris,
-      bbox: {min:[minX,minY,minZ], max:[maxX,maxY,maxZ], ext:[dx,dy,dz]},
-      centroid: [cx/np, cy/np, cz/np]
-    });
-  }
-
-  // STEP 5: merge cluster con centroidi vicini (disco + ring scollegati ma spazialmente vicini)
-  var merged = [];
-  var used = new Array(filtered.length).fill(false);
-  for(var i = 0; i < filtered.length; i++){
-    if(used[i]) continue;
-    used[i] = true;
-    var group = {tris: filtered[i].tris.slice(), centroid: filtered[i].centroid.slice()};
-    for(var j = i+1; j < filtered.length; j++){
-      if(used[j]) continue;
-      var d = 0;
-      for(var k = 0; k < 3; k++){
-        var diff = filtered[i].centroid[k] - filtered[j].centroid[k];
-        d += diff*diff;
-      }
-      if(Math.sqrt(d) < mergeDist){
-        used[j] = true;
-        group.tris = group.tris.concat(filtered[j].tris);
-      }
-    }
-    // Ricalcolo bbox e centroide dopo merge
-    var minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
-    var cx=0,cy=0,cz=0,np=0;
-    for(var ti_i = 0; ti_i < group.tris.length; ti_i++){
-      var ti = group.tris[ti_i];
-      for(var k = 0; k < 3; k++){
-        var o = ti*9 + k*3;
-        var x = pos[o], y = pos[o+1], z = pos[o+2];
-        if(x<minX)minX=x; if(x>maxX)maxX=x;
-        if(y<minY)minY=y; if(y>maxY)maxY=y;
-        if(z<minZ)minZ=z; if(z>maxZ)maxZ=z;
-        cx+=x; cy+=y; cz+=z; np++;
-      }
-    }
-    var dx = maxX-minX, dy = maxY-minY, dz = maxZ-minZ;
-    // Ulteriore filtro post-merge: scarta se dim max troppo grande
-    if(Math.max(dx,dy,dz) > maxDim) continue;
-    // Filtro cilindricita' grossolana: bbox XY simili (plausibile cilindro)
-    var aspectXY = Math.abs(dx - dy) / Math.max(dx, dy);
-    if(aspectXY > 0.4) continue; // se bbox X e Y differiscono > 40%, non e' cilindro
-    // Dimensioni plausibili scanbody: r tra 1-4mm
-    var avgR = (dx + dy) / 4;
-    if(avgR < 0.8 || avgR > 4.0) continue;
-    merged.push({
-      tris: group.tris,
-      bbox: {min:[minX,minY,minZ], max:[maxX,maxY,maxZ], ext:[dx,dy,dz]},
-      centroid: [cx/np, cy/np, cz/np],
-      approxRadius: avgR
-    });
-  }
-
-  return merged;
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
 }
 
-// Funzione ponte: parsing STL -> rilevamento -> lista candidati
-function sostAnalyzeSTL(stlBuffer, opts){
-  var pos = sostParseSTL(stlBuffer);
-  if(!pos) return {error: 'STL parsing fallito', cylinders: []};
-  var cyls = sostDetectCylinders(pos, opts);
-  return {
-    pos: pos,
-    cylinders: cyls,
-    nTriangles: pos.length / 9
-  };
-}
-
-
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  SOSTITUIRE: UI integration                                     ║
-// ╚══════════════════════════════════════════════════════════════════╝
-
+// ── Status banner ──
 function sostShowStatus(msg, isError){
-  var el = document.getElementById('sostStatus');
-  if(!el) return;
-  el.style.display = '';
-  el.textContent = msg;
-  el.style.color = isError ? 'var(--red)' : 'var(--gray)';
+  var s = document.getElementById('sostStatus');
+  if(!s) return;
+  s.style.display = '';
+  s.textContent = msg;
+  s.style.color = isError ? '#EF4444' : 'var(--gray)';
 }
 
+// ── Cambio template via radio ──
 function sostOnTemplateChange(radio){
   sostActiveTemplate = radio.value;
-  // Aggiorna classe "active" per evidenziare label selezionato
+  // Aggiorna UI radio active
   var labels = document.querySelectorAll('#sostTemplateRadio label');
-  for(var i = 0; i < labels.length; i++){
-    var r = labels[i].querySelector('input');
-    if(r) labels[i].classList.toggle('active', r.checked);
-  }
-  // Se custom, apri file picker
+  labels.forEach(function(l){ l.classList.remove('active'); });
+  radio.parentElement.classList.add('active');
   if(radio.value === 'custom'){
-    if(!sostCustomStl){
-      document.getElementById('sostInputCustom').click();
-    }
+    document.getElementById('sostInputCustom').click();
+  } else {
+    document.getElementById('sostCustomName').style.display = 'none';
   }
-  sostShowStatus('Template selezionato: ' + radio.value);
 }
 
 function sostOnCustomPicked(evt){
-  var f = evt.target.files && evt.target.files[0];
-  evt.target.value = '';
-  if(!f){
-    // Annullato: torno a 1T3
-    document.querySelector('input[name="sostTpl"][value="1T3"]').checked = true;
-    sostActiveTemplate = '1T3';
-    var labels = document.querySelectorAll('#sostTemplateRadio label');
-    for(var i = 0; i < labels.length; i++){
-      var r = labels[i].querySelector('input');
-      if(r) labels[i].classList.toggle('active', r.checked);
-    }
-    document.getElementById('sostCustomName').style.display = 'none';
-    return;
-  }
-  if(!f.name.toLowerCase().endsWith('.stl')){
-    sostShowStatus('Seleziona un file con estensione .stl', true);
-    return;
-  }
+  var file = evt.target.files && evt.target.files[0];
+  if(!file) return;
   var reader = new FileReader();
-  reader.onload = function(ev){
-    sostCustomStl = new Uint8Array(ev.target.result);
-    var nm = document.getElementById('sostCustomName');
-    nm.textContent = f.name + ' (' + (f.size/1024).toFixed(1) + ' KB)';
-    nm.style.display = '';
-    sostShowStatus('Template custom caricato: ' + f.name);
+  reader.onload = function(e){
+    sostCustomStlBuffer = new Uint8Array(e.target.result);
+    var name = document.getElementById('sostCustomName');
+    name.textContent = file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)';
+    name.style.display = '';
+    sostShowStatus('Template custom caricato: ' + file.name);
   };
-  reader.readAsArrayBuffer(f);
+  reader.readAsArrayBuffer(file);
 }
 
+// ── Caricamento Multi-A ──
 function sostOnScanPicked(evt){
-  var f = evt.target.files && evt.target.files[0];
-  evt.target.value = '';
-  if(!f) return;
-  if(!f.name.toLowerCase().endsWith('.stl')){
-    sostShowStatus('Seleziona un file con estensione .stl', true);
-    return;
-  }
-  sostShowStatus('Caricamento ' + f.name + '...');
+  var file = evt.target.files && evt.target.files[0];
+  if(!file) return;
   var reader = new FileReader();
-  reader.onload = function(ev){
-    sostStl = new Uint8Array(ev.target.result);
-    // Aggiorna UI slot file
-    var ph = document.getElementById('sostScanPlaceholder');
-    if(ph) ph.textContent = f.name + ' - ' + (f.size/1024/1024).toFixed(1) + ' MB';
-    // Analizza
-    sostAnalyzeAndRender(f.name);
+  reader.onload = function(e){
+    sostStl = new Uint8Array(e.target.result);
+    sostLoadScanToScene(file.name);
   };
-  reader.onerror = function(){ sostShowStatus('Errore lettura file', true); };
-  reader.readAsArrayBuffer(f);
+  reader.readAsArrayBuffer(file);
 }
 
-// Analizza STL + renderizza mesh + evidenzia cilindri rilevati
-function sostAnalyzeAndRender(filename){
-  try {
-    // Prima rimuovi eventuali artefatti da upload precedente
-    sostClearScene();
+function sostLoadScanToScene(filename){
+  sostClearScene();
+  var geo = sostParseSTLToGeometry(sostStl);
+  if(!geo){
+    sostShowStatus('Errore: impossibile parsare il file STL.', true);
+    return;
+  }
+  var mat = new THREE.MeshPhongMaterial({
+    color: 0xc4a48c,
+    side: THREE.DoubleSide,
+    flatShading: false
+  });
+  sostMesh = new THREE.Mesh(geo, mat);
+  sostMesh.userData.isSostituire = true;
+  sostMesh.userData.sostRole = 'scan';
+  scene.add(sostMesh);
 
-    sostShowStatus('Analisi Multi-A...');
-    var res = sostAnalyzeSTL(sostStl, {
-      snapEps: 0.05,
-      maxDim: 20.0,     // scarta tutto cio' che sta sopra 20mm (arcata e' >20mm)
-      minTris: 30,
-      mergeDist: 4.0
-    });
-    if(res.error){
-      sostShowStatus(res.error, true);
+  // Camera fit
+  geo.computeBoundingSphere();
+  var bs = geo.boundingSphere;
+  if(bs){
+    controls.target.copy(bs.center);
+    camera.position.set(bs.center.x + bs.radius*1.5, bs.center.y + bs.radius, bs.center.z + bs.radius*1.5);
+    controls.update();
+  }
+
+  // Aggiorna UI file-slot
+  var slot = document.getElementById('sostSlotScan');
+  if(slot){
+    slot.classList.add('loaded');
+    slot.innerHTML = '<div class="fname">' + filename + '</div><div class="finfo">' +
+      (geo.attributes.position.count / 3).toLocaleString() + ' triangoli</div>';
+  }
+  var ph = document.getElementById('sostScanPlaceholder');
+  if(ph) ph.style.display = 'none';
+
+  // Pre-load template di default
+  if(sostActiveTemplate !== 'custom') sostDecodeTemplate(sostActiveTemplate);
+
+  sostShowStatus('Scansione caricata. Clicca "+ Posiziona" poi sul marker.');
+}
+
+// ── Placement: avvia modalità clic ──
+function sostStartPlacement(){
+  if(!sostMesh){
+    sostShowStatus('Carica prima una scansione.', true);
+    return;
+  }
+  if(sostActiveTemplate === 'custom' && !sostCustomStlBuffer){
+    sostShowStatus('Carica prima un template custom.', true);
+    return;
+  }
+  sostPlacementMode = true;
+  renderer.domElement.style.cursor = 'crosshair';
+  sostShowStatus('Clicca sul marker da sostituire (' +
+    (SOSTITUIRE_TEMPLATE_INFO[sostActiveTemplate] || {label:'Custom'}).label + ').');
+}
+
+// ── Click handler (chiamato da onViewportClick esteso) ──
+function sostOnViewportClick(event){
+  if(!sostPlacementMode || !sostMesh) return false;
+  var rect = renderer.domElement.getBoundingClientRect();
+  var mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  var raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, camera);
+  var hits = raycaster.intersectObject(sostMesh);
+  if(hits.length > 0){
+    sostPlaceTemplate(hits[0].point, hits[0].face.normal);
+    sostPlacementMode = false;
+    renderer.domElement.style.cursor = 'default';
+    return true;
+  }
+  return false;
+}
+
+// ── Posizionamento template (pipeline Analizza: findScanbodyCenter) ──
+function sostPlaceTemplate(rawPoint, rawNormal){
+  var key = sostActiveTemplate;
+  var info = SOSTITUIRE_TEMPLATE_INFO[key] || {label:'Custom', color: 0x888888};
+
+  // Auto-centratura deterministica (stessa funzione di Analizza)
+  var autoResult = findScanbodyCenter(sostMesh.geometry, rawPoint, rawNormal);
+  var point = autoResult.center;
+  var normal = autoResult.axis.clone().normalize();
+
+  // Carica buffer template
+  var bufPromise;
+  if(key === 'custom') bufPromise = Promise.resolve(sostCustomStlBuffer);
+  else bufPromise = sostDecodeTemplate(key);
+
+  bufPromise.then(function(tplBuf){
+    if(!tplBuf){
+      sostShowStatus('Impossibile caricare il template ' + key, true);
+      return;
+    }
+    var geo = sostParseSTLToGeometry(tplBuf);
+    if(!geo){
+      sostShowStatus('Errore parsing template ' + key, true);
       return;
     }
 
-    // Crea mesh Three.js della scena (stile scanMesh di Analizza)
-    var geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(res.pos, 3));
-    geo.computeVertexNormals();
+    // Trasla template sull'asse Z in modo che il centro della cap superiore
+    // coincida con l'origine. Per i template 1T3/SR/OS la cap top e' il
+    // piano che va a contatto con l'impianto (o il riferimento del marker).
+    // Analizza fa translate(0,0,-10) perche' il suo scanbody ha la faccia
+    // piatta a Z=10. I nostri template hanno top disc a Z clinica diversa:
+    //   1T3: 10.000 | SR: -2.000 | OS: 6.000
+    var TOP_Z = { '1T3': 10.000, 'SR': -2.000, 'OS': 6.000 };
+    var tplTopZ = TOP_Z[key];
+    if(tplTopZ === undefined){
+      // Custom: calcolo il Z max dal buffer
+      var pos = geo.attributes.position.array;
+      var zmax = -Infinity;
+      for(var i = 2; i < pos.length; i += 3){
+        if(pos[i] > zmax) zmax = pos[i];
+      }
+      tplTopZ = zmax;
+    }
+    geo.translate(0, 0, -tplTopZ);
+
+    sostCounter++;
+    var id = 'SOST_' + sostCounter;
+    var color = info.color;
+
     var mat = new THREE.MeshPhongMaterial({
-      color: 0xc4a48c,
+      color: color,
+      specular: 0x222222,
+      shininess: 40,
       side: THREE.DoubleSide,
-      flatShading: false
+      transparent: false,
+      opacity: 1.0
     });
-    sostMesh = new THREE.Mesh(geo, mat);
-    sostMesh.userData.isSostituire = true;
-    scene.add(sostMesh);
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'template';
 
-    // Centra camera sulla mesh
-    geo.computeBoundingBox();
-    var bb = geo.boundingBox;
-    var center = new THREE.Vector3();
-    bb.getCenter(center);
-    var size = new THREE.Vector3();
-    bb.getSize(size);
-    var diag = size.length();
-    camera.position.set(center.x, center.y, center.z + diag * 1.5);
-    controls.target.copy(center);
-    controls.update();
+    var group = new THREE.Group();
+    group.name = id;
+    group.add(mesh);
 
-    // Evidenzia i cilindri rilevati con sfere colorate + box
-    sostCylinders = [];
-    res.cylinders.forEach(function(c, idx){
-      // Costruisce una piccola mesh di highlight (cubo wireframe sul bbox)
-      var bbSize = [
-        c.bbox.max[0] - c.bbox.min[0],
-        c.bbox.max[1] - c.bbox.min[1],
-        c.bbox.max[2] - c.bbox.min[2]
-      ];
-      var boxGeo = new THREE.BoxGeometry(bbSize[0] + 0.2, bbSize[1] + 0.2, bbSize[2] + 0.2);
-      var wire = new THREE.EdgesGeometry(boxGeo);
-      var lineMat = new THREE.LineBasicMaterial({color: 0xff4444, linewidth: 2});
-      var highlight = new THREE.LineSegments(wire, lineMat);
-      highlight.position.set(
-        (c.bbox.min[0] + c.bbox.max[0]) / 2,
-        (c.bbox.min[1] + c.bbox.max[1]) / 2,
-        (c.bbox.min[2] + c.bbox.max[2]) / 2
-      );
-      highlight.userData.isSostituire = true;
-      scene.add(highlight);
+    // Posizionamento (pipeline identica ad Analizza placeMUA)
+    group.position.copy(point);
+    var up = new THREE.Vector3(0, 0, 1);
+    group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, normal));
+    group.userData.isSostituire = true;
+    group.userData.sostRole = 'template';
+    scene.add(group);
 
-      sostCylinders.push({
-        id: idx + 1,
-        centroid: c.centroid,
-        bbox: c.bbox,
-        approxRadius: c.approxRadius,
-        tris: c.tris,
-        accepted: true,
-        meshHighlight: highlight
-      });
+    // Linea asse (come Analizza)
+    var axisDir = normal.clone().multiplyScalar(20);
+    var axisGeo = new THREE.BufferGeometry().setFromPoints([point, point.clone().add(axisDir)]);
+    var axisMat = new THREE.LineBasicMaterial({color: color, linewidth: 2});
+    var axisLine = new THREE.Line(axisGeo, axisMat);
+    axisLine.visible = false; // opzionale, si attiva in futuro
+    axisLine.userData.isSostituire = true;
+    scene.add(axisLine);
+
+    sostPlaced.push({
+      id: id,
+      num: sostCounter,
+      group: group,
+      clickPoint: point.clone(),
+      clickNormal: normal.clone(),
+      position: point.clone(),
+      axisDir: normal.clone(),
+      templateKey: key,
+      color: color,
+      rmsd: null,
+      axisLine: axisLine
     });
 
-    // Aggiorna lista UI
-    sostRenderCylList();
-
-    sostShowStatus('Rilevati ' + sostCylinders.length + ' marker su ' + res.nTriangles.toLocaleString() + ' triangoli.');
-  } catch(err){
-    console.error('[Sostituire] analisi fallita:', err);
-    sostShowStatus('Errore analisi: ' + (err.message || err), true);
-  }
+    sostRenderPlacedList();
+    sostUpdateRefineButtonState();
+    sostShowStatus('Marker #' + sostCounter + ' posizionato (' + info.label + ').');
+  }).catch(function(err){
+    console.error('[Sostituire] errore:', err);
+    sostShowStatus('Errore: ' + (err.message || err), true);
+  });
 }
 
-function sostRenderCylList(){
-  var list = document.getElementById('sostCylList');
-  var items = document.getElementById('sostCylListItems');
-  var btnPlace = document.getElementById('sostBtnPlace');
+// ── Raffina (pipeline Analizza alignAll) ──
+function sostAlignAll(){
+  if(!sostMesh || sostPlaced.length === 0){
+    sostShowStatus('Nessun marker posizionato.', true);
+    return;
+  }
+  sostShowStatus('Raffinamento...');
+  setTimeout(function(){
+    sostPlaced.forEach(function(p){
+      // Ri-esegui findScanbodyCenter con il click originale (deterministico)
+      var autoResult = findScanbodyCenter(sostMesh.geometry, p.clickPoint, p.clickNormal);
+      var center = autoResult.center;
+      var axis = autoResult.axis.clone().normalize();
+
+      // Ricostruisci matrice del gruppo
+      var newM = new THREE.Matrix4();
+      var up = new THREE.Vector3(0, 0, 1);
+      var q = new THREE.Quaternion().setFromUnitVectors(up, axis);
+      newM.makeRotationFromQuaternion(q);
+      newM.setPosition(center);
+
+      p.group.matrix.copy(newM);
+      p.group.matrixAutoUpdate = false;
+
+      p.position.copy(center);
+      p.axisDir.copy(axis);
+
+      // Aggiorna linea asse
+      var endPt = center.clone().add(axis.clone().multiplyScalar(20));
+      p.axisLine.geometry.setFromPoints([center, endPt]);
+      p.axisLine.geometry.attributes.position.needsUpdate = true;
+
+      // RMSD semplice: stima locale (opzionale, puo' essere migliorata)
+      p.rmsd = null;
+    });
+    sostRenderPlacedList();
+    sostShowStatus('Raffinamento completato (' + sostPlaced.length + ' marker).');
+  }, 30);
+}
+
+// ── Lista marker posizionati ──
+function sostRenderPlacedList(){
+  var list = document.getElementById('sostPlacedList');
+  var items = document.getElementById('sostPlacedItems');
   if(!list || !items) return;
-  if(sostCylinders.length === 0){
+  if(sostPlaced.length === 0){
     list.style.display = 'none';
-    if(btnPlace) btnPlace.style.display = 'none';
     return;
   }
   list.style.display = '';
-  if(btnPlace) btnPlace.style.display = '';
   var h = '';
-  sostCylinders.forEach(function(c){
-    var zAvg = (c.bbox.min[2] + c.bbox.max[2]) / 2;
-    var rmsdStr = (c.placedRmsd !== undefined)
-      ? ' - RMSD ' + c.placedRmsd.toFixed(3) + 'mm'
-      : '';
+  sostPlaced.forEach(function(p){
+    var info = SOSTITUIRE_TEMPLATE_INFO[p.templateKey] || {label:'Custom'};
+    var colorHex = '#' + p.color.toString(16).padStart(6, '0');
     h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;margin:2px 0;background:var(--light);border-radius:4px;font-family:var(--mono);font-size:9px">';
-    h += '<input type="checkbox" ' + (c.accepted ? 'checked' : '') + ' onchange="sostToggleAccept(' + c.id + ', this.checked)" style="margin:0;cursor:pointer;accent-color:var(--blue)">';
-    h += '<span style="font-weight:800;color:var(--dark);min-width:22px">#' + c.id + '</span>';
-    h += '<span style="color:var(--gray);flex:1">r=' + c.approxRadius.toFixed(2) + 'mm, Z=' + zAvg.toFixed(2) + 'mm' + rmsdStr + '</span>';
+    h += '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + colorHex + '"></span>';
+    h += '<span style="font-weight:800;color:var(--dark);min-width:22px">#' + p.num + '</span>';
+    h += '<span style="color:var(--gray);flex:1">' + info.label + '</span>';
+    h += '<button onclick="sostRemovePlaced(' + p.num + ')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-family:var(--mono);font-size:10px;padding:0 4px">&times;</button>';
     h += '</div>';
   });
   items.innerHTML = h;
 }
 
-// Toggle accept/reject di un marker
-function sostToggleAccept(id, accepted){
-  var c = sostCylinders.find(function(x){ return x.id === id; });
-  if(!c) return;
-  c.accepted = accepted;
-  // Se il template e' gia' posizionato, aggiorna visibilita'
-  if(c.placedMesh){
-    c.placedMesh.visible = accepted;
+function sostRemovePlaced(num){
+  var idx = sostPlaced.findIndex(function(p){ return p.num === num; });
+  if(idx < 0) return;
+  var p = sostPlaced[idx];
+  scene.remove(p.group);
+  if(p.axisLine) scene.remove(p.axisLine);
+  if(p.group.traverse){
+    p.group.traverse(function(obj){
+      if(obj.geometry) obj.geometry.dispose();
+      if(obj.material) obj.material.dispose();
+    });
   }
-  if(c.meshHighlight){
-    c.meshHighlight.material.opacity = accepted ? 1.0 : 0.3;
-    c.meshHighlight.material.transparent = !accepted;
-  }
+  sostPlaced.splice(idx, 1);
+  sostRenderPlacedList();
+  sostUpdateRefineButtonState();
+  sostShowStatus('Rimosso marker #' + num + '.');
 }
 
-// Pulisce tutti gli oggetti di Sostituire dalla scena
+function sostUpdateRefineButtonState(){
+  var btn = document.getElementById('sostBtnRefine');
+  if(!btn) return;
+  var enabled = sostPlaced.length > 0;
+  btn.disabled = !enabled;
+  btn.style.opacity = enabled ? '1' : '0.5';
+  btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+}
+
+// ── Pulizia scena ──
 function sostClearScene(){
   if(typeof scene === 'undefined') return;
   if(sostMesh){
@@ -9416,247 +9346,35 @@ function sostClearScene(){
     if(sostMesh.material) sostMesh.material.dispose();
     sostMesh = null;
   }
-  sostCylinders.forEach(function(c){
-    if(c.meshHighlight){
-      scene.remove(c.meshHighlight);
-      if(c.meshHighlight.geometry) c.meshHighlight.geometry.dispose();
-      if(c.meshHighlight.material) c.meshHighlight.material.dispose();
-    }
-    if(c.placedMesh){
-      scene.remove(c.placedMesh);
-      if(c.placedMesh.geometry) c.placedMesh.geometry.dispose();
-      if(c.placedMesh.material) c.placedMesh.material.dispose();
+  sostPlaced.forEach(function(p){
+    if(p.group) scene.remove(p.group);
+    if(p.axisLine) scene.remove(p.axisLine);
+    if(p.group && p.group.traverse){
+      p.group.traverse(function(obj){
+        if(obj.geometry) obj.geometry.dispose();
+        if(obj.material) obj.material.dispose();
+      });
     }
   });
-  sostPlacedMeshes.forEach(function(m){
-    scene.remove(m);
-    if(m.geometry) m.geometry.dispose();
-    if(m.material) m.material.dispose();
-  });
-  sostPlacedMeshes = [];
-  sostCylinders = [];
-  // Clean stray orphans con userData.isSostituire
+  sostPlaced = [];
+  sostCounter = 0;
+  // Rimuovi orfani residui
   var toRemove = [];
   scene.traverse(function(obj){
     if(obj.userData && obj.userData.isSostituire) toRemove.push(obj);
   });
   toRemove.forEach(function(o){ scene.remove(o); });
+  sostRenderPlacedList();
+  sostUpdateRefineButtonState();
 }
 
-// Helper visibilita' artefatti Sostituire (analogo a _setAnalyzaArtifactsVisible)
+// ── Visibilità artefatti Sostituire (per switch workflow) ──
 function _setSostituireArtifactsVisible(on){
   if(sostMesh) sostMesh.visible = on;
-  sostCylinders.forEach(function(c){
-    if(c.meshHighlight) c.meshHighlight.visible = on;
-    if(c.placedMesh) c.placedMesh.visible = on && c.accepted;
+  sostPlaced.forEach(function(p){
+    if(p.group) p.group.visible = on;
+    if(p.axisLine) p.axisLine.visible = false; // axis line sempre hidden per ora
   });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SOSTITUIRE: posizionamento template sui marker rilevati
-// Per ogni marker accettato: estrae i punti del cluster, invia al server
-// insieme al template STL scelto, riceve matrice R/t, costruisce mesh
-// Three.js trasformato e lo aggiunge alla scena.
-// ═══════════════════════════════════════════════════════════════════════════
-
-async function sostPlaceTemplates(){
-  if(sostCylinders.length === 0){
-    sostShowStatus('Nessun marker rilevato. Carica una scansione.', true);
-    return;
-  }
-  var btn = document.getElementById('sostBtnPlace');
-  if(btn){
-    btn.disabled = true;
-    btn.textContent = 'Posizionamento in corso...';
-    btn.style.opacity = '0.6';
-  }
-
-  // Pulisci eventuali placed mesh di un run precedente
-  sostCylinders.forEach(function(c){
-    if(c.placedMesh){
-      scene.remove(c.placedMesh);
-      if(c.placedMesh.geometry) c.placedMesh.geometry.dispose();
-      if(c.placedMesh.material) c.placedMesh.material.dispose();
-      c.placedMesh = null;
-      c.placedRmsd = undefined;
-    }
-  });
-
-  try {
-    // Step 1: ottieni buffer STL del template scelto
-    var tplBuffer;
-    if(sostActiveTemplate === 'custom'){
-      if(!sostCustomStl){
-        sostShowStatus('Nessun template custom caricato.', true);
-        return;
-      }
-      tplBuffer = sostCustomStl;
-    } else {
-      sostShowStatus('Decompressione template ' + sostActiveTemplate + '...');
-      tplBuffer = await sostDecodeTemplate(sostActiveTemplate);
-      if(!tplBuffer){
-        sostShowStatus('Impossibile decomprimere template ' + sostActiveTemplate, true);
-        return;
-      }
-    }
-
-    var info = SOSTITUIRE_TEMPLATE_INFO[sostActiveTemplate] || {color: 0x0065B3};
-    var tplColor = info.color || 0x0065B3;
-
-    // Step 2: per ogni marker accettato, chiamata HTTP
-    var successCount = 0;
-    var failCount = 0;
-    var rmsds = [];
-
-    for(var i = 0; i < sostCylinders.length; i++){
-      var c = sostCylinders[i];
-      if(!c.accepted){ continue; }
-      sostShowStatus('Allineamento marker #' + c.id + ' (' + (i+1) + '/' + sostCylinders.length + ')...');
-
-      // Estrai punti 3D unici del cluster dal pos buffer della scena
-      var markerPts = sostExtractClusterPoints(c);
-      if(markerPts.length < 30){
-        console.warn('[Sostituire] cluster #' + c.id + ' troppo piccolo:', markerPts.length);
-        failCount++;
-        continue;
-      }
-
-      // Limita punti per non sovraccaricare HTTP (sample fino a 1500)
-      if(markerPts.length > 1500){
-        var stride = Math.ceil(markerPts.length / 1500);
-        var sampled = [];
-        for(var k = 0; k < markerPts.length; k += stride) sampled.push(markerPts[k]);
-        markerPts = sampled;
-      }
-
-      try {
-        var alignRes = await sostCallAlignAPI(tplBuffer, markerPts, sostICPEnabled);
-        // Costruisci mesh template trasformata
-        var placedMesh = sostBuildTransformedTemplateMesh(tplBuffer, alignRes.R, alignRes.t, tplColor);
-        if(placedMesh){
-          placedMesh.userData.isSostituire = true;
-          placedMesh.userData.markerId = c.id;
-          placedMesh.visible = c.accepted;
-          scene.add(placedMesh);
-          c.placedMesh = placedMesh;
-          c.placedRmsd = alignRes.rmsd;
-          sostPlacedMeshes.push(placedMesh);
-          successCount++;
-          rmsds.push(alignRes.rmsd);
-        } else {
-          failCount++;
-        }
-      } catch(err){
-        console.error('[Sostituire] errore marker #' + c.id + ':', err);
-        failCount++;
-      }
-    }
-
-    // Ri-render lista per mostrare RMSD
-    sostRenderCylList();
-
-    // Nascondi box wireframe: ora abbiamo i template veri
-    sostCylinders.forEach(function(c){
-      if(c.meshHighlight) c.meshHighlight.visible = false;
-    });
-
-    var avgRmsd = rmsds.length > 0
-      ? (rmsds.reduce(function(a,b){return a+b;}, 0) / rmsds.length).toFixed(3)
-      : '--';
-    sostShowStatus('Posizionati ' + successCount + '/' + sostCylinders.filter(function(c){return c.accepted}).length +
-      ' marker. RMSD medio: ' + avgRmsd + 'mm' + (failCount > 0 ? '. Falliti: ' + failCount : ''));
-  } catch(err) {
-    console.error('[Sostituire] errore posizionamento:', err);
-    sostShowStatus('Errore: ' + (err.message || err), true);
-  } finally {
-    if(btn){
-      btn.disabled = false;
-      btn.textContent = 'Posiziona templates';
-      btn.style.opacity = '1';
-    }
-  }
-}
-
-// Estrae i punti 3D unici di un cluster dal pos buffer della scena Sostituire
-function sostExtractClusterPoints(cyl){
-  if(!sostMesh || !sostMesh.geometry) return [];
-  var posAttr = sostMesh.geometry.getAttribute('position');
-  if(!posAttr) return [];
-  var pos = posAttr.array;
-  var ptsSet = {};
-  var pts = [];
-  // cyl.tris e' array di indici triangolo nel pos buffer
-  for(var i = 0; i < cyl.tris.length; i++){
-    var ti = cyl.tris[i];
-    for(var k = 0; k < 3; k++){
-      var o = ti * 9 + k * 3;
-      var x = pos[o], y = pos[o+1], z = pos[o+2];
-      // Dedup con chiave stringa
-      var key = Math.round(x*100) + ',' + Math.round(y*100) + ',' + Math.round(z*100);
-      if(!ptsSet[key]){
-        ptsSet[key] = true;
-        pts.push([x, y, z]);
-      }
-    }
-  }
-  return pts;
-}
-
-// Chiama l'endpoint /api/sostituire-align
-async function sostCallAlignAPI(tplBuffer, markerPts, useICP){
-  var fd = new FormData();
-  var tplBlob = new Blob([tplBuffer], {type: 'application/octet-stream'});
-  fd.append('template', tplBlob, 'template.stl');
-  fd.append('marker_pts', JSON.stringify(markerPts));
-  fd.append('use_icp', useICP ? 'true' : 'false');
-  var resp = await fetch('/api/sostituire-align', {method: 'POST', body: fd});
-  if(!resp.ok){
-    var err = await resp.text();
-    throw new Error('Server ' + resp.status + ': ' + err);
-  }
-  return await resp.json();
-}
-
-// Costruisce un THREE.Mesh dal buffer STL del template applicando R (3x3) e t (3)
-// R arriva dal server come lista di liste [[r00,r01,r02],[r10,r11,r12],[r20,r21,r22]]
-function sostBuildTransformedTemplateMesh(stlBuffer, R, t, colorHex){
-  var view = new DataView(stlBuffer.buffer || stlBuffer, stlBuffer.byteOffset || 0, stlBuffer.byteLength);
-  if(view.byteLength < 84) return null;
-  var n = view.getUint32(80, true);
-  if(84 + n * 50 !== view.byteLength) return null;
-  // Cache elementi R per velocita'
-  var r00=R[0][0], r01=R[0][1], r02=R[0][2];
-  var r10=R[1][0], r11=R[1][1], r12=R[1][2];
-  var r20=R[2][0], r21=R[2][1], r22=R[2][2];
-  var tx=t[0], ty=t[1], tz=t[2];
-  var positions = new Float32Array(n * 9);
-  for(var i = 0; i < n; i++){
-    var off = 84 + i * 50;
-    for(var k = 0; k < 3; k++){
-      var ox = view.getFloat32(off + 12 + k*12, true);
-      var oy = view.getFloat32(off + 16 + k*12, true);
-      var oz = view.getFloat32(off + 20 + k*12, true);
-      positions[i*9 + k*3]     = r00*ox + r01*oy + r02*oz + tx;
-      positions[i*9 + k*3 + 1] = r10*ox + r11*oy + r12*oz + ty;
-      positions[i*9 + k*3 + 2] = r20*ox + r21*oy + r22*oz + tz;
-    }
-  }
-  var geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.computeVertexNormals();
-  var mat = new THREE.MeshPhongMaterial({
-    color: colorHex,
-    side: THREE.DoubleSide,
-    flatShading: false,
-    transparent: false,
-    opacity: 1.0,
-    depthTest: true,
-    depthWrite: true,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2
-  });
-  return new THREE.Mesh(geo, mat);
 }
 
 

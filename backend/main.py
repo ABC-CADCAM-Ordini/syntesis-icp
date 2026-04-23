@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from auth import router as auth_router, verify_token
-from icp_engine import analyze_stl_pair, align_template_to_marker, parse_stl
+from icp_engine import analyze_stl_pair
 from pdf_gen import generate_pdf
 from database import init_db, log_analysis, get_leaderboard, save_result
 
@@ -309,81 +309,6 @@ async def analyze_public(
         "bg_a":             result.get("bg_a", []),
         "cyl_tris_a":       result.get("cyl_tris_a", []),
         "cyl_tris_b":       result.get("cyl_tris_b", []),
-    }
-
-
-@app.post("/api/sostituire-align")
-async def sostituire_align(
-    template: UploadFile = File(..., description="Template STL (tpl_1T3, tpl_SR, tpl_OS o custom)"),
-    marker_pts: str = Form(..., description="JSON: lista di [x,y,z] punti del cluster marker"),
-    use_icp: str = Form("true", description="'true' o 'false' per abilitare ICP refine")
-):
-    """
-    Allinea un template STL (scan body) ad un cluster di punti corrispondente
-    ad un marker rilevato nella scansione Multi-A del workflow Sostituire.
-
-    Input:
-        template: file STL (binary) del template scelto
-        marker_pts: JSON array di punti [[x,y,z], ...] del cluster marker
-        use_icp: 'true' per raffinare con ICP spin+point-to-point
-
-    Output:
-        R: matrice di rotazione 3x3 (lista 9 elementi in row-major)
-        t: vettore traslazione 3 elementi
-        rmsd: RMSD finale
-        method: stringa descrittiva
-    """
-    import json as _json
-    import numpy as np
-
-    # Validazione template
-    if template.size and template.size > 5 * 1024 * 1024:
-        raise HTTPException(413, detail="Template troppo grande (max 5 MB).")
-
-    tpl_data = await template.read()
-    if len(tpl_data) < 84:
-        raise HTTPException(400, detail="Template STL non valido.")
-
-    # Parse template
-    try:
-        tpl_tris = parse_stl(tpl_data)
-    except Exception as e:
-        raise HTTPException(400, detail=f"Parsing template fallito: {e}")
-
-    # Parse marker_pts
-    try:
-        pts_list = _json.loads(marker_pts)
-        if not isinstance(pts_list, list) or len(pts_list) < 30:
-            raise HTTPException(400, detail="marker_pts deve contenere almeno 30 punti")
-        marker_arr = np.asarray(pts_list, dtype=np.float64)
-        if marker_arr.ndim != 2 or marker_arr.shape[1] != 3:
-            raise HTTPException(400, detail="marker_pts deve essere lista di [x,y,z]")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(400, detail=f"Parsing marker_pts fallito: {e}")
-
-    # Flag ICP
-    icp_flag = str(use_icp).lower() in ("true", "1", "yes", "on")
-
-    # Esegui allineamento in thread pool (CPU-bound)
-    try:
-        result = await asyncio.get_event_loop().run_in_executor(
-            None, align_template_to_marker, tpl_tris, marker_arr, icp_flag, 16
-        )
-    except ValueError as e:
-        raise HTTPException(422, detail=str(e))
-    except Exception as e:
-        logger.error(f"Errore allineamento template: {e}", exc_info=True)
-        raise HTTPException(500, detail="Errore interno nell'allineamento.")
-
-    return {
-        "R": result["R"],
-        "t": result["t"],
-        "rmsd": result["rmsd"],
-        "method": result["method"],
-        "n_tpl_tris": len(tpl_tris),
-        "n_marker_pts": len(marker_arr),
     }
 
 
