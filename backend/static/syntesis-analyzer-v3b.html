@@ -813,17 +813,9 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       </div>
 
       <div id="sostExportAs" style="display:none;margin-top:10px">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">Contenuto export:</div>
-        <div class="comp-radio" id="sostExportContentRadio">
-          <label class="active"><input type="radio" name="sostExportContent" value="full" checked onchange="sostOnExportContentChange(this)"><span class="sw" style="background:#64748B"></span>Scansione + scanbody</label>
-          <label><input type="radio" name="sostExportContent" value="onlyTpl" onchange="sostOnExportContentChange(this)"><span class="sw" style="background:#0D1B2A"></span>Solo scanbody</label>
-        </div>
-
-        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin:8px 0 4px 0;line-height:1.5">Tipo scanbody (destinazione):</div>
-        <div class="comp-radio" id="sostExportAsRadio">
-          <label class="active"><input type="radio" name="sostExportTpl" value="1T3" checked onchange="sostOnExportTemplateChange(this)"><span class="sw" style="background:#ffaa44"></span>1T3</label>
-          <label><input type="radio" name="sostExportTpl" value="SR" onchange="sostOnExportTemplateChange(this)"><span class="sw" style="background:#0065B3"></span>SR</label>
-          <label><input type="radio" name="sostExportTpl" value="OS" onchange="sostOnExportTemplateChange(this)"><span class="sw" style="background:#639922"></span>OS</label>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">
+          Accendi nell'albero (a sinistra) cosa vuoi includere nell'export:
+          la scansione, e/o i marker 1T3, SR, OS.
         </div>
       </div>
 
@@ -9322,10 +9314,48 @@ function sostOnViewportClick(event){
 }
 
 // ── Posizionamento template (pipeline Analizza: findScanbodyCenter) ──
-function sostPlaceTemplate(rawPoint, rawNormal){
-  var key = sostActiveTemplate;
+// Costruisce e piazza nella scena un THREE.Group contenente la geometria del
+// template richiesto, correttamente posizionato e orientato.
+// Ritorna il group pronto per l'uso.
+function sostBuildTemplateGroup(key, geo, point, normal){
   var info = SOSTITUIRE_TEMPLATE_INFO[key] || {label:'Custom', color: 0x888888};
+  var color = info.color;
+  var mat = new THREE.MeshPhongMaterial({
+    color: color,
+    specular: 0x222222,
+    shininess: 40,
+    side: THREE.DoubleSide,
+    transparent: false,
+    opacity: 1.0
+  });
+  var mesh = new THREE.Mesh(geo, mat);
+  mesh.name = 'template';
+  var group = new THREE.Group();
+  group.add(mesh);
+  geo.computeBoundingBox();
+  var bb = geo.boundingBox;
+  // SR ha disco a Zmin locale (sotto la connessione), gli altri a Zmax
+  var zDiscFromBBox = (key === 'SR') ? -bb.min.z : bb.max.z;
+  var up = (key === 'SR')
+    ? new THREE.Vector3(0, 0, -1)
+    : new THREE.Vector3(0, 0, 1);
+  // Posizione del gruppo: porta la connessione sul click (lungo l'asse)
+  group.position.copy(point);
+  var axisOffset = normal.clone().multiplyScalar(-zDiscFromBBox);
+  group.position.add(axisOffset);
+  if(sostZOffsetMm !== 0){
+    var dn = normal.clone().multiplyScalar(sostZOffsetMm);
+    group.position.add(dn);
+  }
+  // Orientamento: up locale -> asse nello spazio mondo
+  group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, normal));
+  group.userData.isSostituire = true;
+  group.userData.sostRole = 'template';
+  group.userData.templateKey = key;
+  return group;
+}
 
+function sostPlaceTemplate(rawPoint, rawNormal){
   // Auto-centratura deterministica (stessa funzione di Analizza).
   // Passa il raggio del marker presente nella scansione di partenza
   // (1T3: 2.515, SR: 2.030, OS: 1.780) per fare il fit cilindro corretto.
@@ -9335,144 +9365,89 @@ function sostPlaceTemplate(rawPoint, rawNormal){
   var point = autoResult.center;
   var normal = autoResult.axis.clone().normalize();
 
-  // Carica buffer template
-  var bufPromise;
-  if(key === 'custom') bufPromise = Promise.resolve(sostCustomStlBuffer);
-  else bufPromise = sostDecodeTemplate(key);
+  // Template da costruire per ogni marker: tutti e tre insieme cosi' l'utente
+  // puo' scegliere dall'albero cosa visualizzare/esportare.
+  var TPL_KEYS = ['1T3', 'SR', 'OS'];
+  var activeKey = sostActiveTemplate;
 
-  bufPromise.then(function(tplBuf){
-    if(!tplBuf){
-      sostShowStatus('Impossibile caricare il template ' + key, true);
-      return;
-    }
-    var geo = sostParseSTLToGeometry(tplBuf);
-    if(!geo){
-      sostShowStatus('Errore parsing template ' + key, true);
-      return;
-    }
+  // Carica i buffer di tutti e tre (o custom se richiesto specificamente)
+  var promises = TPL_KEYS.map(function(k){ return sostDecodeTemplate(k); });
 
-    // I template 1T3/SR/OS condividono l'origine clinica (0,0,0) locale.
-    // Le differenze di Z tra i range geometrici (1T3: 8.1..10, OS: 4.9..6,
-    // SR: -5..-2) riflettono le differenti altezze cliniche dei marker
-    // rispetto allo stesso riferimento. Non traslare: la rotazione del
-    // gruppo via quaternion.setFromUnitVectors(Z, axis) + offset Z lungo
-    // axis e' sufficiente a posizionarli correttamente, ciascuno secondo
-    // la propria quota intrinseca.
+  Promise.all(promises).then(function(bufs){
+    // Parsa una volta sola
+    var geos = {};
+    for(var i = 0; i < TPL_KEYS.length; i++){
+      if(!bufs[i]){
+        sostShowStatus('Impossibile caricare il template ' + TPL_KEYS[i], true);
+        return;
+      }
+      geos[TPL_KEYS[i]] = sostParseSTLToGeometry(bufs[i]);
+      if(!geos[TPL_KEYS[i]]){
+        sostShowStatus('Errore parsing template ' + TPL_KEYS[i], true);
+        return;
+      }
+    }
 
     sostCounter++;
     var id = 'SOST_' + sostCounter;
-    var color = info.color;
 
-    var mat = new THREE.MeshPhongMaterial({
-      color: color,
-      specular: 0x222222,
-      shininess: 40,
-      side: THREE.DoubleSide,
-      transparent: false,
-      opacity: 1.0
+    // Costruisci i 3 group, aggiungili alla scena
+    var groups = {};
+    TPL_KEYS.forEach(function(k){
+      var g = sostBuildTemplateGroup(k, geos[k], point, normal);
+      g.name = id + '_' + k;
+      // Visibile solo il template scelto dall'utente al momento del placement.
+      // Gli altri due nascosti ma costruiti cosi' l'utente puo' attivarli dall'albero.
+      g.visible = (k === activeKey);
+      scene.add(g);
+      groups[k] = g;
     });
-    var mesh = new THREE.Mesh(geo, mat);
-    mesh.name = 'template';
 
-    var group = new THREE.Group();
-    group.name = id;
-    group.add(mesh);
-
-    // Z del disco letta direttamente dal bbox dello STL caricato. Questo
-    // rende il posizionamento robusto rispetto a eventuali variazioni
-    // di convenzione nei file STL embeddati (Z_disco puo' essere 8.5 o 10
-    // a seconda del file originario).
-    geo.computeBoundingBox();
-    var bb = geo.boundingBox;
-    // Disco: per SR e' a Zmin (sotto la connessione), per altri a Zmax.
-    // Lo riconosco guardando quale delle due estremita' ha piu' triangoli
-    // (il disco e' una superficie piana spessa, con molti triangoli).
-    // Disco a quota nota nel sistema locale:
-    // - 1T3/OS: disco a Zmax, up=+Z. Vertice a (0,0,Zmax) dopo rotazione
-    //   up→axis sta in +Zmax*axis. Per portarlo al click: position = click - Zmax*axis
-    //   -> zDiscFromBBox = +Zmax
-    // - SR: disco a Zmin (negativo), up=-Z. Vertice a (0,0,Zmin) dopo rotazione
-    //   -Z→axis sta in -Zmin*axis (= +|Zmin|*axis, perche' Zmin<0).
-    //   Per portarlo al click: position = click - (-Zmin)*axis = click + Zmin*axis
-    //   -> zDiscFromBBox = -Zmin = +|Zmin| = +5 per SR
-    var zDiscFromBBox;
-    if(key === 'SR'){
-      zDiscFromBBox = -bb.min.z;   // 5 per template SR (Zmin = -5)
-    } else {
-      zDiscFromBBox = bb.max.z;    // 8.5 per 1T3, 6 per OS
-    }
-    // Posizionamento: group.position = click - Z_disco * axis
-    // Il quaternion porta Z_locale → axis, quindi un vertice a (0,0,Z_disco)
-    // locale finisce a position + Z_disco*axis nel mondo. Per farlo coincidere
-    // col click, serve position = click - Z_disco*axis.
-    group.position.copy(point);
-    var axisOffset = normal.clone().multiplyScalar(-zDiscFromBBox);
-    group.position.add(axisOffset);
-    // Applica eventuale offset dello slider (affinamento manuale post-auto)
-    if(sostZOffsetMm !== 0){
-      var dn = normal.clone().multiplyScalar(sostZOffsetMm);
-      group.position.add(dn);
-    }
-    // Orientamento:
-    // - Per 1T3/OS: disco a Zmax del template, corpo a Z minori
-    //   -> up = +Z. Quaternion porta +Z -> axis, il corpo va in -axis
-    //   (verso il moncone) e il disco esce verso +axis.
-    // - Per SR: disco a Zmin del template, corpo a Z maggiori
-    //   -> up = -Z. Quaternion porta -Z -> axis, il disco (a Z=-5 locale)
-    //   esce verso +axis e il corpo (a Z da -5 a -2) si sviluppa oltre
-    //   il disco verso +axis nel mondo = clinicamente corretto.
-    var up = (key === 'SR')
-      ? new THREE.Vector3(0, 0, -1)
-      : new THREE.Vector3(0, 0, 1);
-    group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, normal));
-    group.userData.isSostituire = true;
-    group.userData.sostRole = 'template';
-    scene.add(group);
-
-    // Linea asse (come Analizza)
+    // Linea asse (per riferimento futuro, non visibile di default)
     var axisDir = normal.clone().multiplyScalar(20);
     var axisGeo = new THREE.BufferGeometry().setFromPoints([point, point.clone().add(axisDir)]);
-    var axisMat = new THREE.LineBasicMaterial({color: color, linewidth: 2});
+    var axisMat = new THREE.LineBasicMaterial({
+      color: (SOSTITUIRE_TEMPLATE_INFO[activeKey] || {color:0x888888}).color,
+      linewidth: 2
+    });
     var axisLine = new THREE.Line(axisGeo, axisMat);
-    axisLine.visible = false; // opzionale, si attiva in futuro
+    axisLine.visible = false;
     axisLine.userData.isSostituire = true;
     scene.add(axisLine);
 
     sostPlaced.push({
       id: id,
       num: sostCounter,
-      group: group,
-      clickPoint: rawPoint.clone(),    // raw raycaster click (per Raffina deterministico)
-      clickNormal: rawNormal.clone(),  // raw face normal
+      groups: groups,                   // {'1T3': Group, 'SR': Group, 'OS': Group}
+      group: groups[activeKey],         // alias per codice legacy (cut view, raffina)
+      clickPoint: rawPoint.clone(),
+      clickNormal: rawNormal.clone(),
       position: point.clone(),
       axisDir: normal.clone(),
-      templateKey: key,
-      color: color,
+      templateKey: activeKey,
+      color: (SOSTITUIRE_TEMPLATE_INFO[activeKey] || {color:0x888888}).color,
       rmsd: null,
       axisLine: axisLine
     });
 
+    var activeInfo = SOSTITUIRE_TEMPLATE_INFO[activeKey] || {label: activeKey};
     sostRenderPlacedList();
     sostUpdateRefineButtonState();
-    sostShowStatus('Marker #' + sostCounter + ' posizionato (' + info.label + ').');
+    sostShowStatus('Marker #' + sostCounter + ' posizionato (' + activeInfo.label + ').');
     try { rebuildTree(); } catch(e){}
-    // Apri/aggiorna cut view automaticamente come fa Analizza
     var cutOverlay = document.getElementById('cutViewOverlay');
     if(cutOverlay){
       var isOpen = cutOverlay.style.display === 'flex';
       if(!isOpen){
-        // Cut view chiusa: aprila sul marker appena piazzato
         sostCutState.placedIdx = sostPlaced.length - 1;
         sostCutState.angle = 0;
         sostOpenCutView();
       } else {
-        // Cut view aperta: aggiungi al selettore e seleziona il nuovo
         var sel = document.getElementById('cutMuaSelect');
         if(sel){
           var opt = document.createElement('option');
           opt.value = sostPlaced.length - 1;
-          var infoL = SOSTITUIRE_TEMPLATE_INFO[key] || {label: key};
-          opt.textContent = '#' + sostCounter + ' ' + infoL.label;
+          opt.textContent = '#' + sostCounter + ' ' + activeInfo.label;
           sel.appendChild(opt);
           sel.value = sostPlaced.length - 1;
           sostCutState.placedIdx = sostPlaced.length - 1;
@@ -9495,57 +9470,57 @@ function sostAlignAll(){
   }
   sostShowStatus('Raffinamento...');
   setTimeout(function(){
-    // Raggio del marker nella scansione di partenza (per fit cilindro preciso)
     var sourceRadius = (SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {}).radius;
     var findOpts = sourceRadius ? { radius: sourceRadius } : undefined;
     sostPlaced.forEach(function(p){
-      // Ri-esegui findScanbodyCenter con il click originale (deterministico)
       var autoResult = findScanbodyCenter(sostMesh.geometry, p.clickPoint, p.clickNormal, findOpts);
       var center = autoResult.center;
       var axis = autoResult.axis.clone().normalize();
 
-      // Offset Z = -Z_disco, con semantica coerente al placement
-      var tplMesh = p.group.getObjectByName('template');
-      var zDiscFromBBox = 0;
-      if(tplMesh && tplMesh.geometry){
-        tplMesh.geometry.computeBoundingBox();
-        var bbA = tplMesh.geometry.boundingBox;
-        zDiscFromBBox = (p.templateKey === 'SR') ? -bbA.min.z : bbA.max.z;
+      // Ri-costruisci la matrice per ciascuno dei 3 template del marker
+      // mantenendo la stessa semantica del placement (Zdisc + up per tipo).
+      Object.keys(p.groups || {}).forEach(function(k){
+        var g = p.groups[k];
+        if(!g) return;
+        var tplMeshK = g.getObjectByName('template');
+        if(!tplMeshK || !tplMeshK.geometry) return;
+        tplMeshK.geometry.computeBoundingBox();
+        var bbK = tplMeshK.geometry.boundingBox;
+        var zDiscK = (k === 'SR') ? -bbK.min.z : bbK.max.z;
+        var upK = (k === 'SR')
+          ? new THREE.Vector3(0, 0, -1)
+          : new THREE.Vector3(0, 0, 1);
+        var finalCenterK = center.clone();
+        finalCenterK.add(axis.clone().multiplyScalar(-zDiscK));
+        if(sostZOffsetMm !== 0){
+          finalCenterK.add(axis.clone().multiplyScalar(sostZOffsetMm));
+        }
+        var qK = new THREE.Quaternion().setFromUnitVectors(upK, axis);
+        var MK = new THREE.Matrix4().makeRotationFromQuaternion(qK);
+        MK.setPosition(finalCenterK);
+        g.matrix.copy(MK);
+        g.matrixAutoUpdate = false;
+      });
+
+      // Mantieni p.position/axisDir coerenti con il template attivo (legacy)
+      var activeGroup = p.groups ? p.groups[p.templateKey] : p.group;
+      if(activeGroup){
+        p.group = activeGroup;
+        var activePos = new THREE.Vector3().setFromMatrixPosition(activeGroup.matrix);
+        p.position.copy(activePos);
       }
-      // Offset Z complessivo: ricava automaticamente dal bbox + eventuale slider
-      var finalCenter = center.clone();
-      finalCenter.add(axis.clone().multiplyScalar(-zDiscFromBBox));
-      if(sostZOffsetMm !== 0){
-        finalCenter.add(axis.clone().multiplyScalar(sostZOffsetMm));
-      }
-
-      // Ricostruisci matrice del gruppo (stesso flip SR del placement)
-      var newM = new THREE.Matrix4();
-      var up = (p.templateKey === 'SR')
-        ? new THREE.Vector3(0, 0, -1)
-        : new THREE.Vector3(0, 0, 1);
-      var q = new THREE.Quaternion().setFromUnitVectors(up, axis);
-      newM.makeRotationFromQuaternion(q);
-      newM.setPosition(finalCenter);
-
-      p.group.matrix.copy(newM);
-      p.group.matrixAutoUpdate = false;
-
-      p.position.copy(finalCenter);
       p.axisDir.copy(axis);
 
-      // Aggiorna linea asse
-      var endPt = finalCenter.clone().add(axis.clone().multiplyScalar(20));
-      p.axisLine.geometry.setFromPoints([finalCenter, endPt]);
+      // Aggiorna linea asse dal nuovo center (non posizione template)
+      var endPt = center.clone().add(axis.clone().multiplyScalar(20));
+      p.axisLine.geometry.setFromPoints([center, endPt]);
       p.axisLine.geometry.attributes.position.needsUpdate = true;
 
-      // RMSD semplice: stima locale (opzionale, puo' essere migliorata)
       p.rmsd = null;
     });
     sostRenderPlacedList();
     sostShowStatus('Raffinamento completato (' + sostPlaced.length + ' marker).');
     try { rebuildTree(); } catch(e){}
-    // Aggiorna cut view se aperta
     var cutOverlay = document.getElementById('cutViewOverlay');
     if(cutOverlay && cutOverlay.style.display === 'flex'){
       sostRenderCutView();
@@ -9610,45 +9585,59 @@ function sostExportSTL(){
     sostShowStatus('Serve Multi-A caricata e almeno un marker posizionato.', true);
     return;
   }
+
+  // Raccoglie l'insieme dei tipi di template attivi nell'albero:
+  // un tipo e' "attivo" se almeno un p.groups[tipo] ha .visible===true
+  var activeTypes = [];
+  ['1T3', 'SR', 'OS'].forEach(function(k){
+    var anyOn = sostPlaced.some(function(p){
+      return p.groups && p.groups[k] && p.groups[k].visible;
+    });
+    if(anyOn) activeTypes.push(k);
+  });
+
+  if(activeTypes.length === 0 && !sostMesh.visible){
+    sostShowStatus('Niente da esportare: accendi almeno un elemento nell\'albero.', true);
+    return;
+  }
+
   var btn = document.getElementById('sostBtnExport');
   if(btn){
     btn.disabled = true;
     btn.style.opacity = '0.6';
     btn.textContent = 'Generazione STL...';
   }
-  // Tipo di destinazione scelto nel radio "Esporta come"
-  var destKey = sostExportTemplate;
-  var info = SOSTITUIRE_TEMPLATE_INFO[destKey] || {label: destKey};
 
-  // Carica il buffer del template di destinazione (cached)
-  sostDecodeTemplate(destKey).then(function(destTplBuf){
-    if(!destTplBuf){
-      sostShowStatus('Impossibile caricare il template ' + destKey, true);
-      if(btn){ btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Esporta STL'; }
-      return;
+  var includeScan = !!sostMesh.visible;
+
+  // Pre-carica le geometrie di tutti i tipi attivi (cached)
+  var loads = activeTypes.map(function(k){ return sostDecodeTemplate(k); });
+  Promise.all(loads).then(function(bufs){
+    var destGeos = {};
+    for(var i = 0; i < activeTypes.length; i++){
+      if(!bufs[i]){
+        sostShowStatus('Impossibile caricare il template ' + activeTypes[i], true);
+        if(btn){ btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Esporta STL'; }
+        return;
+      }
+      destGeos[activeTypes[i]] = sostParseSTLToGeometry(bufs[i]);
     }
-    // Parsa la geometria del template di destinazione (una volta sola)
-    // NESSUNA traslazione: i template condividono l'origine clinica (0,0,0)
-    var destGeo = sostParseSTLToGeometry(destTplBuf);
-    if(!destGeo){
-      sostShowStatus('Errore parsing template ' + destKey, true);
-      if(btn){ btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Esporta STL'; }
-      return;
-    }
-    // Giro di UI update prima del lavoro pesante
     setTimeout(function(){
       try {
         var startT = performance.now();
-        var outTris = sostBuildExportTriangles(destGeo, destKey);
+        var outTris = sostBuildExportTriangles(destGeos, activeTypes, includeScan);
         var nTris = outTris.length / 9;
         var stlBuffer = sostSerializeBinarySTL(outTris);
+        // Nome file
         var scanName = 'sostituire_export';
         var slot = document.getElementById('sostSlotScan');
         if(slot){
           var fname = slot.querySelector('.fname');
           var base = fname ? fname.textContent.replace(/\.stl$/i, '') : 'sost';
-          var suffix = (sostExportContent === 'onlyTpl') ? ('_scanbody_' + destKey) : ('_' + destKey);
-          scanName = base + suffix;
+          var parts = [];
+          if(!includeScan) parts.push('scanbody');
+          if(activeTypes.length > 0) parts.push(activeTypes.join('-'));
+          scanName = base + (parts.length > 0 ? '_' + parts.join('_') : '_export');
         }
         var blob = new Blob([stlBuffer], {type: 'application/octet-stream'});
         var url = URL.createObjectURL(blob);
@@ -9662,7 +9651,8 @@ function sostExportSTL(){
           URL.revokeObjectURL(url);
         }, 100);
         var dt = ((performance.now() - startT) / 1000).toFixed(1);
-        sostShowStatus('Export ' + info.label + ' completato: ' + nTris.toLocaleString() + ' triangoli in ' + dt + 's.');
+        var lbl = activeTypes.length > 0 ? activeTypes.join('+') : 'scansione';
+        sostShowStatus('Export ' + lbl + ' completato: ' + nTris.toLocaleString() + ' triangoli in ' + dt + 's.');
       } catch(err) {
         console.error('[Sostituire export]', err);
         sostShowStatus('Errore export: ' + (err.message || err), true);
@@ -9677,31 +9667,23 @@ function sostExportSTL(){
   });
 }
 
-// Costruisce l'array Float32 di triangoli per l'export
-// destGeo: geometria del template di DESTINAZIONE (gia' parsato, origine clinica 0,0,0)
-// destKey: stringa '1T3'|'SR'|'OS'|etc per lookup parametri soppressione
-// Ritorna Float32Array [x0,y0,z0, x1,y1,z1, x2,y2,z2, ...]
-function sostBuildExportTriangles(destGeo, destKey){
+// Costruisce l'array Float32 di triangoli per l'export.
+// destGeos: { '1T3': geo, 'SR': geo, 'OS': geo } (solo i tipi attivi)
+// activeTypes: array con i tipi effettivamente visibili per almeno 1 marker
+// includeScan: se true, la scansione Multi-A viene inclusa (filtrata dai cilindri)
+function sostBuildExportTriangles(destGeos, activeTypes, includeScan){
   var scanPos = sostMesh.geometry.attributes.position.array;
   var nScanTris = scanPos.length / 9;
 
-  // Pre-calcola parametri cilindri di soppressione per ogni marker.
-  // Il cilindro e' ASIMMETRICO rispetto al click (centrato sull'origine
-  // clinica = p.position): copre l'UNIONE degli intervalli Z dei template
-  // origine e destinazione. Cosi' quando esporti 1T3 (Z:8-10) come OS (Z:5-6),
-  // il cilindro taglia da Z=5 a Z=10 lungo l'asse, sopprimendo sia il marker
-  // originale scannerizzato sia lo spazio dove va il nuovo template.
-  //
-  // Riferimento Z: axial_from_origin = (triangolo - p.position) . axisDir
-  //   positivo = verso la direzione uscente dallo scanbody (cap del marker)
-  //   negativo = verso l'interno del moncone
-  var destCull = SOSTITUIRE_CULL_CYL[destKey] || {radius: 3.0, zMin: -1, zMax: 1};
+  // Cilindro di soppressione per ogni marker:
+  // - srcCull = parametri del template di PARTENZA (gia' scansionato)
+  // - dstCull = UNIONE (max/min) dei range Z di tutti i tipi attivi PRESENTI
+  //   per quel marker (cioe' quelli effettivamente visibili nell'albero)
   var cullers = sostPlaced.map(function(p){
-    var key = p.templateKey;
-    var srcCull = SOSTITUIRE_CULL_CYL[key];
+    var srcCull = SOSTITUIRE_CULL_CYL[p.templateKey];
     if(!srcCull){
-      // Custom o fallback: bbox del template nel local
-      var tplMesh = p.group.getObjectByName('template');
+      var anyG = p.groups && p.groups[p.templateKey];
+      var tplMesh = anyG && anyG.getObjectByName('template');
       var bbox = null;
       if(tplMesh && tplMesh.geometry){
         tplMesh.geometry.computeBoundingBox();
@@ -9713,44 +9695,45 @@ function sostBuildExportTriangles(destGeo, destKey){
         zMax: bbox ? bbox.max.z : 1
       };
     }
-    var finalR = Math.max(srcCull.radius, destCull.radius);
-    // Unione [min, max] dei due intervalli Z + piccolo safety margin
-    var zMin = Math.min(srcCull.zMin, destCull.zMin) - 0.1;
-    var zMax = Math.max(srcCull.zMax, destCull.zMax) + 0.1;
+    // Unione dei cilindri dei tipi attivi VISIBILI su questo marker
+    var zMin = srcCull.zMin, zMax = srcCull.zMax, maxR = srcCull.radius;
+    activeTypes.forEach(function(k){
+      var g = p.groups && p.groups[k];
+      if(!g || !g.visible) return;
+      var dc = SOSTITUIRE_CULL_CYL[k];
+      if(!dc) return;
+      if(dc.zMin < zMin) zMin = dc.zMin;
+      if(dc.zMax > zMax) zMax = dc.zMax;
+      if(dc.radius > maxR) maxR = dc.radius;
+    });
     return {
       center: p.position,
       axis: p.axisDir.clone().normalize(),
-      radius2: (finalR + 0.1) * (finalR + 0.1),
-      zMin: zMin,
-      zMax: zMax
+      radius2: (maxR + 0.1) * (maxR + 0.1),
+      zMin: zMin - 0.1,
+      zMax: zMax + 0.1
     };
   });
 
-  // Pass 1: filtro triangoli della Multi-A (saltato se modalita' solo scanbody)
-  var keepBuffer = new Float32Array(sostExportContent === 'full' ? scanPos.length : 0);
+  // Pass 1: filtro triangoli Multi-A (solo se includeScan)
+  var keepBuffer = new Float32Array(includeScan ? scanPos.length : 0);
   var keepCount = 0;
-  if(sostExportContent === 'full'){
-    // Tengo solo i triangoli il cui centroide NON cade in nessun cilindro
+  if(includeScan){
     for(var i = 0; i < nScanTris; i++){
       var o = i * 9;
       var cx = (scanPos[o] + scanPos[o+3] + scanPos[o+6]) / 3;
       var cy = (scanPos[o+1] + scanPos[o+4] + scanPos[o+7]) / 3;
       var cz = (scanPos[o+2] + scanPos[o+5] + scanPos[o+8]) / 3;
-
       var inCull = false;
-      for(var k = 0; k < cullers.length; k++){
-        var cu = cullers[k];
+      for(var c = 0; c < cullers.length; c++){
+        var cu = cullers[c];
         var dx = cx - cu.center.x, dy = cy - cu.center.y, dz = cz - cu.center.z;
         var axial = dx * cu.axis.x + dy * cu.axis.y + dz * cu.axis.z;
         if(axial < cu.zMin || axial > cu.zMax) continue;
         var rx = dx - axial * cu.axis.x;
         var ry = dy - axial * cu.axis.y;
         var rz = dz - axial * cu.axis.z;
-        var radial2 = rx*rx + ry*ry + rz*rz;
-        if(radial2 < cu.radius2){
-          inCull = true;
-          break;
-        }
+        if(rx*rx + ry*ry + rz*rz < cu.radius2){ inCull = true; break; }
       }
       if(!inCull){
         for(var j = 0; j < 9; j++) keepBuffer[keepCount * 9 + j] = scanPos[o + j];
@@ -9759,43 +9742,50 @@ function sostBuildExportTriangles(destGeo, destKey){
     }
   }
 
-  // Pass 2: per ogni marker posizionato, applica la sua R+t alla geometria
-  // del template di DESTINAZIONE (destGeo). L'origine clinica condivisa dei
-  // template IPD garantisce che R+t funzioni identicamente per 1T3/SR/OS.
-  var destTplPos = destGeo.attributes.position.array;
-  var nDestTplTris = destTplPos.length / 9;
+  // Pass 2: per ogni (marker, tipo) con .visible===true, applica R+t al template
   var tplArrays = [];
   var totalTplTris = 0;
   sostPlaced.forEach(function(p){
-    p.group.updateMatrixWorld(true);
-    var m4 = p.group.matrixWorld;  // trasformazione R+t del marker
-    var out = new Float32Array(destTplPos.length);
-    var v = new THREE.Vector3();
-    for(var i = 0; i < nDestTplTris; i++){
-      var o = i * 9;
-      for(var k = 0; k < 3; k++){
-        v.set(destTplPos[o + k*3], destTplPos[o + k*3 + 1], destTplPos[o + k*3 + 2]);
-        v.applyMatrix4(m4);
-        out[o + k*3]     = v.x;
-        out[o + k*3 + 1] = v.y;
-        out[o + k*3 + 2] = v.z;
+    activeTypes.forEach(function(k){
+      var g = p.groups && p.groups[k];
+      if(!g || !g.visible) return;
+      var destGeo = destGeos[k];
+      if(!destGeo) return;
+      g.updateMatrixWorld(true);
+      var m4 = g.matrixWorld;
+      var destTplPos = destGeo.attributes.position.array;
+      var nDestTplTris = destTplPos.length / 9;
+      var out = new Float32Array(destTplPos.length);
+      var v = new THREE.Vector3();
+      for(var i = 0; i < nDestTplTris; i++){
+        var o = i * 9;
+        for(var kk = 0; kk < 3; kk++){
+          v.set(destTplPos[o + kk*3], destTplPos[o + kk*3 + 1], destTplPos[o + kk*3 + 2]);
+          v.applyMatrix4(m4);
+          out[o + kk*3]     = v.x;
+          out[o + kk*3 + 1] = v.y;
+          out[o + kk*3 + 2] = v.z;
+        }
       }
-    }
-    tplArrays.push(out);
-    totalTplTris += nDestTplTris;
+      tplArrays.push(out);
+      totalTplTris += nDestTplTris;
+    });
   });
 
-  // Concatena: scan filtrato + tutti i template
-  var final = new Float32Array(keepCount * 9 + totalTplTris * 9);
-  final.set(keepBuffer.subarray(0, keepCount * 9), 0);
+  // Concatena
+  var total = keepCount * 9 + totalTplTris * 9;
+  var final = new Float32Array(total);
+  if(includeScan) final.set(keepBuffer.subarray(0, keepCount * 9), 0);
   var offset = keepCount * 9;
   tplArrays.forEach(function(arr){
     final.set(arr, offset);
     offset += arr.length;
   });
 
-  console.log('[Sostituire export] scan orig:', nScanTris, '-> keep:', keepCount,
-              '(culled', nScanTris - keepCount, ') + template tris:', totalTplTris);
+  console.log('[Sostituire export] includeScan=' + includeScan,
+              'types=' + activeTypes.join(','),
+              'scan kept=' + keepCount,
+              'tpl tris=' + totalTplTris);
   return final;
 }
 
@@ -9848,26 +9838,36 @@ function sostRemovePlaced(num){
   var idx = sostPlaced.findIndex(function(p){ return p.num === num; });
   if(idx < 0) return;
   var p = sostPlaced[idx];
-  scene.remove(p.group);
-  if(p.axisLine) scene.remove(p.axisLine);
-  if(p.group.traverse){
+  // Rimuovi i 3 group variant (1T3/SR/OS)
+  if(p.groups){
+    Object.keys(p.groups).forEach(function(k){
+      var g = p.groups[k];
+      if(!g) return;
+      scene.remove(g);
+      g.traverse(function(obj){
+        if(obj.geometry) obj.geometry.dispose();
+        if(obj.material) obj.material.dispose();
+      });
+    });
+  } else if(p.group){
+    // fallback legacy (non dovrebbe piu' accadere)
+    scene.remove(p.group);
     p.group.traverse(function(obj){
       if(obj.geometry) obj.geometry.dispose();
       if(obj.material) obj.material.dispose();
     });
   }
+  if(p.axisLine) scene.remove(p.axisLine);
   sostPlaced.splice(idx, 1);
   sostRenderPlacedList();
   sostUpdateRefineButtonState();
   sostShowStatus('Rimosso marker #' + num + '.');
   try { rebuildTree(); } catch(e){}
-  // Gestisci cut view se aperta
   var cutOverlay = document.getElementById('cutViewOverlay');
   if(cutOverlay && cutOverlay.style.display === 'flex'){
     if(sostPlaced.length === 0){
       cutOverlay.style.display = 'none';
     } else {
-      // Ricostruisci selettore e seleziona primo disponibile
       var sel = document.getElementById('cutMuaSelect');
       if(sel){
         sel.innerHTML = '';
@@ -9944,40 +9944,96 @@ function sostRebuildTree(){
   var layerTree = document.getElementById('layerTree');
   if(!layerTree) return;
   var h = '';
-  // Voce "Scansione" (sostMesh)
   if(sostMesh){
     h += '<div class="tree-node"><input type="checkbox" '+(sostMesh.visible?'checked':'')+
          ' onchange="sostToggleScanVisibility(this.checked)"><span class="dot" style="background:#c4a48c"></span>'+
          '<span class="lbl">Scansione (Multi-A)</span></div>';
   }
-  // Voci "Marker #N" (sostPlaced)
   if(sostPlaced.length > 0){
-    h += '<div class="tree-node" style="margin-top:4px"><span class="lbl" style="color:var(--gray);font-size:9px;text-transform:uppercase;letter-spacing:.06em">Marker posizionati</span></div>';
-    sostPlaced.forEach(function(p, idx){
-      var colorHex = '#' + p.color.toString(16).padStart(6, '0');
-      var info = SOSTITUIRE_TEMPLATE_INFO[p.templateKey] || {label: p.templateKey};
-      var visible = (p.group && p.group.visible !== false);
-      h += '<div class="tree-node"><input type="checkbox" '+(visible?'checked':'')+
-           ' onchange="sostTogglePlacedVisibility('+p.num+', this.checked)"><span class="dot" style="background:'+colorHex+'"></span>'+
-           '<span class="lbl">#'+p.num+' '+info.label+'</span>'+
-           '<button class="del-btn" onclick="sostRemovePlaced('+p.num+')" title="Elimina marker #'+p.num+'">✕</button></div>';
+    // Tre gruppi, uno per ciascun tipo di template. Ogni gruppo ha un
+    // checkbox "master" che accende/spegne tutti i marker del tipo, poi
+    // un elenco dei singoli marker con checkbox individuali.
+    var TPL_ORDER = [
+      { key: '1T3', label: 'Marker 1T3', color: '#ffaa44' },
+      { key: 'SR',  label: 'Marker SR',  color: '#0065B3' },
+      { key: 'OS',  label: 'Marker OS',  color: '#639922' }
+    ];
+    TPL_ORDER.forEach(function(tpl){
+      // Calcola stato master: visible se tutti i marker di questo tipo sono visibili
+      var anyVisible = false, allVisible = true;
+      sostPlaced.forEach(function(p){
+        var g = p.groups && p.groups[tpl.key];
+        if(!g) return;
+        if(g.visible) anyVisible = true;
+        else allVisible = false;
+      });
+      var masterChecked = anyVisible && allVisible;
+      var masterIndeterminate = anyVisible && !allVisible;
+      h += '<div class="tree-node" style="margin-top:6px">' +
+           '<input type="checkbox" ' + (masterChecked ? 'checked' : '') +
+           ' onchange="sostToggleGroupVisibility(\'' + tpl.key + '\', this.checked)"' +
+           (masterIndeterminate ? ' data-indet="1"' : '') + '>' +
+           '<span class="dot" style="background:' + tpl.color + '"></span>' +
+           '<span class="lbl" style="font-weight:700">' + tpl.label + '</span>' +
+           '</div>';
+      sostPlaced.forEach(function(p){
+        var g = p.groups && p.groups[tpl.key];
+        if(!g) return;
+        var visible = g.visible;
+        h += '<div class="tree-node" style="padding-left:22px">' +
+             '<input type="checkbox" ' + (visible ? 'checked' : '') +
+             ' onchange="sostTogglePlacedTplVisibility(' + p.num + ', \'' + tpl.key + '\', this.checked)">' +
+             '<span class="dot" style="background:' + tpl.color + ';opacity:.6"></span>' +
+             '<span class="lbl">#' + p.num + '</span>' +
+             '<button class="del-btn" onclick="sostRemovePlaced(' + p.num + ')" title="Elimina marker #' + p.num + '">✕</button>' +
+             '</div>';
+      });
     });
   }
   if(!sostMesh && sostPlaced.length === 0){
     h = '<div class="tree-node"><span class="lbl" style="color:var(--gray);font-size:10px">Nessun oggetto. Carica Multi-A.</span></div>';
   }
   layerTree.innerHTML = h;
+  // Applica indeterminate via JS (HTML non lo supporta come attributo)
+  layerTree.querySelectorAll('input[data-indet="1"]').forEach(function(cb){
+    cb.indeterminate = true;
+  });
 }
 
 function sostToggleScanVisibility(on){
   if(sostMesh) sostMesh.visible = on;
 }
 
+// Toggle di un singolo template di uno specifico marker
+function sostTogglePlacedTplVisibility(num, tplKey, on){
+  var p = sostPlaced.find(function(x){ return x.num === num; });
+  if(!p) return;
+  var g = p.groups && p.groups[tplKey];
+  if(g) g.visible = on;
+  // Aggiorna master del gruppo senza ricostruire tutto l'albero
+  sostRebuildTree();
+}
+
+// Toggle di tutti i marker di un tipo (es. tutti 1T3, tutti SR, tutti OS)
+function sostToggleGroupVisibility(tplKey, on){
+  sostPlaced.forEach(function(p){
+    var g = p.groups && p.groups[tplKey];
+    if(g) g.visible = on;
+  });
+  sostRebuildTree();
+}
+
+// Legacy: kept for compatibility but redirected
 function sostTogglePlacedVisibility(num, on){
   var p = sostPlaced.find(function(x){ return x.num === num; });
   if(!p) return;
-  if(p.group) p.group.visible = on;
-  if(p.axisLine) p.axisLine.visible = false; // axis line reserved
+  // Toggle all 3 template variants together
+  ['1T3','SR','OS'].forEach(function(k){
+    var g = p.groups && p.groups[k];
+    if(g) g.visible = on;
+  });
+  if(p.axisLine) p.axisLine.visible = false;
+  sostRebuildTree();
 }
 
 // ═══════════════════════════════════════════════════════════════════
