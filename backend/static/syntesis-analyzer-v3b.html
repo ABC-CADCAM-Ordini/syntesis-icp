@@ -1296,6 +1296,37 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
     '), center=('+center[0].toFixed(3)+','+center[1].toFixed(3)+','+center[2].toFixed(3)+
     '), flat pts='+flatPts.length+' -> '+flatPtsFinal.length+', side pts='+allNearPts.length);
   
+  // Box diagnostico visibile in pagina (per Sostituire solo, quando opts passato)
+  if(opts && typeof opts.radius === 'number'){
+    try {
+      var dbg = document.getElementById('cylFitDebugBox');
+      if(!dbg){
+        dbg = document.createElement('div');
+        dbg.id = 'cylFitDebugBox';
+        dbg.style.cssText = 'position:fixed;top:90px;left:20px;z-index:9999;background:#0D1B2A;color:#fff;padding:10px 14px;border-radius:8px;font-family:ui-monospace,monospace;font-size:11px;line-height:1.55;max-width:380px;box-shadow:0 4px 16px rgba(0,0,0,.35);border:2px solid #0065B3';
+        document.body.appendChild(dbg);
+      }
+      var dCC = Math.sqrt(
+        (center[0]-cpx)*(center[0]-cpx) +
+        (center[1]-cpy)*(center[1]-cpy) +
+        (center[2]-cpz)*(center[2]-cpz)
+      );
+      // Distanza click-center lungo axis (deve essere piccola se center e' sul piano del disco)
+      var dxC = center[0]-cpx, dyC = center[1]-cpy, dzC = center[2]-cpz;
+      var axialCC = dxC*axis[0] + dyC*axis[1] + dzC*axis[2];
+      dbg.innerHTML =
+        '<b style="color:#4FC3F7">DIAGNOSTICA CylFit</b><br>' +
+        'radius usato: <b>' + SCANBODY_RADIUS.toFixed(3) + '</b> mm<br>' +
+        'click: (' + cpx.toFixed(2) + ', ' + cpy.toFixed(2) + ', ' + cpz.toFixed(2) + ')<br>' +
+        'center: (' + center[0].toFixed(2) + ', ' + center[1].toFixed(2) + ', ' + center[2].toFixed(2) + ')<br>' +
+        'axis: (' + axis[0].toFixed(3) + ', ' + axis[1].toFixed(3) + ', ' + axis[2].toFixed(3) + ')<br>' +
+        'flat pts: ' + flatPts.length + ' → <b style="color:#4FC3F7">' + flatPtsFinal.length + '</b><br>' +
+        'side pts: ' + allNearPts.length + '<br>' +
+        'dist click→center: <b>' + dCC.toFixed(3) + '</b> mm<br>' +
+        'dist lungo asse: <b>' + axialCC.toFixed(3) + '</b> mm';
+    } catch(e){}
+  }
+  
   return {
     center: new THREE.Vector3(center[0], center[1], center[2]),
     axis: new THREE.Vector3(axis[0], axis[1], axis[2])
