@@ -1159,3 +1159,169 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         "ct_b_final": icp["aligned"].tolist(),
         "off":       offset.tolist(),
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SOSTITUIRE: allineamento template → marker rilevato
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _rotation_between_vectors(v_from: np.ndarray, v_to: np.ndarray) -> np.ndarray:
+    """Matrice di rotazione che porta v_from su v_to (entrambi unitari)."""
+    a = v_from / (np.linalg.norm(v_from) + 1e-12)
+    b = v_to / (np.linalg.norm(v_to) + 1e-12)
+    v = np.cross(a, b)
+    c = float(np.dot(a, b))
+    s = float(np.linalg.norm(v))
+    if s < 1e-9:
+        # Vettori paralleli o antiparalleli
+        if c > 0:
+            return np.eye(3)
+        # Antiparalleli: rotazione di 180° attorno ad un asse perpendicolare ad a
+        # Scelgo l'asse canonico meno allineato con a
+        ax = np.array([1.0, 0, 0]) if abs(a[0]) < 0.9 else np.array([0, 1.0, 0])
+        perp = np.cross(a, ax)
+        perp /= np.linalg.norm(perp)
+        # Rodrigues con theta=pi
+        K = np.array([[0, -perp[2], perp[1]],
+                      [perp[2], 0, -perp[0]],
+                      [-perp[1], perp[0], 0]])
+        return np.eye(3) + 2.0 * K @ K
+    # Rodrigues
+    K = np.array([[0, -v[2], v[1]],
+                  [v[2], 0, -v[0]],
+                  [-v[1], v[0], 0]])
+    return np.eye(3) + K + K @ K * ((1 - c) / (s * s))
+
+
+def _cap_centroid_for_cluster(pts: np.ndarray, axis: np.ndarray, top: bool = True) -> np.ndarray:
+    """Centroide della cap (sup o inf) di un cluster di punti, proiettati sull'asse."""
+    c = pts.mean(axis=0)
+    proj = (pts - c) @ axis
+    pmax, pmin = proj.max(), proj.min()
+    H = pmax - pmin
+    thresh = max(H * 0.20, 0.1)
+    if top:
+        cap_mask = proj > pmax - thresh
+    else:
+        cap_mask = proj < pmin + thresh
+    cap_pts = pts[cap_mask]
+    if len(cap_pts) < 3:
+        return c
+    return cap_pts.mean(axis=0)
+
+
+def align_template_to_marker(template_tris: np.ndarray,
+                             marker_pts: np.ndarray,
+                             use_icp: bool = True,
+                             n_rot_attempts: int = 16) -> dict:
+    """
+    Allinea un template (mesh STL parsata) ad un cluster di punti di un marker
+    rilevato nella scansione Multi-A.
+
+    Pipeline:
+      1. Asse template + asse marker (cyl_axis-style via PCA + cap normals)
+      2. Rotazione minima per allineare gli assi
+      3. Traslazione per centroide cap top (template top ↔ marker top)
+      4. Se use_icp: 16 rotazioni attorno all'asse + ICP point-to-point
+         scegliendo il miglior risultato per RMSD
+
+    Input:
+      template_tris: ndarray shape (N, 3, 3)   triangoli del template
+      marker_pts:    ndarray shape (M, 3)      punti del cluster marker
+      use_icp:       bool                      se applicare refine ICP
+      n_rot_attempts: int                      rotazioni di spin (16 = 22.5° step)
+
+    Output:
+      dict con:
+        R: matrice di rotazione 3x3
+        t: vettore di traslazione 3
+        rmsd: RMSD finale
+        method: descrizione pipeline usata
+    """
+    # ── Validazione input ────────────────────────────────────────────────────
+    if len(template_tris) < 10:
+        raise ValueError(f"Template troppo piccolo: {len(template_tris)} triangoli")
+    if len(marker_pts) < 30:
+        raise ValueError(f"Marker cluster troppo piccolo: {len(marker_pts)} punti")
+
+    # ── 1. Assi e centroidi ──────────────────────────────────────────────────
+    tpl_pts = template_tris.reshape(-1, 3)
+    tpl_axis = cyl_axis(template_tris)
+    marker_axis = cyl_axis(marker_pts.reshape(-1, 1, 3).repeat(3, axis=1))  # trucco: riusa cyl_axis
+
+    # Entrambi gli assi puntano da cap bottom a cap top (per convenzione cyl_axis)
+    tpl_top = _cap_centroid_for_cluster(tpl_pts, tpl_axis, top=True)
+    marker_top = _cap_centroid_for_cluster(marker_pts, marker_axis, top=True)
+
+    # ── 2. Rotazione iniziale per allineare assi ─────────────────────────────
+    R_axis = _rotation_between_vectors(tpl_axis, marker_axis)
+
+    # ── 3. Traslazione cap-top a cap-top ─────────────────────────────────────
+    tpl_pts_rot = apply_transform(tpl_pts, R_axis, np.zeros(3))
+    tpl_top_rot = R_axis @ tpl_top
+    t_init = marker_top - tpl_top_rot
+
+    tpl_aligned = tpl_pts_rot + t_init
+    R_best = R_axis
+    t_best = t_init
+
+    if not use_icp:
+        # Calcolo solo RMSD di nearest neighbor per reporting
+        # (sub-sample per velocità)
+        moving_sub = tpl_aligned[::max(1, len(tpl_aligned) // 1000)]
+        dists = np.linalg.norm(marker_pts[:, None, :] - moving_sub[None, :, :], axis=2)
+        rmsd = float(np.sqrt(np.mean(dists.min(axis=0) ** 2)))
+        return {
+            "R": R_best.tolist(),
+            "t": t_best.tolist(),
+            "rmsd": rmsd,
+            "method": "rigid_axis_align"
+        }
+
+    # ── 4. ICP con spin attempts attorno all'asse del marker ─────────────────
+    # Per ogni rotazione di spin, runno ICP breve e tengo il migliore
+    best_rmsd = float("inf")
+    best_R = R_best
+    best_t = t_best
+
+    # Sub-sample template per ICP veloce (cap max ~500 punti)
+    if len(tpl_aligned) > 500:
+        stride = len(tpl_aligned) // 500
+        tpl_ds = tpl_aligned[::stride]
+    else:
+        tpl_ds = tpl_aligned
+
+    for k in range(n_rot_attempts):
+        theta = (2 * np.pi * k) / n_rot_attempts
+        # Rotazione di theta attorno a marker_axis, applicata intorno a marker_top
+        axis_u = marker_axis / np.linalg.norm(marker_axis)
+        c_t, s_t = np.cos(theta), np.sin(theta)
+        K = np.array([[0, -axis_u[2], axis_u[1]],
+                      [axis_u[2], 0, -axis_u[0]],
+                      [-axis_u[1], axis_u[0], 0]])
+        R_spin = np.eye(3) * c_t + s_t * K + (1 - c_t) * np.outer(axis_u, axis_u)
+        # spin attorno a marker_top: P' = R_spin @ (P - marker_top) + marker_top
+        moving = (R_spin @ (tpl_ds - marker_top).T).T + marker_top
+        icp_res = run_icp(marker_pts, moving, max_iter=30)
+        rmsd_k = icp_res["rmsd"]
+        if rmsd_k < best_rmsd:
+            best_rmsd = rmsd_k
+            # Trasformazione composta: R_spin (attorno a marker_top) + R_axis + t_init + R_icp + t_icp
+            # Applico la composizione:
+            #   P_out = R_icp @ (R_spin @ (R_axis @ P + t_init - marker_top) + marker_top) + t_icp
+            # Espando:
+            #   R_final = R_icp @ R_spin @ R_axis
+            #   t_final = R_icp @ (R_spin @ (t_init - marker_top) + marker_top) + t_icp
+            R_icp = np.asarray(icp_res["R"])
+            t_icp = np.asarray(icp_res["t"])
+            R_final = R_icp @ R_spin @ R_axis
+            t_final = R_icp @ (R_spin @ (t_init - marker_top) + marker_top) + t_icp
+            best_R = R_final
+            best_t = t_final
+
+    return {
+        "R": best_R.tolist(),
+        "t": best_t.tolist(),
+        "rmsd": best_rmsd,
+        "method": f"icp_spin_{n_rot_attempts}"
+    }

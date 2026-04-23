@@ -771,23 +771,25 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 
       <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin:12px 0 4px 0;line-height:1.5">Template scan body:</div>
       <div class="comp-radio" id="sostTemplateRadio">
-        <label class="active"><input type="radio" name="sostTpl" value="1T3" checked onchange="sostOnTemplateChange(this)"><span class="sw" style="background:#ffaa44"></span>1T3</label>
-        <label><input type="radio" name="sostTpl" value="SR" onchange="sostOnTemplateChange(this)"><span class="sw" style="background:#0065B3"></span>SR</label>
-        <label><input type="radio" name="sostTpl" value="OS" onchange="sostOnTemplateChange(this)"><span class="sw" style="background:#639922"></span>OS</label>
+        <label class="active"><input type="radio" name="sostTpl" value="1T3" checked onchange="sostOnTemplateChange(this)"><span class="sw" style="background:#ffaa44"></span>Marker 1T3</label>
+        <label><input type="radio" name="sostTpl" value="SR" onchange="sostOnTemplateChange(this)"><span class="sw" style="background:#0065B3"></span>Marker SR</label>
+        <label><input type="radio" name="sostTpl" value="OS" onchange="sostOnTemplateChange(this)"><span class="sw" style="background:#639922"></span>Marker OS</label>
         <label><input type="radio" name="sostTpl" value="custom" onchange="sostOnTemplateChange(this)"><span class="sw" style="background:linear-gradient(135deg,#888,#ccc)"></span>Custom</label>
       </div>
       <input type="file" id="sostInputCustom" accept=".stl,.STL" style="display:none" onchange="sostOnCustomPicked(event)">
       <div id="sostCustomName" style="display:none;font-family:var(--mono);font-size:9px;color:var(--dark);margin-top:4px;padding:4px 6px;background:var(--light);border-radius:4px;border:1px solid var(--border)"></div>
 
       <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px 0;padding:6px 2px;border-top:1px solid var(--border)">
-        <input type="checkbox" id="sostICPToggle" onchange="sostICPEnabled=this.checked" style="margin:0;cursor:pointer;accent-color:var(--blue)">
+        <input type="checkbox" id="sostICPToggle" checked onchange="sostICPEnabled=this.checked" style="margin:0;cursor:pointer;accent-color:var(--blue)">
         <label for="sostICPToggle" style="font-family:var(--mono);font-size:10px;color:var(--dark);cursor:pointer;flex:1">Raffina con ICP (post-processing)</label>
       </div>
 
       <div id="sostCylList" style="display:none;margin-top:8px">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">Cilindri rilevati:</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">Marker rilevati:</div>
         <div id="sostCylListItems"></div>
       </div>
+
+      <button id="sostBtnPlace" onclick="sostPlaceTemplates()" style="display:none;width:100%;margin-top:10px;padding:8px 12px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.05em;cursor:pointer;text-transform:uppercase">Posiziona templates</button>
 
       <div id="sostStatus" style="display:none;font-family:var(--mono);font-size:9px;color:var(--gray);margin-top:6px;padding:4px 6px;background:var(--light);border-radius:4px;line-height:1.45"></div>
     </div>
@@ -8956,8 +8958,9 @@ var sostMesh = null;             // THREE.Mesh del Multi-A
 var sostCylinders = [];          // [{id, center:Vec3, axis:Vec3, radius, height, meshHighlight, accepted}]
 var sostActiveTemplate = '1T3';  // '1T3' | 'SR' | 'OS' | 'custom'
 var sostCustomStl = null;        // Uint8Array se template custom caricato
-var sostICPEnabled = false;      // toggle "Raffina con ICP"
-var sostTemplateMeshes = {};     // {'1T3': Mesh, 'SR': Mesh, 'OS': Mesh} cache
+var sostICPEnabled = true;       // toggle "Raffina con ICP" - default on per accuratezza
+var sostTemplateMeshes = {};     // {'1T3': Uint8Array, 'SR': ..., 'OS': ...} cache buffer template decompresso
+var sostPlacedMeshes = [];       // [THREE.Mesh] - template posizionati nella scena dopo Posiziona
 
 // --- METADATA TEMPLATE ---
 // Info clinica (bbox, Z del centro disco) usata per preview e UI
@@ -9355,7 +9358,7 @@ function sostAnalyzeAndRender(filename){
     // Aggiorna lista UI
     sostRenderCylList();
 
-    sostShowStatus('Rilevati ' + sostCylinders.length + ' cilindri su ' + res.nTriangles.toLocaleString() + ' triangoli.');
+    sostShowStatus('Rilevati ' + sostCylinders.length + ' marker su ' + res.nTriangles.toLocaleString() + ' triangoli.');
   } catch(err){
     console.error('[Sostituire] analisi fallita:', err);
     sostShowStatus('Errore analisi: ' + (err.message || err), true);
@@ -9365,21 +9368,43 @@ function sostAnalyzeAndRender(filename){
 function sostRenderCylList(){
   var list = document.getElementById('sostCylList');
   var items = document.getElementById('sostCylListItems');
+  var btnPlace = document.getElementById('sostBtnPlace');
   if(!list || !items) return;
   if(sostCylinders.length === 0){
     list.style.display = 'none';
+    if(btnPlace) btnPlace.style.display = 'none';
     return;
   }
   list.style.display = '';
+  if(btnPlace) btnPlace.style.display = '';
   var h = '';
   sostCylinders.forEach(function(c){
     var zAvg = (c.bbox.min[2] + c.bbox.max[2]) / 2;
+    var rmsdStr = (c.placedRmsd !== undefined)
+      ? ' - RMSD ' + c.placedRmsd.toFixed(3) + 'mm'
+      : '';
     h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;margin:2px 0;background:var(--light);border-radius:4px;font-family:var(--mono);font-size:9px">';
+    h += '<input type="checkbox" ' + (c.accepted ? 'checked' : '') + ' onchange="sostToggleAccept(' + c.id + ', this.checked)" style="margin:0;cursor:pointer;accent-color:var(--blue)">';
     h += '<span style="font-weight:800;color:var(--dark);min-width:22px">#' + c.id + '</span>';
-    h += '<span style="color:var(--gray)">r=' + c.approxRadius.toFixed(2) + 'mm, Z=' + zAvg.toFixed(2) + 'mm</span>';
+    h += '<span style="color:var(--gray);flex:1">r=' + c.approxRadius.toFixed(2) + 'mm, Z=' + zAvg.toFixed(2) + 'mm' + rmsdStr + '</span>';
     h += '</div>';
   });
   items.innerHTML = h;
+}
+
+// Toggle accept/reject di un marker
+function sostToggleAccept(id, accepted){
+  var c = sostCylinders.find(function(x){ return x.id === id; });
+  if(!c) return;
+  c.accepted = accepted;
+  // Se il template e' gia' posizionato, aggiorna visibilita'
+  if(c.placedMesh){
+    c.placedMesh.visible = accepted;
+  }
+  if(c.meshHighlight){
+    c.meshHighlight.material.opacity = accepted ? 1.0 : 0.3;
+    c.meshHighlight.material.transparent = !accepted;
+  }
 }
 
 // Pulisce tutti gli oggetti di Sostituire dalla scena
@@ -9397,9 +9422,20 @@ function sostClearScene(){
       if(c.meshHighlight.geometry) c.meshHighlight.geometry.dispose();
       if(c.meshHighlight.material) c.meshHighlight.material.dispose();
     }
+    if(c.placedMesh){
+      scene.remove(c.placedMesh);
+      if(c.placedMesh.geometry) c.placedMesh.geometry.dispose();
+      if(c.placedMesh.material) c.placedMesh.material.dispose();
+    }
   });
+  sostPlacedMeshes.forEach(function(m){
+    scene.remove(m);
+    if(m.geometry) m.geometry.dispose();
+    if(m.material) m.material.dispose();
+  });
+  sostPlacedMeshes = [];
   sostCylinders = [];
-  // Clean stray orphans con userData.isSostituire (es. mesh template aggiunte in futuro)
+  // Clean stray orphans con userData.isSostituire
   var toRemove = [];
   scene.traverse(function(obj){
     if(obj.userData && obj.userData.isSostituire) toRemove.push(obj);
@@ -9412,7 +9448,208 @@ function _setSostituireArtifactsVisible(on){
   if(sostMesh) sostMesh.visible = on;
   sostCylinders.forEach(function(c){
     if(c.meshHighlight) c.meshHighlight.visible = on;
+    if(c.placedMesh) c.placedMesh.visible = on && c.accepted;
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SOSTITUIRE: posizionamento template sui marker rilevati
+// Per ogni marker accettato: estrae i punti del cluster, invia al server
+// insieme al template STL scelto, riceve matrice R/t, costruisce mesh
+// Three.js trasformato e lo aggiunge alla scena.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function sostPlaceTemplates(){
+  if(sostCylinders.length === 0){
+    sostShowStatus('Nessun marker rilevato. Carica una scansione.', true);
+    return;
+  }
+  var btn = document.getElementById('sostBtnPlace');
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = 'Posizionamento in corso...';
+    btn.style.opacity = '0.6';
+  }
+
+  // Pulisci eventuali placed mesh di un run precedente
+  sostCylinders.forEach(function(c){
+    if(c.placedMesh){
+      scene.remove(c.placedMesh);
+      if(c.placedMesh.geometry) c.placedMesh.geometry.dispose();
+      if(c.placedMesh.material) c.placedMesh.material.dispose();
+      c.placedMesh = null;
+      c.placedRmsd = undefined;
+    }
+  });
+
+  try {
+    // Step 1: ottieni buffer STL del template scelto
+    var tplBuffer;
+    if(sostActiveTemplate === 'custom'){
+      if(!sostCustomStl){
+        sostShowStatus('Nessun template custom caricato.', true);
+        return;
+      }
+      tplBuffer = sostCustomStl;
+    } else {
+      sostShowStatus('Decompressione template ' + sostActiveTemplate + '...');
+      tplBuffer = await sostDecodeTemplate(sostActiveTemplate);
+      if(!tplBuffer){
+        sostShowStatus('Impossibile decomprimere template ' + sostActiveTemplate, true);
+        return;
+      }
+    }
+
+    var info = SOSTITUIRE_TEMPLATE_INFO[sostActiveTemplate] || {color: 0x0065B3};
+    var tplColor = info.color || 0x0065B3;
+
+    // Step 2: per ogni marker accettato, chiamata HTTP
+    var successCount = 0;
+    var failCount = 0;
+    var rmsds = [];
+
+    for(var i = 0; i < sostCylinders.length; i++){
+      var c = sostCylinders[i];
+      if(!c.accepted){ continue; }
+      sostShowStatus('Allineamento marker #' + c.id + ' (' + (i+1) + '/' + sostCylinders.length + ')...');
+
+      // Estrai punti 3D unici del cluster dal pos buffer della scena
+      var markerPts = sostExtractClusterPoints(c);
+      if(markerPts.length < 30){
+        console.warn('[Sostituire] cluster #' + c.id + ' troppo piccolo:', markerPts.length);
+        failCount++;
+        continue;
+      }
+
+      // Limita punti per non sovraccaricare HTTP (sample fino a 1500)
+      if(markerPts.length > 1500){
+        var stride = Math.ceil(markerPts.length / 1500);
+        var sampled = [];
+        for(var k = 0; k < markerPts.length; k += stride) sampled.push(markerPts[k]);
+        markerPts = sampled;
+      }
+
+      try {
+        var alignRes = await sostCallAlignAPI(tplBuffer, markerPts, sostICPEnabled);
+        // Costruisci mesh template trasformata
+        var placedMesh = sostBuildTransformedTemplateMesh(tplBuffer, alignRes.R, alignRes.t, tplColor);
+        if(placedMesh){
+          placedMesh.userData.isSostituire = true;
+          placedMesh.userData.markerId = c.id;
+          placedMesh.visible = c.accepted;
+          scene.add(placedMesh);
+          c.placedMesh = placedMesh;
+          c.placedRmsd = alignRes.rmsd;
+          sostPlacedMeshes.push(placedMesh);
+          successCount++;
+          rmsds.push(alignRes.rmsd);
+        } else {
+          failCount++;
+        }
+      } catch(err){
+        console.error('[Sostituire] errore marker #' + c.id + ':', err);
+        failCount++;
+      }
+    }
+
+    // Ri-render lista per mostrare RMSD
+    sostRenderCylList();
+
+    // Nascondi box wireframe: ora abbiamo i template veri
+    sostCylinders.forEach(function(c){
+      if(c.meshHighlight) c.meshHighlight.visible = false;
+    });
+
+    var avgRmsd = rmsds.length > 0
+      ? (rmsds.reduce(function(a,b){return a+b;}, 0) / rmsds.length).toFixed(3)
+      : '--';
+    sostShowStatus('Posizionati ' + successCount + '/' + sostCylinders.filter(function(c){return c.accepted}).length +
+      ' marker. RMSD medio: ' + avgRmsd + 'mm' + (failCount > 0 ? '. Falliti: ' + failCount : ''));
+  } catch(err) {
+    console.error('[Sostituire] errore posizionamento:', err);
+    sostShowStatus('Errore: ' + (err.message || err), true);
+  } finally {
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = 'Posiziona templates';
+      btn.style.opacity = '1';
+    }
+  }
+}
+
+// Estrae i punti 3D unici di un cluster dal pos buffer della scena Sostituire
+function sostExtractClusterPoints(cyl){
+  if(!sostMesh || !sostMesh.geometry) return [];
+  var posAttr = sostMesh.geometry.getAttribute('position');
+  if(!posAttr) return [];
+  var pos = posAttr.array;
+  var ptsSet = {};
+  var pts = [];
+  // cyl.tris e' array di indici triangolo nel pos buffer
+  for(var i = 0; i < cyl.tris.length; i++){
+    var ti = cyl.tris[i];
+    for(var k = 0; k < 3; k++){
+      var o = ti * 9 + k * 3;
+      var x = pos[o], y = pos[o+1], z = pos[o+2];
+      // Dedup con chiave stringa
+      var key = Math.round(x*100) + ',' + Math.round(y*100) + ',' + Math.round(z*100);
+      if(!ptsSet[key]){
+        ptsSet[key] = true;
+        pts.push([x, y, z]);
+      }
+    }
+  }
+  return pts;
+}
+
+// Chiama l'endpoint /api/sostituire-align
+async function sostCallAlignAPI(tplBuffer, markerPts, useICP){
+  var fd = new FormData();
+  var tplBlob = new Blob([tplBuffer], {type: 'application/octet-stream'});
+  fd.append('template', tplBlob, 'template.stl');
+  fd.append('marker_pts', JSON.stringify(markerPts));
+  fd.append('use_icp', useICP ? 'true' : 'false');
+  var resp = await fetch('/api/sostituire-align', {method: 'POST', body: fd});
+  if(!resp.ok){
+    var err = await resp.text();
+    throw new Error('Server ' + resp.status + ': ' + err);
+  }
+  return await resp.json();
+}
+
+// Costruisce un THREE.Mesh dal buffer STL del template applicando R (3x3) e t (3)
+function sostBuildTransformedTemplateMesh(stlBuffer, R, t, colorHex){
+  var view = new DataView(stlBuffer.buffer || stlBuffer, stlBuffer.byteOffset || 0, stlBuffer.byteLength);
+  if(view.byteLength < 84) return null;
+  var n = view.getUint32(80, true);
+  if(84 + n * 50 !== view.byteLength) return null;
+  var positions = new Float32Array(n * 9);
+  for(var i = 0; i < n; i++){
+    var off = 84 + i * 50;
+    for(var k = 0; k < 3; k++){
+      var ox = view.getFloat32(off + 12 + k*12, true);
+      var oy = view.getFloat32(off + 16 + k*12, true);
+      var oz = view.getFloat32(off + 20 + k*12, true);
+      // Applica R + t (row-major: R[0..8])
+      var nx = R[0]*ox + R[1]*oy + R[2]*oz + t[0];
+      var ny = R[3]*ox + R[4]*oy + R[5]*oz + t[1];
+      var nz = R[6]*ox + R[7]*oy + R[8]*oz + t[2];
+      positions[i*9 + k*3]     = nx;
+      positions[i*9 + k*3 + 1] = ny;
+      positions[i*9 + k*3 + 2] = nz;
+    }
+  }
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  var mat = new THREE.MeshPhongMaterial({
+    color: colorHex,
+    side: THREE.DoubleSide,
+    flatShading: false,
+    transparent: true,
+    opacity: 0.88
+  });
+  return new THREE.Mesh(geo, mat);
 }
 
 
