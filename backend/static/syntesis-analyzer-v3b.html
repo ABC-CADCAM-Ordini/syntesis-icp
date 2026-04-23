@@ -1317,13 +1317,16 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
       dbg.innerHTML =
         '<b style="color:#4FC3F7">DIAGNOSTICA CylFit</b><br>' +
         'radius usato: <b>' + SCANBODY_RADIUS.toFixed(3) + '</b> mm<br>' +
-        'click: (' + cpx.toFixed(2) + ', ' + cpy.toFixed(2) + ', ' + cpz.toFixed(2) + ')<br>' +
-        'center: (' + center[0].toFixed(2) + ', ' + center[1].toFixed(2) + ', ' + center[2].toFixed(2) + ')<br>' +
+        'click raw: (' + cpx.toFixed(2) + ', ' + cpy.toFixed(2) + ', ' + cpz.toFixed(2) + ')<br>' +
+        'center (=faccia disco): (' + center[0].toFixed(2) + ', ' + center[1].toFixed(2) + ', ' + center[2].toFixed(2) + ')<br>' +
         'axis: (' + axis[0].toFixed(3) + ', ' + axis[1].toFixed(3) + ', ' + axis[2].toFixed(3) + ')<br>' +
         'flat pts: ' + flatPts.length + ' → <b style="color:#4FC3F7">' + flatPtsFinal.length + '</b><br>' +
         'side pts: ' + allNearPts.length + '<br>' +
         'dist click→center: <b>' + dCC.toFixed(3) + '</b> mm<br>' +
-        'dist lungo asse: <b>' + axialCC.toFixed(3) + '</b> mm';
+        'dist lungo asse: <b>' + axialCC.toFixed(3) + '</b> mm<br>' +
+        '<br><b style="color:#FFB84D">POST-PLACEMENT:</b><br>' +
+        'offset corrente: <b>' + (typeof sostZOffsetMm !== 'undefined' ? sostZOffsetMm.toFixed(2) : '?') + '</b> mm<br>' +
+        '(si aggiornera\' dopo placeTemplate)';
     } catch(e){}
   }
   
@@ -9435,6 +9438,38 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     group.userData.isSostituire = true;
     group.userData.sostRole = 'template';
     scene.add(group);
+
+    // DIAGNOSTICA POST-PLACEMENT: calcola dove finisce il disco del template
+    // nel mondo, e confronta con la faccia piatta della scansione (point).
+    try {
+      var dbg = document.getElementById('cylFitDebugBox');
+      if(dbg){
+        // Bbox del template in locale per trovare il piano del disco
+        mesh.geometry.computeBoundingBox();
+        var bb = mesh.geometry.boundingBox;
+        // Il disco e' sulla faccia del template con Z estrema (Zmax per 1T3/OS, Zmin per SR)
+        var zDiscLocal;
+        if(key === 'SR') zDiscLocal = bb.min.z;   // SR: disco a Zmin
+        else zDiscLocal = bb.max.z;                 // 1T3/OS: disco a Zmax
+        // Punto (0,0,zDiscLocal) trasformato in mondo
+        var discLocal = new THREE.Vector3(0, 0, zDiscLocal);
+        group.updateMatrixWorld(true);
+        var discWorld = discLocal.clone().applyMatrix4(group.matrixWorld);
+        // Differenza vs piano faccia piatta scansione (= point)
+        var deltaVec = discWorld.clone().sub(point);
+        var axialDelta = deltaVec.dot(normal);  // componente lungo asse
+        var currentHTML = dbg.innerHTML;
+        var postHTML =
+          '<br><b style="color:#FFB84D">POST-PLACEMENT:</b><br>' +
+          'offset corrente: <b>' + sostZOffsetMm.toFixed(2) + '</b> mm<br>' +
+          'Z disco locale: <b>' + zDiscLocal.toFixed(3) + '</b> mm<br>' +
+          'disco template (mondo): (' + discWorld.x.toFixed(2) + ', ' + discWorld.y.toFixed(2) + ', ' + discWorld.z.toFixed(2) + ')<br>' +
+          'faccia scan (point): (' + point.x.toFixed(2) + ', ' + point.y.toFixed(2) + ', ' + point.z.toFixed(2) + ')<br>' +
+          'Δ lungo asse: <b style="color:' + (Math.abs(axialDelta) < 0.1 ? '#4CAF50' : '#F44336') + '">' + axialDelta.toFixed(3) + '</b> mm<br>' +
+          'Δ totale: ' + deltaVec.length().toFixed(3) + ' mm';
+        dbg.innerHTML = currentHTML.replace(/<br><b[^<]*POST-PLACEMENT[\s\S]*/, '') + postHTML;
+      }
+    } catch(e){ console.warn('debug post-placement failed:', e); }
 
     // Linea asse (come Analizza)
     var axisDir = normal.clone().multiplyScalar(20);
