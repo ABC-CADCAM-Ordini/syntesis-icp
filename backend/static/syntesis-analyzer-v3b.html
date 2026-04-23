@@ -9417,8 +9417,8 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       id: id,
       num: sostCounter,
       group: group,
-      clickPoint: point.clone(),
-      clickNormal: normal.clone(),
+      clickPoint: rawPoint.clone(),    // raw raycaster click (per Raffina deterministico)
+      clickNormal: rawNormal.clone(),  // raw face normal
       position: point.clone(),
       axisDir: normal.clone(),
       templateKey: key,
