@@ -9031,10 +9031,18 @@ var sostSourceTemplate = '1T3';  // tipo di marker presente nella scansione di p
 // Quando l'utente clicca sul disco, findScanbodyCenter ritorna center.
 // Per posizionare il template: group.position = center - DISC_Z * axis
 // cosi' il disco del modello 3D va a coincidere con il click.
+// Offset Z = -Z_disco del template corrispondente alla scansione di partenza.
+// L'origine (0,0,0) dei template coincide con la CONNESSIONE implantare.
+// L'utente clicca sul disco visibile che sta a una quota Z_disco nota:
+//   1T3: disco a Z=+10 (sopra la connessione)
+//   OS:  disco a Z=+6  (sopra la connessione, 4mm piu' basso di 1T3)
+//   SR:  disco a Z=-5  (sotto la connessione, l'unico cosi')
+// Per portare l'origine del template sulla connessione: position = click - Z_disco * axis
+//   -> offset = -Z_disco
 var SOSTITUIRE_SOURCE_OFFSET = {
-  '1T3': -10.00,   // disco 1T3 a Z=+10 locale, up=+Z  -> offset = -10
-  'SR':   -5.00,   // disco SR  a Z=-5  locale, up=-Z (flip) -> offset = -5
-  'OS':   -6.00    // disco OS  a Z=+6  locale, up=+Z  -> offset = -6
+  '1T3': -10.00,   // disco 1T3 a Z=+10 locale
+  'SR':    5.00,   // disco SR  a Z=-5  locale -> offset = -(-5) = +5
+  'OS':   -6.00    // disco OS  a Z=+6  locale
 };
 
 // --- METADATA TEMPLATE ---
@@ -9357,20 +9365,21 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     group.name = id;
     group.add(mesh);
 
-    // Posizionamento (pipeline identica ad Analizza placeMUA)
-    // + offset Z lungo l'asse del marker (slider UI)
+    // Posizionamento: group.position = connessione = click - Z_disco_source * axis
+    // Z_disco_source e' la quota del disco (cliccato) nel sistema locale del template
+    // corrispondente alla scansione di partenza.
+    // 1T3: disco a +10 -> position = click - 10*axis
+    // OS:  disco a +6  -> position = click - 6*axis
+    // SR:  disco a -5  -> position = click + 5*axis (il disco e' sotto la connessione)
     group.position.copy(point);
     if(sostZOffsetMm !== 0){
       var dn = normal.clone().multiplyScalar(sostZOffsetMm);
       group.position.add(dn);
     }
-    // Vettore "up" del template nel suo sistema locale:
-    // 1T3/OS hanno il disco a Zmax (up = +Z)
-    // SR ha il disco a Zmin (up = -Z) -> serve flip 180°
-    var sourceKey = sostSourceTemplate;
-    var up = (sourceKey === 'SR')
-      ? new THREE.Vector3(0, 0, -1)
-      : new THREE.Vector3(0, 0, 1);
+    // Orientamento: tutti i template IPD hanno +Z che punta dalla connessione
+    // verso l'esterno del corpo (dove c'e' il disco per 1T3/OS, o verso
+    // l'emergenza per SR). findScanbodyCenter ritorna axis nello stesso verso.
+    var up = new THREE.Vector3(0, 0, 1);
     group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, normal));
     group.userData.isSostituire = true;
     group.userData.sostRole = 'template';
@@ -9459,10 +9468,7 @@ function sostAlignAll(){
 
       // Ricostruisci matrice del gruppo
       var newM = new THREE.Matrix4();
-      // Stesso flip di SR applicato nel placement
-      var up = (sostSourceTemplate === 'SR')
-        ? new THREE.Vector3(0, 0, -1)
-        : new THREE.Vector3(0, 0, 1);
+      var up = new THREE.Vector3(0, 0, 1);
       var q = new THREE.Quaternion().setFromUnitVectors(up, axis);
       newM.makeRotationFromQuaternion(q);
       newM.setPosition(finalCenter);
