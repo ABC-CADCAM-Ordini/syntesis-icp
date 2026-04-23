@@ -9314,10 +9314,17 @@ function sostOnViewportClick(event){
 }
 
 // ── Posizionamento template (pipeline Analizza: findScanbodyCenter) ──
-// Costruisce e piazza nella scena un THREE.Group contenente la geometria del
-// template richiesto, correttamente posizionato e orientato.
-// Ritorna il group pronto per l'uso.
-function sostBuildTemplateGroup(key, geo, point, normal){
+// Costruisce il THREE.Group di un singolo template (key) correttamente
+// orientato e posizionato. L'origine locale del template (0,0,0) = connessione
+// implantare. Questo punto e' condiviso da tutti i 3 template IPD, quindi
+// basta farlo coincidere con `connectionWorld` e ogni template si colloca
+// automaticamente alla propria quota intrinseca:
+//   - 1T3: disco a Z=+8.5 locale -> +8.5 axis nel mondo (sopra la connessione)
+//   - OS:  disco a Z=+6.0 locale -> +6.0 axis nel mondo
+//   - SR:  disco a Z=-5.0 locale -> -5.0 axis nel mondo (sotto la connessione)
+// Nessun flip SR: la convenzione STL ha gia' il verso corretto rispetto
+// all'origine clinica condivisa.
+function sostBuildTemplateGroup(key, geo, connectionWorld, axis){
   var info = SOSTITUIRE_TEMPLATE_INFO[key] || {label:'Custom', color: 0x888888};
   var color = info.color;
   var mat = new THREE.MeshPhongMaterial({
@@ -9332,23 +9339,12 @@ function sostBuildTemplateGroup(key, geo, point, normal){
   mesh.name = 'template';
   var group = new THREE.Group();
   group.add(mesh);
-  geo.computeBoundingBox();
-  var bb = geo.boundingBox;
-  // SR ha disco a Zmin locale (sotto la connessione), gli altri a Zmax
-  var zDiscFromBBox = (key === 'SR') ? -bb.min.z : bb.max.z;
-  var up = (key === 'SR')
-    ? new THREE.Vector3(0, 0, -1)
-    : new THREE.Vector3(0, 0, 1);
-  // Posizione del gruppo: porta la connessione sul click (lungo l'asse)
-  group.position.copy(point);
-  var axisOffset = normal.clone().multiplyScalar(-zDiscFromBBox);
-  group.position.add(axisOffset);
-  if(sostZOffsetMm !== 0){
-    var dn = normal.clone().multiplyScalar(sostZOffsetMm);
-    group.position.add(dn);
-  }
-  // Orientamento: up locale -> asse nello spazio mondo
-  group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, normal));
+  // Origine locale (0,0,0) = connessione implantare.
+  group.position.copy(connectionWorld);
+  // up locale = +Z. Quaternion porta +Z -> axis, i punti a Z>0 locale
+  // vanno in +axis nel mondo, quelli a Z<0 vanno in -axis.
+  var up = new THREE.Vector3(0, 0, 1);
+  group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, axis));
   group.userData.isSostituire = true;
   group.userData.sostRole = 'template';
   group.userData.templateKey = key;
@@ -9362,15 +9358,15 @@ function sostPlaceTemplate(rawPoint, rawNormal){
   var sourceRadius = (SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {}).radius;
   var autoResult = findScanbodyCenter(sostMesh.geometry, rawPoint, rawNormal,
     sourceRadius ? { radius: sourceRadius } : undefined);
-  var point = autoResult.center;
-  var normal = autoResult.axis.clone().normalize();
+  var discWorld = autoResult.center;       // faccia del disco scansionato nel mondo
+  var axis = autoResult.axis.clone().normalize();
 
   // Template da costruire per ogni marker: tutti e tre insieme cosi' l'utente
   // puo' scegliere dall'albero cosa visualizzare/esportare.
   var TPL_KEYS = ['1T3', 'SR', 'OS'];
   var activeKey = sostActiveTemplate;
 
-  // Carica i buffer di tutti e tre (o custom se richiesto specificamente)
+  // Carica i buffer di tutti e tre
   var promises = TPL_KEYS.map(function(k){ return sostDecodeTemplate(k); });
 
   Promise.all(promises).then(function(bufs){
@@ -9388,24 +9384,35 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       }
     }
 
+    // CONNESSIONE IMPLANTARE = origine clinica condivisa da tutti i template.
+    // Dal disco scannerizzato (sostSourceTemplate), risali lungo l'asse di
+    // Z_disco_source fino alla connessione. Convenzione locale:
+    //   - 1T3/OS: disco a Zmax (+8.5, +6.0) -> connessione = disco - zDisc*axis
+    //   - SR:     disco a Zmin (-5.0)        -> connessione = disco - (-5)*axis = disco + 5*axis
+    // In entrambi i casi: connessione = disco - zDisc_signed * axis, dove zDisc_signed
+    // e' la coordinata Z locale del piano del disco (positiva per 1T3/OS, negativa per SR).
+    var sourceGeo = geos[sostSourceTemplate];
+    sourceGeo.computeBoundingBox();
+    var srcBB = sourceGeo.boundingBox;
+    var zDiscSource = (sostSourceTemplate === 'SR') ? srcBB.min.z : srcBB.max.z;
+    var connectionWorld = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscSource));
+
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // Costruisci i 3 group, aggiungili alla scena
+    // Costruisci i 3 group, tutti con origine = connessione implantare
     var groups = {};
     TPL_KEYS.forEach(function(k){
-      var g = sostBuildTemplateGroup(k, geos[k], point, normal);
+      var g = sostBuildTemplateGroup(k, geos[k], connectionWorld, axis);
       g.name = id + '_' + k;
-      // Visibile solo il template scelto dall'utente al momento del placement.
-      // Gli altri due nascosti ma costruiti cosi' l'utente puo' attivarli dall'albero.
       g.visible = (k === activeKey);
       scene.add(g);
       groups[k] = g;
     });
 
-    // Linea asse (per riferimento futuro, non visibile di default)
-    var axisDir = normal.clone().multiplyScalar(20);
-    var axisGeo = new THREE.BufferGeometry().setFromPoints([point, point.clone().add(axisDir)]);
+    // Linea asse (riferimento, non visibile di default)
+    var axisDir = axis.clone().multiplyScalar(20);
+    var axisGeo = new THREE.BufferGeometry().setFromPoints([connectionWorld, connectionWorld.clone().add(axisDir)]);
     var axisMat = new THREE.LineBasicMaterial({
       color: (SOSTITUIRE_TEMPLATE_INFO[activeKey] || {color:0x888888}).color,
       linewidth: 2
@@ -9418,12 +9425,13 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostPlaced.push({
       id: id,
       num: sostCounter,
-      groups: groups,                   // {'1T3': Group, 'SR': Group, 'OS': Group}
-      group: groups[activeKey],         // alias per codice legacy (cut view, raffina)
+      groups: groups,
+      group: groups[activeKey],
       clickPoint: rawPoint.clone(),
       clickNormal: rawNormal.clone(),
-      position: point.clone(),
-      axisDir: normal.clone(),
+      position: connectionWorld.clone(),   // connessione implantare (origine clinica)
+      discWorld: discWorld.clone(),         // faccia del disco source scansionato
+      axisDir: axis.clone(),
       templateKey: activeKey,
       color: (SOSTITUIRE_TEMPLATE_INFO[activeKey] || {color:0x888888}).color,
       rmsd: null,
@@ -9474,46 +9482,44 @@ function sostAlignAll(){
     var findOpts = sourceRadius ? { radius: sourceRadius } : undefined;
     sostPlaced.forEach(function(p){
       var autoResult = findScanbodyCenter(sostMesh.geometry, p.clickPoint, p.clickNormal, findOpts);
-      var center = autoResult.center;
+      var discWorld = autoResult.center;
       var axis = autoResult.axis.clone().normalize();
 
-      // Ri-costruisci la matrice per ciascuno dei 3 template del marker
-      // mantenendo la stessa semantica del placement (Zdisc + up per tipo).
+      // Calcola connessione implantare dal disco source (stessa formula del placement)
+      // Uso la bbox del template source-type dal primo marker disponibile
+      var srcG = p.groups && p.groups[sostSourceTemplate];
+      var zDiscSource = 0;
+      if(srcG){
+        var tplMesh = srcG.getObjectByName('template');
+        if(tplMesh && tplMesh.geometry){
+          tplMesh.geometry.computeBoundingBox();
+          var bbS = tplMesh.geometry.boundingBox;
+          zDiscSource = (sostSourceTemplate === 'SR') ? bbS.min.z : bbS.max.z;
+        }
+      }
+      var connectionWorld = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscSource));
+
+      // Ricostruisci matrice di ciascun group (up=+Z per tutti)
       Object.keys(p.groups || {}).forEach(function(k){
         var g = p.groups[k];
         if(!g) return;
-        var tplMeshK = g.getObjectByName('template');
-        if(!tplMeshK || !tplMeshK.geometry) return;
-        tplMeshK.geometry.computeBoundingBox();
-        var bbK = tplMeshK.geometry.boundingBox;
-        var zDiscK = (k === 'SR') ? -bbK.min.z : bbK.max.z;
-        var upK = (k === 'SR')
-          ? new THREE.Vector3(0, 0, -1)
-          : new THREE.Vector3(0, 0, 1);
-        var finalCenterK = center.clone();
-        finalCenterK.add(axis.clone().multiplyScalar(-zDiscK));
-        if(sostZOffsetMm !== 0){
-          finalCenterK.add(axis.clone().multiplyScalar(sostZOffsetMm));
-        }
-        var qK = new THREE.Quaternion().setFromUnitVectors(upK, axis);
+        var up = new THREE.Vector3(0, 0, 1);
+        var qK = new THREE.Quaternion().setFromUnitVectors(up, axis);
         var MK = new THREE.Matrix4().makeRotationFromQuaternion(qK);
-        MK.setPosition(finalCenterK);
+        MK.setPosition(connectionWorld);
         g.matrix.copy(MK);
         g.matrixAutoUpdate = false;
       });
 
-      // Mantieni p.position/axisDir coerenti con il template attivo (legacy)
+      // Aggiorna state
       var activeGroup = p.groups ? p.groups[p.templateKey] : p.group;
-      if(activeGroup){
-        p.group = activeGroup;
-        var activePos = new THREE.Vector3().setFromMatrixPosition(activeGroup.matrix);
-        p.position.copy(activePos);
-      }
+      if(activeGroup) p.group = activeGroup;
+      p.position.copy(connectionWorld);
+      if(p.discWorld) p.discWorld.copy(discWorld);
       p.axisDir.copy(axis);
 
-      // Aggiorna linea asse dal nuovo center (non posizione template)
-      var endPt = center.clone().add(axis.clone().multiplyScalar(20));
-      p.axisLine.geometry.setFromPoints([center, endPt]);
+      var endPt = connectionWorld.clone().add(axis.clone().multiplyScalar(20));
+      p.axisLine.geometry.setFromPoints([connectionWorld, endPt]);
       p.axisLine.geometry.attributes.position.needsUpdate = true;
 
       p.rmsd = null;
