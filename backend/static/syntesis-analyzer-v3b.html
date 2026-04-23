@@ -9019,6 +9019,8 @@ var sostCustomStlBuffer = null;  // Uint8Array del template custom
 var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
+// Stato UI per la scansione Multi-A: opacita' 0..1
+var sostScanUI = { opacity: 1.0 };
 // Stato UI per gruppi nell'albero: collassato (di default) e opacita' (1.0 = pieno, 0 = trasparente)
 var sostGroupUI = {
   '1T3': { collapsed: true, opacity: 1.0 },
@@ -9235,8 +9237,14 @@ function sostLoadScanToScene(filename){
   var mat = new THREE.MeshPhongMaterial({
     color: 0xc4a48c,
     side: THREE.DoubleSide,
-    flatShading: false
+    flatShading: false,
+    transparent: true,
+    opacity: sostScanUI.opacity,
+    depthWrite: true
   });
+  // Aggiorna flag transparent in base all'opacita' per evitare costi di
+  // sorting quando e' piena (100% = opaco reale)
+  mat.transparent = sostScanUI.opacity < 1.0;
   sostMesh = new THREE.Mesh(geo, mat);
   sostMesh.userData.isSostituire = true;
   sostMesh.userData.sostRole = 'scan';
@@ -9941,9 +9949,19 @@ function sostRebuildTree(){
   if(!layerTree) return;
   var h = '';
   if(sostMesh){
-    h += '<div class="tree-node"><input type="checkbox" '+(sostMesh.visible?'checked':'')+
-         ' onchange="sostToggleScanVisibility(this.checked)"><span class="dot" style="background:#c4a48c"></span>'+
-         '<span class="lbl">Scansione (Multi-A)</span></div>';
+    h += '<div class="tree-node" style="display:flex;align-items:center;gap:2px">' +
+         '<span style="width:12px"></span>' +   // spacer per allineare alla freccia dei gruppi
+         '<input type="checkbox" ' + (sostMesh.visible ? 'checked' : '') +
+         ' onchange="sostToggleScanVisibility(this.checked)">' +
+         '<span class="dot" style="background:#c4a48c"></span>' +
+         '<span class="lbl" style="flex:1">Scansione (Multi-A)</span>' +
+         '<span style="font-family:var(--mono);font-size:8px;color:var(--gray);min-width:26px;text-align:right" id="sostOpLblScan">' + Math.round(sostScanUI.opacity * 100) + '%</span>' +
+         '</div>';
+    h += '<div class="tree-node" style="padding-left:18px;padding-right:4px;margin-top:-2px;margin-bottom:2px">' +
+         '<input type="range" min="0" max="100" step="1" value="' + Math.round(sostScanUI.opacity * 100) + '"' +
+         ' oninput="sostOnScanOpacityChange(this.value)"' +
+         ' style="width:100%;accent-color:#c4a48c;height:4px" title="Trasparenza scansione">' +
+         '</div>';
   }
   if(sostPlaced.length > 0){
     var TPL_ORDER = [
@@ -10042,6 +10060,21 @@ function sostOnGroupOpacityChange(tplKey, pctStr){
 
 function sostToggleScanVisibility(on){
   if(sostMesh) sostMesh.visible = on;
+}
+
+// Cambia opacita' della scansione Multi-A (0..100)
+function sostOnScanOpacityChange(pctStr){
+  var pct = parseInt(pctStr, 10);
+  if(isNaN(pct)) return;
+  var op = Math.max(0, Math.min(1, pct / 100));
+  sostScanUI.opacity = op;
+  if(sostMesh && sostMesh.material){
+    sostMesh.material.opacity = op;
+    sostMesh.material.transparent = op < 1.0;
+    sostMesh.material.needsUpdate = true;
+  }
+  var lbl = document.getElementById('sostOpLblScan');
+  if(lbl) lbl.textContent = pct + '%';
 }
 
 // Toggle di un singolo template di uno specifico marker
