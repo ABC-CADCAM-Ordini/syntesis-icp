@@ -9589,6 +9589,30 @@ function sostAlignAll(){
 
       // RMSD semplice: stima locale (opzionale, puo' essere migliorata)
       p.rmsd = null;
+
+      // DEBUG: aggiorna il box diagnostico per il primo marker raffinato
+      try {
+        var dbgR = document.getElementById('cylFitDebugBox');
+        if(dbgR && p === sostPlaced[0]){
+          // Calcola dove e' il disco del template dopo il Raffina
+          p.group.updateMatrixWorld(true);
+          var tplMeshR = p.group.getObjectByName('template');
+          if(tplMeshR && tplMeshR.geometry){
+            tplMeshR.geometry.computeBoundingBox();
+            var bbR = tplMeshR.geometry.boundingBox;
+            var zDiscR = (p.templateKey === 'SR') ? bbR.min.z : bbR.max.z;
+            var discLocalR = new THREE.Vector3(0, 0, zDiscR);
+            var discWorldR = discLocalR.clone().applyMatrix4(tplMeshR.matrixWorld);
+            var deltaR = discWorldR.clone().sub(center);
+            var axDeltaR = deltaR.dot(axis);
+            dbgR.innerHTML += '<br><b style="color:#E1BEE7">POST-RAFFINA:</b><br>' +
+              'zDisc bbox: <b>' + zDiscR.toFixed(3) + '</b> mm<br>' +
+              'disco template ora: (' + discWorldR.x.toFixed(2) + ', ' + discWorldR.y.toFixed(2) + ', ' + discWorldR.z.toFixed(2) + ')<br>' +
+              'center ricalcolato: (' + center.x.toFixed(2) + ', ' + center.y.toFixed(2) + ', ' + center.z.toFixed(2) + ')<br>' +
+              'Δ disco→center: <b style="color:' + (Math.abs(axDeltaR) < 0.1 ? '#4CAF50' : '#F44336') + '">' + axDeltaR.toFixed(3) + '</b> mm';
+          }
+        }
+      } catch(e){ console.warn(e); }
     });
     sostRenderPlacedList();
     sostShowStatus('Raffinamento completato (' + sostPlaced.length + ' marker).');
