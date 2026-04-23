@@ -9021,6 +9021,8 @@ var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
 // Stato UI per la scansione Multi-A: opacita' 0..1
 var sostScanUI = { opacity: 1.0 };
+// Stato UI per le etichette numeriche 3D
+var sostLabelsUI = { visible: true };
 // Stato UI per gruppi nell'albero: collassato (di default) e opacita' (1.0 = pieno, 0 = trasparente)
 var sostGroupUI = {
   '1T3': { collapsed: true, opacity: 1.0 },
@@ -9312,6 +9314,43 @@ function sostOnViewportClick(event){
 }
 
 // ── Posizionamento template (pipeline Analizza: findScanbodyCenter) ──
+// Crea uno sprite con il numero del marker, da posizionare sopra ciascun
+// template. Canvas 128x128 con testo nero su fondo bianco bordato.
+// Lo sprite mantiene dimensione costante in world units (scalabile se serve).
+function sostMakeLabelSprite(num){
+  var canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  var ctx = canvas.getContext('2d');
+  // Sfondo: cerchio bianco con bordo scuro
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(64, 64, 54, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#0D1B2A';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  // Testo: numero centrato in nero
+  ctx.fillStyle = '#0D1B2A';
+  ctx.font = 'bold 72px ui-monospace, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(num), 64, 68);
+  var texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  var mat = new THREE.SpriteMaterial({
+    map: texture,
+    depthTest: false,
+    depthWrite: false,
+    transparent: true
+  });
+  var sprite = new THREE.Sprite(mat);
+  // Dimensione in unita' mondo: ~2.5mm di lato, visibile ma non invasivo
+  sprite.scale.set(2.5, 2.5, 1);
+  sprite.renderOrder = 999; // sempre sopra le mesh
+  return sprite;
+}
+
 // Costruisce il THREE.Group di un singolo template (key) correttamente
 // orientato e posizionato. L'origine locale del template (0,0,0) = connessione
 // implantare. Questo punto e' condiviso da tutti i 3 template IPD, quindi
@@ -9427,6 +9466,17 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     axisLine.userData.isSostituire = true;
     scene.add(axisLine);
 
+    // Label numerica 3D sopra il marker (sprite sempre face-camera).
+    // Posizionata 12mm sopra la connessione lungo l'asse, cosi' sta sopra
+    // tutti i template (1T3 disco a 8.5, quindi 12 e' sopra con margine).
+    var labelSprite = sostMakeLabelSprite(sostCounter);
+    var labelPos = connectionWorld.clone().add(axis.clone().multiplyScalar(12));
+    labelSprite.position.copy(labelPos);
+    labelSprite.visible = sostLabelsUI.visible;
+    labelSprite.userData.isSostituire = true;
+    labelSprite.userData.sostRole = 'label';
+    scene.add(labelSprite);
+
     sostPlaced.push({
       id: id,
       num: sostCounter,
@@ -9440,7 +9490,8 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       templateKey: activeKey,
       color: (SOSTITUIRE_TEMPLATE_INFO[activeKey] || {color:0x888888}).color,
       rmsd: null,
-      axisLine: axisLine
+      axisLine: axisLine,
+      labelSprite: labelSprite
     });
 
     var activeInfo = SOSTITUIRE_TEMPLATE_INFO[activeKey] || {label: activeKey};
@@ -9526,6 +9577,12 @@ function sostAlignAll(){
       var endPt = connectionWorld.clone().add(axis.clone().multiplyScalar(20));
       p.axisLine.geometry.setFromPoints([connectionWorld, endPt]);
       p.axisLine.geometry.attributes.position.needsUpdate = true;
+
+      // Aggiorna posizione label sprite (12mm sopra la connessione)
+      if(p.labelSprite){
+        var newLabelPos = connectionWorld.clone().add(axis.clone().multiplyScalar(12));
+        p.labelSprite.position.copy(newLabelPos);
+      }
 
       p.rmsd = null;
     });
@@ -9862,6 +9919,13 @@ function sostRemovePlaced(num){
     });
   }
   if(p.axisLine) scene.remove(p.axisLine);
+  if(p.labelSprite){
+    scene.remove(p.labelSprite);
+    if(p.labelSprite.material){
+      if(p.labelSprite.material.map) p.labelSprite.material.map.dispose();
+      p.labelSprite.material.dispose();
+    }
+  }
   sostPlaced.splice(idx, 1);
   sostRenderPlacedList();
   sostUpdateRefineButtonState();
@@ -9964,6 +10028,14 @@ function sostRebuildTree(){
          '</div>';
   }
   if(sostPlaced.length > 0){
+    // Riga toggle per etichette numeriche 3D
+    h += '<div class="tree-node" style="display:flex;align-items:center;gap:2px;margin-top:6px">' +
+         '<span style="width:12px"></span>' +
+         '<input type="checkbox" ' + (sostLabelsUI.visible ? 'checked' : '') +
+         ' onchange="sostToggleLabelsVisibility(this.checked)">' +
+         '<span class="dot" style="background:#0D1B2A;border:2px solid #fff;box-sizing:border-box"></span>' +
+         '<span class="lbl" style="flex:1">Etichette numeriche</span>' +
+         '</div>';
     var TPL_ORDER = [
       { key: '1T3', label: 'Marker 1T3', color: '#ffaa44' },
       { key: 'SR',  label: 'Marker SR',  color: '#0065B3' },
@@ -10060,6 +10132,14 @@ function sostOnGroupOpacityChange(tplKey, pctStr){
 
 function sostToggleScanVisibility(on){
   if(sostMesh) sostMesh.visible = on;
+}
+
+// Mostra/nasconde tutte le etichette numeriche 3D
+function sostToggleLabelsVisibility(on){
+  sostLabelsUI.visible = on;
+  sostPlaced.forEach(function(p){
+    if(p.labelSprite) p.labelSprite.visible = on;
+  });
 }
 
 // Cambia opacita' della scansione Multi-A (0..100)
