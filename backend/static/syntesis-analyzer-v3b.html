@@ -9372,11 +9372,19 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     // Disco: per SR e' a Zmin (sotto la connessione), per altri a Zmax.
     // Lo riconosco guardando quale delle due estremita' ha piu' triangoli
     // (il disco e' una superficie piana spessa, con molti triangoli).
+    // Disco a quota nota nel sistema locale:
+    // - 1T3/OS: disco a Zmax, up=+Z. Vertice a (0,0,Zmax) dopo rotazione
+    //   up→axis sta in +Zmax*axis. Per portarlo al click: position = click - Zmax*axis
+    //   -> zDiscFromBBox = +Zmax
+    // - SR: disco a Zmin (negativo), up=-Z. Vertice a (0,0,Zmin) dopo rotazione
+    //   -Z→axis sta in -Zmin*axis (= +|Zmin|*axis, perche' Zmin<0).
+    //   Per portarlo al click: position = click - (-Zmin)*axis = click + Zmin*axis
+    //   -> zDiscFromBBox = -Zmin = +|Zmin| = +5 per SR
     var zDiscFromBBox;
     if(key === 'SR'){
-      zDiscFromBBox = bb.min.z;
+      zDiscFromBBox = -bb.min.z;   // 5 per template SR (Zmin = -5)
     } else {
-      zDiscFromBBox = bb.max.z;
+      zDiscFromBBox = bb.max.z;    // 8.5 per 1T3, 6 per OS
     }
     // Posizionamento: group.position = click - Z_disco * axis
     // Il quaternion porta Z_locale → axis, quindi un vertice a (0,0,Z_disco)
@@ -9390,15 +9398,17 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       var dn = normal.clone().multiplyScalar(sostZOffsetMm);
       group.position.add(dn);
     }
-    // Orientamento: tutti i template IPD hanno +Z che punta dalla connessione
-    // verso l'esterno del corpo. findScanbodyCenter ritorna axis nello stesso
-    // verso per 1T3/OS. Per SR (disco sotto connessione) il template STL ha
-    // il disco a Zmin, quindi la parte con "la geometria visibile" punta
-    // verso -Z locale. Il quaternion up=+Z -> axis lo porta orientato
-    // correttamente perche' zDiscFromBBox e' negativo per SR: position si
-    // sposta di +(5)*axis verso l'alto, e il disco del template (a Z=-5
-    // locale) finisce dopo la rotazione a position + (-5)*axis = click.
-    var up = new THREE.Vector3(0, 0, 1);
+    // Orientamento:
+    // - Per 1T3/OS: disco a Zmax del template, corpo a Z minori
+    //   -> up = +Z. Quaternion porta +Z -> axis, il corpo va in -axis
+    //   (verso il moncone) e il disco esce verso +axis.
+    // - Per SR: disco a Zmin del template, corpo a Z maggiori
+    //   -> up = -Z. Quaternion porta -Z -> axis, il disco (a Z=-5 locale)
+    //   esce verso +axis e il corpo (a Z da -5 a -2) si sviluppa oltre
+    //   il disco verso +axis nel mondo = clinicamente corretto.
+    var up = (key === 'SR')
+      ? new THREE.Vector3(0, 0, -1)
+      : new THREE.Vector3(0, 0, 1);
     group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, normal));
     group.userData.isSostituire = true;
     group.userData.sostRole = 'template';
@@ -9479,13 +9489,13 @@ function sostAlignAll(){
       var center = autoResult.center;
       var axis = autoResult.axis.clone().normalize();
 
-      // Offset Z = -Z_disco del template del marker gia' posizionato
+      // Offset Z = -Z_disco, con semantica coerente al placement
       var tplMesh = p.group.getObjectByName('template');
       var zDiscFromBBox = 0;
       if(tplMesh && tplMesh.geometry){
         tplMesh.geometry.computeBoundingBox();
         var bbA = tplMesh.geometry.boundingBox;
-        zDiscFromBBox = (p.templateKey === 'SR') ? bbA.min.z : bbA.max.z;
+        zDiscFromBBox = (p.templateKey === 'SR') ? -bbA.min.z : bbA.max.z;
       }
       // Offset Z complessivo: ricava automaticamente dal bbox + eventuale slider
       var finalCenter = center.clone();
@@ -9494,9 +9504,11 @@ function sostAlignAll(){
         finalCenter.add(axis.clone().multiplyScalar(sostZOffsetMm));
       }
 
-      // Ricostruisci matrice del gruppo
+      // Ricostruisci matrice del gruppo (stesso flip SR del placement)
       var newM = new THREE.Matrix4();
-      var up = new THREE.Vector3(0, 0, 1);
+      var up = (p.templateKey === 'SR')
+        ? new THREE.Vector3(0, 0, -1)
+        : new THREE.Vector3(0, 0, 1);
       var q = new THREE.Quaternion().setFromUnitVectors(up, axis);
       newM.makeRotationFromQuaternion(q);
       newM.setPosition(finalCenter);
