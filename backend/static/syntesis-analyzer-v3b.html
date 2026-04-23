@@ -792,13 +792,6 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
         <label><input type="radio" name="sostSource" value="OS" onchange="sostOnSourceChange(this)"><span class="sw" style="background:#639922"></span>OS</label>
       </div>
 
-      <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin:12px 0 4px 0;line-height:1.5">Template scan body:</div>
-      <div class="comp-radio" id="sostTemplateRadio">
-        <label class="active"><input type="radio" name="sostTpl" value="1T3" checked onchange="sostOnTemplateChange(this)"><span class="sw" style="background:#ffaa44"></span>Marker 1T3</label>
-        <label><input type="radio" name="sostTpl" value="SR" onchange="sostOnTemplateChange(this)"><span class="sw" style="background:#0065B3"></span>Marker SR</label>
-        <label><input type="radio" name="sostTpl" value="OS" onchange="sostOnTemplateChange(this)"><span class="sw" style="background:#639922"></span>Marker OS</label>
-        <label><input type="radio" name="sostTpl" value="custom" onchange="sostOnTemplateChange(this)"><span class="sw" style="background:linear-gradient(135deg,#888,#ccc)"></span>Custom</label>
-      </div>
       <input type="file" id="sostInputCustom" accept=".stl,.STL" style="display:none" onchange="sostOnCustomPicked(event)">
       <div id="sostCustomName" style="display:none;font-family:var(--mono);font-size:9px;color:var(--dark);margin-top:4px;padding:4px 6px;background:var(--light);border-radius:4px;border:1px solid var(--border)"></div>
 
@@ -808,18 +801,16 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       </div>
 
       <div id="sostPlacedList" style="display:none;margin-top:10px">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">Marker posizionati:</div>
         <div id="sostPlacedItems"></div>
       </div>
 
-      <div id="sostExportAs" style="display:none;margin-top:10px">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">
-          Accendi nell'albero (a sinistra) cosa vuoi includere nell'export:
-          la scansione, e/o i marker 1T3, SR, OS.
+      <button id="sostBtnExport" onclick="sostExportSTL()" style="display:none;width:100%;margin-top:10px;padding:8px 12px;background:var(--dark);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.05em;cursor:pointer;text-transform:uppercase">Esporta STL</button>
+
+      <div id="sostExportAs" style="display:none;margin-top:6px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);line-height:1.5">
+          Usa l'albero a sinistra per scegliere cosa esportare (scansione, 1T3, SR, OS).
         </div>
       </div>
-
-      <button id="sostBtnExport" onclick="sostExportSTL()" style="display:none;width:100%;margin-top:10px;padding:8px 12px;background:var(--dark);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.05em;cursor:pointer;text-transform:uppercase">Esporta STL</button>
 
       <div id="sostStatus" style="display:none;font-family:var(--mono);font-size:9px;color:var(--gray);margin-top:6px;padding:4px 6px;background:var(--light);border-radius:4px;line-height:1.45"></div>
     </div>
@@ -9023,7 +9014,7 @@ var SOSTITUIRE_TEMPLATES_B64 = {
 // --- STATO GLOBALE MODULO ---
 var sostStl = null;              // Uint8Array del Multi-A caricato
 var sostMesh = null;             // THREE.Mesh del Multi-A
-var sostActiveTemplate = '1T3';  // '1T3' | 'SR' | 'OS' | 'custom'
+var sostActiveTemplate = '1T3';  // Alias del source: dopo il placement mostro subito il template del tipo 'source' (gli altri sono nell'albero)
 var sostCustomStlBuffer = null;  // Uint8Array del template custom
 var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
@@ -9144,12 +9135,10 @@ function sostOnTemplateChange(radio){
 // Scansione di partenza: marker presente nella Multi-A
 function sostOnSourceChange(radio){
   sostSourceTemplate = radio.value;
+  sostActiveTemplate = radio.value;   // segue automaticamente il source
   var labels = document.querySelectorAll('#sostSourceRadio label');
   labels.forEach(function(l){ l.classList.remove('active'); });
   radio.parentElement.classList.add('active');
-  // L'offset principale viene ricavato automaticamente dal bbox del template
-  // scelto come destinazione al momento del placement. Lo slider (se usato)
-  // resta come aggiustamento manuale indipendente dal source.
 }
 
 // Slider Offset Z: aggiorna real-time tutti i marker esistenti
@@ -9289,14 +9278,9 @@ function sostStartPlacement(){
     sostShowStatus('Carica prima una scansione.', true);
     return;
   }
-  if(sostActiveTemplate === 'custom' && !sostCustomStlBuffer){
-    sostShowStatus('Carica prima un template custom.', true);
-    return;
-  }
   sostPlacementMode = true;
   renderer.domElement.style.cursor = 'crosshair';
-  sostShowStatus('Clicca sul marker da sostituire (' +
-    (SOSTITUIRE_TEMPLATE_INFO[sostActiveTemplate] || {label:'Custom'}).label + ').');
+  sostShowStatus('Clicca su uno scanbody per posizionarvi il marker.');
 }
 
 // ── Click handler (chiamato da onViewportClick esteso) ──
@@ -9549,6 +9533,7 @@ function sostAlignAll(){
 
 // ── Lista marker posizionati ──
 function sostRenderPlacedList(){
+  // Lista ridondante con l'albero a sinistra: sostituita da un semplice contatore
   var list = document.getElementById('sostPlacedList');
   var items = document.getElementById('sostPlacedItems');
   var btnExport = document.getElementById('sostBtnExport');
@@ -9563,18 +9548,10 @@ function sostRenderPlacedList(){
   list.style.display = '';
   if(btnExport) btnExport.style.display = '';
   if(exportAs) exportAs.style.display = '';
-  var h = '';
-  sostPlaced.forEach(function(p){
-    var info = SOSTITUIRE_TEMPLATE_INFO[p.templateKey] || {label:'Custom'};
-    var colorHex = '#' + p.color.toString(16).padStart(6, '0');
-    h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;margin:2px 0;background:var(--light);border-radius:4px;font-family:var(--mono);font-size:9px">';
-    h += '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + colorHex + '"></span>';
-    h += '<span style="font-weight:800;color:var(--dark);min-width:22px">#' + p.num + '</span>';
-    h += '<span style="color:var(--gray);flex:1">' + info.label + '</span>';
-    h += '<button onclick="sostRemovePlaced(' + p.num + ')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-family:var(--mono);font-size:10px;padding:0 4px">&times;</button>';
-    h += '</div>';
-  });
-  items.innerHTML = h;
+  items.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--dark);padding:4px 0">' +
+                    '<b>' + sostPlaced.length + '</b> ' +
+                    (sostPlaced.length === 1 ? 'marker' : 'marker') + ' posizionat' +
+                    (sostPlaced.length === 1 ? 'o' : 'i') + '.</div>';
 }
 
 // ═══════════════════════════════════════════════════════════════════
