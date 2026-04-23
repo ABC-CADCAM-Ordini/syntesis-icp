@@ -380,6 +380,13 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
         </span>
         <span class="wf-label"><span class="wf-name">Misurare</span><span class="wf-desc">Confronto ICP tra accoppiamenti</span></span>
       </div>
+      <div class="workflow-menu-sep"></div>
+      <div class="workflow-menu-item" data-wf="sostituire" onclick="selectWorkflow('sostituire')">
+        <span class="wf-icon">
+          <svg width="12" height="12" viewBox="0 0 28 28" fill="none"><path d="M5 10 L14 5 L23 10 L14 15 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M5 15 L14 20 L23 15" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M18 19 L22 23 M22 19 L18 23" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </span>
+        <span class="wf-label"><span class="wf-name">Sostituire</span><span class="wf-desc">Sostituzione scan body con ICP</span></span>
+      </div>
     </div>
   </div>
   <div class="tb-sep analisi-only"></div>
@@ -747,6 +754,16 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div class="mis-scb-list-wrap" id="misScbListWrap" style="display:none">
         <div class="mis-scb-list-title">Scanbody (clicca per evidenziare)</div>
         <div class="mis-scb-list" id="misScbList"></div>
+      </div>
+    </div>
+
+    <div class="panel-section" id="panelSostituire" style="display:none">
+      <div class="panel-label">Sostituire scan body</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--gray);line-height:1.6;padding:14px 6px;text-align:center;border:1.5px dashed var(--border);border-radius:8px">
+        <div style="font-weight:800;color:var(--dark);margin-bottom:6px">In costruzione</div>
+        <div>Il workflow Sostituire sta migrando dal modulo autonomo alla scena condivisa dell'analizzatore.</div>
+        <div style="margin-top:10px;font-size:9px">Per ora puoi usare il modulo autonomo:</div>
+        <a href="/replacer" style="display:inline-block;margin-top:6px;padding:6px 12px;border:1.5px solid var(--blue);color:var(--blue);border-radius:5px;font-family:var(--mono);font-size:9px;font-weight:800;letter-spacing:.06em;text-decoration:none">Apri /replacer</a>
       </div>
     </div>
 
@@ -2116,7 +2133,8 @@ var currentWorkflow = 'analizza';
 var WORKFLOWS = {
   'analizza': { name: 'Analizza', subtitle: 'Analisi angolare implantare', mode: 'misura' },
   'accoppia': { name: 'Accoppia', subtitle: 'Esporta ScanBody e prepara Misurare', mode: 'accoppia' },
-  'misurare': { name: 'Misurare', subtitle: 'Confronto ICP tra accoppiamenti', mode: 'misurare' }
+  'misurare': { name: 'Misurare', subtitle: 'Confronto ICP tra accoppiamenti', mode: 'misurare' },
+  'sostituire': { name: 'Sostituire', subtitle: 'Sostituzione scan body con ICP', mode: 'sostituire' }
 };
 
 function toggleWorkflowMenu(e){
@@ -2181,6 +2199,13 @@ function selectWorkflow(wf){
   // Se sto uscendo da Misurare verso un altro workflow, smonto il viewport ICP
   if(prev === 'misurare' && wf !== 'misurare'){
     try { misICP_unmountViewport(); } catch(e){ console.warn('[Misurare] unmount fallito:', e); }
+  }
+  // Se sto uscendo da Sostituire verso un altro workflow, riaccendo Analizza
+  // (placeholder: nella fase 3 questo diventera' _setSostituireArtifactsVisible(false))
+  if(prev === 'sostituire' && wf !== 'sostituire'){
+    try { _setAnalyzaArtifactsVisible(true); } catch(e){}
+    var panSostExit = document.getElementById('panelSostituire');
+    if(panSostExit) panSostExit.style.display = 'none';
   }
 
   if(wf === 'analizza'){
@@ -2249,6 +2274,32 @@ function selectWorkflow(wf){
     try { misICP_mountViewport(); } catch(e){ console.warn('[Misurare] mount fallito:', e); }
     showStatus('Workflow Misurare: carica due STL per iniziare.');
   }
+  else if(wf === 'sostituire'){
+    analysisMode = 'sostituire';
+    // Nascondo tutti i pannelli degli altri workflow
+    if(panAng)  panAng.style.display  = 'none';
+    if(panAx)   panAx.style.display   = 'none';
+    if(panExp)  panExp.style.display  = 'none';
+    if(panMisL) panMisL.style.display = 'none';
+    if(panMisC) panMisC.style.display = 'none';
+    if(panMisI) panMisI.style.display = 'none';
+    if(panCli)  panCli.style.display  = 'none';
+    if(panMua)  panMua.style.display  = 'none';
+    if(panScan) panScan.style.display = 'none';
+    if(layPan)  layPan.style.display  = 'none';
+    // Nascondo i pulsanti toolbar degli altri workflow
+    analisiBtns.forEach(function(el){ el.style.display = 'none'; });
+    misurareBtns.forEach(function(el){ el.style.display = 'none'; });
+    var sostituireBtns = document.querySelectorAll('.sostituire-only');
+    sostituireBtns.forEach(function(el){ el.style.display = ''; });
+    // Mostro il pannello Sostituire (se presente)
+    var panSost = document.getElementById('panelSostituire');
+    if(panSost) panSost.style.display = '';
+    // Pulisco artefatti Analizza (scansione, MUA, spline, ecc.)
+    try { _setAnalyzaArtifactsVisible(false); } catch(e){}
+    if(stage) stage.classList.add('hidden');
+    showStatus('Workflow Sostituire: in costruzione.');
+  }
 }
 
 // Retrocompatibilita': setMode('misura'|'accoppia') continua a funzionare per
@@ -2257,6 +2308,7 @@ function setMode(mode){
   if(mode === 'misura')        return selectWorkflow('analizza');
   if(mode === 'accoppia')      return selectWorkflow('accoppia');
   if(mode === 'misurare')      return selectWorkflow('misurare');
+  if(mode === 'sostituire')    return selectWorkflow('sostituire');
 }
 
 
