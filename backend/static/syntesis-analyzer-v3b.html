@@ -9028,6 +9028,12 @@ var sostCustomStlBuffer = null;  // Uint8Array del template custom
 var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
+// Stato UI per gruppi nell'albero: collassato e opacita' (1.0 = pieno, 0 = trasparente)
+var sostGroupUI = {
+  '1T3': { collapsed: false, opacity: 1.0 },
+  'SR':  { collapsed: false, opacity: 1.0 },
+  'OS':  { collapsed: false, opacity: 1.0 }
+};
 var sostCounter = 0;             // progressivo ID
 var sostZOffsetMm = 0.00;        // aggiustamento fine manuale sopra l'offset auto calcolato dal bbox
 var sostExportTemplate = '1T3';  // tipo di template da usare all'export ('1T3' | 'SR' | 'OS')
@@ -9332,8 +9338,9 @@ function sostBuildTemplateGroup(key, geo, connectionWorld, axis){
     specular: 0x222222,
     shininess: 40,
     side: THREE.DoubleSide,
-    transparent: false,
-    opacity: 1.0
+    transparent: true,
+    opacity: 1.0,
+    depthWrite: true
   });
   var mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'template';
@@ -9348,6 +9355,12 @@ function sostBuildTemplateGroup(key, geo, connectionWorld, axis){
   group.userData.isSostituire = true;
   group.userData.sostRole = 'template';
   group.userData.templateKey = key;
+  // Applica opacita' corrente del gruppo (se l'utente l'ha gia' regolata)
+  var uiState = sostGroupUI[key];
+  if(uiState && typeof uiState.opacity === 'number'){
+    mat.opacity = uiState.opacity;
+    mat.transparent = uiState.opacity < 1.0;
+  }
   return group;
 }
 
@@ -9956,54 +9969,98 @@ function sostRebuildTree(){
          '<span class="lbl">Scansione (Multi-A)</span></div>';
   }
   if(sostPlaced.length > 0){
-    // Tre gruppi, uno per ciascun tipo di template. Ogni gruppo ha un
-    // checkbox "master" che accende/spegne tutti i marker del tipo, poi
-    // un elenco dei singoli marker con checkbox individuali.
     var TPL_ORDER = [
       { key: '1T3', label: 'Marker 1T3', color: '#ffaa44' },
       { key: 'SR',  label: 'Marker SR',  color: '#0065B3' },
       { key: 'OS',  label: 'Marker OS',  color: '#639922' }
     ];
     TPL_ORDER.forEach(function(tpl){
-      // Calcola stato master: visible se tutti i marker di questo tipo sono visibili
+      var ui = sostGroupUI[tpl.key] || { collapsed: false, opacity: 1.0 };
       var anyVisible = false, allVisible = true;
+      var count = 0;
       sostPlaced.forEach(function(p){
         var g = p.groups && p.groups[tpl.key];
         if(!g) return;
+        count++;
         if(g.visible) anyVisible = true;
         else allVisible = false;
       });
+      if(count === 0) return;
       var masterChecked = anyVisible && allVisible;
       var masterIndeterminate = anyVisible && !allVisible;
-      h += '<div class="tree-node" style="margin-top:6px">' +
+      // Riga master: freccia di collapse + checkbox + pallino + label + pulsante opacita'
+      var arrow = ui.collapsed ? '▸' : '▾';
+      h += '<div class="tree-node" style="margin-top:6px;display:flex;align-items:center;gap:2px">' +
+           '<span class="sost-caret" onclick="sostToggleGroupCollapse(\'' + tpl.key + '\')"' +
+             ' style="cursor:pointer;user-select:none;width:12px;font-size:9px;color:var(--gray);text-align:center">' + arrow + '</span>' +
            '<input type="checkbox" ' + (masterChecked ? 'checked' : '') +
            ' onchange="sostToggleGroupVisibility(\'' + tpl.key + '\', this.checked)"' +
            (masterIndeterminate ? ' data-indet="1"' : '') + '>' +
            '<span class="dot" style="background:' + tpl.color + '"></span>' +
-           '<span class="lbl" style="font-weight:700">' + tpl.label + '</span>' +
+           '<span class="lbl" style="font-weight:700;flex:1">' + tpl.label + '</span>' +
+           '<span style="font-family:var(--mono);font-size:8px;color:var(--gray);min-width:26px;text-align:right" id="sostOpLbl_' + tpl.key + '">' + Math.round(ui.opacity * 100) + '%</span>' +
            '</div>';
-      sostPlaced.forEach(function(p){
-        var g = p.groups && p.groups[tpl.key];
-        if(!g) return;
-        var visible = g.visible;
-        h += '<div class="tree-node" style="padding-left:22px">' +
-             '<input type="checkbox" ' + (visible ? 'checked' : '') +
-             ' onchange="sostTogglePlacedTplVisibility(' + p.num + ', \'' + tpl.key + '\', this.checked)">' +
-             '<span class="dot" style="background:' + tpl.color + ';opacity:.6"></span>' +
-             '<span class="lbl">#' + p.num + '</span>' +
-             '<button class="del-btn" onclick="sostRemovePlaced(' + p.num + ')" title="Elimina marker #' + p.num + '">✕</button>' +
-             '</div>';
-      });
+      // Slider opacita' (sempre visibile, anche se il gruppo e' collassato)
+      h += '<div class="tree-node" style="padding-left:18px;padding-right:4px;margin-top:-2px;margin-bottom:2px">' +
+           '<input type="range" min="0" max="100" step="1" value="' + Math.round(ui.opacity * 100) + '"' +
+           ' oninput="sostOnGroupOpacityChange(\'' + tpl.key + '\', this.value)"' +
+           ' style="width:100%;accent-color:' + tpl.color + ';height:4px" title="Trasparenza ' + tpl.label + '">' +
+           '</div>';
+      // Figli (visibili solo se non collassato)
+      if(!ui.collapsed){
+        sostPlaced.forEach(function(p){
+          var g = p.groups && p.groups[tpl.key];
+          if(!g) return;
+          var visible = g.visible;
+          h += '<div class="tree-node" style="padding-left:34px">' +
+               '<input type="checkbox" ' + (visible ? 'checked' : '') +
+               ' onchange="sostTogglePlacedTplVisibility(' + p.num + ', \'' + tpl.key + '\', this.checked)">' +
+               '<span class="dot" style="background:' + tpl.color + ';opacity:.6"></span>' +
+               '<span class="lbl">#' + p.num + '</span>' +
+               '<button class="del-btn" onclick="sostRemovePlaced(' + p.num + ')" title="Elimina marker #' + p.num + '">✕</button>' +
+               '</div>';
+        });
+      }
     });
   }
   if(!sostMesh && sostPlaced.length === 0){
     h = '<div class="tree-node"><span class="lbl" style="color:var(--gray);font-size:10px">Nessun oggetto. Carica Multi-A.</span></div>';
   }
   layerTree.innerHTML = h;
-  // Applica indeterminate via JS (HTML non lo supporta come attributo)
   layerTree.querySelectorAll('input[data-indet="1"]').forEach(function(cb){
     cb.indeterminate = true;
   });
+}
+
+// Toggle collapsed state di un gruppo
+function sostToggleGroupCollapse(tplKey){
+  if(!sostGroupUI[tplKey]) sostGroupUI[tplKey] = { collapsed: false, opacity: 1.0 };
+  sostGroupUI[tplKey].collapsed = !sostGroupUI[tplKey].collapsed;
+  sostRebuildTree();
+}
+
+// Cambia opacita' di tutti i marker di un tipo. pctStr e' stringa 0..100.
+function sostOnGroupOpacityChange(tplKey, pctStr){
+  var pct = parseInt(pctStr, 10);
+  if(isNaN(pct)) return;
+  var op = Math.max(0, Math.min(1, pct / 100));
+  if(!sostGroupUI[tplKey]) sostGroupUI[tplKey] = { collapsed: false, opacity: 1.0 };
+  sostGroupUI[tplKey].opacity = op;
+  // Applica a ogni template del tipo
+  sostPlaced.forEach(function(p){
+    var g = p.groups && p.groups[tplKey];
+    if(!g) return;
+    g.traverse(function(obj){
+      if(obj.material){
+        obj.material.opacity = op;
+        obj.material.transparent = op < 1.0;
+        obj.material.needsUpdate = true;
+      }
+    });
+  });
+  // Aggiorna solo la label % senza rifare tutto il tree (evita jitter dello slider)
+  var lbl = document.getElementById('sostOpLbl_' + tplKey);
+  if(lbl) lbl.textContent = pct + '%';
 }
 
 function sostToggleScanVisibility(on){
