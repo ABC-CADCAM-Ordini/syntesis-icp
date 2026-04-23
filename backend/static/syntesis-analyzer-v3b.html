@@ -802,15 +802,6 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <input type="file" id="sostInputCustom" accept=".stl,.STL" style="display:none" onchange="sostOnCustomPicked(event)">
       <div id="sostCustomName" style="display:none;font-family:var(--mono);font-size:9px;color:var(--dark);margin-top:4px;padding:4px 6px;background:var(--light);border-radius:4px;border:1px solid var(--border)"></div>
 
-      <div style="margin-top:12px;padding:8px;background:var(--light);border-radius:5px">
-        <label style="display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">
-          <span>Offset Z (taratura)</span>
-          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">0.00</span>
-        </label>
-        <input type="range" id="sostZOffset" min="-5" max="5" step="0.1" value="0" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
-        <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Aggiustamento fine manuale. L'offset principale e' calcolato automaticamente dal template.</div>
-      </div>
-
       <div style="display:flex;gap:6px;margin-top:12px">
         <button id="sostBtnPlace" onclick="sostStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona</button>
         <button id="sostBtnRefine" onclick="sostAlignAll()" style="flex:1;padding:8px 10px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase;opacity:0.5" disabled>Raffina</button>
@@ -1295,40 +1286,6 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   console.log('[CylFit] axis=('+axis[0].toFixed(3)+','+axis[1].toFixed(3)+','+axis[2].toFixed(3)+
     '), center=('+center[0].toFixed(3)+','+center[1].toFixed(3)+','+center[2].toFixed(3)+
     '), flat pts='+flatPts.length+' -> '+flatPtsFinal.length+', side pts='+allNearPts.length);
-  
-  // Box diagnostico visibile in pagina (per Sostituire solo, quando opts passato)
-  if(opts && typeof opts.radius === 'number'){
-    try {
-      var dbg = document.getElementById('cylFitDebugBox');
-      if(!dbg){
-        dbg = document.createElement('div');
-        dbg.id = 'cylFitDebugBox';
-        dbg.style.cssText = 'position:fixed;top:90px;left:20px;z-index:9999;background:#0D1B2A;color:#fff;padding:10px 14px;border-radius:8px;font-family:ui-monospace,monospace;font-size:11px;line-height:1.55;max-width:380px;box-shadow:0 4px 16px rgba(0,0,0,.35);border:2px solid #0065B3';
-        document.body.appendChild(dbg);
-      }
-      var dCC = Math.sqrt(
-        (center[0]-cpx)*(center[0]-cpx) +
-        (center[1]-cpy)*(center[1]-cpy) +
-        (center[2]-cpz)*(center[2]-cpz)
-      );
-      // Distanza click-center lungo axis (deve essere piccola se center e' sul piano del disco)
-      var dxC = center[0]-cpx, dyC = center[1]-cpy, dzC = center[2]-cpz;
-      var axialCC = dxC*axis[0] + dyC*axis[1] + dzC*axis[2];
-      dbg.innerHTML =
-        '<b style="color:#4FC3F7">DIAGNOSTICA CylFit</b><br>' +
-        'radius usato: <b>' + SCANBODY_RADIUS.toFixed(3) + '</b> mm<br>' +
-        'click raw: (' + cpx.toFixed(2) + ', ' + cpy.toFixed(2) + ', ' + cpz.toFixed(2) + ')<br>' +
-        'center (=faccia disco): (' + center[0].toFixed(2) + ', ' + center[1].toFixed(2) + ', ' + center[2].toFixed(2) + ')<br>' +
-        'axis: (' + axis[0].toFixed(3) + ', ' + axis[1].toFixed(3) + ', ' + axis[2].toFixed(3) + ')<br>' +
-        'flat pts: ' + flatPts.length + ' → <b style="color:#4FC3F7">' + flatPtsFinal.length + '</b><br>' +
-        'side pts: ' + allNearPts.length + '<br>' +
-        'dist click→center: <b>' + dCC.toFixed(3) + '</b> mm<br>' +
-        'dist lungo asse: <b>' + axialCC.toFixed(3) + '</b> mm<br>' +
-        '<br><b style="color:#FFB84D">POST-PLACEMENT:</b><br>' +
-        'offset corrente: <b>' + (typeof sostZOffsetMm !== 'undefined' ? sostZOffsetMm.toFixed(2) : '?') + '</b> mm<br>' +
-        '(si aggiornera\' dopo placeTemplate)';
-    } catch(e){}
-  }
   
   return {
     center: new THREE.Vector3(center[0], center[1], center[2]),
@@ -9447,38 +9404,6 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     group.userData.sostRole = 'template';
     scene.add(group);
 
-    // DIAGNOSTICA POST-PLACEMENT: calcola dove finisce il disco del template
-    // nel mondo, e confronta con la faccia piatta della scansione (point).
-    try {
-      var dbg = document.getElementById('cylFitDebugBox');
-      if(dbg){
-        // Bbox del template in locale per trovare il piano del disco
-        mesh.geometry.computeBoundingBox();
-        var bb = mesh.geometry.boundingBox;
-        // Il disco e' sulla faccia del template con Z estrema (Zmax per 1T3/OS, Zmin per SR)
-        var zDiscLocal;
-        if(key === 'SR') zDiscLocal = bb.min.z;   // SR: disco a Zmin
-        else zDiscLocal = bb.max.z;                 // 1T3/OS: disco a Zmax
-        // Punto (0,0,zDiscLocal) trasformato in mondo
-        var discLocal = new THREE.Vector3(0, 0, zDiscLocal);
-        group.updateMatrixWorld(true);
-        var discWorld = discLocal.clone().applyMatrix4(group.matrixWorld);
-        // Differenza vs piano faccia piatta scansione (= point)
-        var deltaVec = discWorld.clone().sub(point);
-        var axialDelta = deltaVec.dot(normal);  // componente lungo asse
-        var currentHTML = dbg.innerHTML;
-        var postHTML =
-          '<br><b style="color:#FFB84D">POST-PLACEMENT:</b><br>' +
-          'offset corrente: <b>' + sostZOffsetMm.toFixed(2) + '</b> mm<br>' +
-          'Z disco locale: <b>' + zDiscLocal.toFixed(3) + '</b> mm<br>' +
-          'disco template (mondo): (' + discWorld.x.toFixed(2) + ', ' + discWorld.y.toFixed(2) + ', ' + discWorld.z.toFixed(2) + ')<br>' +
-          'faccia scan (point): (' + point.x.toFixed(2) + ', ' + point.y.toFixed(2) + ', ' + point.z.toFixed(2) + ')<br>' +
-          'Δ lungo asse: <b style="color:' + (Math.abs(axialDelta) < 0.1 ? '#4CAF50' : '#F44336') + '">' + axialDelta.toFixed(3) + '</b> mm<br>' +
-          'Δ totale: ' + deltaVec.length().toFixed(3) + ' mm';
-        dbg.innerHTML = currentHTML.replace(/<br><b[^<]*POST-PLACEMENT[\s\S]*/, '') + postHTML;
-      }
-    } catch(e){ console.warn('debug post-placement failed:', e); }
-
     // Linea asse (come Analizza)
     var axisDir = normal.clone().multiplyScalar(20);
     var axisGeo = new THREE.BufferGeometry().setFromPoints([point, point.clone().add(axisDir)]);
@@ -9589,30 +9514,6 @@ function sostAlignAll(){
 
       // RMSD semplice: stima locale (opzionale, puo' essere migliorata)
       p.rmsd = null;
-
-      // DEBUG: aggiorna il box diagnostico per il primo marker raffinato
-      try {
-        var dbgR = document.getElementById('cylFitDebugBox');
-        if(dbgR && p === sostPlaced[0]){
-          // Calcola dove e' il disco del template dopo il Raffina
-          p.group.updateMatrixWorld(true);
-          var tplMeshR = p.group.getObjectByName('template');
-          if(tplMeshR && tplMeshR.geometry){
-            tplMeshR.geometry.computeBoundingBox();
-            var bbR = tplMeshR.geometry.boundingBox;
-            var zDiscR = (p.templateKey === 'SR') ? bbR.min.z : bbR.max.z;
-            var discLocalR = new THREE.Vector3(0, 0, zDiscR);
-            var discWorldR = discLocalR.clone().applyMatrix4(tplMeshR.matrixWorld);
-            var deltaR = discWorldR.clone().sub(center);
-            var axDeltaR = deltaR.dot(axis);
-            dbgR.innerHTML += '<br><b style="color:#E1BEE7">POST-RAFFINA:</b><br>' +
-              'zDisc bbox: <b>' + zDiscR.toFixed(3) + '</b> mm<br>' +
-              'disco template ora: (' + discWorldR.x.toFixed(2) + ', ' + discWorldR.y.toFixed(2) + ', ' + discWorldR.z.toFixed(2) + ')<br>' +
-              'center ricalcolato: (' + center.x.toFixed(2) + ', ' + center.y.toFixed(2) + ', ' + center.z.toFixed(2) + ')<br>' +
-              'Δ disco→center: <b style="color:' + (Math.abs(axDeltaR) < 0.1 ? '#4CAF50' : '#F44336') + '">' + axDeltaR.toFixed(3) + '</b> mm';
-          }
-        }
-      } catch(e){ console.warn(e); }
     });
     sostRenderPlacedList();
     sostShowStatus('Raffinamento completato (' + sostPlaced.length + ' marker).');
