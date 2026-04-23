@@ -814,6 +814,8 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
         <div id="sostPlacedItems"></div>
       </div>
 
+      <button id="sostBtnExport" onclick="sostExportSTL()" style="display:none;width:100%;margin-top:10px;padding:8px 12px;background:var(--dark);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.05em;cursor:pointer;text-transform:uppercase">Esporta STL</button>
+
       <div id="sostStatus" style="display:none;font-family:var(--mono);font-size:9px;color:var(--gray);margin-top:6px;padding:4px 6px;background:var(--light);border-radius:4px;line-height:1.45"></div>
     </div>
 
@@ -9397,12 +9399,15 @@ function sostAlignAll(){
 function sostRenderPlacedList(){
   var list = document.getElementById('sostPlacedList');
   var items = document.getElementById('sostPlacedItems');
+  var btnExport = document.getElementById('sostBtnExport');
   if(!list || !items) return;
   if(sostPlaced.length === 0){
     list.style.display = 'none';
+    if(btnExport) btnExport.style.display = 'none';
     return;
   }
   list.style.display = '';
+  if(btnExport) btnExport.style.display = '';
   var h = '';
   sostPlaced.forEach(function(p){
     var info = SOSTITUIRE_TEMPLATE_INFO[p.templateKey] || {label:'Custom'};
@@ -9454,6 +9459,224 @@ function sostOnZOffsetChange(){
   if(cutOverlay && cutOverlay.style.display === 'flex'){
     sostRenderCutView();
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SOSTITUIRE: Export STL
+// Genera un file STL binario contenente:
+// - La Multi-A originale MENO i triangoli che cadono nei cilindri di
+//   soppressione dei marker piazzati (sostituzione pulita)
+// - I triangoli dei template posizionati, trasformati da matrixWorld
+// ═══════════════════════════════════════════════════════════════════
+
+// Parametri del cilindro di soppressione per ciascun template.
+// Radius = raggio template + margine laterale (per catturare bordo marker)
+// Height = dimensione lungo l'asse dal punto di click (±height)
+// Valori tarabili empiricamente se l'export mangia troppo / troppo poco
+var SOSTITUIRE_CULL_CYL = {
+  '1T3': { radius: 2.815, height: 1.9 },   // 2.515 + 0.3 margine
+  'SR':  { radius: 2.330, height: 3.0 },   // 2.030 + 0.3
+  'OS':  { radius: 2.080, height: 1.1 }    // 1.780 + 0.3
+};
+
+function sostExportSTL(){
+  if(!sostMesh || sostPlaced.length === 0){
+    sostShowStatus('Serve Multi-A caricata e almeno un marker posizionato.', true);
+    return;
+  }
+  var btn = document.getElementById('sostBtnExport');
+  if(btn){
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    btn.textContent = 'Generazione STL...';
+  }
+  // Aggiorna UI subito
+  setTimeout(function(){
+    try {
+      var startT = performance.now();
+      var outTris = sostBuildExportTriangles();
+      var nTris = outTris.length / 9;  // ogni triangolo = 9 float
+      var stlBuffer = sostSerializeBinarySTL(outTris);
+      // Trigger download
+      var scanName = 'sostituire_export';
+      var slot = document.getElementById('sostSlotScan');
+      if(slot){
+        var fname = slot.querySelector('.fname');
+        if(fname) scanName = fname.textContent.replace(/\.stl$/i, '') + '_sost';
+      }
+      var blob = new Blob([stlBuffer], {type: 'application/octet-stream'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = scanName + '.stl';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+      var dt = ((performance.now() - startT) / 1000).toFixed(1);
+      sostShowStatus('Export completato: ' + nTris.toLocaleString() + ' triangoli in ' + dt + 's.');
+    } catch(err) {
+      console.error('[Sostituire export]', err);
+      sostShowStatus('Errore export: ' + (err.message || err), true);
+    } finally {
+      if(btn){
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.textContent = 'Esporta STL';
+      }
+    }
+  }, 30);
+}
+
+// Costruisce l'array Float32 di triangoli per l'export
+// Ritorna Float32Array [x0,y0,z0, x1,y1,z1, x2,y2,z2, ...]
+function sostBuildExportTriangles(){
+  var scanPos = sostMesh.geometry.attributes.position.array;
+  var nScanTris = scanPos.length / 9;
+
+  // Pre-calcola parametri cilindri di soppressione per ogni marker
+  // (in coordinate mondo: asse = p.axisDir, centro = p.position)
+  var cullers = sostPlaced.map(function(p){
+    var key = p.templateKey;
+    var cyl = SOSTITUIRE_CULL_CYL[key];
+    if(!cyl){
+      // Custom o fallback: usa bbox del template
+      var tplMesh = p.group.getObjectByName('template');
+      var bbox = null;
+      if(tplMesh && tplMesh.geometry){
+        tplMesh.geometry.computeBoundingBox();
+        bbox = tplMesh.geometry.boundingBox;
+      }
+      cyl = {
+        radius: bbox ? Math.max(bbox.max.x - bbox.min.x, bbox.max.y - bbox.min.y) / 2 + 0.3 : 3.0,
+        height: bbox ? (bbox.max.z - bbox.min.z) : 2.0
+      };
+    }
+    return {
+      center: p.position,
+      axis: p.axisDir.clone().normalize(),
+      radius2: (cyl.radius + 0.1) * (cyl.radius + 0.1),  // cache quadrato + piccolo extra safety
+      halfHeight: cyl.height  // dimezzata simmetrica attorno al click... +/- height mm lungo asse
+    };
+  });
+
+  // Pass 1: filtro triangoli della Multi-A
+  // Tengo solo i triangoli il cui centroide NON cade in nessun cilindro di soppressione
+  var keepBuffer = new Float32Array(scanPos.length);  // max size
+  var keepCount = 0;
+  for(var i = 0; i < nScanTris; i++){
+    var o = i * 9;
+    var cx = (scanPos[o] + scanPos[o+3] + scanPos[o+6]) / 3;
+    var cy = (scanPos[o+1] + scanPos[o+4] + scanPos[o+7]) / 3;
+    var cz = (scanPos[o+2] + scanPos[o+5] + scanPos[o+8]) / 3;
+
+    var inCull = false;
+    for(var k = 0; k < cullers.length; k++){
+      var cu = cullers[k];
+      var dx = cx - cu.center.x, dy = cy - cu.center.y, dz = cz - cu.center.z;
+      var axial = dx * cu.axis.x + dy * cu.axis.y + dz * cu.axis.z;
+      if(axial < -cu.halfHeight || axial > cu.halfHeight) continue;
+      var rx = dx - axial * cu.axis.x;
+      var ry = dy - axial * cu.axis.y;
+      var rz = dz - axial * cu.axis.z;
+      var radial2 = rx*rx + ry*ry + rz*rz;
+      if(radial2 < cu.radius2){
+        inCull = true;
+        break;
+      }
+    }
+    if(!inCull){
+      // Copia triangolo nel buffer
+      for(var j = 0; j < 9; j++) keepBuffer[keepCount * 9 + j] = scanPos[o + j];
+      keepCount++;
+    }
+  }
+
+  // Pass 2: aggiungi i triangoli di ciascun template trasformato
+  var tplArrays = [];
+  var totalTplTris = 0;
+  sostPlaced.forEach(function(p){
+    var tplMesh = p.group.getObjectByName('template');
+    if(!tplMesh || !tplMesh.geometry) return;
+    p.group.updateMatrixWorld(true);
+    var m4 = tplMesh.matrixWorld;
+    var tplPos = tplMesh.geometry.attributes.position.array;
+    var nTplTris = tplPos.length / 9;
+    var out = new Float32Array(tplPos.length);
+    var v = new THREE.Vector3();
+    for(var i = 0; i < nTplTris; i++){
+      var o = i * 9;
+      for(var k = 0; k < 3; k++){
+        v.set(tplPos[o + k*3], tplPos[o + k*3 + 1], tplPos[o + k*3 + 2]);
+        v.applyMatrix4(m4);
+        out[o + k*3]     = v.x;
+        out[o + k*3 + 1] = v.y;
+        out[o + k*3 + 2] = v.z;
+      }
+    }
+    tplArrays.push(out);
+    totalTplTris += nTplTris;
+  });
+
+  // Concatena: scan filtrato + tutti i template
+  var final = new Float32Array(keepCount * 9 + totalTplTris * 9);
+  final.set(keepBuffer.subarray(0, keepCount * 9), 0);
+  var offset = keepCount * 9;
+  tplArrays.forEach(function(arr){
+    final.set(arr, offset);
+    offset += arr.length;
+  });
+
+  console.log('[Sostituire export] scan orig:', nScanTris, '-> keep:', keepCount,
+              '(culled', nScanTris - keepCount, ') + template tris:', totalTplTris);
+  return final;
+}
+
+// Serializza un array di triangoli Float32 in STL binario
+// Formato STL binario: header 80B + uint32 nTris + per triangolo (normal 3f + v0 3f + v1 3f + v2 3f + uint16 attr) = 50B
+function sostSerializeBinarySTL(trisArr){
+  var nTris = trisArr.length / 9;
+  var size = 84 + nTris * 50;
+  var buf = new ArrayBuffer(size);
+  var view = new DataView(buf);
+  // Header 80B (riempito con testo identificativo)
+  var header = 'Syntesis-ICP Sostituire export v1.0';
+  for(var i = 0; i < Math.min(header.length, 80); i++){
+    view.setUint8(i, header.charCodeAt(i));
+  }
+  view.setUint32(80, nTris, true);
+  var off = 84;
+  for(var t = 0; t < nTris; t++){
+    var o = t * 9;
+    var ax = trisArr[o],   ay = trisArr[o+1], az = trisArr[o+2];
+    var bx = trisArr[o+3], by = trisArr[o+4], bz = trisArr[o+5];
+    var cx = trisArr[o+6], cy = trisArr[o+7], cz = trisArr[o+8];
+    // Calcola normale del triangolo (cross product)
+    var ux = bx - ax, uy = by - ay, uz = bz - az;
+    var vx = cx - ax, vy = cy - ay, vz = cz - az;
+    var nx = uy * vz - uz * vy;
+    var ny = uz * vx - ux * vz;
+    var nz = ux * vy - uy * vx;
+    var nLen = Math.sqrt(nx*nx + ny*ny + nz*nz);
+    if(nLen > 1e-10){ nx /= nLen; ny /= nLen; nz /= nLen; }
+    view.setFloat32(off,    nx, true);
+    view.setFloat32(off+4,  ny, true);
+    view.setFloat32(off+8,  nz, true);
+    view.setFloat32(off+12, ax, true);
+    view.setFloat32(off+16, ay, true);
+    view.setFloat32(off+20, az, true);
+    view.setFloat32(off+24, bx, true);
+    view.setFloat32(off+28, by, true);
+    view.setFloat32(off+32, bz, true);
+    view.setFloat32(off+36, cx, true);
+    view.setFloat32(off+40, cy, true);
+    view.setFloat32(off+44, cz, true);
+    view.setUint16(off+48, 0, true);  // attr byte count (unused)
+    off += 50;
+  }
+  return buf;
 }
 
 function sostRemovePlaced(num){
