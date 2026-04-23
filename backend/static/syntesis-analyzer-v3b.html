@@ -9195,24 +9195,26 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       return;
     }
 
-    // Trasla template sull'asse Z in modo che il CENTRO del disco coincida
-    // con il punto di click. Il marker fisicamente si centra sulla faccia
-    // piatta dello scanbody (non appoggiato sopra ne' incastrato sotto).
-    // Centro disco = (zMin + zMax) / 2.
-    // Nei template: 1T3 center=9.05 (range 8.1..10.0), SR=-3.5 (-5..-2), OS=5.45 (4.9..6.0)
-    var CENTER_Z = { '1T3': 9.050, 'SR': -3.500, 'OS': 5.450 };
-    var tplCenterZ = CENTER_Z[key];
-    if(tplCenterZ === undefined){
-      // Custom: calcolo midpoint Z dal buffer
+    // Traslazione identica alla logica di Analizza: la faccia piatta del
+    // template va a Z=0 locale, cosi' l'origine del gruppo coincide con la
+    // faccia piatta quando il gruppo si posiziona in "center" (il click).
+    // Analizza usa translate(0,0,-10) perche' il suo scanbody ha la faccia
+    // piatta a Z=10. I nostri template hanno Z della faccia piatta diversa:
+    //   1T3: 10.000 (stessa convenzione di Analizza)
+    //   SR:  -2.000
+    //   OS:   6.000
+    var FLAT_FACE_Z = { '1T3': 10.000, 'SR': -2.000, 'OS': 6.000 };
+    var tplFlatZ = FLAT_FACE_Z[key];
+    if(tplFlatZ === undefined){
+      // Custom: assumo convenzione Analizza (faccia piatta a zMax)
       var pos = geo.attributes.position.array;
-      var zmin = Infinity, zmax = -Infinity;
+      var zmax = -Infinity;
       for(var i = 2; i < pos.length; i += 3){
-        if(pos[i] < zmin) zmin = pos[i];
         if(pos[i] > zmax) zmax = pos[i];
       }
-      tplCenterZ = (zmin + zmax) / 2;
+      tplFlatZ = zmax;
     }
-    geo.translate(0, 0, -tplCenterZ);
+    geo.translate(0, 0, -tplFlatZ);
 
     sostCounter++;
     var id = 'SOST_' + sostCounter;
