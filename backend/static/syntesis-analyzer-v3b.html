@@ -3089,21 +3089,43 @@ function misICP_highlightCylinder(idx){
 }
 
 // --- MONTAGGIO/SMONTAGGIO VIEWPORT (entra/esce da Misurare) ---
+
+// Imposta la visibilita' di tutti gli artefatti del workflow Analizza
+// (scansione, MUA, assi, mappe sottosquadri, spline, coni divergenza,
+// scanbody scan/colorati, label 3D DOM) come blocco unico.
+function _setAnalyzaArtifactsVisible(on){
+  if(scanMesh) scanMesh.visible = on;
+  if(typeof muaObjects !== 'undefined'){
+    muaObjects.forEach(function(m){
+      // Il Group contiene scanbodyMesh + anMesh + mtMesh + axisLine come children
+      if(m.group) m.group.visible = on;
+      // Mesh aggiunte direttamente a scene (non children di m.group)
+      if(m.scanbodyScanMesh) m.scanbodyScanMesh.visible = on && (m.scanbodyScanVisible === true);
+      if(m.scanbodyColoredMesh) m.scanbodyColoredMesh.visible = on && (m.scanbodyColoredVisible === true);
+      if(m.undercutMesh) m.undercutMesh.visible = on && (m.undercutMapActive === true);
+      // Label DOM divergence
+      if(m.labelEl) m.labelEl.style.display = on ? '' : 'none';
+    });
+  }
+  if(typeof meanAxisLine !== 'undefined' && meanAxisLine) meanAxisLine.visible = on;
+  if(typeof divergenceCones !== 'undefined') divergenceCones.forEach(function(c){ if(c) c.visible = on; });
+  if(typeof muaGroupSplines !== 'undefined') muaGroupSplines.forEach(function(s){ if(s) s.visible = on; });
+  // SVG linee che collegano label 3D ai MUA
+  var svgLines = document.getElementById('labelLines');
+  if(svgLines) svgLines.style.display = on ? '' : 'none';
+}
+
 function misICP_mountViewport(){
   if(misICP_viewportMounted) return;
   misICP_viewportMounted=true;
-  // Salvo stato visibilita' di scanMesh e overlay che potrebbero confondere la vista
+  // Salvo stato corrente (per ripristino in unmount)
   misICP_savedState={
     scanMeshVisible: scanMesh ? scanMesh.visible : null,
-    muaVisible: muaObjects.map(function(o){return o.visible;}),
-    meanAxisVisible: meanAxisLine ? meanAxisLine.visible : null,
     cameraPos: camera ? camera.position.clone() : null,
     controlsTarget: controls ? controls.target.clone() : null
   };
-  // Nascondo la scansione corrente e i MUA (Misurare vive in un altro contesto)
-  if(scanMesh) scanMesh.visible=false;
-  muaObjects.forEach(function(o){o.visible=false;});
-  if(meanAxisLine) meanAxisLine.visible=false;
+  // Nascondo TUTTO cio' che appartiene ad Analizza (scansione, MUA, label, spline...)
+  _setAnalyzaArtifactsVisible(false);
   // Nascondo overlay DOM che non c'entrano con Misurare
   var emptyState=document.getElementById('emptyState');
   if(emptyState) emptyState.classList.add('hidden');
@@ -3135,13 +3157,10 @@ function misICP_unmountViewport(){
   misICP_labels.forEach(function(el){ if(el) el.style.display='none'; });
   misICP_closeCutview();
   misICP_hideTree();
-  // Ripristino stato precedente
+  // Ripristino artefatti Analizza (visibilita' individuali preservate dai flag interni)
+  _setAnalyzaArtifactsVisible(true);
+  // Ripristino stato camera/controls
   if(misICP_savedState){
-    if(scanMesh && misICP_savedState.scanMeshVisible !== null) scanMesh.visible=misICP_savedState.scanMeshVisible;
-    muaObjects.forEach(function(o,i){
-      if(misICP_savedState.muaVisible[i] !== undefined) o.visible=misICP_savedState.muaVisible[i];
-    });
-    if(meanAxisLine && misICP_savedState.meanAxisVisible !== null) meanAxisLine.visible=misICP_savedState.meanAxisVisible;
     if(camera && misICP_savedState.cameraPos) camera.position.copy(misICP_savedState.cameraPos);
     if(controls && misICP_savedState.controlsTarget) controls.target.copy(misICP_savedState.controlsTarget);
     if(controls) controls.update && controls.update();
