@@ -785,6 +785,13 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       </div>
       <input type="file" id="sostInputScan" accept=".stl,.STL" style="display:none" onchange="sostOnScanPicked(event)">
 
+      <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin:12px 0 4px 0;line-height:1.5">Scansione di partenza (marker presente):</div>
+      <div class="comp-radio" id="sostSourceRadio">
+        <label class="active"><input type="radio" name="sostSource" value="1T3" checked onchange="sostOnSourceChange(this)"><span class="sw" style="background:#ffaa44"></span>1T3</label>
+        <label><input type="radio" name="sostSource" value="SR" onchange="sostOnSourceChange(this)"><span class="sw" style="background:#0065B3"></span>SR</label>
+        <label><input type="radio" name="sostSource" value="OS" onchange="sostOnSourceChange(this)"><span class="sw" style="background:#639922"></span>OS</label>
+      </div>
+
       <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin:12px 0 4px 0;line-height:1.5">Template scan body:</div>
       <div class="comp-radio" id="sostTemplateRadio">
         <label class="active"><input type="radio" name="sostTpl" value="1T3" checked onchange="sostOnTemplateChange(this)"><span class="sw" style="background:#ffaa44"></span>Marker 1T3</label>
@@ -794,6 +801,15 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       </div>
       <input type="file" id="sostInputCustom" accept=".stl,.STL" style="display:none" onchange="sostOnCustomPicked(event)">
       <div id="sostCustomName" style="display:none;font-family:var(--mono);font-size:9px;color:var(--dark);margin-top:4px;padding:4px 6px;background:var(--light);border-radius:4px;border:1px solid var(--border)"></div>
+
+      <div style="margin-top:12px;padding:8px;background:var(--light);border-radius:5px">
+        <label style="display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">
+          <span>Offset Z (taratura)</span>
+          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">-8.50</span>
+        </label>
+        <input type="range" id="sostZOffset" min="-15" max="5" step="0.1" value="-8.5" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Delta click->origine clinica. Un valore per ogni tipo di scansione di partenza.</div>
+      </div>
 
       <div style="display:flex;gap:6px;margin-top:12px">
         <button id="sostBtnPlace" onclick="sostStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona</button>
@@ -9003,6 +9019,16 @@ var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, p
 var sostCounter = 0;             // progressivo ID
 var sostZOffsetMm = -8.50;       // offset lungo asse dall'origine clinica condivisa dei template IPD (tarato 2026-04-23)
 var sostExportTemplate = '1T3';  // tipo di template da usare all'export ('1T3' | 'SR' | 'OS')
+var sostSourceTemplate = '1T3';  // tipo di marker presente nella scansione di partenza
+
+// Offset Z tarati per ciascun tipo di marker presente nella scansione di partenza.
+// Rappresenta il delta lungo l'asse dal click (faccia piatta) all'origine clinica
+// condivisa (0,0,0 locale dei template STL).
+var SOSTITUIRE_SOURCE_OFFSET = {
+  '1T3': -8.50,   // tarato 2026-04-23
+  'SR':   0.00,   // da tarare
+  'OS':   0.00    // da tarare
+};
 
 // --- METADATA TEMPLATE ---
 var SOSTITUIRE_TEMPLATE_INFO = {
@@ -9082,6 +9108,70 @@ function sostOnTemplateChange(radio){
     document.getElementById('sostCustomName').style.display = 'none';
   }
   // Offset Z e' unico per tutti i template: non cambia al cambio radio
+}
+
+// Scansione di partenza: carica offset Z tarato per quel tipo di marker
+function sostOnSourceChange(radio){
+  sostSourceTemplate = radio.value;
+  var labels = document.querySelectorAll('#sostSourceRadio label');
+  labels.forEach(function(l){ l.classList.remove('active'); });
+  radio.parentElement.classList.add('active');
+  // Carica l'offset tarato per questa scansione di partenza
+  var defaultOffset = SOSTITUIRE_SOURCE_OFFSET[radio.value];
+  if(typeof defaultOffset === 'number'){
+    var slider = document.getElementById('sostZOffset');
+    var label = document.getElementById('sostZOffsetValue');
+    if(slider){
+      var delta = defaultOffset - sostZOffsetMm;
+      slider.value = defaultOffset;
+      if(label) label.textContent = defaultOffset.toFixed(2);
+      sostZOffsetMm = defaultOffset;
+      // Sposta i marker gia' esistenti per riflettere il nuovo offset
+      if(delta !== 0 && sostPlaced.length > 0){
+        sostApplyOffsetDelta(delta);
+      }
+    }
+  }
+}
+
+// Slider Offset Z: aggiorna real-time tutti i marker esistenti
+function sostOnZOffsetChange(){
+  var slider = document.getElementById('sostZOffset');
+  var label = document.getElementById('sostZOffsetValue');
+  if(!slider) return;
+  var newOffset = parseFloat(slider.value);
+  var delta = newOffset - sostZOffsetMm;
+  sostZOffsetMm = newOffset;
+  if(label) label.textContent = newOffset.toFixed(2);
+  if(delta === 0) return;
+  sostApplyOffsetDelta(delta);
+}
+
+// Sposta tutti i marker posizionati di delta lungo il loro asse
+function sostApplyOffsetDelta(delta){
+  sostPlaced.forEach(function(p){
+    var d = p.axisDir.clone().multiplyScalar(delta);
+    if(p.group.matrixAutoUpdate === false){
+      // Matrice gestita manualmente (post-raffinamento)
+      var curPos = new THREE.Vector3();
+      curPos.setFromMatrixPosition(p.group.matrix);
+      curPos.add(d);
+      p.group.matrix.setPosition(curPos);
+    } else {
+      p.group.position.add(d);
+    }
+    p.position.add(d);
+    if(p.axisLine){
+      var endPt = p.position.clone().add(p.axisDir.clone().multiplyScalar(20));
+      p.axisLine.geometry.setFromPoints([p.position, endPt]);
+      p.axisLine.geometry.attributes.position.needsUpdate = true;
+    }
+  });
+  // Aggiorna cut view se aperta
+  var cutOverlay = document.getElementById('cutViewOverlay');
+  if(cutOverlay && cutOverlay.style.display === 'flex'){
+    sostRenderCutView();
+  }
 }
 
 // Radio "Esporta come": sceglie quale template usare come destinazione
