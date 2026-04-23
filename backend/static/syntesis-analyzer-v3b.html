@@ -9032,9 +9032,9 @@ var sostSourceTemplate = '1T3';  // tipo di marker presente nella scansione di p
 // Per posizionare il template: group.position = center - DISC_Z * axis
 // cosi' il disco del modello 3D va a coincidere con il click.
 var SOSTITUIRE_SOURCE_OFFSET = {
-  '1T3': -10.00,   // disco 1T3 a Z=+10 locale  -> offset = -10
-  'SR':    5.00,   // disco SR  a Z=-5  locale  -> offset = +5 (sopra l'origine)
-  'OS':   -6.00    // disco OS  a Z=+6  locale  -> offset = -6
+  '1T3': -10.00,   // disco 1T3 a Z=+10 locale, up=+Z  -> offset = -10
+  'SR':   -5.00,   // disco SR  a Z=-5  locale, up=-Z (flip) -> offset = -5
+  'OS':   -6.00    // disco OS  a Z=+6  locale, up=+Z  -> offset = -6
 };
 
 // --- METADATA TEMPLATE ---
@@ -9364,7 +9364,13 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       var dn = normal.clone().multiplyScalar(sostZOffsetMm);
       group.position.add(dn);
     }
-    var up = new THREE.Vector3(0, 0, 1);
+    // Vettore "up" del template nel suo sistema locale:
+    // 1T3/OS hanno il disco a Zmax (up = +Z)
+    // SR ha il disco a Zmin (up = -Z) -> serve flip 180°
+    var sourceKey = sostSourceTemplate;
+    var up = (sourceKey === 'SR')
+      ? new THREE.Vector3(0, 0, -1)
+      : new THREE.Vector3(0, 0, 1);
     group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, normal));
     group.userData.isSostituire = true;
     group.userData.sostRole = 'template';
@@ -9453,7 +9459,10 @@ function sostAlignAll(){
 
       // Ricostruisci matrice del gruppo
       var newM = new THREE.Matrix4();
-      var up = new THREE.Vector3(0, 0, 1);
+      // Stesso flip di SR applicato nel placement
+      var up = (sostSourceTemplate === 'SR')
+        ? new THREE.Vector3(0, 0, -1)
+        : new THREE.Vector3(0, 0, 1);
       var q = new THREE.Quaternion().setFromUnitVectors(up, axis);
       newM.makeRotationFromQuaternion(q);
       newM.setPosition(finalCenter);
