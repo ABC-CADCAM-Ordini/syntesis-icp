@@ -187,11 +187,15 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .misurare-btn:hover{opacity:.9}
 .misurare-btn:disabled{opacity:.35;cursor:not-allowed}
 .misurare-selected{display:flex;gap:6px;margin-top:8px}
-.misurare-selected .slot{flex:1;padding:5px 7px;border:1.5px dashed var(--border);border-radius:5px;font-family:var(--mono);font-size:8px;color:var(--gray);min-height:26px;display:flex;align-items:center;overflow:hidden;line-height:1.2}
+.misurare-selected .slot-wrap{flex:1;display:flex;gap:4px;align-items:stretch;min-width:0}
+.misurare-selected .slot{flex:1;padding:5px 7px;border:1.5px dashed var(--border);border-radius:5px;font-family:var(--mono);font-size:8px;color:var(--gray);min-height:26px;display:flex;align-items:center;overflow:hidden;line-height:1.2;min-width:0}
 .misurare-selected .slot.filled{border-style:solid}
 .misurare-selected .slot.src.filled{border-color:var(--blue);background:rgba(0,101,179,.04);color:var(--dark)}
 .misurare-selected .slot.tgt.filled{border-color:var(--green);background:rgba(13,158,110,.04);color:var(--dark)}
 .misurare-selected .slot .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.misurare-selected .slot-upload{flex-shrink:0;border:1.5px solid var(--border);background:var(--white);border-radius:5px;cursor:pointer;padding:0 7px;display:flex;align-items:center;justify-content:center;color:var(--gray);transition:all .15s;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.04em}
+.misurare-selected .slot-upload:hover{border-color:var(--blue);color:var(--blue);background:rgba(0,101,179,.06)}
+.misurare-selected .slot-upload svg{display:block}
 /* WorkFlow menu (stile coerente con file-menu) */
 .workflow-menu{position:absolute;top:100%;left:0;margin-top:6px;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:5px;min-width:210px;box-shadow:0 6px 20px rgba(15,25,35,.12);z-index:100;display:none}
 .workflow-menu.open{display:block}
@@ -679,8 +683,20 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div class="panel-label">Confronta nel Comparator</div>
       <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">Selezione attiva:</div>
       <div class="misurare-selected">
-        <div class="slot src" id="slotMisurareSrc"><span>source</span></div>
-        <div class="slot tgt" id="slotMisurareTgt"><span>target</span></div>
+        <div class="slot-wrap">
+          <div class="slot src" id="slotMisurareSrc"><span>source</span></div>
+          <button class="slot-upload" type="button" onclick="document.getElementById('uploadMisurareSrc').click()" title="Carica STL come source">
+            <svg width="11" height="11" viewBox="0 0 28 28" fill="none"><path d="M14 20 L14 5 M8 11 L14 5 L20 11" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 22 L23 22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+          <input type="file" id="uploadMisurareSrc" accept=".stl,.STL" style="display:none" onchange="uploadMisurareFile(event,'src')">
+        </div>
+        <div class="slot-wrap">
+          <div class="slot tgt" id="slotMisurareTgt"><span>target</span></div>
+          <button class="slot-upload" type="button" onclick="document.getElementById('uploadMisurareTgt').click()" title="Carica STL come target">
+            <svg width="11" height="11" viewBox="0 0 28 28" fill="none"><path d="M14 20 L14 5 M8 11 L14 5 L20 11" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 22 L23 22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+          <input type="file" id="uploadMisurareTgt" accept=".stl,.STL" style="display:none" onchange="uploadMisurareFile(event,'tgt')">
+        </div>
       </div>
       <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-top:10px;margin-bottom:2px;line-height:1.5">Componente da confrontare:</div>
       <div class="comp-radio" id="compRadio">
@@ -4870,6 +4886,55 @@ function refreshMisurareList(){
     }
     var countEl = document.getElementById('misurareCount');
     if(countEl) countEl.textContent = '!';
+  });
+}
+
+// Carica un file STL da disco, lo registra come accoppiamento
+// (disponibile per 24h nella lista recenti) e lo assegna allo slot selezionato.
+// Il componente attivo in compRadio determina sotto quale chiave viene salvato
+// in stlBlobs (scanbody / matematica / analogo) per coerenza con il flusso Comparator.
+function uploadMisurareFile(evt, slot){
+  var input = evt && evt.target;
+  if(!input || !input.files || input.files.length === 0) return;
+  var file = input.files[0];
+  // Reset immediato del picker per permettere ri-upload stesso file
+  input.value = '';
+  if(!file.name.toLowerCase().endsWith('.stl')){
+    showStatus('Seleziona un file con estensione .stl');
+    return;
+  }
+  if(typeof SyntesisDB === 'undefined'){
+    showStatus('Cache locale non disponibile in questo browser.');
+    return;
+  }
+  var now = new Date();
+  var scanName = file.name;
+  var baseName = scanName.replace(/\.stl$/i, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'caso';
+  var compKey = (misurareState && misurareState.component) || 'scanbody';
+  var stlBlobs = {};
+  stlBlobs[compKey] = file; // File estende Blob, IndexedDB lo accetta
+  var entry = {
+    id: 'upl_' + now.getTime() + '_' + Math.random().toString(36).slice(2, 7),
+    scanName: scanName,
+    baseName: baseName,
+    timestamp: now.toISOString(),
+    timestampMs: now.getTime(),
+    expiresAtMs: now.getTime() + 24*60*60*1000,
+    muaCount: 0,
+    alignedCount: 0,
+    components: [compKey],
+    stlBlobs: stlBlobs,
+    metadata: { source: 'upload', component: compKey, sizeBytes: file.size },
+    uploadedFromDisk: true
+  };
+  SyntesisDB.saveAccoppiamento(entry).then(function(){
+    if(slot === 'src') misurareState.sourceId = entry.id;
+    else if(slot === 'tgt') misurareState.targetId = entry.id;
+    showStatus('File caricato: ' + scanName + ' (slot ' + (slot === 'src' ? 'source' : 'target') + ').');
+    return refreshMisurareList();
+  }).catch(function(err){
+    showStatus('Errore salvataggio: ' + (err && err.message ? err.message : 'sconosciuto'));
+    console.warn('[IndexedDB] upload fallito:', err);
   });
 }
 
