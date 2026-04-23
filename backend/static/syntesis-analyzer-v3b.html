@@ -798,10 +798,10 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div style="margin-top:12px;padding:8px;background:var(--light);border-radius:5px">
         <label style="display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">
           <span>Offset Z (mm)</span>
-          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">-0.40</span>
+          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">-9.50</span>
         </label>
-        <input type="range" id="sostZOffset" min="-3" max="3" step="0.1" value="-0.4" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
-        <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Profondita' del template rispetto alla faccia piatta. Default tarato per 1T3. Applicato in real-time.</div>
+        <input type="range" id="sostZOffset" min="-15" max="5" step="0.1" value="-9.5" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Offset lungo asse marker dall'origine clinica condivisa. Stesso valore per 1T3/SR/OS.</div>
       </div>
 
       <div style="display:flex;gap:6px;margin-top:12px">
@@ -9010,7 +9010,7 @@ var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
 var sostCounter = 0;             // progressivo ID
-var sostZOffsetMm = -0.40;       // offset Z applicato nel locale del template (slider UI, default tarato per 1T3)
+var sostZOffsetMm = -9.50;       // offset Z lungo asse dall'origine clinica condivisa (slider UI, da tarare)
 var sostExportTemplate = '1T3';  // tipo di template da usare all'export ('1T3' | 'SR' | 'OS')
 
 // --- METADATA TEMPLATE ---
@@ -9238,26 +9238,13 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       return;
     }
 
-    // I template STL attualmente forniti non condividono la stessa convenzione
-    // di origine clinica (punto Z=0 locale differisce tra 1T3/SR/OS). Per
-    // supportare il rendering coerente con Analizza senza rigenerare gli STL,
-    // traslo ciascun template in modo che zMin sia a Z=0 locale. L'eventuale
-    // delta tra il click (centroide faccia flat) e l'origine clinica condivisa
-    // e' compensato dallo slider Offset Z.
-    //
-    // NOTA IMPORTANTE: l'offset -0.40 e' tarato per 1T3. Se esporti come SR
-    // o OS puo' servire ritarare lo slider empiricamente.
-    var BASE_Z = { '1T3': 8.100, 'SR': -5.000, 'OS': 4.900 };
-    var tplBaseZ = BASE_Z[key];
-    if(tplBaseZ === undefined){
-      var pos = geo.attributes.position.array;
-      var zmin = Infinity;
-      for(var i = 2; i < pos.length; i += 3){
-        if(pos[i] < zmin) zmin = pos[i];
-      }
-      tplBaseZ = zmin;
-    }
-    geo.translate(0, 0, -tplBaseZ);
+    // I template 1T3/SR/OS condividono l'origine clinica (0,0,0) locale.
+    // Le differenze di Z tra i range geometrici (1T3: 8.1..10, OS: 4.9..6,
+    // SR: -5..-2) riflettono le differenti altezze cliniche dei marker
+    // rispetto allo stesso riferimento. Non traslare: la rotazione del
+    // gruppo via quaternion.setFromUnitVectors(Z, axis) + offset Z lungo
+    // axis e' sufficiente a posizionarli correttamente, ciascuno secondo
+    // la propria quota intrinseca.
 
     sostCounter++;
     var id = 'SOST_' + sostCounter;
@@ -9511,26 +9498,13 @@ function sostExportSTL(){
       return;
     }
     // Parsa la geometria del template di destinazione (una volta sola)
+    // NESSUNA traslazione: i template condividono l'origine clinica (0,0,0)
     var destGeo = sostParseSTLToGeometry(destTplBuf);
     if(!destGeo){
       sostShowStatus('Errore parsing template ' + destKey, true);
       if(btn){ btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Esporta STL'; }
       return;
     }
-    // Applica la stessa traslazione zMin -> 0 usata al placement, cosi' la
-    // trasformazione del gruppo (group.matrixWorld) funziona anche sul
-    // template di destinazione.
-    var BASE_Z = { '1T3': 8.100, 'SR': -5.000, 'OS': 4.900 };
-    var destBaseZ = BASE_Z[destKey];
-    if(destBaseZ === undefined){
-      var destPos = destGeo.attributes.position.array;
-      var zmin = Infinity;
-      for(var i = 2; i < destPos.length; i += 3){
-        if(destPos[i] < zmin) zmin = destPos[i];
-      }
-      destBaseZ = zmin;
-    }
-    destGeo.translate(0, 0, -destBaseZ);
     // Giro di UI update prima del lavoro pesante
     setTimeout(function(){
       try {
