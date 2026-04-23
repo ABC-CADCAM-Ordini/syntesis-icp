@@ -1146,20 +1146,7 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   var nTri = pos.length / 9;
   var cnx = clickNormal.x, cny = clickNormal.y, cnz = clickNormal.z;
   var cpx = clickPos.x, cpy = clickPos.y, cpz = clickPos.z;
-  // Raggio di ricerca: Analizza usa 5mm fisso (backward compat).
-  // Sostituire passa opts.radius e usa 1.5x quel raggio per evitare di
-  // raccogliere triangoli del cono sotto la faccia piatta su marker piccoli.
-  //   1T3 (R=2.515) -> 3.77mm | SR (R=2.03) -> 3.04mm | OS (R=1.78) -> 2.67mm
-  var searchR = (opts && typeof opts.radius === 'number')
-    ? SCANBODY_RADIUS * 1.5
-    : 5.0;
-  var searchR2 = searchR * searchR;
-
-  // Soglia di planarita': 0.80 default (Analizza, faccia 1T3 grande).
-  // Piu' stretta quando opts.radius passato (Sostituire su marker piccoli):
-  // 0.92 -> accetta solo triangoli con normale entro ~23° dalla normale
-  // del click, rigetta i bordi della faccia e il cono laterale.
-  var flatDotThresh = (opts && typeof opts.radius === 'number') ? 0.92 : 0.80;
+  var searchR2 = 5.0 * 5.0;
 
   // --- STEP 1: trova punti della faccia piatta -> asse ---
   var flatPts = [], flatNorms = [];
@@ -1181,7 +1168,7 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
     nx /= nLen; ny /= nLen; nz /= nLen;
     
     var dot = nx*cnx + ny*cny + nz*cnz;
-    if(dot > flatDotThresh){
+    if(dot > 0.80){
       flatPts.push([cx, cy, cz]);
       flatNorms.push([nx, ny, nz]);
     }
