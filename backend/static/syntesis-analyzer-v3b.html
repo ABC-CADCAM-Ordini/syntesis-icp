@@ -805,9 +805,9 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div style="margin-top:12px;padding:8px;background:var(--light);border-radius:5px">
         <label style="display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">
           <span>Offset Z (taratura)</span>
-          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">-8.50</span>
+          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">-10.00</span>
         </label>
-        <input type="range" id="sostZOffset" min="-15" max="5" step="0.1" value="-8.5" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
+        <input type="range" id="sostZOffset" min="-15" max="5" step="0.1" value="-10" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
         <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Delta click->origine clinica. Un valore per ogni tipo di scansione di partenza.</div>
       </div>
 
@@ -1191,10 +1191,30 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   if(avgLen < 0.01) return { center: clickPos.clone(), axis: clickNormal.clone() };
   var axis = [avgN[0]/avgLen, avgN[1]/avgLen, avgN[2]/avgLen];
   
+  // SECONDO PASSO (solo se opts passato, cioe' chiamato da Sostituire):
+  // rifiltra i flat pts tenendo solo quelli vicini al CLICK lungo l'asse
+  // (entro 0.8mm sopra/sotto). Elimina triangoli classificati "flat" per
+  // orientamento simile al click ma fisicamente lontani, su zone del
+  // moncone adiacente. Analizza non usa questo filtro per retrocompat.
+  var flatPtsFinal = flatPts;
+  if(opts && typeof opts.radius === 'number'){
+    var axialMaxDist = 0.8;
+    var refined = [];
+    for(var fi = 0; fi < flatPts.length; fi++){
+      var fp = flatPts[fi];
+      var adx = fp[0] - cpx, ady = fp[1] - cpy, adz = fp[2] - cpz;
+      var axialDist = adx*axis[0] + ady*axis[1] + adz*axis[2];
+      if(Math.abs(axialDist) <= axialMaxDist){
+        refined.push(fp);
+      }
+    }
+    if(refined.length >= 20) flatPtsFinal = refined;
+  }
+  
   // Baricentro faccia piatta (quota Z del piano, stima iniziale centro)
   var flatBc = [0, 0, 0];
-  flatPts.forEach(function(p){ flatBc[0]+=p[0]; flatBc[1]+=p[1]; flatBc[2]+=p[2]; });
-  flatBc[0] /= flatPts.length; flatBc[1] /= flatPts.length; flatBc[2] /= flatPts.length;
+  flatPtsFinal.forEach(function(p){ flatBc[0]+=p[0]; flatBc[1]+=p[1]; flatBc[2]+=p[2]; });
+  flatBc[0] /= flatPtsFinal.length; flatBc[1] /= flatPtsFinal.length; flatBc[2] /= flatPtsFinal.length;
   
   // --- STEP 2: costruisci basi del piano perpendicolare all'asse ---
   // Due vettori ortonormali u, v nel piano
@@ -1274,7 +1294,7 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   
   console.log('[CylFit] axis=('+axis[0].toFixed(3)+','+axis[1].toFixed(3)+','+axis[2].toFixed(3)+
     '), center=('+center[0].toFixed(3)+','+center[1].toFixed(3)+','+center[2].toFixed(3)+
-    '), flat pts='+flatPts.length+', side pts='+allNearPts.length);
+    '), flat pts='+flatPts.length+' -> '+flatPtsFinal.length+', side pts='+allNearPts.length);
   
   return {
     center: new THREE.Vector3(center[0], center[1], center[2]),
@@ -9020,7 +9040,7 @@ var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
 var sostCounter = 0;             // progressivo ID
-var sostZOffsetMm = -8.50;       // offset Z default per 1T3 (valore tarato empiricamente)
+var sostZOffsetMm = -10.00;      // offset canonico 1T3 (disco a +10 dalla connessione)
 var sostExportTemplate = '1T3';  // tipo di template da usare all'export ('1T3' | 'SR' | 'OS')
 var sostSourceTemplate = '1T3';  // tipo di marker presente nella scansione di partenza
 
@@ -9031,16 +9051,18 @@ var sostSourceTemplate = '1T3';  // tipo di marker presente nella scansione di p
 // Quando l'utente clicca sul disco, findScanbodyCenter ritorna center.
 // Per posizionare il template: group.position = center - DISC_Z * axis
 // cosi' il disco del modello 3D va a coincidere con il click.
-// Offset Z tarati empiricamente da Francesco per ciascun tipo di marker
-// nella scansione di partenza. I valori teorici basati sulla specifica
-// IPD (disco a +10 per 1T3, +6 OS, -5 SR) non funzionano in pratica:
-// findScanbodyCenter ha un bias sistematico di ~1.5mm che sposta il
-// centro rilevato sotto la faccia piatta reale. Questi valori sono quelli
-// che danno il disco del modello sovrapposto alla faccia piatta scansione.
+// Offset Z = -Z_disco_source nel sistema locale del template.
+// L'origine (0,0,0) dei template IPD coincide con la connessione implantare.
+// Il disco cliccato sta a una Z nota dalla connessione:
+//   1T3: disco a +10 -> offset -10
+//   OS:  disco a +6  -> offset -6
+//   SR:  disco a -5  -> offset +5
+// Con il fix del bias di findScanbodyCenter (refinement dei flat pts lungo
+// l'asse), questi valori canonici dovrebbero funzionare direttamente.
 var SOSTITUIRE_SOURCE_OFFSET = {
-  '1T3': -8.50,    // tarato visualmente (teorico -10)
-  'SR':   5.00,    // da tarare (teorico +5)
-  'OS':  -4.00     // tarato visualmente (teorico -6)
+  '1T3': -10.00,
+  'SR':    5.00,
+  'OS':   -6.00
 };
 
 // --- METADATA TEMPLATE ---
