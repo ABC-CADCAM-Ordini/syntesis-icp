@@ -795,6 +795,15 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <input type="file" id="sostInputCustom" accept=".stl,.STL" style="display:none" onchange="sostOnCustomPicked(event)">
       <div id="sostCustomName" style="display:none;font-family:var(--mono);font-size:9px;color:var(--dark);margin-top:4px;padding:4px 6px;background:var(--light);border-radius:4px;border:1px solid var(--border)"></div>
 
+      <div style="margin-top:12px;padding:8px;background:var(--light);border-radius:5px">
+        <label style="display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">
+          <span>Offset Z (mm)</span>
+          <span id="sostZOffsetValue" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:800">0.00</span>
+        </label>
+        <input type="range" id="sostZOffset" min="-3" max="3" step="0.1" value="0" oninput="sostOnZOffsetChange()" style="width:100%;accent-color:#0065B3">
+        <div style="font-family:var(--mono);font-size:8px;color:var(--gray);margin-top:4px;line-height:1.4">Regola la profondita' del template rispetto alla faccia piatta. Applicato in real-time a tutti i marker posizionati.</div>
+      </div>
+
       <div style="display:flex;gap:6px;margin-top:12px">
         <button id="sostBtnPlace" onclick="sostStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona</button>
         <button id="sostBtnRefine" onclick="sostAlignAll()" style="flex:1;padding:8px 10px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase;opacity:0.5" disabled>Raffina</button>
@@ -8990,6 +8999,7 @@ var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
 var sostCounter = 0;             // progressivo ID
+var sostZOffsetMm = 0;           // offset Z applicato nel locale del template (slider UI)
 
 // --- METADATA TEMPLATE ---
 var SOSTITUIRE_TEMPLATE_INFO = {
@@ -9199,26 +9209,27 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       return;
     }
 
-    // Traslazione identica alla logica di Analizza: la faccia piatta del
-    // template va a Z=0 locale, cosi' l'origine del gruppo coincide con la
-    // faccia piatta quando il gruppo si posiziona in "center" (il click).
-    // Analizza usa translate(0,0,-10) perche' il suo scanbody ha la faccia
-    // piatta a Z=10. I nostri template hanno Z della faccia piatta diversa:
-    //   1T3: 10.000 (stessa convenzione di Analizza)
-    //   SR:  -2.000
-    //   OS:   6.000
-    var FLAT_FACE_Z = { '1T3': 10.000, 'SR': -2.000, 'OS': 6.000 };
-    var tplFlatZ = FLAT_FACE_Z[key];
-    if(tplFlatZ === undefined){
-      // Custom: assumo convenzione Analizza (faccia piatta a zMax)
+    // Traslazione geometria: porta la BASE del template (cap inferiore = zMin)
+    // a Z=0 locale. Cosi' quando il gruppo si posiziona nel click, la base del
+    // disco coincide con la faccia piatta della scansione.
+    // L'offset Z aggiuntivo (slider UI) e' applicato al livello di group.position.
+    //
+    // Convenzione base dei template:
+    //   1T3: zMin=8.100 (range 8.1..10.0)
+    //   SR:  zMin=-5.000 (range -5..-2)
+    //   OS:  zMin=4.900  (range 4.9..6.0)
+    var BASE_Z = { '1T3': 8.100, 'SR': -5.000, 'OS': 4.900 };
+    var tplBaseZ = BASE_Z[key];
+    if(tplBaseZ === undefined){
+      // Custom: usa zMin calcolato dal buffer
       var pos = geo.attributes.position.array;
-      var zmax = -Infinity;
+      var zmin = Infinity;
       for(var i = 2; i < pos.length; i += 3){
-        if(pos[i] > zmax) zmax = pos[i];
+        if(pos[i] < zmin) zmin = pos[i];
       }
-      tplFlatZ = zmax;
+      tplBaseZ = zmin;
     }
-    geo.translate(0, 0, -tplFlatZ);
+    geo.translate(0, 0, -tplBaseZ);
 
     sostCounter++;
     var id = 'SOST_' + sostCounter;
@@ -9240,7 +9251,12 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     group.add(mesh);
 
     // Posizionamento (pipeline identica ad Analizza placeMUA)
+    // + offset Z lungo l'asse del marker (slider UI)
     group.position.copy(point);
+    if(sostZOffsetMm !== 0){
+      var dn = normal.clone().multiplyScalar(sostZOffsetMm);
+      group.position.add(dn);
+    }
     var up = new THREE.Vector3(0, 0, 1);
     group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, normal));
     group.userData.isSostituire = true;
@@ -9319,22 +9335,28 @@ function sostAlignAll(){
       var center = autoResult.center;
       var axis = autoResult.axis.clone().normalize();
 
+      // Offset Z lungo l'asse (slider UI)
+      var finalCenter = center.clone();
+      if(sostZOffsetMm !== 0){
+        finalCenter.add(axis.clone().multiplyScalar(sostZOffsetMm));
+      }
+
       // Ricostruisci matrice del gruppo
       var newM = new THREE.Matrix4();
       var up = new THREE.Vector3(0, 0, 1);
       var q = new THREE.Quaternion().setFromUnitVectors(up, axis);
       newM.makeRotationFromQuaternion(q);
-      newM.setPosition(center);
+      newM.setPosition(finalCenter);
 
       p.group.matrix.copy(newM);
       p.group.matrixAutoUpdate = false;
 
-      p.position.copy(center);
+      p.position.copy(finalCenter);
       p.axisDir.copy(axis);
 
       // Aggiorna linea asse
-      var endPt = center.clone().add(axis.clone().multiplyScalar(20));
-      p.axisLine.geometry.setFromPoints([center, endPt]);
+      var endPt = finalCenter.clone().add(axis.clone().multiplyScalar(20));
+      p.axisLine.geometry.setFromPoints([finalCenter, endPt]);
       p.axisLine.geometry.attributes.position.needsUpdate = true;
 
       // RMSD semplice: stima locale (opzionale, puo' essere migliorata)
@@ -9373,6 +9395,45 @@ function sostRenderPlacedList(){
     h += '</div>';
   });
   items.innerHTML = h;
+}
+
+// Callback slider "Offset Z": aggiorna tutti i marker in real-time
+// L'offset e' applicato spostando group.position lungo axisDir
+// (stessa direzione in cui e' stato applicato al placement)
+function sostOnZOffsetChange(){
+  var slider = document.getElementById('sostZOffset');
+  var label = document.getElementById('sostZOffsetValue');
+  if(!slider) return;
+  var newOffset = parseFloat(slider.value);
+  var delta = newOffset - sostZOffsetMm;
+  sostZOffsetMm = newOffset;
+  if(label) label.textContent = newOffset.toFixed(2);
+  if(delta === 0) return;
+  // Applica delta ai marker esistenti: sposta group.position di delta*axisDir
+  sostPlaced.forEach(function(p){
+    var d = p.axisDir.clone().multiplyScalar(delta);
+    if(p.group.matrixAutoUpdate === false){
+      // Matrice gestita manualmente (post-raffinamento): aggiorna la matrix
+      var curPos = new THREE.Vector3();
+      curPos.setFromMatrixPosition(p.group.matrix);
+      curPos.add(d);
+      p.group.matrix.setPosition(curPos);
+    } else {
+      p.group.position.add(d);
+    }
+    p.position.add(d);
+    // Aggiorna linea asse (ricostruisci da position + axisDir)
+    if(p.axisLine){
+      var endPt = p.position.clone().add(p.axisDir.clone().multiplyScalar(20));
+      p.axisLine.geometry.setFromPoints([p.position, endPt]);
+      p.axisLine.geometry.attributes.position.needsUpdate = true;
+    }
+  });
+  // Aggiorna cut view se aperta
+  var cutOverlay = document.getElementById('cutViewOverlay');
+  if(cutOverlay && cutOverlay.style.display === 'flex'){
+    sostRenderCutView();
+  }
 }
 
 function sostRemovePlaced(num){
