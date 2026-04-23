@@ -813,7 +813,13 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       </div>
 
       <div id="sostExportAs" style="display:none;margin-top:10px">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">Esporta come:</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin-bottom:4px;line-height:1.5">Contenuto export:</div>
+        <div class="comp-radio" id="sostExportContentRadio">
+          <label class="active"><input type="radio" name="sostExportContent" value="full" checked onchange="sostOnExportContentChange(this)"><span class="sw" style="background:#64748B"></span>Scansione + scanbody</label>
+          <label><input type="radio" name="sostExportContent" value="onlyTpl" onchange="sostOnExportContentChange(this)"><span class="sw" style="background:#0D1B2A"></span>Solo scanbody</label>
+        </div>
+
+        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);margin:8px 0 4px 0;line-height:1.5">Tipo scanbody (destinazione):</div>
         <div class="comp-radio" id="sostExportAsRadio">
           <label class="active"><input type="radio" name="sostExportTpl" value="1T3" checked onchange="sostOnExportTemplateChange(this)"><span class="sw" style="background:#ffaa44"></span>1T3</label>
           <label><input type="radio" name="sostExportTpl" value="SR" onchange="sostOnExportTemplateChange(this)"><span class="sw" style="background:#0065B3"></span>SR</label>
@@ -9033,6 +9039,7 @@ var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, p
 var sostCounter = 0;             // progressivo ID
 var sostZOffsetMm = 0.00;        // aggiustamento fine manuale sopra l'offset auto calcolato dal bbox
 var sostExportTemplate = '1T3';  // tipo di template da usare all'export ('1T3' | 'SR' | 'OS')
+var sostExportContent = 'full';  // 'full' = scansione+scanbody, 'onlyTpl' = solo scanbody
 var sostSourceTemplate = '1T3';  // tipo di marker presente nella scansione di partenza
 
 // Offset Z = Z del centro del disco marker nel sistema locale del template STL.
@@ -9193,6 +9200,14 @@ function sostApplyOffsetDelta(delta){
 function sostOnExportTemplateChange(radio){
   sostExportTemplate = radio.value;
   var labels = document.querySelectorAll('#sostExportAsRadio label');
+  labels.forEach(function(l){ l.classList.remove('active'); });
+  radio.parentElement.classList.add('active');
+}
+
+// Radio "Contenuto export": scansione+scanbody vs solo scanbody
+function sostOnExportContentChange(radio){
+  sostExportContent = radio.value;
+  var labels = document.querySelectorAll('#sostExportContentRadio label');
   labels.forEach(function(l){ l.classList.remove('active'); });
   radio.parentElement.classList.add('active');
 }
@@ -9631,7 +9646,9 @@ function sostExportSTL(){
         var slot = document.getElementById('sostSlotScan');
         if(slot){
           var fname = slot.querySelector('.fname');
-          if(fname) scanName = fname.textContent.replace(/\.stl$/i, '') + '_' + destKey;
+          var base = fname ? fname.textContent.replace(/\.stl$/i, '') : 'sost';
+          var suffix = (sostExportContent === 'onlyTpl') ? ('_scanbody_' + destKey) : ('_' + destKey);
+          scanName = base + suffix;
         }
         var blob = new Blob([stlBuffer], {type: 'application/octet-stream'});
         var url = URL.createObjectURL(blob);
@@ -9709,35 +9726,36 @@ function sostBuildExportTriangles(destGeo, destKey){
     };
   });
 
-  // Pass 1: filtro triangoli della Multi-A
-  // Tengo solo i triangoli il cui centroide NON cade in nessun cilindro di soppressione
-  var keepBuffer = new Float32Array(scanPos.length);  // max size
+  // Pass 1: filtro triangoli della Multi-A (saltato se modalita' solo scanbody)
+  var keepBuffer = new Float32Array(sostExportContent === 'full' ? scanPos.length : 0);
   var keepCount = 0;
-  for(var i = 0; i < nScanTris; i++){
-    var o = i * 9;
-    var cx = (scanPos[o] + scanPos[o+3] + scanPos[o+6]) / 3;
-    var cy = (scanPos[o+1] + scanPos[o+4] + scanPos[o+7]) / 3;
-    var cz = (scanPos[o+2] + scanPos[o+5] + scanPos[o+8]) / 3;
+  if(sostExportContent === 'full'){
+    // Tengo solo i triangoli il cui centroide NON cade in nessun cilindro
+    for(var i = 0; i < nScanTris; i++){
+      var o = i * 9;
+      var cx = (scanPos[o] + scanPos[o+3] + scanPos[o+6]) / 3;
+      var cy = (scanPos[o+1] + scanPos[o+4] + scanPos[o+7]) / 3;
+      var cz = (scanPos[o+2] + scanPos[o+5] + scanPos[o+8]) / 3;
 
-    var inCull = false;
-    for(var k = 0; k < cullers.length; k++){
-      var cu = cullers[k];
-      var dx = cx - cu.center.x, dy = cy - cu.center.y, dz = cz - cu.center.z;
-      var axial = dx * cu.axis.x + dy * cu.axis.y + dz * cu.axis.z;
-      if(axial < cu.zMin || axial > cu.zMax) continue;
-      var rx = dx - axial * cu.axis.x;
-      var ry = dy - axial * cu.axis.y;
-      var rz = dz - axial * cu.axis.z;
-      var radial2 = rx*rx + ry*ry + rz*rz;
-      if(radial2 < cu.radius2){
-        inCull = true;
-        break;
+      var inCull = false;
+      for(var k = 0; k < cullers.length; k++){
+        var cu = cullers[k];
+        var dx = cx - cu.center.x, dy = cy - cu.center.y, dz = cz - cu.center.z;
+        var axial = dx * cu.axis.x + dy * cu.axis.y + dz * cu.axis.z;
+        if(axial < cu.zMin || axial > cu.zMax) continue;
+        var rx = dx - axial * cu.axis.x;
+        var ry = dy - axial * cu.axis.y;
+        var rz = dz - axial * cu.axis.z;
+        var radial2 = rx*rx + ry*ry + rz*rz;
+        if(radial2 < cu.radius2){
+          inCull = true;
+          break;
+        }
       }
-    }
-    if(!inCull){
-      // Copia triangolo nel buffer
-      for(var j = 0; j < 9; j++) keepBuffer[keepCount * 9 + j] = scanPos[o + j];
-      keepCount++;
+      if(!inCull){
+        for(var j = 0; j < 9; j++) keepBuffer[keepCount * 9 + j] = scanPos[o + j];
+        keepCount++;
+      }
     }
   }
 
