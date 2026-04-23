@@ -9618,11 +9618,17 @@ async function sostCallAlignAPI(tplBuffer, markerPts, useICP){
 }
 
 // Costruisce un THREE.Mesh dal buffer STL del template applicando R (3x3) e t (3)
+// R arriva dal server come lista di liste [[r00,r01,r02],[r10,r11,r12],[r20,r21,r22]]
 function sostBuildTransformedTemplateMesh(stlBuffer, R, t, colorHex){
   var view = new DataView(stlBuffer.buffer || stlBuffer, stlBuffer.byteOffset || 0, stlBuffer.byteLength);
   if(view.byteLength < 84) return null;
   var n = view.getUint32(80, true);
   if(84 + n * 50 !== view.byteLength) return null;
+  // Cache elementi R per velocita'
+  var r00=R[0][0], r01=R[0][1], r02=R[0][2];
+  var r10=R[1][0], r11=R[1][1], r12=R[1][2];
+  var r20=R[2][0], r21=R[2][1], r22=R[2][2];
+  var tx=t[0], ty=t[1], tz=t[2];
   var positions = new Float32Array(n * 9);
   for(var i = 0; i < n; i++){
     var off = 84 + i * 50;
@@ -9630,13 +9636,9 @@ function sostBuildTransformedTemplateMesh(stlBuffer, R, t, colorHex){
       var ox = view.getFloat32(off + 12 + k*12, true);
       var oy = view.getFloat32(off + 16 + k*12, true);
       var oz = view.getFloat32(off + 20 + k*12, true);
-      // Applica R + t (row-major: R[0..8])
-      var nx = R[0]*ox + R[1]*oy + R[2]*oz + t[0];
-      var ny = R[3]*ox + R[4]*oy + R[5]*oz + t[1];
-      var nz = R[6]*ox + R[7]*oy + R[8]*oz + t[2];
-      positions[i*9 + k*3]     = nx;
-      positions[i*9 + k*3 + 1] = ny;
-      positions[i*9 + k*3 + 2] = nz;
+      positions[i*9 + k*3]     = r00*ox + r01*oy + r02*oz + tx;
+      positions[i*9 + k*3 + 1] = r10*ox + r11*oy + r12*oz + ty;
+      positions[i*9 + k*3 + 2] = r20*ox + r21*oy + r22*oz + tz;
     }
   }
   var geo = new THREE.BufferGeometry();
@@ -9646,8 +9648,13 @@ function sostBuildTransformedTemplateMesh(stlBuffer, R, t, colorHex){
     color: colorHex,
     side: THREE.DoubleSide,
     flatShading: false,
-    transparent: true,
-    opacity: 0.88
+    transparent: false,
+    opacity: 1.0,
+    depthTest: true,
+    depthWrite: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2
   });
   return new THREE.Mesh(geo, mat);
 }
