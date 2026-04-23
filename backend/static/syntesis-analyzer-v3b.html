@@ -398,6 +398,14 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
     </svg>
     Livelli
   </button>
+  <button class="btn sostituire-only" style="display:none" onclick="toggleLayersPanel()" title="Mostra/nascondi albero della scena (Livelli)">
+    <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5 10 L14 5 L23 10 L14 15 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+      <path d="M5 15 L14 20 L23 15" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+      <path d="M5 20 L14 25 L23 20" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+    </svg>
+    Livelli
+  </button>
   <button class="btn green primary analisi-only" onclick="startPlacement()" title="Posiziona un nuovo MUA sulla scansione">
     <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <ellipse cx="14" cy="10" rx="7" ry="2.5" stroke="#0065B3" stroke-width="1.6" fill="none"/>
@@ -446,6 +454,14 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
     Sezione
   </button>
   <button class="btn misurare-only" style="display:none" onclick="misICP_toggleCutview()" title="Sezione 2D dello scanbody selezionato">
+    <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="5" y="6" width="18" height="16" stroke="#0065B3" stroke-width="1.6" fill="none"/>
+      <line x1="5" y1="14" x2="23" y2="14" stroke="#0065B3" stroke-width="1.6" stroke-dasharray="2 2"/>
+      <line x1="14" y1="2" x2="14" y2="26" stroke="#0065B3" stroke-width="1.6" stroke-dasharray="1 2"/>
+    </svg>
+    Sezione
+  </button>
+  <button class="btn sostituire-only" style="display:none" onclick="sostOpenCutView()" title="Vista in sezione del marker selezionato">
     <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="5" y="6" width="18" height="16" stroke="#0065B3" stroke-width="1.6" fill="none"/>
       <line x1="5" y1="14" x2="23" y2="14" stroke="#0065B3" stroke-width="1.6" stroke-dasharray="2 2"/>
@@ -1689,6 +1705,13 @@ function showStatus(msg){var el=document.getElementById('statusMsg');el.textCont
 
 // ── LAYER TREE ──────────────────────────────────────────────────
 function rebuildTree(){
+  // In workflow Sostituire l'albero mostra sostMesh + i template posizionati
+  if(typeof analysisMode !== 'undefined' && analysisMode === 'sostituire'){
+    if(typeof sostRebuildTree === 'function'){
+      sostRebuildTree();
+      return;
+    }
+  }
   var h='<div class="tree-node"><input type="checkbox" '+(scanMesh&&scanMesh.visible?'checked':'')+' onchange="toggleLayer(\'scan\',this.checked)"><span class="dot" style="background:#889aad"></span><span class="lbl">Scansione</span></div>';
   if(muaObjects.length > 0){
     h += '<div class="tree-node"><input type="checkbox" '+(scanbodiesVisible?'checked':'')+' onchange="toggleAllScanbodies(this.checked)"><span class="dot" style="background:#ffaa44"></span><span class="lbl">Scanbody 1T3 (tutti)</span></div>';
@@ -2324,7 +2347,8 @@ function selectWorkflow(wf){
     if(panCli)  panCli.style.display  = 'none';
     if(panMua)  panMua.style.display  = 'none';
     if(panScan) panScan.style.display = 'none';
-    if(layPan)  layPan.style.display  = 'none';
+    // Albero scena visibile anche in Sostituire (riuso layout)
+    if(layPan)  layPan.style.display  = 'flex';
     // Nascondo i pulsanti toolbar degli altri workflow
     analisiBtns.forEach(function(el){ el.style.display = 'none'; });
     misurareBtns.forEach(function(el){ el.style.display = 'none'; });
@@ -2336,7 +2360,9 @@ function selectWorkflow(wf){
     // Pulisco artefatti Analizza (scansione, MUA, spline, ecc.)
     try { _setAnalyzaArtifactsVisible(false); } catch(e){}
     if(stage) stage.classList.add('hidden');
-    showStatus('Workflow Sostituire: in costruzione.');
+    // Ricostruisci albero per mostrare oggetti Sostituire
+    try { rebuildTree(); } catch(e){}
+    showStatus('Workflow Sostituire: clicca + Posiziona e poi sul marker.');
   }
 }
 
@@ -9104,6 +9130,7 @@ function sostLoadScanToScene(filename){
   if(sostActiveTemplate !== 'custom') sostDecodeTemplate(sostActiveTemplate);
 
   sostShowStatus('Scansione caricata. Clicca "+ Posiziona" poi sul marker.');
+  try { rebuildTree(); } catch(e){}
 }
 
 // ── Placement: avvia modalità clic ──
@@ -9240,6 +9267,32 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostRenderPlacedList();
     sostUpdateRefineButtonState();
     sostShowStatus('Marker #' + sostCounter + ' posizionato (' + info.label + ').');
+    try { rebuildTree(); } catch(e){}
+    // Apri/aggiorna cut view automaticamente come fa Analizza
+    var cutOverlay = document.getElementById('cutViewOverlay');
+    if(cutOverlay){
+      var isOpen = cutOverlay.style.display === 'flex';
+      if(!isOpen){
+        // Cut view chiusa: aprila sul marker appena piazzato
+        sostCutState.placedIdx = sostPlaced.length - 1;
+        sostCutState.angle = 0;
+        sostOpenCutView();
+      } else {
+        // Cut view aperta: aggiungi al selettore e seleziona il nuovo
+        var sel = document.getElementById('cutMuaSelect');
+        if(sel){
+          var opt = document.createElement('option');
+          opt.value = sostPlaced.length - 1;
+          var infoL = SOSTITUIRE_TEMPLATE_INFO[key] || {label: key};
+          opt.textContent = '#' + sostCounter + ' ' + infoL.label;
+          sel.appendChild(opt);
+          sel.value = sostPlaced.length - 1;
+          sostCutState.placedIdx = sostPlaced.length - 1;
+          sostCutState.angle = 0;
+        }
+        sostRenderCutView();
+      }
+    }
   }).catch(function(err){
     console.error('[Sostituire] errore:', err);
     sostShowStatus('Errore: ' + (err.message || err), true);
@@ -9283,6 +9336,12 @@ function sostAlignAll(){
     });
     sostRenderPlacedList();
     sostShowStatus('Raffinamento completato (' + sostPlaced.length + ' marker).');
+    try { rebuildTree(); } catch(e){}
+    // Aggiorna cut view se aperta
+    var cutOverlay = document.getElementById('cutViewOverlay');
+    if(cutOverlay && cutOverlay.style.display === 'flex'){
+      sostRenderCutView();
+    }
   }, 30);
 }
 
@@ -9326,6 +9385,30 @@ function sostRemovePlaced(num){
   sostRenderPlacedList();
   sostUpdateRefineButtonState();
   sostShowStatus('Rimosso marker #' + num + '.');
+  try { rebuildTree(); } catch(e){}
+  // Gestisci cut view se aperta
+  var cutOverlay = document.getElementById('cutViewOverlay');
+  if(cutOverlay && cutOverlay.style.display === 'flex'){
+    if(sostPlaced.length === 0){
+      cutOverlay.style.display = 'none';
+    } else {
+      // Ricostruisci selettore e seleziona primo disponibile
+      var sel = document.getElementById('cutMuaSelect');
+      if(sel){
+        sel.innerHTML = '';
+        sostPlaced.forEach(function(p, i){
+          var opt = document.createElement('option');
+          opt.value = i;
+          var info = SOSTITUIRE_TEMPLATE_INFO[p.templateKey] || {label: p.templateKey};
+          opt.textContent = '#' + p.num + ' ' + info.label;
+          sel.appendChild(opt);
+        });
+        sostCutState.placedIdx = 0;
+        sel.value = 0;
+      }
+      sostRenderCutView();
+    }
+  }
 }
 
 function sostUpdateRefineButtonState(){
@@ -9375,6 +9458,214 @@ function _setSostituireArtifactsVisible(on){
     if(p.group) p.group.visible = on;
     if(p.axisLine) p.axisLine.visible = false; // axis line sempre hidden per ora
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SOSTITUIRE: albero scena
+// Renderizza dentro #layerTree (stesso container usato da Analizza)
+// Chiamato da rebuildTree() quando analysisMode === 'sostituire'
+// ═══════════════════════════════════════════════════════════════════
+function sostRebuildTree(){
+  var layerTree = document.getElementById('layerTree');
+  if(!layerTree) return;
+  var h = '';
+  // Voce "Scansione" (sostMesh)
+  if(sostMesh){
+    h += '<div class="tree-node"><input type="checkbox" '+(sostMesh.visible?'checked':'')+
+         ' onchange="sostToggleScanVisibility(this.checked)"><span class="dot" style="background:#c4a48c"></span>'+
+         '<span class="lbl">Scansione (Multi-A)</span></div>';
+  }
+  // Voci "Marker #N" (sostPlaced)
+  if(sostPlaced.length > 0){
+    h += '<div class="tree-node" style="margin-top:4px"><span class="lbl" style="color:var(--gray);font-size:9px;text-transform:uppercase;letter-spacing:.06em">Marker posizionati</span></div>';
+    sostPlaced.forEach(function(p, idx){
+      var colorHex = '#' + p.color.toString(16).padStart(6, '0');
+      var info = SOSTITUIRE_TEMPLATE_INFO[p.templateKey] || {label: p.templateKey};
+      var visible = (p.group && p.group.visible !== false);
+      h += '<div class="tree-node"><input type="checkbox" '+(visible?'checked':'')+
+           ' onchange="sostTogglePlacedVisibility('+p.num+', this.checked)"><span class="dot" style="background:'+colorHex+'"></span>'+
+           '<span class="lbl">#'+p.num+' '+info.label+'</span>'+
+           '<button class="del-btn" onclick="sostRemovePlaced('+p.num+')" title="Elimina marker #'+p.num+'">✕</button></div>';
+    });
+  }
+  if(!sostMesh && sostPlaced.length === 0){
+    h = '<div class="tree-node"><span class="lbl" style="color:var(--gray);font-size:10px">Nessun oggetto. Carica Multi-A.</span></div>';
+  }
+  layerTree.innerHTML = h;
+}
+
+function sostToggleScanVisibility(on){
+  if(sostMesh) sostMesh.visible = on;
+}
+
+function sostTogglePlacedVisibility(num, on){
+  var p = sostPlaced.find(function(x){ return x.num === num; });
+  if(!p) return;
+  if(p.group) p.group.visible = on;
+  if(p.axisLine) p.axisLine.visible = false; // axis line reserved
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SOSTITUIRE: Cut view (sezione 2D)
+// Riusa extractCutSegments, intersectPlaneTriangle, projectTo2D di Analizza
+// UI: riusa overlay #cutViewOverlay di Analizza ma renderizza in modo
+// indipendente selezionando i marker Sostituire invece dei MUA
+// ═══════════════════════════════════════════════════════════════════
+var sostCutState = { placedIdx: 0, angle: 0, dragging: false, lastX: 0 };
+
+function sostOpenCutView(){
+  if(sostPlaced.length === 0){
+    sostShowStatus('Posiziona almeno un marker prima di aprire la sezione.', true);
+    return;
+  }
+  // Popola il selettore (riuso #cutMuaSelect dell'overlay esistente)
+  var sel = document.getElementById('cutMuaSelect');
+  if(!sel){ sostShowStatus('UI sezione non disponibile.', true); return; }
+  sel.innerHTML = '';
+  sostPlaced.forEach(function(p, i){
+    var opt = document.createElement('option');
+    opt.value = i;
+    var info = SOSTITUIRE_TEMPLATE_INFO[p.templateKey] || {label: p.templateKey};
+    opt.textContent = '#' + p.num + ' ' + info.label;
+    sel.appendChild(opt);
+  });
+  sel.value = 0;
+  sostCutState.placedIdx = 0;
+  sostCutState.angle = 0;
+  sel.onchange = function(){ sostCutState.placedIdx = parseInt(sel.value); sostRenderCutView(); };
+  // Drag handlers sul canvas
+  var canvas = document.getElementById('cutCanvas');
+  if(canvas){
+    canvas.onmousedown = function(e){ sostCutState.dragging = true; sostCutState.lastX = e.clientX; canvas.style.cursor = 'grabbing'; };
+    canvas.onmousemove = function(e){
+      if(!sostCutState.dragging) return;
+      var dx = e.clientX - sostCutState.lastX;
+      sostCutState.angle = (sostCutState.angle + dx * 0.5) % 360;
+      if(sostCutState.angle < 0) sostCutState.angle += 360;
+      sostCutState.lastX = e.clientX;
+      sostRenderCutView();
+    };
+    canvas.onmouseup = canvas.onmouseleave = function(){ sostCutState.dragging = false; canvas.style.cursor = 'grab'; };
+  }
+  document.getElementById('cutViewOverlay').style.display = 'flex';
+  sostRenderCutView();
+}
+
+function sostRenderCutView(){
+  var p = sostPlaced[sostCutState.placedIdx];
+  if(!p || !sostMesh) return;
+  var angDisp = document.getElementById('cutAngleDisplay');
+  if(angDisp) angDisp.textContent = Math.round(sostCutState.angle) + '°';
+
+  var canvas = document.getElementById('cutCanvas');
+  if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  // Piano di sezione: passa per p.position, contiene p.axisDir, normale ruota di angle°
+  var axis = p.axisDir.clone().normalize();
+  var ref = Math.abs(axis.z) < 0.9 ? new THREE.Vector3(0,0,1) : new THREE.Vector3(1,0,0);
+  var baseU = new THREE.Vector3().crossVectors(axis, ref).normalize();
+  var angRad = sostCutState.angle * Math.PI / 180;
+  var q = new THREE.Quaternion().setFromAxisAngle(axis, angRad);
+  var uAxis = baseU.clone().applyQuaternion(q);
+  var wAxis = axis.clone();
+  var normal = new THREE.Vector3().crossVectors(uAxis, wAxis).normalize();
+
+  var planePoint = [p.position.x, p.position.y, p.position.z];
+  var planeNormal = [normal.x, normal.y, normal.z];
+  var uArr = [uAxis.x, uAxis.y, uAxis.z];
+  var wArr = [wAxis.x, wAxis.y, wAxis.z];
+
+  // Sezione scansione Multi-A (bianca)
+  var scanSegs = extractCutSegments(sostMesh.geometry, null, planePoint, planeNormal);
+
+  // Sezione template posizionato (colore del marker)
+  // Il template e' dentro p.group; p.group ha matrix applicata; estraggo la mesh "template"
+  var tplMesh = p.group.getObjectByName('template');
+  var tplSegs = [];
+  if(tplMesh && tplMesh.geometry){
+    p.group.updateMatrixWorld(true);
+    tplSegs = extractCutSegments(tplMesh.geometry, tplMesh.matrixWorld, planePoint, planeNormal);
+  }
+
+  // Calcola range 2D per centrare e scalare
+  var allPts2D = [];
+  function pushSegs(segs){
+    segs.forEach(function(s){
+      allPts2D.push(projectTo2D(s[0], planePoint, uArr, wArr));
+      allPts2D.push(projectTo2D(s[1], planePoint, uArr, wArr));
+    });
+  }
+  pushSegs(scanSegs);
+  pushSegs(tplSegs);
+  if(allPts2D.length === 0){
+    ctx.fillStyle = '#555';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Nessuna intersezione con il piano', W/2, H/2);
+    return;
+  }
+
+  // Centra sul template (se presente) altrimenti su tutto
+  var centerU = 0, centerW = 0;
+  var refPts = tplSegs.length > 0 ? [] : allPts2D;
+  if(tplSegs.length > 0){
+    tplSegs.forEach(function(s){
+      refPts.push(projectTo2D(s[0], planePoint, uArr, wArr));
+      refPts.push(projectTo2D(s[1], planePoint, uArr, wArr));
+    });
+  }
+  refPts.forEach(function(pt){ centerU += pt[0]; centerW += pt[1]; });
+  centerU /= refPts.length; centerW /= refPts.length;
+
+  // Zoom: riuso slider #cutZoom se esiste
+  var zoomSlider = document.getElementById('cutZoom');
+  var zoom = zoomSlider ? parseFloat(zoomSlider.value) : 15;
+  var scale = Math.min(W, H) / (zoom * 2);
+
+  function toCanvas(pt2d){
+    return [
+      W/2 + (pt2d[0] - centerU) * scale,
+      H/2 - (pt2d[1] - centerW) * scale  // Y inverted
+    ];
+  }
+
+  // Disegna scansione (bianco)
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  scanSegs.forEach(function(s){
+    var a = toCanvas(projectTo2D(s[0], planePoint, uArr, wArr));
+    var b = toCanvas(projectTo2D(s[1], planePoint, uArr, wArr));
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+  });
+  ctx.stroke();
+
+  // Disegna template (colore del marker)
+  var info = SOSTITUIRE_TEMPLATE_INFO[p.templateKey] || {color: 0xffaa44};
+  var hex = '#' + info.color.toString(16).padStart(6, '0');
+  ctx.strokeStyle = hex;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  tplSegs.forEach(function(s){
+    var a = toCanvas(projectTo2D(s[0], planePoint, uArr, wArr));
+    var b = toCanvas(projectTo2D(s[1], planePoint, uArr, wArr));
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+  });
+  ctx.stroke();
+
+  // Mirino centrale sul punto piazzamento (come Analizza)
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(W/2 - 8, H/2); ctx.lineTo(W/2 + 8, H/2);
+  ctx.moveTo(W/2, H/2 - 8); ctx.lineTo(W/2, H/2 + 8);
+  ctx.stroke();
 }
 
 
