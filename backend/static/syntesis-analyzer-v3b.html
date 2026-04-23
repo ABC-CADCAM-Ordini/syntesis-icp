@@ -9019,11 +9019,11 @@ var sostCustomStlBuffer = null;  // Uint8Array del template custom
 var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
-// Stato UI per gruppi nell'albero: collassato e opacita' (1.0 = pieno, 0 = trasparente)
+// Stato UI per gruppi nell'albero: collassato (di default) e opacita' (1.0 = pieno, 0 = trasparente)
 var sostGroupUI = {
-  '1T3': { collapsed: false, opacity: 1.0 },
-  'SR':  { collapsed: false, opacity: 1.0 },
-  'OS':  { collapsed: false, opacity: 1.0 }
+  '1T3': { collapsed: true, opacity: 1.0 },
+  'SR':  { collapsed: true, opacity: 1.0 },
+  'OS':  { collapsed: true, opacity: 1.0 }
 };
 var sostCounter = 0;             // progressivo ID
 var sostZOffsetMm = 0.00;        // aggiustamento fine manuale sopra l'offset auto calcolato dal bbox
