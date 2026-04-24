@@ -314,13 +314,32 @@ def _count_based_veto_ok(tris: np.ndarray, comp: list[int]) -> bool:
     """Veto leggero per componenti accettate dal count-based:
       - almeno 500 triangoli (scarta rumore con count fortuito)
       - bbox max dimension < 25mm (scarta tessuti molli)
-    Non richiede facce cap perche` scanbody CAD possono avere corpo senza cap.
+      - almeno 30 facce cap (|nz|>0.5): scarta scatole/coni vuoti senza disco
+        riconoscibile (v7.3.7.002, fix Upper falsi positivi)
+    
+    Soglia 30 (non 100 come geometric strict) per non escludere CAD low-res
+    in cui il cap e` rappresentato da pochi triangoli.
     """
     if len(comp) < 500:
         return False
     tc = tris[comp]
     bb = tc.reshape(-1, 3).max(0) - tc.reshape(-1, 3).min(0)
     if float(max(bb[0], bb[1], bb[2])) > 25.0:
+        return False
+    # v7.3.7.002: check minimo facce cap per filtrare scatole/coni vuoti.
+    # Eccezione: CAD modellati con corpo cilindrico e cap come componenti
+    # topologiche separate (es. 1T3.STL) hanno il corpo con n_cap=0.
+    # Il corpo ha aspect ratio diametro/altezza > 2 (cilindro stretto/basso),
+    # quindi lo riconosciamo e lo accettiamo anche con pochi cap.
+    v0, v1, v2 = tc[:, 0], tc[:, 1], tc[:, 2]
+    e1, e2 = v1 - v0, v2 - v0
+    cross = np.cross(e1, e2)
+    nl = np.linalg.norm(cross, axis=1).clip(1e-9)
+    n_cap = int((np.abs(cross[:, 2] / nl) > 0.5).sum())
+    aspect = max(float(bb[0]), float(bb[1])) / max(float(bb[2]), 0.01)
+    is_flat_disc = (n_cap >= 100 and aspect > 5.0)  # disco piatto (es. cap CAD separato)
+    is_cyl_body = (aspect > 2.0 and float(bb[2]) > 1.0)  # corpo cilindrico (es. body CAD)
+    if n_cap < 30 and not is_flat_disc and not is_cyl_body:
         return False
     return True
 
