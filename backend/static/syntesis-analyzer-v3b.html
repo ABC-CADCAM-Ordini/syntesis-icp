@@ -9565,66 +9565,149 @@ function sostAlignAll(){
     sostShowStatus('Nessun marker posizionato.', true);
     return;
   }
-  sostShowStatus('Raffinamento...');
-  setTimeout(function(){
-    var sourceRadius = (SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {}).radius;
-    var findOpts = sourceRadius ? { radius: sourceRadius } : undefined;
-    sostPlaced.forEach(function(p){
-      var autoResult = findScanbodyCenter(sostMesh.geometry, p.clickPoint, p.clickNormal, findOpts);
-      var discWorld = autoResult.center;
-      var axis = autoResult.axis.clone().normalize();
+  sostShowStatus('Raffinamento ICP...');
 
-      // Calcola connessione implantare dal disco source (stessa formula del placement)
-      // Uso la bbox del template source-type dal primo marker disponibile
-      var srcG = p.groups && p.groups[sostSourceTemplate];
-      var zDiscSource = 0;
-      if(srcG){
-        var tplMesh = srcG.getObjectByName('template');
-        if(tplMesh && tplMesh.geometry){
-          tplMesh.geometry.computeBoundingBox();
-          var bbS = tplMesh.geometry.boundingBox;
-          zDiscSource = bbS.max.z;  // v7.3.6.004: SR normalizzato via flip
+  // v7.3.7.001: vero raffinamento via ICP locale (prima era no-op deterministico).
+  // Per ciascun marker:
+  //   1. Estrai punti del CAD source nel frame world corrente (via matrice gruppo)
+  //   2. Crop triangoli scansione entro cilindro (radius + zMin/zMax da SOSTITUIRE_CULL_CYL)
+  //   3. runICP(scanPts, tplWorldPts, 25) -> R_refine, t_refine
+  //   4. Applica R_refine * oldMatrix alle matrici dei 3 gruppi (1T3/SR/OS) del marker
+  //   5. Aggiorna p.position, p.axisDir, axisLine
+  setTimeout(function(){
+    var TPL_KEYS = ['1T3', 'SR', 'OS'];
+    var promises = TPL_KEYS.map(function(k){ return sostDecodeTemplate(k); });
+    Promise.all(promises).then(function(bufs){
+      var geos = {};
+      for(var i = 0; i < TPL_KEYS.length; i++){
+        geos[TPL_KEYS[i]] = sostParseSTLToGeometry(bufs[i]);
+        // Flip SR coerente con sostPlaceTemplate (v7.3.6.004)
+        if(TPL_KEYS[i] === 'SR' && geos[TPL_KEYS[i]]){
+          geos[TPL_KEYS[i]].applyMatrix4(
+            new THREE.Matrix4().makeRotationX(Math.PI)
+          );
+          geos[TPL_KEYS[i]].computeBoundingBox();
         }
       }
-      var connectionWorld = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscSource));
 
-      // Ricostruisci matrice di ciascun group (up=+Z per tutti)
-      Object.keys(p.groups || {}).forEach(function(k){
-        var g = p.groups[k];
-        if(!g) return;
-        var up = new THREE.Vector3(0, 0, 1);
-        var qK = new THREE.Quaternion().setFromUnitVectors(up, axis);
-        var MK = new THREE.Matrix4().makeRotationFromQuaternion(qK);
-        MK.setPosition(connectionWorld);
-        g.matrix.copy(MK);
-        g.matrixAutoUpdate = false;
+      var scanPos = sostMesh.geometry.attributes.position.array;
+      var nScanTri = scanPos.length / 9;
+
+      sostPlaced.forEach(function(p){
+        var sourceKey = sostSourceTemplate;
+        var cadGeo = geos[sourceKey];
+        var sourceGroup = p.groups && p.groups[sourceKey];
+        if(!cadGeo || !sourceGroup){ return; }
+
+        // 1. Sample punti template nel frame world corrente
+        var cadPos = cadGeo.attributes.position.array;
+        var nCadTri = cadPos.length / 9;
+        var maxTplPts = 400;
+        var stepCad = Math.max(1, Math.floor((nCadTri * 3) / maxTplPts));
+        var m = sourceGroup.matrix.elements;  // column-major
+        var tplWorld = [];
+        for(var ti = 0; ti < nCadTri; ti++){
+          for(var vi = 0; vi < 3; vi++){
+            if(((ti * 3) + vi) % stepCad !== 0) continue;
+            var o = ti * 9 + vi * 3;
+            var lx = cadPos[o], ly = cadPos[o+1], lz = cadPos[o+2];
+            var wx = m[0]*lx + m[4]*ly + m[8]*lz  + m[12];
+            var wy = m[1]*lx + m[5]*ly + m[9]*lz  + m[13];
+            var wz = m[2]*lx + m[6]*ly + m[10]*lz + m[14];
+            tplWorld.push([wx, wy, wz]);
+          }
+        }
+
+        // 2. Crop scansione attorno al marker (cilindro lungo axis)
+        var cullInfo = SOSTITUIRE_CULL_CYL[sourceKey] || {radius: 3.0, zMin: -2, zMax: 8};
+        var cx = p.position.x, cy = p.position.y, cz = p.position.z;
+        var ax = p.axisDir.x, ay = p.axisDir.y, az = p.axisDir.z;
+        var radLim = (cullInfo.radius + 1.5);
+        var radLim2 = radLim * radLim;
+        var zLo = cullInfo.zMin - 1.0;
+        var zHi = cullInfo.zMax + 1.0;
+        var scanPts = [];
+        for(var i = 0; i < nScanTri; i++){
+          var oi = i * 9;
+          var px = (scanPos[oi]   + scanPos[oi+3] + scanPos[oi+6]) / 3;
+          var py = (scanPos[oi+1] + scanPos[oi+4] + scanPos[oi+7]) / 3;
+          var pz = (scanPos[oi+2] + scanPos[oi+5] + scanPos[oi+8]) / 3;
+          var dx = px - cx, dy = py - cy, dz = pz - cz;
+          var zp = dx*ax + dy*ay + dz*az;
+          if(zp < zLo || zp > zHi) continue;
+          var rx = dx - zp*ax, ry = dy - zp*ay, rz = dz - zp*az;
+          if(rx*rx + ry*ry + rz*rz > radLim2) continue;
+          scanPts.push([px, py, pz]);
+        }
+
+        // Fallback: se crop ha troppo pochi punti, non raffinare
+        if(scanPts.length < 50 || tplWorld.length < 50){
+          return;
+        }
+
+        // Sub-sample scansione se troppi punti (cap a 1500 per performance)
+        if(scanPts.length > 1500){
+          var stride = Math.ceil(scanPts.length / 1500);
+          var sub = [];
+          for(var k = 0; k < scanPts.length; k += stride) sub.push(scanPts[k]);
+          scanPts = sub;
+        }
+
+        // 3. ICP locale
+        var icpRes;
+        try {
+          icpRes = runICP(scanPts, tplWorld, 25);
+        } catch(e){
+          console.warn('[sostAlignAll] ICP fallito per marker', p.id, e);
+          return;
+        }
+        var R = icpRes.R, t = icpRes.t;
+
+        // 4. Matrice rigida da R, t
+        var Rm = new THREE.Matrix4().set(
+          R[0][0], R[0][1], R[0][2], t[0],
+          R[1][0], R[1][1], R[1][2], t[1],
+          R[2][0], R[2][1], R[2][2], t[2],
+          0,       0,       0,       1
+        );
+
+        // Applica a tutti e 3 i gruppi del marker
+        Object.keys(p.groups || {}).forEach(function(k){
+          var g = p.groups[k];
+          if(!g) return;
+          var newMat = new THREE.Matrix4().multiplyMatrices(Rm, g.matrix);
+          g.matrix.copy(newMat);
+          g.matrixAutoUpdate = false;
+        });
+
+        // 5. Aggiorna state
+        var newPos = new THREE.Vector3(cx, cy, cz).applyMatrix4(Rm);
+        p.position.copy(newPos);
+        if(p.discWorld){
+          p.discWorld.applyMatrix4(Rm);
+        }
+        // axisDir: trasforma come direzione (solo R, no translation)
+        var nAx = new THREE.Vector3(ax, ay, az);
+        nAx.applyMatrix4(new THREE.Matrix4().extractRotation(Rm));
+        nAx.normalize();
+        p.axisDir.copy(nAx);
+
+        var endPt = p.position.clone().add(p.axisDir.clone().multiplyScalar(20));
+        p.axisLine.geometry.setFromPoints([p.position, endPt]);
+        p.axisLine.geometry.attributes.position.needsUpdate = true;
+
+        p.rmsd = icpRes.rmsd;
       });
 
-      // Aggiorna state
-      var activeGroup = p.groups ? p.groups[p.templateKey] : p.group;
-      if(activeGroup) p.group = activeGroup;
-      p.position.copy(connectionWorld);
-      if(p.discWorld) p.discWorld.copy(discWorld);
-      p.axisDir.copy(axis);
-
-      var endPt = connectionWorld.clone().add(axis.clone().multiplyScalar(20));
-      p.axisLine.geometry.setFromPoints([connectionWorld, endPt]);
-      p.axisLine.geometry.attributes.position.needsUpdate = true;
-
-      // La label HTML viene aggiornata automaticamente dal loop (sostUpdateLabels),
-      // basa la posizione su p.position che e' gia' stato aggiornato sopra.
-
-      p.rmsd = null;
+      sostRenderPlacedList();
+      sostShowStatus('Raffinamento ICP completato (' + sostPlaced.length + ' marker).');
+      try { rebuildTree(); } catch(e){}
+      if(sostScanUI.cutOnMarkers) sostRebuildScanGeometry();
+      var cutOverlay = document.getElementById('cutViewOverlay');
+      if(cutOverlay && cutOverlay.style.display === 'flex'){
+        sostRenderCutView();
+      }
     });
-    sostRenderPlacedList();
-    sostShowStatus('Raffinamento completato (' + sostPlaced.length + ' marker).');
-    try { rebuildTree(); } catch(e){}
-    // Se il taglio e' attivo, ricostruisci la scansione con i nuovi centri
-    if(sostScanUI.cutOnMarkers) sostRebuildScanGeometry();
-    var cutOverlay = document.getElementById('cutViewOverlay');
-    if(cutOverlay && cutOverlay.style.display === 'flex'){
-      sostRenderCutView();
-    }
   }, 30);
 }
 
