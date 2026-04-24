@@ -1091,6 +1091,15 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     ct_a_pre = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a_pre])
     ct_b_pre6 = np.array([raw_ct_b_shifted[[c for c in cl]].mean(0) for cl in clust_b_pre])
 
+    # v7.3.6.003: rilevamento modalita` template-vs-patient.
+    # Se A ha 1 solo cluster di riferimento (es. 1T3 singolo scanbody CAD in 2
+    # isole topologiche unite dal clustering) e B ha piu` candidati, il motore
+    # produce matematicamente un solo pair con d3 e rmsd prossimi a zero per
+    # costruzione (sovrapposizione di 1 punto su 1 punto tramite Nelder-Mead).
+    # Questo e` clinicamente non valutabile: il numero non riflette deviazioni
+    # reali ma solo l`errore di coincidenza tra cap centers.
+    is_template_mode = (len(ct_a_pre) == 1 and len(ct_b_pre6) > 1)
+
     # ── Pre-allineamento sui centroidi clusterizzati ──────────────────────────
     if landmarks and len(landmarks.get("a", [])) >= 3 and len(landmarks.get("b", [])) >= 3:
         pts_a_lm = np.array([[p["x"], p["y"], p["z"]] for p in landmarks["a"][:3]], dtype=np.float64)
@@ -1332,7 +1341,19 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
                 "note": "dati insufficienti per il calcolo della confidenza",
             }
         # Attacca la confidence all'ultima coppia appena creata
-        pairs[-1]["confidence"] = _pair_conf
+        if is_template_mode:
+            # v7.3.6.003: override in modalita` template.
+            # Il d3 matematicamente calcolato non rappresenta una deviazione
+            # clinica reale quando A e` singolo reference e B ha N candidati.
+            pairs[-1]["confidence"] = {
+                "score_pct": None,
+                "level": "non_disponibile",
+                "note": ("modalita` template (A reference singolo vs B multi-scanbody): "
+                         "d3 non utilizzabile come valutazione clinica. "
+                         "Per misure affidabili fornire A e B con lo stesso numero di scanbody."),
+            }
+        else:
+            pairs[-1]["confidence"] = _pair_conf
 
     # ICP sui centroidi per compatibilità (RMSD e angolo)
     icp = run_icp(ct_a, ct_b_aligned, max_iter=80)
@@ -1478,6 +1499,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         "detected_profile": detected["name"] if detected else "Generico",
         "n_scan_a": len(scan_a),
         "n_scan_b": len(scan_b),
+        "analysis_mode": "template" if is_template_mode else "pairwise",
         "excluded_a": len(bg_idx_a),
         "excluded_b": len(bg_idx_b),
         # v7.3.6: numero di scanbody trovati in B ma non matchati al reference
