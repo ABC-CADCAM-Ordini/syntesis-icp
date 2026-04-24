@@ -9565,11 +9565,13 @@ function sostAlignAll(){
     sostShowStatus('Nessun marker posizionato.', true);
     return;
   }
-  sostShowStatus('Raffinamento ICP robusto...');
+  sostShowStatus('Raffinamento ICP pesato (disco+cilindro)...');
 
-  // v7.3.7.003: ICP locale con outlier rejection (risolve il "drift" oscillante
-  // del Raffina: point-to-point classico cambia pose ad ogni click perche` le
-  // nearest pairs cambiano; con median-filter diventa stabile al minimo).
+  // v7.3.7.004: weighted ICP con outlier rejection (cap guida planarita`,
+  // body guida centro XY). Peso 5x sui punti cap (normale locale |nz|>0.8)
+  // per bilanciare l'area del cilindro laterale che altrimenti trascinerebbe
+  // il fit in tilt. Francesco 2026-04-25: "la faccia piatta deve guidare la
+  // planarita` dell'accoppiamento e il cilindro centrare gli assi".
   //
   // Per ciascun marker:
   //   1. Sample ~400 punti CAD del source template nel frame world corrente
@@ -9609,11 +9611,16 @@ function sostAlignAll(){
 
         // 1. Sample punti template nel frame world
         var cadPos = cadGeo.attributes.position.array;
+        // v7.3.7.004: lettura normali locali per weighted ICP.
+        // computeVertexNormals() e` chiamato in sostParseSTLToGeometry e il flip SR
+        // (applyMatrix4) propaga la trasformazione alle normali.
+        var cadNorm = cadGeo.attributes.normal ? cadGeo.attributes.normal.array : null;
         var nCadTri = cadPos.length / 9;
         var maxTplPts = 400;
         var stepCad = Math.max(1, Math.floor((nCadTri * 3) / maxTplPts));
         var m = sourceGroup.matrix.elements;
         var tplWorld = [];
+        var tplWeights = [];  // v7.3.7.004: weighted ICP (cap dominante per planarita`)
         for(var ti = 0; ti < nCadTri; ti++){
           for(var vi = 0; vi < 3; vi++){
             if(((ti * 3) + vi) % stepCad !== 0) continue;
@@ -9624,6 +9631,21 @@ function sostAlignAll(){
               m[1]*lx + m[5]*ly + m[9]*lz  + m[13],
               m[2]*lx + m[6]*ly + m[10]*lz + m[14]
             ]);
+            // Peso in base alla feature locale:
+            //   - cap (disco): normale locale circa +/-Z (asse cilindro) -> guida planarita`
+            //   - body (cilindro): normale laterale                      -> guida centro XY
+            // Dopo il flip SR (v7.3.6.004) tutti i template hanno convenzione coerente:
+            // cap a Zmax, normali cap in direzione +Z locale.
+            if(cadNorm){
+              var nlz = cadNorm[o + 2];
+              // Peso 5x sul cap: con ratio area_body/area_cap ~5:1 per OS, il peso 5x
+              // porta il contributo del cap a pari livello del body (5x*1 cap = 5 body),
+              // e oltre per 1T3/SR dove il cap ha area relativa maggiore.
+              // Francesco 2026-04-25: "la faccia piatta guida la planarita`".
+              tplWeights.push(Math.abs(nlz) > 0.8 ? 5.0 : 1.0);
+            } else {
+              tplWeights.push(1.0);
+            }
           }
         }
 
@@ -9692,18 +9714,19 @@ function sostAlignAll(){
           var medD = sortedD[Math.floor(sortedD.length / 2)];
           var thresh = medD * OUTLIER_RATIO + 0.05;  // floor minimo 0.05mm
 
-          // Filtra outlier
-          var goodM = [], goodF = [];
+          // Filtra outlier, mantenendo i pesi template corrispondenti
+          var goodM = [], goodF = [], goodW = [];
           for(var pi = 0; pi < pairD.length; pi++){
             if(pairD[pi] <= thresh){
               goodM.push(pairM[pi]);
               goodF.push(pairF[pi]);
+              goodW.push(tplWeights[pi]);  // v7.3.7.004
             }
           }
           if(goodM.length < 15) break;  // troppo pochi inlier
 
-          // Kabsch sulle inlier
-          var kb = kabsch(goodM, goodF);
+          // Kabsch weighted: cap domina planarita`, body centra XY (v7.3.7.004)
+          var kb = kabsch(goodM, goodF, goodW);
 
           // Applica R, t a TUTTI i moving (non solo inlier)
           for(var mi = 0; mi < moving.length; mi++){
@@ -9777,7 +9800,7 @@ function sostAlignAll(){
       });
 
       sostRenderPlacedList();
-      sostShowStatus('Raffinamento ICP robusto completato (' + nRefined + '/' + sostPlaced.length + ' marker).');
+      sostShowStatus('Raffinamento completato (' + nRefined + '/' + sostPlaced.length + ' marker).');
       try { rebuildTree(); } catch(e){}
       if(sostScanUI.cutOnMarkers) sostRebuildScanGeometry();
       var cutOverlay = document.getElementById('cutViewOverlay');
