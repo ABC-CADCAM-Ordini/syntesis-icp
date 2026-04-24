@@ -9455,6 +9455,17 @@ function sostPlaceTemplate(rawPoint, rawNormal){
         sostShowStatus('Errore parsing template ' + TPL_KEYS[i], true);
         return;
       }
+      // v7.3.6.004: hotfix flip SR.
+      // Il CAD SR e` modellato con convenzione Z invertita (disco a Zmin,
+      // piattaforma a Zmax) rispetto a 1T3/OS. Normalizziamo con rotazione
+      // 180 gradi attorno a X cosi` tutti i template condividono la stessa
+      // convenzione (disco = Zmax, piattaforma = Zmin).
+      if(TPL_KEYS[i] === 'SR'){
+        geos[TPL_KEYS[i]].applyMatrix4(
+          new THREE.Matrix4().makeRotationX(Math.PI)
+        );
+        geos[TPL_KEYS[i]].computeBoundingBox();
+      }
     }
 
     // CONNESSIONE IMPLANTARE = origine clinica condivisa da tutti i template.
@@ -9467,7 +9478,7 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     var sourceGeo = geos[sostSourceTemplate];
     sourceGeo.computeBoundingBox();
     var srcBB = sourceGeo.boundingBox;
-    var zDiscSource = (sostSourceTemplate === 'SR') ? srcBB.min.z : srcBB.max.z;
+    var zDiscSource = srcBB.max.z;  // v7.3.6.004: SR ora normalizzato via flip, disco sempre a Zmax
     var connectionWorld = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscSource));
 
     sostCounter++;
@@ -9572,7 +9583,7 @@ function sostAlignAll(){
         if(tplMesh && tplMesh.geometry){
           tplMesh.geometry.computeBoundingBox();
           var bbS = tplMesh.geometry.boundingBox;
-          zDiscSource = (sostSourceTemplate === 'SR') ? bbS.min.z : bbS.max.z;
+          zDiscSource = bbS.max.z;  // v7.3.6.004: SR normalizzato via flip
         }
       }
       var connectionWorld = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscSource));
@@ -9658,7 +9669,7 @@ function sostRenderPlacedList(){
 // zMax lungo l'asse. Valori tarati empiricamente.
 var SOSTITUIRE_CULL_CYL = {
   '1T3': { radius: 2.815, zMin: -2.000, zMax: 10.000 },   // corpo marker si estende fino a ~Z=0
-  'SR':  { radius: 2.330, zMin: -5.000, zMax: -2.000 },
+  'SR':  { radius: 2.330, zMin: 2.000, zMax: 5.000 },   // v7.3.6.004: post-flip X (disco a Zmax)
   'OS':  { radius: 2.080, zMin: -2.000, zMax: 6.000 }
 };
 
@@ -9703,6 +9714,13 @@ function sostExportSTL(){
         return;
       }
       destGeos[activeTypes[i]] = sostParseSTLToGeometry(bufs[i]);
+      // v7.3.6.004: flip SR anche in export per coerenza visuale
+      if(activeTypes[i] === 'SR' && destGeos[activeTypes[i]]){
+        destGeos[activeTypes[i]].applyMatrix4(
+          new THREE.Matrix4().makeRotationX(Math.PI)
+        );
+        destGeos[activeTypes[i]].computeBoundingBox();
+      }
     }
     setTimeout(function(){
       try {
