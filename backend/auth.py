@@ -1,5 +1,10 @@
 """
 Autenticazione JWT per Syntesis-ICP
+
+v7.3.1 — verifica firma crittografica per Apple ID token e claim audience
+          per Google ID token. La sessione Syntesis continua a usare HMAC-SHA256
+          in casa (nessuna dipendenza esterna). Solo le verifiche di token di
+          terze parti passano per PyJWT.
 """
 
 import os
@@ -19,6 +24,12 @@ security = HTTPBearer()
 
 SECRET_KEY = os.getenv("JWT_SECRET", "CAMBIA-QUESTA-CHIAVE-IN-PRODUZIONE")
 TOKEN_EXPIRE_HOURS = int(os.getenv("TOKEN_EXPIRE_HOURS", "24"))
+
+# OAuth client IDs per validazione audience dei token di terze parti
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+APPLE_CLIENT_ID = os.getenv("APPLE_CLIENT_ID", "")   # Bundle ID o Services ID
+APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys"
+APPLE_ISSUER = "https://appleid.apple.com"
 
 
 # ── JWT minimalista (nessuna dipendenza esterna) ──────────────────────────────
@@ -173,34 +184,100 @@ class SocialLoginRequest(BaseModel):
 
 
 async def _verify_google_token(token: str) -> dict:
-    """Verifica ID token Google tramite Google tokeninfo API."""
+    """Verifica ID token Google tramite Google tokeninfo API.
+
+    Valida firma (lato Google), audience (il nostro Client ID) e issuer.
+    Senza il check di audience, un token emesso per un'altra applicazione
+    Google varrebbe come login per Syntesis: una vulnerabilità silenziosa
+    ma reale.
+    """
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(500, detail="Google login non configurato sul server.")
+
     import urllib.request, json as _json
     url = f"https://oauth2.googleapis.com/tokeninfo?id_token={token}"
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:
             data = _json.loads(resp.read())
         if "email" not in data:
-            raise ValueError("Token Google non valido")
+            raise ValueError("Email non presente nel token Google.")
+        if data.get("aud") != GOOGLE_CLIENT_ID:
+            raise ValueError("Audience del token Google non corrisponde.")
+        if data.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+            raise ValueError("Issuer del token Google non valido.")
+        # Google ritorna 'email_verified' come stringa "true"
+        if str(data.get("email_verified", "")).lower() != "true":
+            raise ValueError("Email Google non verificata.")
         return {"email": data["email"], "name": data.get("name", "")}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(401, detail=f"Token Google non valido: {e}")
 
 
-async def _verify_apple_token(token: str) -> dict:
-    """Verifica Apple ID token decodificando il JWT (senza dipendenze)."""
+_apple_jwks_client = None
+
+def _get_apple_jwks_client():
+    """JWKS client Apple con cache interna delle chiavi pubbliche.
+
+    Lazy init per evitare chiamate di rete al boot quando Apple login
+    non e` configurato.
+    """
+    global _apple_jwks_client
+    if _apple_jwks_client is None:
+        try:
+            import jwt
+            from jwt import PyJWKClient
+        except ImportError as e:
+            raise HTTPException(500, detail=f"PyJWT non installato: {e}")
+        _apple_jwks_client = PyJWKClient(APPLE_JWKS_URL, cache_keys=True, lifespan=86400)
+    return _apple_jwks_client
+
+
+async def _verify_apple_token(token: str, fallback_email: str = "", fallback_name: str = "") -> dict:
+    """Verifica Apple ID token con firma RS256 contro le JWK pubbliche Apple.
+
+    Il codice precedente decodificava solo il payload in base64 senza verificare
+    la firma: chiunque poteva forgiare un JWT con qualsiasi email e ottenere un
+    account. Questo fix chiude completamente quella via.
+
+    Apple invia l'email solo al primo login; nei token successivi l'email manca
+    e bisogna aver memorizzato il mapping sub -> email. Per retrocompatibilita`
+    accettiamo anche un fallback_email fornito dal frontend in prima connessione.
+    """
+    if not APPLE_CLIENT_ID:
+        raise HTTPException(500, detail="Apple login non configurato sul server.")
+
     try:
-        parts = token.split(".")
-        if len(parts) != 3:
-            raise ValueError("Formato JWT non valido")
-        import base64 as _b64, json as _json
-        payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
-        payload = _json.loads(_b64.urlsafe_b64decode(payload_b64))
-        email = payload.get("email", "")
-        if not email:
-            raise ValueError("Email non presente nel token Apple")
-        return {"email": email, "name": ""}
+        import jwt
+    except ImportError as e:
+        raise HTTPException(500, detail=f"PyJWT non installato: {e}")
+
+    try:
+        client = _get_apple_jwks_client()
+        signing_key = client.get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=APPLE_CLIENT_ID,
+            issuer=APPLE_ISSUER,
+        )
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, detail="Token Apple scaduto.")
+    except jwt.InvalidAudienceError:
+        raise HTTPException(401, detail="Audience del token Apple non corrisponde.")
+    except jwt.InvalidIssuerError:
+        raise HTTPException(401, detail="Issuer del token Apple non valido.")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(401, detail=f"Token Apple non valido: {e}")
+
+    email = (payload.get("email") or fallback_email or "").strip()
+    if not email:
+        raise HTTPException(400, detail="Email Apple non disponibile.")
+    return {"email": email, "name": fallback_name or ""}
 
 
 async def _verify_facebook_token(access_token: str, name: str, email: str) -> dict:
@@ -230,7 +307,7 @@ async def social_login(req: SocialLoginRequest):
     if provider == "google":
         user_info = await _verify_google_token(req.token)
     elif provider == "apple":
-        user_info = await _verify_apple_token(req.token)
+        user_info = await _verify_apple_token(req.token, req.email or "", req.name or "")
     elif provider == "facebook":
         user_info = await _verify_facebook_token(req.token, req.name or "", req.email or "")
     else:

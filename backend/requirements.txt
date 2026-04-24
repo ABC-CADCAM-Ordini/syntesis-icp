@@ -6,3 +6,5 @@ python-multipart==0.0.17
 reportlab==4.2.5
 aiofiles==24.1.0
 scipy==1.14.1
+PyJWT[crypto]==2.10.1
+slowapi==0.1.9
