@@ -1749,90 +1749,72 @@ function goBack(){
 
 </script>
 
-<!-- ═══ VIEW MODE BAR (v7.3.5.001) ═══ -->
+<!-- ═══ VIEW MODE BAR (v7.3.5.002) ═══ -->
 <!--
-  Syntesis-ICP — View Mode Bar (Solid / Wireframe / Both)
-  Barra fixed bottom-center per cambiare modalita` di visualizzazione 3D.
-  Richiede che ogni modulo definisca onSyntesisViewModeChange(mode).
-  v7.3.5.001
+  Syntesis-ICP — View Mode Bar v2 (compact, icon-only)
+  v7.3.5.002 — feedback Francesco: rimpicciolita, solo icone, stile layersPanel
 -->
 <style>
-.vm-bar {
+#vmBar {
   position: fixed;
-  bottom: 18px;
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: rgba(255,255,255,0.95);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-  z-index: 800;
-  font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(255,255,255,0.70);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.10);
+  z-index: 9000;
+  pointer-events: auto;
 }
-.vm-btn {
+#vmBar .vm-btn {
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
+  justify-content: center;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
-  color: #0D1B2A;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
+  color: var(--dark, #0D1B2A);
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
-  font-family: inherit;
+  padding: 0;
 }
-.vm-btn:hover { background: #f3f4f6; }
-.vm-btn.active { background: #0052A3; color: #ffffff; }
-.vm-btn.active:hover { background: #003f82; }
-.vm-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
-@media (max-width: 640px) {
-  .vm-bar { padding: 3px; gap: 3px; bottom: 12px; }
-  .vm-btn { padding: 7px 10px; font-size: 11px; }
-  .vm-btn svg { width: 12px; height: 12px; }
-}
-@media (max-width: 420px) {
-  .vm-btn span { display: none; }
-  .vm-btn { padding: 8px; }
-}
+#vmBar .vm-btn:hover { background: rgba(0,0,0,0.05); }
+#vmBar .vm-btn.active { background: var(--blue, #0052A3); color: #ffffff; }
+#vmBar .vm-btn.active:hover { background: #003f82; }
+#vmBar .vm-btn svg { width: 18px; height: 18px; display: block; }
 </style>
 
-<div class="vm-bar" id="vmBar" role="toolbar" aria-label="Modalita` di visualizzazione 3D">
-  <button type="button" class="vm-btn active" id="vmSolid" onclick="setViewMode('solid')" aria-pressed="true" title="Solid">
-    <svg viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round">
-      <ellipse cx="8" cy="3.5" rx="5" ry="1.6" fill="currentColor"/>
-      <path d="M3 3.5 V12.5 a5 1.6 0 0 0 10 0 V3.5" fill="currentColor" stroke="none"/>
-      <ellipse cx="8" cy="3.5" rx="5" ry="1.6" fill="none" stroke="currentColor" opacity="0.5"/>
+<div id="vmBar" role="toolbar" aria-label="Modalita visualizzazione 3D">
+  <button type="button" class="vm-btn active" id="vmSolid" onclick="setViewMode('solid')" aria-pressed="true" aria-label="Solid" title="Solid">
+    <svg width="18" height="18" viewBox="0 0 28 28" fill="none">
+      <ellipse cx="14" cy="8" rx="8" ry="2.5" stroke="currentColor" stroke-width="1.6" fill="currentColor" fill-opacity="0.2"/>
+      <path d="M6 8 L6 20 M22 8 L22 20" stroke="currentColor" stroke-width="1.6"/>
+      <path d="M6 20 Q14 23 22 20" stroke="currentColor" stroke-width="1.6" fill="currentColor" fill-opacity="0.2"/>
     </svg>
-    <span>Solid</span>
   </button>
-  <button type="button" class="vm-btn" id="vmWireframe" onclick="setViewMode('wireframe')" aria-pressed="false" title="Wireframe">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round">
-      <ellipse cx="8" cy="3.5" rx="5" ry="1.6"/>
-      <ellipse cx="8" cy="12.5" rx="5" ry="1.6"/>
-      <path d="M3 3.5 V12.5"/>
-      <path d="M13 3.5 V12.5"/>
-      <path d="M8 1.9 V14.1" stroke-dasharray="1.5 1.5" opacity="0.6"/>
+  <button type="button" class="vm-btn" id="vmWireframe" onclick="setViewMode('wireframe')" aria-pressed="false" aria-label="Wireframe" title="Wireframe">
+    <svg width="18" height="18" viewBox="0 0 28 28" fill="none">
+      <ellipse cx="14" cy="8" rx="8" ry="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/>
+      <path d="M6 8 L6 20 M22 8 L22 20 M14 10.5 L14 22.5" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M6 20 Q14 23 22 20" stroke="currentColor" stroke-width="1.4" fill="none"/>
+      <path d="M10 9 L10 21 M18 9 L18 21" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5 1.5"/>
     </svg>
-    <span>Wireframe</span>
   </button>
-  <button type="button" class="vm-btn" id="vmBoth" onclick="setViewMode('both')" aria-pressed="false" title="Both">
-    <svg viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round">
-      <ellipse cx="8" cy="3.5" rx="5" ry="1.6" fill="currentColor" stroke="none"/>
-      <path d="M3 3.5 V12.5 a5 1.6 0 0 0 10 0 V3.5" fill="currentColor" stroke="none"/>
-      <ellipse cx="8" cy="3.5" rx="5" ry="1.6" fill="none" stroke="#ffffff" stroke-width="0.8" opacity="0.7"/>
-      <ellipse cx="8" cy="12.5" rx="5" ry="1.6" fill="none" stroke="#ffffff" stroke-width="0.8" opacity="0.7"/>
-      <path d="M3 3.5 V12.5 M13 3.5 V12.5" stroke="#ffffff" stroke-width="0.8" opacity="0.7"/>
+  <button type="button" class="vm-btn" id="vmBoth" onclick="setViewMode('both')" aria-pressed="false" aria-label="Both" title="Both">
+    <svg width="18" height="18" viewBox="0 0 28 28" fill="none">
+      <ellipse cx="14" cy="8" rx="8" ry="2.5" stroke="currentColor" stroke-width="1.6" fill="currentColor" fill-opacity="0.25"/>
+      <path d="M6 8 L6 20 M22 8 L22 20 M14 10.5 L14 22.5" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M6 20 Q14 23 22 20" stroke="currentColor" stroke-width="1.6" fill="currentColor" fill-opacity="0.25"/>
+      <path d="M10 9 L10 21 M18 9 L18 21" stroke="currentColor" stroke-width="0.9" stroke-dasharray="1.5 1.5"/>
     </svg>
-    <span>Both</span>
   </button>
 </div>
 
@@ -1841,12 +1823,23 @@ function goBack(){
   var STORE_KEY = 'syntesis_viewMode';
   var VALID = ['solid', 'wireframe', 'both'];
 
+  // Sposta la barra come figlia diretta di <body> per sganciarla da
+  // qualsiasi ancestor con 'transform' (che altrimenti farebbe pensare
+  // a position:fixed relativo a quel container invece che al viewport,
+  // portando la barra "fuori dalla finestra").
+  function detachToBody(){
+    var bar = document.getElementById('vmBar');
+    if(bar && bar.parentNode !== document.body){
+      document.body.appendChild(bar);
+    }
+  }
+
   window.setViewMode = function(mode){
     if(VALID.indexOf(mode) < 0) return;
     try { localStorage.setItem(STORE_KEY, mode); } catch(e){}
     updateViewModeBar(mode);
     if(typeof window.onSyntesisViewModeChange === 'function'){
-      try { window.onSyntesisViewModeChange(mode); } catch(e){ console.warn('[vm-bar] callback error:', e); }
+      try { window.onSyntesisViewModeChange(mode); } catch(e){ console.warn('[vm-bar]', e); }
     }
   };
 
@@ -1860,13 +1853,12 @@ function goBack(){
     });
   };
 
-  // Restore al load
   function boot(){
+    detachToBody();
     try {
       var saved = localStorage.getItem(STORE_KEY);
       if(saved && VALID.indexOf(saved) >= 0){
         updateViewModeBar(saved);
-        // Applica subito la callback se disponibile, altrimenti aspetta
         if(typeof window.onSyntesisViewModeChange === 'function'){
           setTimeout(function(){ window.onSyntesisViewModeChange(saved); }, 100);
         }
@@ -1882,11 +1874,9 @@ function goBack(){
 </script>
 
 <script>
-// View-mode bar → logica render mode per i viewer V1 e V2 del replacer
 (function(){
   function _applyToMesh(mesh, mode){
     if(!mesh || !mesh.material || mesh.isLineSegments) return;
-    // Rimuovi overlay wireframe precedente se presente
     if(mesh.userData && mesh.userData._vmWireOverlay){
       mesh.remove(mesh.userData._vmWireOverlay);
       if(mesh.userData._vmWireOverlay.geometry) mesh.userData._vmWireOverlay.geometry.dispose();
@@ -1894,30 +1884,25 @@ function goBack(){
       mesh.userData._vmWireOverlay = null;
     }
     if(mode === 'wireframe'){
-      mesh.material.wireframe = true;
-      mesh.material.needsUpdate = true;
+      mesh.material.wireframe = true; mesh.material.needsUpdate = true;
     } else if(mode === 'both'){
-      mesh.material.wireframe = false;
-      mesh.material.needsUpdate = true;
+      mesh.material.wireframe = false; mesh.material.needsUpdate = true;
       try {
         var wg = new THREE.WireframeGeometry(mesh.geometry);
-        var wm = new THREE.LineBasicMaterial({color: 0x000000, transparent: true, opacity: 0.3, depthTest: true});
+        var wm = new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:0.3,depthTest:true});
         var wl = new THREE.LineSegments(wg, wm);
         wl.name = '_vmWireOverlay';
         mesh.add(wl);
         if(!mesh.userData) mesh.userData = {};
         mesh.userData._vmWireOverlay = wl;
       } catch(e){}
-    } else { // solid
-      mesh.material.wireframe = false;
-      mesh.material.needsUpdate = true;
+    } else {
+      mesh.material.wireframe = false; mesh.material.needsUpdate = true;
     }
   }
   function _applyToScene(scene, mode){
     if(!scene || !scene.traverse) return;
-    scene.traverse(function(obj){
-      if(obj.isMesh) _applyToMesh(obj, mode);
-    });
+    scene.traverse(function(o){ if(o.isMesh) _applyToMesh(o, mode); });
   }
   window.onSyntesisViewModeChange = function(mode){
     if(typeof V1 !== 'undefined' && V1 && V1.scene) _applyToScene(V1.scene, mode);
