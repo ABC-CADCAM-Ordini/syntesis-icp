@@ -277,11 +277,99 @@ def dominant_profile(comps: list[list[int]]) -> Optional[dict]:
     return None
 
 
-def partition_comps(comps: list[list[int]]) -> tuple[list, list]:
+def partition_comps(comps: list[list[int]], tris: np.ndarray = None) -> tuple[list, list]:
+    """Classifica le componenti in 'scanbody' e 'background'.
+
+    Criterio v7.3.6 (additivo con veto leggero):
+      - is_scan_sub(count): primo filtro count-based
+      - _looks_like_scanbody_geometric: secondo filtro geometrico (piu` stringente)
+      - veto leggero: se passa solo count-based (non geometric), e tris e`
+        disponibile, richiede n_tri>=500 E max(bbox)<25mm. Scopo: scartare
+        frammenti molto piccoli con conteggio fortuito e isole grandi tipo
+        tessuti molli che non dovrebbero mai essere scanbody.
+    Una componente e` scanbody se: (count E veto_ok) O geometric.
+    
+    IMPORTANTE: il veto NON richiede facce cap, perche` scanbody CAD spesso
+    hanno corpo e cap come componenti topologiche separate (il corpo e` solo
+    parete laterale senza cap, cap e` un disco piatto).
+    """
     scan, bg = [], []
     for i, c in enumerate(comps):
-        (scan if is_scan_sub(len(c)) else bg).append(i)
+        is_by_count = is_scan_sub(len(c))
+        is_by_geom = (tris is not None) and _looks_like_scanbody_geometric(tris, c)
+        
+        # Veto leggero per count-based: filtra frammenti e macro-oggetti
+        if is_by_count and not is_by_geom and tris is not None:
+            if not _count_based_veto_ok(tris, c):
+                is_by_count = False
+        
+        if is_by_count or is_by_geom:
+            scan.append(i)
+        else:
+            bg.append(i)
     return scan, bg
+
+
+def _count_based_veto_ok(tris: np.ndarray, comp: list[int]) -> bool:
+    """Veto leggero per componenti accettate dal count-based:
+      - almeno 500 triangoli (scarta rumore con count fortuito)
+      - bbox max dimension < 25mm (scarta tessuti molli)
+    Non richiede facce cap perche` scanbody CAD possono avere corpo senza cap.
+    """
+    if len(comp) < 500:
+        return False
+    tc = tris[comp]
+    bb = tc.reshape(-1, 3).max(0) - tc.reshape(-1, 3).min(0)
+    if float(max(bb[0], bb[1], bb[2])) > 25.0:
+        return False
+    return True
+
+
+def _looks_like_scanbody_geometric(tris: np.ndarray, comp: list[int]) -> bool:
+    """Classifica una componente come scanbody sulla base della sua GEOMETRIA
+    invece del conteggio triangoli. Criteri (v7.3.6):
+      - bbox dimensioni planari: 3-12 mm per lato
+      - bbox altezza:            0.5-12 mm
+      - aspect ratio planare/Z:  0.3-3 (forma cilindrica o leggermente appiattita)
+      - almeno 500 triangoli totali e 100 facce cap (|nz|>0.5)
+    
+    Questi criteri escludono: tessuti molli (bbox >> 12mm), frammenti (<500 tris),
+    oggetti piatti (aspect ratio elevato), e includono scanbody a diverse
+    risoluzioni di scanner.
+    """
+    n = len(comp)
+    if n < 500:
+        return False
+    tc = tris[comp]
+    verts = tc.reshape(-1, 3)
+    bb_dim = verts.max(0) - verts.min(0)
+    # Dimensioni attese per uno scanbody cilindrico
+    planar_max = float(max(bb_dim[0], bb_dim[1]))
+    planar_min = float(min(bb_dim[0], bb_dim[1]))
+    height = float(bb_dim[2])
+    if not (3.0 < planar_max < 12.0):
+        return False
+    if not (3.0 < planar_min < 12.0):
+        return False
+    if not (0.5 < height < 12.0):
+        return False
+    # Aspect ratio: diametro/altezza
+    aspect = planar_max / max(height, 0.01)
+    if not (0.3 < aspect < 3.0):
+        return False
+    # Almeno qualche faccia cap (|nz|>0.5)
+    v0, v1, v2 = tc[:, 0], tc[:, 1], tc[:, 2]
+    e1, e2 = v1 - v0, v2 - v0
+    nz_c = e1[:, 0]*e2[:, 1] - e1[:, 1]*e2[:, 0]
+    nl = np.sqrt(
+        (e1[:, 1]*e2[:, 2] - e1[:, 2]*e2[:, 1])**2 +
+        (e1[:, 2]*e2[:, 0] - e1[:, 0]*e2[:, 2])**2 +
+        nz_c**2
+    ).clip(1e-9)
+    n_cap = int((np.abs(nz_c / nl) > 0.5).sum())
+    if n_cap < 100:
+        return False
+    return True
 
 
 # ── 3×3 linear algebra ────────────────────────────────────────────────────────
@@ -638,7 +726,16 @@ def icp_full_mesh(tris_a: np.ndarray, nm_a: np.ndarray,
                   n_sample: int = 5000, max_iter: int = 80,
                   tol: float = 1e-8) -> dict:
     """ICP point-to-point su mesh subsampled (stratified: 40% cap + 60% resto).
-    Usa scipy.spatial.cKDTree. Ritorna {R, t, rmsd, iter}.
+    Usa scipy.spatial.cKDTree.
+
+    Ritorna {R, t, rmsd, iter} (invariato), piu` metriche di qualita` (v7.3.6):
+      - mask_ratio:    frazione di punti matchati nell'ultima iter
+                       (coverage: 1.0 = tutti i sample hanno trovato match buoni)
+      - residuals_std: std dei residui dei punti matchati (in mm)
+      - normal_cos:    cos medio dell'angolo fra normali dei punti matchati
+                       (1.0 = match geometricamente perfetto)
+      - n_samples:     numero di sample complessivi usati
+      - n_matched:     numero di sample matchati nell'ultima iter
     """
     from scipy.spatial import cKDTree as _KDT
     nl_a = np.linalg.norm(nm_a, axis=1).clip(1e-9)
@@ -652,16 +749,25 @@ def icp_full_mesh(tris_a: np.ndarray, nm_a: np.ndarray,
     idx_ca = rng.choice(np.where(cap_a)[0], n_cap, replace=False)
     idx_ra = rng.choice(np.where(~cap_a)[0], min(n_rest, int((~cap_a).sum())), replace=False)
     pts_a = np.vstack([cents_a[idx_ca], cents_a[idx_ra]])
+    # Normali campionate di A (non vengono trasformate: sono fisse)
+    nms_a = np.vstack([nm_a[idx_ca] / nl_a[idx_ca, None],
+                       nm_a[idx_ra] / nl_a[idx_ra, None]])
     idx_cb = rng.choice(np.where(cap_b)[0], n_cap, replace=False)
     idx_rb = rng.choice(np.where(~cap_b)[0], min(n_rest, int((~cap_b).sum())), replace=False)
     pts_b = np.vstack([cents_b[idx_cb], cents_b[idx_rb]]).copy()
+    # Normali campionate di B (vengono ruotate insieme a pts_b durante l'ICP)
+    nms_b = np.vstack([nm_b[idx_cb] / nl_b[idx_cb, None],
+                       nm_b[idx_rb] / nl_b[idx_rb, None]]).copy()
     R_acc = np.eye(3); t_acc = np.zeros(3)
     tree_a = _KDT(pts_a); prev_rmsd = float("inf")
+    # Variabili tenute aggiornate per metriche finali
+    last_dists = None; last_inds = None; last_mask = None
     for _it in range(max_iter):
         dists, inds = tree_a.query(pts_b, k=1)
         med = float(np.median(dists))
         mask = dists < med * 2.5
         if mask.sum() < 10: break
+        last_dists, last_inds, last_mask = dists, inds, mask
         ma = pts_a[inds[mask]]; mb = pts_b[mask]
         ca, cb = ma.mean(0), mb.mean(0)
         H = (mb - cb).T @ (ma - ca)
@@ -670,11 +776,195 @@ def icp_full_mesh(tris_a: np.ndarray, nm_a: np.ndarray,
         if np.linalg.det(R) < 0: Vt[-1] *= -1; R = Vt.T @ U.T
         t = ca - R @ cb
         pts_b = (R @ pts_b.T).T + t
+        nms_b = (R @ nms_b.T).T  # ruota anche le normali
         R_acc = R @ R_acc; t_acc = R @ t_acc + t
         rmsd = float(np.sqrt(np.mean(dists[mask] ** 2)))
         if abs(prev_rmsd - rmsd) < tol: break
         prev_rmsd = rmsd
-    return {"R": R_acc, "t": t_acc, "rmsd": prev_rmsd, "iter": _it + 1}
+
+    # ── Calcolo metriche di qualita` (v7.3.6) ──────────────────────────────
+    n_samples_final = len(pts_b)
+    if last_mask is not None and last_mask.sum() >= 3:
+        n_matched = int(last_mask.sum())
+        matched_dists = last_dists[last_mask]
+        residuals_std = float(np.std(matched_dists))
+        # Coerenza normali sui match
+        nm_a_m = nms_a[last_inds[last_mask]]
+        nm_b_m = nms_b[last_mask]
+        cos_vals = np.sum(nm_a_m * nm_b_m, axis=1)
+        # Le normali possono essere di segno opposto (convenzione scanner);
+        # interessa l'allineamento del piano tangente → |cos|.
+        normal_cos = float(np.mean(np.abs(cos_vals)))
+    else:
+        n_matched = 0
+        residuals_std = 0.0
+        normal_cos = 0.0
+
+    mask_ratio = n_matched / max(1, n_samples_final)
+
+    return {
+        "R": R_acc, "t": t_acc,
+        "rmsd": prev_rmsd, "iter": _it + 1,
+        "mask_ratio": mask_ratio,
+        "residuals_std": residuals_std,
+        "normal_cos": normal_cos,
+        "n_samples": n_samples_final,
+        "n_matched": n_matched,
+    }
+
+
+def compute_confidence(coverage: float,
+                        residual_mm: float,
+                        uniformity_mm: float,
+                        normal_cos: float,
+                        scanner_sigma_um: float = 20.0) -> dict:
+    """Combina le 4 metriche in un punteggio di confidenza 0-100.
+
+    Parametri:
+      coverage:      frazione di campioni matchati (0-1)
+      residual_mm:   RMSD residuo dell'ICP in mm
+      uniformity_mm: std dei residui in mm
+      normal_cos:    cos medio dell'angolo tra normali matchate (0-1)
+      scanner_sigma_um: rumore atteso dello scanner in micron (default 20)
+
+    Ritorna un dict con score_pct (0-100), level ("alta"/"media"/"bassa"),
+    i fattori originali e i fattori scalati a [0,1] per debug.
+
+    Modello dei fattori (ognuno scalato a [0,1], poi media ponderata):
+      f_coverage:  70% o piu` di copertura = 1.0, meno = proporzionale
+      f_residual:  residuo <= sigma_scanner = 1.0, degrada per eccesso
+      f_uniformity: std <= sigma_scanner = 1.0, degrada fino a 3*sigma
+      f_normal:    0.7 → 0, 1.0 → 1.0 (lineare in mezzo)
+
+    Pesi scelti in modo che coverage e normal_cos (indicatori che il motore
+    stia guardando lo scanbody giusto) pesino piu` di residuo/uniformita`
+    (che misurano qualita` ma non correttezza).
+    """
+    # Converti in micron per omogeneita`
+    residual_um = residual_mm * 1000.0
+    uniformity_um = uniformity_mm * 1000.0
+    sigma = max(1.0, scanner_sigma_um)
+
+    f_coverage = min(1.0, max(0.0, coverage / 0.7))
+    # residuo sotto sigma: pieno punteggio. Oltre: degrada linearmente fino a 2*sigma = 0
+    f_residual = max(0.0, min(1.0, 1.0 - max(0.0, residual_um - sigma) / sigma))
+    # std: tollerata fino a 1*sigma al 100%, degrada fino a 3*sigma = 0
+    f_uniformity = max(0.0, min(1.0, 1.0 - max(0.0, uniformity_um - sigma) / (2.0 * sigma)))
+    # normal_cos: 0.7 → 0, 1.0 → 1.0
+    f_normal = max(0.0, min(1.0, (normal_cos - 0.7) / 0.3)) if normal_cos > 0.7 else 0.0
+
+    score_01 = 0.30 * f_coverage + 0.25 * f_residual + 0.20 * f_uniformity + 0.25 * f_normal
+    score_pct = max(0.0, min(100.0, score_01 * 100.0))
+
+    if score_pct >= 80.0:
+        level = "alta"
+    elif score_pct >= 55.0:
+        level = "media"
+    else:
+        level = "bassa"
+
+    return {
+        "score_pct": round(score_pct, 1),
+        "level": level,
+        "factors": {
+            "coverage": round(float(coverage), 3),
+            "residual_um": round(residual_um, 1),
+            "uniformity_um": round(uniformity_um, 1),
+            "normal_cos": round(float(normal_cos), 3),
+        },
+        "scaled": {
+            "f_coverage": round(f_coverage, 3),
+            "f_residual": round(f_residual, 3),
+            "f_uniformity": round(f_uniformity, 3),
+            "f_normal": round(f_normal, 3),
+        },
+        "scanner_sigma_um": sigma,
+    }
+
+
+def _tri_normals(tris: np.ndarray) -> np.ndarray:
+    """Normali unitarie per ogni triangolo (v7.3.6 helper)."""
+    v0, v1, v2 = tris[:, 0], tris[:, 1], tris[:, 2]
+    e1, e2 = v1 - v0, v2 - v0
+    nx = e1[:, 1]*e2[:, 2] - e1[:, 2]*e2[:, 1]
+    ny = e1[:, 2]*e2[:, 0] - e1[:, 0]*e2[:, 2]
+    nz = e1[:, 0]*e2[:, 1] - e1[:, 1]*e2[:, 0]
+    nl = np.sqrt(nx*nx + ny*ny + nz*nz).clip(1e-9)
+    return np.stack([nx/nl, ny/nl, nz/nl], axis=1)
+
+
+def compute_pair_confidence(tris_a_local: np.ndarray,
+                              tris_b_local_aligned: np.ndarray,
+                              scanner_sigma_um: float = 20.0,
+                              match_threshold_um: float = 80.0) -> dict:
+    """Calcola la confidenza di una singola coppia scanbody.
+    
+    tris_a_local:         triangoli del reference (scanbody CAD) nello spazio A
+    tris_b_local_aligned: triangoli della scansione dello scanbody identificato,
+                          gia` trasformati nello spazio di A
+    scanner_sigma_um:     rumore atteso dello scanner (default 20 um)
+    match_threshold_um:   soglia entro cui un punto e` considerato "matchato"
+                          (default 80 um = 4*sigma, copre il 99.7% del rumore atteso)
+    
+    Ritorna il dict restituito da compute_confidence.
+    """
+    from scipy.spatial import cKDTree as _KDT
+    
+    if len(tris_a_local) < 20 or len(tris_b_local_aligned) < 20:
+        return {
+            "score_pct": None,
+            "level": "non_disponibile",
+            "note": f"mesh troppo piccole ({len(tris_a_local)} vs {len(tris_b_local_aligned)} tris)",
+        }
+    
+    # Centroidi triangoli (punto rappresentativo per ognuno)
+    cA = tris_a_local.mean(1)
+    cB = tris_b_local_aligned.mean(1)
+    nm_A = _tri_normals(tris_a_local)
+    nm_B = _tri_normals(tris_b_local_aligned)
+    
+    # KDTree su A, query da B: per ogni punto di B trova il piu` vicino in A
+    tree_a = _KDT(cA)
+    dists, inds = tree_a.query(cB, k=1)
+    
+    # Coverage: frazione di punti di B che hanno un corrispondente entro la soglia
+    threshold_mm = match_threshold_um / 1000.0
+    matched = dists < threshold_mm
+    coverage = float(matched.sum() / len(cB)) if len(cB) > 0 else 0.0
+    
+    if matched.sum() < 10:
+        return {
+            "score_pct": 0.0,
+            "level": "bassa",
+            "note": f"pochi match ({int(matched.sum())}) entro {match_threshold_um} um",
+            "factors": {
+                "coverage": round(coverage, 3),
+                "residual_um": round(float(np.median(dists) * 1000), 1),
+                "uniformity_um": round(float(np.std(dists) * 1000), 1),
+                "normal_cos": 0.0,
+            }
+        }
+    
+    # RMSD residuo sui soli matched
+    residual_mm = float(np.sqrt(np.mean(dists[matched]**2)))
+    uniformity_mm = float(np.std(dists[matched]))
+    
+    # Coerenza normali sui matched
+    nm_A_m = nm_A[inds[matched]]
+    nm_B_m = nm_B[matched]
+    cos_vals = np.sum(nm_A_m * nm_B_m, axis=1)
+    normal_cos = float(np.mean(np.abs(cos_vals)))
+    
+    conf = compute_confidence(
+        coverage=coverage,
+        residual_mm=residual_mm,
+        uniformity_mm=uniformity_mm,
+        normal_cos=normal_cos,
+        scanner_sigma_um=scanner_sigma_um,
+    )
+    conf["n_matched"] = int(matched.sum())
+    conf["n_total"] = int(len(cB))
+    return conf
 
 
 def mean_cap_normal_z(tris: np.ndarray) -> float:
@@ -712,8 +1002,8 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     if not comps_a or not comps_b:
         raise ValueError("Nessun componente trovato in uno o entrambi i file STL.")
 
-    scan_idx_a, bg_idx_a = partition_comps(comps_a)
-    scan_idx_b, bg_idx_b = partition_comps(comps_b)
+    scan_idx_a, bg_idx_a = partition_comps(comps_a, tris_a)
+    scan_idx_b, bg_idx_b = partition_comps(comps_b, tris_b)
 
     scan_a = [comps_a[i] for i in scan_idx_a]
     scan_b = [comps_b[i] for i in scan_idx_b]
@@ -1011,8 +1301,38 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         pairs.append({
             "a": _O_a.tolist(), "b": _O_b.tolist(),
             "dx": float(_d_radiale[0]), "dy": float(_d_radiale[1]), "dz": _dZ,
-            "dxy": _dXY, "d3": _d3
+            "dxy": _dXY, "d3": _d3,
         })
+
+        # v7.3.6: confidenza per-coppia calcolata localmente su 6DOF alignment.
+        # Uso tris_b_aligned (che e` tris_b post R_pre+t_pre, 6DOF completo)
+        # invece di _tris_b_i (che e` tris_b post R_min+t_min_v, solo 3DOF Rz).
+        # R_min raddrizza bene i centroidi cap ma non i triangoli tiltati.
+        if _tb_idx and len(_tris_a_i) > 0:
+            _tris_b_6dof = tris_b_aligned[_tb_idx]
+            # Raggio locale: 99° percentile della distanza dei triangoli di A
+            # dal loro centro cap, piu` un margine di 2mm. Piu` robusto di
+            # max(bbox) che sottostima per scanbody bassi e larghi.
+            _cA_all = _tris_a_i.mean(1)
+            _dists_a = np.linalg.norm(_cA_all - _O_a, axis=1)
+            _R_local = float(np.percentile(_dists_a, 99)) + 2.0
+            _R_local = max(_R_local, 4.0)  # minimo 4mm comunque
+            _cB = _tris_b_6dof.mean(1)
+            _mask_local = np.linalg.norm(_cB - _O_a, axis=1) < _R_local
+            _tris_b_local = _tris_b_6dof[_mask_local]
+            _pair_conf = compute_pair_confidence(
+                _tris_a_i, _tris_b_local,
+                scanner_sigma_um=20.0,
+                match_threshold_um=80.0,
+            )
+        else:
+            _pair_conf = {
+                "score_pct": None,
+                "level": "non_disponibile",
+                "note": "dati insufficienti per il calcolo della confidenza",
+            }
+        # Attacca la confidence all'ultima coppia appena creata
+        pairs[-1]["confidence"] = _pair_conf
 
     # ICP sui centroidi per compatibilità (RMSD e angolo)
     icp = run_icp(ct_a, ct_b_aligned, max_iter=80)
@@ -1160,6 +1480,10 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         "n_scan_b": len(scan_b),
         "excluded_a": len(bg_idx_a),
         "excluded_b": len(bg_idx_b),
+        # v7.3.6: numero di scanbody trovati in B ma non matchati al reference
+        # (tipicamente quando |A| < |B|, cioe` un reference singolo vs scansione
+        # con multi-scanbody). 0 nel caso normale |A|==|B|.
+        "extra_instances_b": max(0, len(scan_b) - len(pairs)),
         "filename_a": name_a,
         "filename_b": name_b,
         # Dati mesh per anteprime e PDF

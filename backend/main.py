@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # La sorgente unica del frontend e` backend/static/index.html nel repo.
     # Viene copiata dal Dockerfile (COPY backend/ .) e servita staticamente.
-    # Nessuna decodifica o riscrittura al boot (v7.3.3+).
+    # Nessuna decodifica o riscrittura al boot (v7.3.6.002+).
     await init_db()
     yield
 
