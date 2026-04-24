@@ -1080,7 +1080,7 @@ function init(){
   animate();
   updateRaffinaButtonState();
 }
-function animate(){requestAnimationFrame(animate);controls.update();updateDivergenceLabels();renderer.render(scene,camera)}
+function animate(){requestAnimationFrame(animate);controls.update();updateDivergenceLabels();if(typeof sostEnsureLabelElements==='function')sostEnsureLabelElements();if(typeof sostUpdateLabels==='function')sostUpdateLabels();renderer.render(scene,camera)}
 
 // Load scan
 function loadScan(input){if(input.files.length>0)loadScanFile(input.files[0])}
@@ -9020,9 +9020,11 @@ var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
 // Stato UI per la scansione Multi-A: opacita' 0..1
-var sostScanUI = { opacity: 1.0 };
+var sostScanUI = { opacity: 1.0, cutOnMarkers: false };
 // Stato UI per le etichette numeriche 3D
 var sostLabelsUI = { visible: true };
+// Geometria originale della scansione (preservata per ripristinare dopo un taglio)
+var sostOriginalGeo = null;
 // Stato UI per gruppi nell'albero: collassato (di default) e opacita' (1.0 = pieno, 0 = trasparente)
 var sostGroupUI = {
   '1T3': { collapsed: true, opacity: 1.0 },
@@ -9251,6 +9253,8 @@ function sostLoadScanToScene(filename){
   sostMesh.userData.isSostituire = true;
   sostMesh.userData.sostRole = 'scan';
   scene.add(sostMesh);
+  // Salva la geometria originale per poter ricostruire dopo un taglio
+  sostOriginalGeo = geo.clone();
 
   // Nascondi la scritta "Carica una scansione intraorale" (condivisa con Analizza)
   var emptyState = document.getElementById('emptyState');
@@ -9314,41 +9318,66 @@ function sostOnViewportClick(event){
 }
 
 // ── Posizionamento template (pipeline Analizza: findScanbodyCenter) ──
-// Crea uno sprite con il numero del marker, da posizionare sopra ciascun
-// template. Canvas 128x128 con testo nero su fondo bianco bordato.
-// Lo sprite mantiene dimensione costante in world units (scalabile se serve).
-function sostMakeLabelSprite(num){
-  var canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
-  var ctx = canvas.getContext('2d');
-  // Sfondo: cerchio bianco con bordo scuro
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(64, 64, 54, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#0D1B2A';
-  ctx.lineWidth = 5;
-  ctx.stroke();
-  // Testo: numero centrato in nero
-  ctx.fillStyle = '#0D1B2A';
-  ctx.font = 'bold 72px ui-monospace, monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(num), 64, 68);
-  var texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  var mat = new THREE.SpriteMaterial({
-    map: texture,
-    depthTest: false,
-    depthWrite: false,
-    transparent: true
+// Label numeriche 2D proiettate: stesso pattern di Analizza (div .divergence-label).
+// Sostituire crea div nel #labelLayer (condiviso con Analizza) e li posiziona
+// a ogni frame nel loop di animazione. Stilisticamente identiche alle label
+// di Analizza ma senza divergenza (solo numero #N).
+function sostEnsureLabelElements(){
+  var layer = document.getElementById('labelLayer');
+  if(!layer) return;
+  sostPlaced.forEach(function(p){
+    if(!p.labelEl){
+      var el = document.createElement('div');
+      el.className = 'divergence-label sost-label';
+      el.style.display = 'none';
+      el.style.background = '#0D1B2A';
+      layer.appendChild(el);
+      p.labelEl = el;
+    }
   });
-  var sprite = new THREE.Sprite(mat);
-  // Dimensione in unita' mondo: ~2.5mm di lato, visibile ma non invasivo
-  sprite.scale.set(2.5, 2.5, 1);
-  sprite.renderOrder = 999; // sempre sopra le mesh
-  return sprite;
+  // Rimuovi div per marker eliminati
+  var activeEls = new Set(sostPlaced.map(function(p){ return p.labelEl; }).filter(Boolean));
+  Array.from(layer.children).forEach(function(child){
+    if(child.tagName !== 'DIV') return;
+    if(!child.classList || !child.classList.contains('sost-label')) return;
+    if(!activeEls.has(child)) layer.removeChild(child);
+  });
+}
+
+function sostUpdateLabels(){
+  if(!camera || !renderer) return;
+  if(analysisMode !== 'sostituire') return;
+  var vp = document.getElementById('viewport');
+  if(!vp) return;
+  if(!sostLabelsUI.visible){
+    sostPlaced.forEach(function(p){
+      if(p.labelEl) p.labelEl.style.display = 'none';
+    });
+    return;
+  }
+  var rect = renderer.domElement.getBoundingClientRect();
+  var vpRect = vp.getBoundingClientRect();
+  var W = rect.width, H = rect.height;
+  var offX = rect.left - vpRect.left;
+  var offY = rect.top - vpRect.top;
+  sostPlaced.forEach(function(p){
+    if(!p.labelEl) return;
+    // Ancora: connessione implantare (p.position).
+    // Label 10mm sopra lungo l'asse (sopra i dischi 1T3 max Z=8.5).
+    var anchor = p.position.clone();
+    var labelPos = p.position.clone().add(p.axisDir.clone().multiplyScalar(10));
+    var vl = labelPos.clone().project(camera);
+    if(vl.z > 1 || vl.z < -1){
+      p.labelEl.style.display = 'none';
+      return;
+    }
+    var labelX = offX + (vl.x * 0.5 + 0.5) * W;
+    var labelY = offY + (-vl.y * 0.5 + 0.5) * H;
+    p.labelEl.style.display = 'block';
+    p.labelEl.style.left = labelX + 'px';
+    p.labelEl.style.top = labelY + 'px';
+    p.labelEl.textContent = '#' + p.num;
+  });
 }
 
 // Costruisce il THREE.Group di un singolo template (key) correttamente
@@ -9466,16 +9495,9 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     axisLine.userData.isSostituire = true;
     scene.add(axisLine);
 
-    // Label numerica 3D sopra il marker (sprite sempre face-camera).
-    // Posizionata 12mm sopra la connessione lungo l'asse, cosi' sta sopra
-    // tutti i template (1T3 disco a 8.5, quindi 12 e' sopra con margine).
-    var labelSprite = sostMakeLabelSprite(sostCounter);
-    var labelPos = connectionWorld.clone().add(axis.clone().multiplyScalar(12));
-    labelSprite.position.copy(labelPos);
-    labelSprite.visible = sostLabelsUI.visible;
-    labelSprite.userData.isSostituire = true;
-    labelSprite.userData.sostRole = 'label';
-    scene.add(labelSprite);
+    // Label numerica: creata come div 2D proiettato (stesso pattern di
+    // Analizza). Nessun oggetto 3D da gestire: sostEnsureLabelElements()
+    // crea i div nel #labelLayer a partire da sostPlaced.
 
     sostPlaced.push({
       id: id,
@@ -9490,8 +9512,7 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       templateKey: activeKey,
       color: (SOSTITUIRE_TEMPLATE_INFO[activeKey] || {color:0x888888}).color,
       rmsd: null,
-      axisLine: axisLine,
-      labelSprite: labelSprite
+      axisLine: axisLine
     });
 
     var activeInfo = SOSTITUIRE_TEMPLATE_INFO[activeKey] || {label: activeKey};
@@ -9499,6 +9520,7 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostUpdateRefineButtonState();
     sostShowStatus('Marker #' + sostCounter + ' posizionato (' + activeInfo.label + ').');
     try { rebuildTree(); } catch(e){}
+    if(sostScanUI.cutOnMarkers) sostRebuildScanGeometry();
     var cutOverlay = document.getElementById('cutViewOverlay');
     if(cutOverlay){
       var isOpen = cutOverlay.style.display === 'flex';
@@ -9578,17 +9600,16 @@ function sostAlignAll(){
       p.axisLine.geometry.setFromPoints([connectionWorld, endPt]);
       p.axisLine.geometry.attributes.position.needsUpdate = true;
 
-      // Aggiorna posizione label sprite (12mm sopra la connessione)
-      if(p.labelSprite){
-        var newLabelPos = connectionWorld.clone().add(axis.clone().multiplyScalar(12));
-        p.labelSprite.position.copy(newLabelPos);
-      }
+      // La label HTML viene aggiornata automaticamente dal loop (sostUpdateLabels),
+      // basa la posizione su p.position che e' gia' stato aggiornato sopra.
 
       p.rmsd = null;
     });
     sostRenderPlacedList();
     sostShowStatus('Raffinamento completato (' + sostPlaced.length + ' marker).');
     try { rebuildTree(); } catch(e){}
+    // Se il taglio e' attivo, ricostruisci la scansione con i nuovi centri
+    if(sostScanUI.cutOnMarkers) sostRebuildScanGeometry();
     var cutOverlay = document.getElementById('cutViewOverlay');
     if(cutOverlay && cutOverlay.style.display === 'flex'){
       sostRenderCutView();
@@ -9919,18 +9940,14 @@ function sostRemovePlaced(num){
     });
   }
   if(p.axisLine) scene.remove(p.axisLine);
-  if(p.labelSprite){
-    scene.remove(p.labelSprite);
-    if(p.labelSprite.material){
-      if(p.labelSprite.material.map) p.labelSprite.material.map.dispose();
-      p.labelSprite.material.dispose();
-    }
-  }
+  // Label HTML viene rimossa automaticamente da sostEnsureLabelElements
+  // al prossimo frame (rileva che il marker non e' piu' in sostPlaced).
   sostPlaced.splice(idx, 1);
   sostRenderPlacedList();
   sostUpdateRefineButtonState();
   sostShowStatus('Rimosso marker #' + num + '.');
   try { rebuildTree(); } catch(e){}
+  if(sostScanUI.cutOnMarkers) sostRebuildScanGeometry();
   var cutOverlay = document.getElementById('cutViewOverlay');
   if(cutOverlay && cutOverlay.style.display === 'flex'){
     if(sostPlaced.length === 0){
@@ -10026,6 +10043,15 @@ function sostRebuildTree(){
          ' oninput="sostOnScanOpacityChange(this.value)"' +
          ' style="width:100%;accent-color:#c4a48c;height:4px" title="Trasparenza scansione">' +
          '</div>';
+    // Taglia scansione sui marker (nasconde la porzione di scansione attorno ai marker)
+    if(sostPlaced.length > 0){
+      h += '<div class="tree-node" style="padding-left:18px;display:flex;align-items:center;gap:2px">' +
+           '<input type="checkbox" ' + (sostScanUI.cutOnMarkers ? 'checked' : '') +
+           ' onchange="sostToggleScanCut(this.checked)">' +
+           '<span class="dot" style="background:#889aad;border:1px dashed #333"></span>' +
+           '<span class="lbl">Taglia scansione sui marker</span>' +
+           '</div>';
+    }
   }
   if(sostPlaced.length > 0){
     // Riga toggle per etichette numeriche 3D
@@ -10134,12 +10160,69 @@ function sostToggleScanVisibility(on){
   if(sostMesh) sostMesh.visible = on;
 }
 
-// Mostra/nasconde tutte le etichette numeriche 3D
+// Mostra/nasconde tutte le etichette numeriche (ora HTML, non piu' sprite 3D)
 function sostToggleLabelsVisibility(on){
   sostLabelsUI.visible = on;
   sostPlaced.forEach(function(p){
-    if(p.labelSprite) p.labelSprite.visible = on;
+    if(p.labelEl) p.labelEl.style.display = on ? 'block' : 'none';
   });
+}
+
+// Taglia/ripristina la porzione di scansione attorno a ciascun marker.
+// Usa un cilindro verticale (axis = p.axisDir) di raggio SOST_CUT_RADIUS
+// centrato sulla connessione implantare.
+var SOST_CUT_RADIUS = 2.75;     // mm (diametro 5.5mm, copre 1T3/SR/OS)
+var SOST_CUT_HALF_H = 30.0;     // mm (taglio passante lungo l'asse)
+
+function sostToggleScanCut(on){
+  sostScanUI.cutOnMarkers = on;
+  sostRebuildScanGeometry();
+}
+
+function sostRebuildScanGeometry(){
+  if(!sostOriginalGeo || !sostMesh) return;
+  if(!sostScanUI.cutOnMarkers || sostPlaced.length === 0){
+    sostMesh.geometry.dispose();
+    sostMesh.geometry = sostOriginalGeo.clone();
+    sostMesh.geometry.computeVertexNormals();
+    return;
+  }
+  var cylinders = sostPlaced.map(function(p){
+    return {
+      cp: p.position,
+      ax: p.axisDir.clone().normalize(),
+      R2: SOST_CUT_RADIUS * SOST_CUT_RADIUS,
+      halfH: SOST_CUT_HALF_H
+    };
+  });
+  var pos = sostOriginalGeo.attributes.position.array;
+  var nTri = pos.length / 9;
+  var kept = [];
+  for(var i = 0; i < nTri; i++){
+    var ni = i * 9;
+    var cx = (pos[ni] + pos[ni+3] + pos[ni+6]) / 3;
+    var cy = (pos[ni+1] + pos[ni+4] + pos[ni+7]) / 3;
+    var cz = (pos[ni+2] + pos[ni+5] + pos[ni+8]) / 3;
+    var inside = false;
+    for(var c = 0; c < cylinders.length; c++){
+      var cyl = cylinders[c];
+      var dx = cx - cyl.cp.x, dy = cy - cyl.cp.y, dz = cz - cyl.cp.z;
+      var axial = dx*cyl.ax.x + dy*cyl.ax.y + dz*cyl.ax.z;
+      if(Math.abs(axial) > cyl.halfH) continue;
+      var px = dx - axial*cyl.ax.x;
+      var py = dy - axial*cyl.ax.y;
+      var pz = dz - axial*cyl.ax.z;
+      if(px*px + py*py + pz*pz <= cyl.R2){ inside = true; break; }
+    }
+    if(!inside){
+      for(var j = 0; j < 9; j++) kept.push(pos[ni + j]);
+    }
+  }
+  var newGeo = new THREE.BufferGeometry();
+  newGeo.setAttribute('position', new THREE.Float32BufferAttribute(kept, 3));
+  newGeo.computeVertexNormals();
+  sostMesh.geometry.dispose();
+  sostMesh.geometry = newGeo;
 }
 
 // Cambia opacita' della scansione Multi-A (0..100)
