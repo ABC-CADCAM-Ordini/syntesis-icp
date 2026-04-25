@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.016</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.017</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Source Sans 3','Source Sans Pro',sans-serif;--mono:'Source Sans 3','Source Sans Pro',sans-serif}
@@ -321,7 +321,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .mis-tree-slider-row input[type=range]{flex:1;height:12px;accent-color:#0065B3;cursor:pointer;margin:0}
 .mis-tree-val{font-size:9px;color:var(--gray);min-width:30px;text-align:right}
 
-/* Certificato Taratura modal v7.3.9.016 */
+/* Certificato Taratura modal v7.3.9.017 */
 .calmodal-back{position:fixed;inset:0;background:rgba(15,25,35,.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px}
 .calmodal-back.show{display:flex}
 .calmodal{background:#fff;border-radius:14px;max-width:600px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,25,35,.3);font-family:var(--font)}
@@ -352,7 +352,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.016</span>
+      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.017</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -935,7 +935,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '7.3.9.016';
+window.ANALIZZA_BUILD = '7.3.9.017';
 window.ANALIZZA_BUILD_DATE = '2026-04-25';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2370,7 +2370,7 @@ function selectWorkflow(wf){
   // Se sto uscendo da Misurare verso un altro workflow, smonto il viewport ICP
   if(prev === 'misurare' && wf !== 'misurare'){
     try { misICP_unmountViewport(); } catch(e){ console.warn('[Misurare] unmount fallito:', e); }
-    // FIX v7.3.9.016: riaccendi artefatti Analizza se torni in analizza/accoppia
+    // FIX v7.3.9.017: riaccendi artefatti Analizza se torni in analizza/accoppia
     if(wf === 'analizza' || wf === 'accoppia'){
       try { _setAnalyzaArtifactsVisible(true); } catch(e){}
     }
@@ -2427,7 +2427,7 @@ function selectWorkflow(wf){
   }
   else if(wf === 'misurare'){
     analysisMode = 'misurare';
-    // FIX v7.3.9.016: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
+    // FIX v7.3.9.017: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
     try { _setAnalyzaArtifactsVisible(false); } catch(e){}
     if(panAng)  panAng.style.display  = 'none';
     if(panAx)   panAx.style.display   = 'none';
@@ -5502,7 +5502,7 @@ function misICP_renderClinicalPDF(data){
   var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.016)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.017)', null, true);
 
   // Pagina 2: Note metodologiche (statica, identica per ogni report)
   doc.addPage();
@@ -5548,7 +5548,7 @@ function misICP_renderClinicalPDF(data){
 // ────────────────────────────────────────────────────────────────────
 
 
-// ── CERTIFICATO DI TARATURA v7.3.9.016 ─────────────────────────────
+// ── CERTIFICATO DI TARATURA v7.3.9.017 ─────────────────────────────
 // Modal di raccolta metadati + helpers di classificazione PASS/VERIFICA/FAIL
 // Soglie industriali standard: PASS \u2264 50\u03bcm, VERIFICA 50-100\u03bcm, FAIL > 100\u03bcm
 // (per angoli: PASS \u2264 0.5\u00b0, VERIFICA 0.5-1.0\u00b0, FAIL > 1.0\u00b0)
@@ -5623,7 +5623,7 @@ function misICP_submitCalibration(){
 
 
 function misICP_renderCalibrationPDF(data, calibMeta){
-  // CERTIFICATO DI TARATURA v7.3.9.016
+  // CERTIFICATO DI TARATURA v7.3.9.017
   // 5 pagine: Copertina | Frontespizio | Procedura+Sintesi | Mappa+Dettaglio | Inter-centroide+Firme
   // Range di riferimento (non giudizi): \u2264 50\u03bcm = precisione, 50-100\u03bcm = vigilanza, > 100\u03bcm = critico
   if(!calibMeta){
@@ -5714,60 +5714,94 @@ function misICP_renderCalibrationPDF(data, calibMeta){
   var angMean = data.avgAngle != null ? data.avgAngle : (angles.length ? angles.reduce(function(s,v){return s+v;},0)/angles.length : 0);
 
   // ============================================================
-  // PAGINA 1: COPERTINA con logo
+  // PAGINA 1: COPERTINA stile NASA-istituzionale
+  // Sfondo scuro, anello score gradient, niente giudizio testuale
   // ============================================================
-  // Sfondo bianco. Striscia blu sottile in alto e in basso.
-  setFill('#0065B3'); doc.rect(0, 0, W, 4, 'F');
-  setFill('#0F1923'); doc.rect(0, H-4, W, 4, 'F');
+  // Sfondo blu antracite
+  setFill('#0D1B2A'); doc.rect(0, 0, W, H, 'F');
+  // Strisce decorative gialle in alto (riprende identità Syntesis-ICP report)
+  setFill('#FFD700'); doc.rect(0, 0, W, 3, 'F');
+  setFill('#F59E0B'); doc.rect(0, 3, W, 1.5, 'F');
 
-  // Logo grande al centro alto
+  // Logo Syntesis grande al centro alto (75mm di larghezza)
   if(logoSrc){
     try {
-      // Logo dimensione ~80mm width, mantenendo aspect ratio
-      doc.addImage(logoSrc, 'PNG', (W-80)/2, 35, 80, 24);
+      doc.addImage(logoSrc, 'PNG', (W-75)/2, 18, 75, 22);
     } catch(e){
-      console.warn('[Taratura PDF] addImage logo failed:', e);
+      // Fallback: testo
+      setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(22);
+      doc.text('Syntesis', W/2, 30, {align:'center'});
     }
-  } else {
-    setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(28);
-    doc.text('SYNTESIS', W/2, 50, {align:'center'});
   }
 
-  // Titolo principale del certificato
-  setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(28);
-  doc.text('CERTIFICATO', W/2, 100, {align:'center'});
-  doc.text('DI TARATURA', W/2, 113, {align:'center'});
+  // Titolo certificato
+  setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(20);
+  doc.text('CERTIFICATO DI TARATURA', W/2, 56, {align:'center'});
+  setTxt('#B0B8C1'); doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text('Verifica metrologica iniziale di sistema', W/2, 62, {align:'center'});
 
-  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(11);
-  doc.text('Verifica metrologica iniziale di sistema', W/2, 124, {align:'center'});
-
-  // Linea decorativa
-  setDraw('#0065B3'); doc.setLineWidth(0.6);
-  doc.line(W/2-25, 132, W/2+25, 132);
-
-  // Box centrale con ID e data
-  var boxW = 130, boxH = 50, boxX = (W-boxW)/2, boxY = 150;
-  setDraw('#D6E4F0'); doc.setLineWidth(0.5);
-  doc.rect(boxX, boxY, boxW, boxH);
-  setFill('#F7F9FC'); doc.rect(boxX, boxY, boxW, 12, 'F');
-  setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(9);
-  doc.text('IDENTIFICATIVO DEL DOCUMENTO', boxX+boxW/2, boxY+8, {align:'center'});
-
+  // Anello score con gradient (riprende stile vecchio cover Clinico/Analisi)
+  // Il punteggio resta segnaletica visiva neutra: il colore informa, non giudica.
+  var cx2 = W/2, cy2 = 100, ringR = 24;
+  // Sfondo cerchio (anello scuro grigio-blu)
+  doc.setDrawColor(40,50,65); doc.setLineWidth(7);
+  doc.circle(cx2, cy2, ringR, 'S');
+  // Arco colorato proporzionale allo score
+  var pct = (data.score || 0) / 100;
+  var segs = 80;
+  var colRGB = data.lv && data.lv.col ? misICP_hexRGB(data.lv.col) : [13,158,110];
+  doc.setDrawColor(colRGB[0], colRGB[1], colRGB[2]);
+  doc.setLineWidth(7);
+  var prev = null;
+  for(var sI = 0; sI <= segs*pct; sI++){
+    var ang = -Math.PI/2 + (sI/segs)*Math.PI*2;
+    var x = cx2 + ringR*Math.cos(ang);
+    var y = cy2 + ringR*Math.sin(ang);
+    if(prev) doc.line(prev[0], prev[1], x, y);
+    prev = [x, y];
+  }
+  // Numero score al centro (bianco, non colorato di giudizio)
+  setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(26);
+  doc.text((data.score||0).toFixed(2), cx2, cy2+3, {align:'center'});
   setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(8);
-  doc.text('ID Certificato', boxX+8, boxY+22);
-  setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(13);
-  doc.text(calibMeta.certId, boxX+8, boxY+30);
+  doc.text('/100', cx2, cy2+10, {align:'center'});
+  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+  doc.text('SCORE METROLOGICO', cx2, cy2+ringR+8, {align:'center'});
 
-  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(8);
-  doc.text('Data di emissione', boxX+8, boxY+38);
-  setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text(calibMeta.dateStr + '  alle  ' + calibMeta.timeStr, boxX+8, boxY+45);
+  // Pillola con ID certificato (sostituisce il badge di giudizio del vecchio cover)
+  var pillY = 142, pillH = 11, pillW = 78, pillX = (W-pillW)/2;
+  setFill('#1A2C3F'); doc.roundedRect(pillX, pillY, pillW, pillH, 4, 4, 'F');
+  setDraw('#FFD700'); doc.setLineWidth(0.4);
+  doc.roundedRect(pillX, pillY, pillW, pillH, 4, 4, 'S');
+  setTxt('#FFD700'); doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text(calibMeta.certId, W/2, pillY+7.5, {align:'center'});
 
-  // Footer copertina con info azienda
+  // Box info: file, scanbody, RMSD, data
+  var infoY = 165;
+  var infos = [
+    ['File A (riferimento)', data.fileA || '—'],
+    ['File B (confronto)',   data.fileB || '—'],
+    ['N scanbody',           String(data.nCyl || data.pairs.length)],
+    ['RMSD ICP',             (data.rmsdUm||0).toFixed(1)+' µm'],
+    ['Data emissione',       calibMeta.dateStr + ' • ' + calibMeta.timeStr]
+  ];
+  infos.forEach(function(row, ii){
+    var rowY = infoY + ii*9;
+    setTxt('#7A90A4');
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    doc.text(row[0], ml+4, rowY);
+    setTxt('#FFFFFF');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
+    doc.text(String(row[1]), W-mr-4, rowY, {align:'right'});
+    doc.setDrawColor(40,50,65); doc.setLineWidth(0.15);
+    doc.line(ml+4, rowY+1.8, W-mr-4, rowY+1.8);
+  });
+
+  // Footer cover
   setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(8);
-  doc.text('Biaggini Medical Devices S.r.l.', W/2, H-32, {align:'center'});
-  doc.setFont('helvetica','italic'); doc.setFontSize(7);
-  doc.text('Documento generato automaticamente da Syntesis-ICP v7.3.9.016', W/2, H-26, {align:'center'});
+  doc.text('Biaggini Medical Devices S.r.l.', W/2, H-22, {align:'center'});
+  setTxt('#FFD700'); doc.setFont('helvetica','italic'); doc.setFontSize(7);
+  doc.text('syntesis-icp.com · Precision Scanner', W/2, H-15, {align:'center'});
 
   pdfFoot(1, 5);
 
@@ -5812,7 +5846,7 @@ function misICP_renderCalibrationPDF(data, calibMeta){
   h = drawInfoBox(ml, y, cw, 'OPERAZIONE', [
     ['Data taratura',      calibMeta.dateStr + '  alle  ' + calibMeta.timeStr],
     ['Procedura',          'Allineamento Kabsch + SVD + ICP iterativo'],
-    ['Software',           'Syntesis-ICP - Misurare (Analizza v7.3.9.016)']
+    ['Software',           'Syntesis-ICP - Misurare (Analizza v7.3.9.017)']
   ]);
   y += h + 6;
 
@@ -6287,7 +6321,7 @@ function misICP_renderExcel(data){
     ['Scala mappa colorimetrica', data.scaleUm,                       'μm'],
     [],
     ['SOFTWARE'],
-    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.016)'],
+    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.017)'],
     ['Produttore',   'Biaggini Medical Devices S.r.l.'],
     ['Sito',         'https://syntesis-icp.com'],
     [],
@@ -6502,7 +6536,7 @@ function misICP_renderExcel(data){
     ['File B slug filesystem',           slugB],
     ['Data analisi (locale)',            dtStr],
     ['Data analisi (ISO 8601)',          dtIso],
-    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.016)'],
+    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.017)'],
     ['Produttore',                       'Biaggini Medical Devices S.r.l.'],
     ['Sito',                             'https://syntesis-icp.com'],
     ['User-Agent browser',               ua]
@@ -6577,7 +6611,7 @@ function misICP_generateReport(kind){
   if(btn){ btn.classList.add('busy'); btn.innerHTML='<span>Generazione in corso...</span>'; }
   misICP_clearError();
 
-  // FIX v7.3.9.016: per Taratura apri modal di raccolta metadati invece di generare subito
+  // FIX v7.3.9.017: per Taratura apri modal di raccolta metadati invece di generare subito
   if(kind === 'taratura'){
     var btn0 = document.getElementById('misBtnReport');
     if(btn0){ btn0.classList.remove('busy'); btn0.innerHTML = '<span>Scarica report</span><span style="font-size:11px;opacity:0.8">&#9662;</span>'; }
@@ -6696,11 +6730,11 @@ function misICP_updateLabels(){
   if(!vp) return;
   var rect = vp.getBoundingClientRect();
   var W = rect.width, H = rect.height;
-  // FIX v7.3.9.016: replica pattern Analizza con leader line.
+  // FIX v7.3.9.017: replica pattern Analizza con leader line.
   // Pulisco le linee SVG (riuso il layer #labelLines)
   var svg = document.getElementById('labelLines');
   if(svg){
-    // FIX v7.3.9.016: riattivo il layer (era spento da _setAnalyzaArtifactsVisible
+    // FIX v7.3.9.017: riattivo il layer (era spento da _setAnalyzaArtifactsVisible
     // all'ingresso in Misurare, quindi le linee non si vedevano)
     svg.style.display = '';
     while(svg.firstChild) svg.removeChild(svg.firstChild);
@@ -13610,7 +13644,7 @@ window.onSyntesisViewModeChange = function(mode){
 </script>
 
 
-<!-- Modal Certificato Taratura v7.3.9.016 -->
+<!-- Modal Certificato Taratura v7.3.9.017 -->
 <div class="calmodal-back" id="calibrationModal">
   <div class="calmodal">
     <div class="calmodal-h">
