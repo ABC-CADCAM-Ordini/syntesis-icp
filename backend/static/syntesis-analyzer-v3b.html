@@ -5848,14 +5848,14 @@ function misICP_pdfDrawCalibrationCover(doc, data, calibMeta){
   doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#B0B8C1');
   doc.text('Precision Scanner Report - Taratura', W/2, 46, {align:'center'});
 
-  // Anello smooth via canvas
+  // Anello smooth - gradient SOTTILE nel colore base (v7.3.9.022)
   var scoreRingSrc = (function(){
-    var sizePx = 600;
+    var sizePx = 700;
     var c = document.createElement('canvas');
     c.width = sizePx; c.height = sizePx;
     var ctx = c.getContext('2d');
     var cx = sizePx/2, cy = sizePx/2;
-    var lineW = sizePx * 0.085;
+    var lineW = sizePx * 0.08;
     var ringR = (sizePx - lineW)/2 - 8;
     ctx.lineCap = 'butt';
     ctx.lineWidth = lineW;
@@ -5865,7 +5865,21 @@ function misICP_pdfDrawCalibrationCover(doc, data, calibMeta){
     ctx.stroke();
     var pct = Math.max(0, Math.min(1, (data.score||0)/100));
     if(pct > 0){
-      ctx.strokeStyle = (data.lv && data.lv.col) ? data.lv.col : '#0D9E6E';
+      var baseCol = (data.lv && data.lv.col) ? data.lv.col : '#0D9E6E';
+      var lightCol = misICP_shadeHex(baseCol, 0.25);
+      var darkCol  = misICP_shadeHex(baseCol, -0.15);
+      var stroke;
+      if(typeof ctx.createConicGradient === 'function'){
+        var grad = ctx.createConicGradient(-Math.PI/2, cx, cy);
+        grad.addColorStop(0,         lightCol);
+        grad.addColorStop(pct*0.5,   baseCol);
+        grad.addColorStop(pct,       darkCol);
+        grad.addColorStop(1,         darkCol);
+        stroke = grad;
+      } else {
+        stroke = baseCol;
+      }
+      ctx.strokeStyle = stroke;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.arc(cx, cy, ringR, -Math.PI/2, -Math.PI/2 + pct * 2*Math.PI);
