@@ -4156,10 +4156,12 @@ function misICP_drawColorMap(cv, pairs){
   if(!cv || !pairs || !pairs.length) return;
   var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
   ctx.clearRect(0,0,W,H);
-  // Sfondo dark coerente con la cover (#0d1b2a)
-  ctx.fillStyle='#0d1b2a'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='#142433'; ctx.fillRect(2,2,W-4,H-4);
-  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1; ctx.strokeRect(2,2,W-4,H-4);
+  // Sfondo CHIARO come nel report del 22/04: massima leggibilita' dei micron
+  // delle distanze e dei numeri sui nodi. Il box bianco crea contrasto sulla
+  // cover dark senza richiedere palette dark complicata.
+  ctx.fillStyle='#f9fafb'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#ffffff'; ctx.fillRect(2,2,W-4,H-4);
+  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1; ctx.strokeRect(2,2,W-4,H-4);
   var padL=52, padR=40, padT=36, padB=60;
   var vw=W-padL-padR, vh=H-padT-padB;
   var n=pairs.length;
@@ -4193,21 +4195,21 @@ function misICP_drawColorMap(cv, pairs){
   function sc(p1,p2){ return [padL+(p1-(c1-rg/2-margin))*scl, padT+vh-(p2-(c2-rg/2-margin))*scl]; }
 
   var gs=5;
-  ctx.strokeStyle='rgba(176,184,193,0.18)'; ctx.lineWidth=0.5; ctx.setLineDash([3,4]);
+  ctx.strokeStyle='rgba(220,228,235,0.55)'; ctx.lineWidth=0.5; ctx.setLineDash([3,4]);
   for(var g1=Math.floor((mn1-margin)/gs)*gs; g1<=(mx1+margin); g1+=gs){
     var gpx=sc(g1,0)[0]; if(gpx<padL-1 || gpx>padL+vw+1) continue;
     ctx.beginPath(); ctx.moveTo(gpx,padT); ctx.lineTo(gpx,padT+vh); ctx.stroke();
-    ctx.fillStyle='rgba(176,184,193,0.55)'; ctx.font='7px monospace'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(150,160,170,0.85)'; ctx.font='7px monospace'; ctx.textAlign='center';
     ctx.fillText(g1.toFixed(0),gpx,padT+vh+12);
   }
   for(var g2=Math.floor((mn2-margin)/gs)*gs; g2<=(mx2+margin); g2+=gs){
     var gpy=sc(0,g2)[1]; if(gpy<padT-1 || gpy>padT+vh+1) continue;
     ctx.beginPath(); ctx.moveTo(padL,gpy); ctx.lineTo(padL+vw,gpy); ctx.stroke();
-    ctx.fillStyle='rgba(176,184,193,0.55)'; ctx.font='7px monospace'; ctx.textAlign='right';
+    ctx.fillStyle='rgba(150,160,170,0.85)'; ctx.font='7px monospace'; ctx.textAlign='right';
     ctx.fillText(g2.toFixed(0),padL-4,gpy+3);
   }
   ctx.setLineDash([]);
-  ctx.fillStyle='#9ca3af'; ctx.font='8px monospace'; ctx.textAlign='center';
+  ctx.fillStyle='#6b7280'; ctx.font='8px monospace'; ctx.textAlign='center';
   ctx.fillText('asse arcata (mm)', padL+vw/2, padT+vh+24);
   ctx.save(); ctx.translate(14, padT+vh/2); ctx.rotate(-Math.PI/2);
   ctx.fillText('trasversale (mm)',0,0); ctx.restore();
@@ -4222,18 +4224,18 @@ function misICP_drawColorMap(cv, pairs){
     ctx.lineCap='round'; ctx.lineJoin='round';
     [20,12,5].forEach(function(lw,li){
       ctx.beginPath(); ap.forEach(function(pt,i){ if(i===0) ctx.moveTo(pt[0],pt[1]); else ctx.lineTo(pt[0],pt[1]); });
-      ctx.strokeStyle='rgba(120,160,200,'+(0.10+li*0.06)+')'; ctx.lineWidth=lw; ctx.stroke();
+      ctx.strokeStyle='rgba(180,200,215,'+(0.10+li*0.06)+')'; ctx.lineWidth=lw; ctx.stroke();
     });
   }
 
-  // Heatmap
+  // Heatmap (bg chiaro: alpha leggermente piu' bassa per non saturare)
   pairs.forEach(function(pp){
     if(!pp.b) return;
     var d3um=Math.round(pp.d3*1000), lv=misICP_clinLevel(d3um);
     var pb=pcaProj(pp.b[0],pp.b[1],pp.b[2]), spb=sc(pb[0],pb[1]);
     var hr=Math.min(32, Math.max(16, d3um/20+16));
     var g=ctx.createRadialGradient(spb[0],spb[1],0,spb[0],spb[1],hr);
-    g.addColorStop(0, lv.col+'66'); g.addColorStop(0.6, lv.col+'22'); g.addColorStop(1,'transparent');
+    g.addColorStop(0, lv.col+'44'); g.addColorStop(0.6, lv.col+'18'); g.addColorStop(1,'transparent');
     ctx.fillStyle=g; ctx.beginPath(); ctx.arc(spb[0],spb[1],hr,0,Math.PI*2); ctx.fill();
   });
 
@@ -4255,15 +4257,15 @@ function misICP_drawColorMap(cv, pairs){
     ctx.closePath(); ctx.fill();
   });
 
-  // Posizioni A (cerchi blu chiaro su dark)
+  // Posizioni A (cerchi blu su sfondo chiaro)
   pairs.forEach(function(pp,i){
     var pa=pcaProj(pp.a[0],pp.a[1],pp.a[2]), spa=sc(pa[0],pa[1]);
     ctx.beginPath(); ctx.arc(spa[0],spa[1],12,0,Math.PI*2);
-    ctx.strokeStyle='rgba(120,180,235,0.32)'; ctx.lineWidth=3; ctx.stroke();
+    ctx.strokeStyle='rgba(26,95,158,0.22)'; ctx.lineWidth=3; ctx.stroke();
     ctx.beginPath(); ctx.arc(spa[0],spa[1],7,0,Math.PI*2);
-    ctx.fillStyle='rgba(20,36,51,0.85)'; ctx.fill();
-    ctx.strokeStyle='#7ab8eb'; ctx.lineWidth=1.5; ctx.stroke();
-    ctx.fillStyle='#cfe5fa'; ctx.font='bold 8px monospace';
+    ctx.fillStyle='rgba(26,95,158,0.07)'; ctx.fill();
+    ctx.strokeStyle='#1a5f9e'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle='#1a5f9e'; ctx.font='bold 8px monospace';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(''+(i+1),spa[0],spa[1]); ctx.textBaseline='alphabetic';
   });
@@ -4274,9 +4276,9 @@ function misICP_drawColorMap(cv, pairs){
     var d3um=Math.round(pp.d3*1000), lv=misICP_clinLevel(d3um);
     var pb=pcaProj(pp.b[0],pp.b[1],pp.b[2]), spb=sc(pb[0],pb[1]);
     ctx.beginPath(); ctx.arc(spb[0],spb[1],10,0,Math.PI*2);
-    ctx.fillStyle=lv.col+'40'; ctx.fill();
+    ctx.fillStyle=lv.col+'28'; ctx.fill();
     ctx.beginPath(); ctx.arc(spb[0],spb[1],6,0,Math.PI*2);
-    ctx.fillStyle=lv.col; ctx.fill(); ctx.strokeStyle='#0d1b2a'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle=lv.col; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
     ctx.fillStyle='#fff'; ctx.font='bold 8px monospace';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(''+(i+1),spb[0],spb[1]); ctx.textBaseline='alphabetic';
@@ -4286,11 +4288,11 @@ function misICP_drawColorMap(cv, pairs){
 
   // Scale bar 10 mm
   var sbLen=10*scl, sbX=padL+vw-sbLen-4, sbY=padT+vh+36;
-  ctx.strokeStyle='#9ca3af'; ctx.lineWidth=2; ctx.lineCap='square';
+  ctx.strokeStyle='#374151'; ctx.lineWidth=2; ctx.lineCap='square';
   ctx.beginPath(); ctx.moveTo(sbX,sbY); ctx.lineTo(sbX+sbLen,sbY); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(sbX,sbY-3); ctx.lineTo(sbX,sbY+3); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(sbX+sbLen,sbY-3); ctx.lineTo(sbX+sbLen,sbY+3); ctx.stroke();
-  ctx.fillStyle='#cbd5e1'; ctx.font='8px monospace'; ctx.textAlign='center';
+  ctx.fillStyle='#374151'; ctx.font='8px monospace'; ctx.textAlign='center';
   ctx.fillText('10 mm', sbX+sbLen/2, sbY+11);
 
   // Color scale bar destra
@@ -4300,31 +4302,34 @@ function misICP_drawColorMap(cv, pairs){
   cg.addColorStop(0.5,'#F97316'); cg.addColorStop(0.7,'#D97706');
   cg.addColorStop(1,'#639922');
   ctx.fillStyle=cg; ctx.fillRect(csX,padT,csW,csH);
-  ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=0.5; ctx.strokeRect(csX,padT,csW,csH);
+  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=0.5; ctx.strokeRect(csX,padT,csW,csH);
   [[0,'0'],[50,'50'],[100,'100'],[150,'150'],[250,'250'],[500,'500']].forEach(function(t){
     var ty=padT+csH-(t[0]/500)*csH;
-    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(csX,ty); ctx.lineTo(csX+csW,ty); ctx.stroke();
-    ctx.fillStyle='#cbd5e1'; ctx.font='7px monospace'; ctx.textAlign='left';
+    ctx.strokeStyle='#fff'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(csX,ty); ctx.lineTo(csX+csW,ty); ctx.stroke();
+    ctx.fillStyle='#6b7280'; ctx.font='7px monospace'; ctx.textAlign='left';
     ctx.fillText(t[1], csX+csW+3, ty+3);
   });
   ctx.fillStyle='#9ca3af'; ctx.font='7px monospace'; ctx.textAlign='center';
   ctx.fillText('\u03bcm', csX+csW/2, padT+csH+10);
 
-  // Legenda (chiara su sfondo dark)
+  // Legenda (chiara come nel report del 22/04)
   var lgY=padT+vh+46;
   ctx.beginPath(); ctx.arc(padL+6,lgY,5,0,Math.PI*2);
-  ctx.strokeStyle='#7ab8eb'; ctx.lineWidth=1.5; ctx.fillStyle='rgba(120,180,235,0.18)'; ctx.fill(); ctx.stroke();
-  ctx.fillStyle='#cbd5e1'; ctx.font='8px monospace'; ctx.textAlign='left';
+  ctx.strokeStyle='#1a5f9e'; ctx.lineWidth=1.5; ctx.fillStyle='rgba(26,95,158,0.08)'; ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#374151'; ctx.font='8px monospace'; ctx.textAlign='left';
   ctx.fillText('A = riferimento', padL+14, lgY+3);
   ctx.beginPath(); ctx.arc(padL+115,lgY,5,0,Math.PI*2);
-  ctx.fillStyle='#EF4444'; ctx.fill(); ctx.strokeStyle='#0d1b2a'; ctx.lineWidth=1.5; ctx.stroke();
-  ctx.fillStyle='#cbd5e1'; ctx.fillText('B = misurato (ICP)', padL+123, lgY+3);
+  ctx.fillStyle='#EF4444'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.fillStyle='#374151'; ctx.fillText('B = misurato (ICP)', padL+123, lgY+3);
   var planeAngle=Math.acos(Math.min(1,Math.abs(u3[2])))*180/Math.PI;
   ctx.fillStyle='#9ca3af'; ctx.font='7px monospace'; ctx.textAlign='right';
   ctx.fillText('Piano best-fit perp. Z: '+planeAngle.toFixed(1)+'\u00b0', padL+vw, lgY+3);
 }
 
 // Vista 3D ortogonale di un cilindro: mesh A blu + mesh B arancione sovrapposte
+// con scale UNIFORME per non distorcere la geometria. Senza scale uniforme,
+// stesso millimetro su X e Y produce pixel diversi (vw=232 vs vh=168) e i
+// cilindri risultano ovalizzati anziche' circolari.
 function misICP_paintView(cv, triA, triB, trisBg, ax1, ax2, axD, title){
   if(!cv) return;
   var ctx=cv.getContext('2d'), W=cv.width, H=cv.height, pd=4, th=14;
@@ -4347,10 +4352,15 @@ function misICP_paintView(cv, triA, triB, trisBg, ax1, ax2, axD, title){
     });
   });
   var rg=Math.max(mx1-mn1, mx2-mn2)||1, c1=(mn1+mx1)/2, c2=(mn2+mx2)/2, mg=rg*0.08;
-  function px(v){ return [pd+((v[ax1]-(c1-rg/2-mg))/(rg+mg*2))*vw, pd+vh-((v[ax2]-(c2-rg/2-mg))/(rg+mg*2))*vh]; }
-  // Costruisco una lista MISTA di triangoli (BG + A + B) ordinata per profondita': cosi'
-  // i triangoli di A (blu) e B (arancione) si interleavano e si vedono entrambi.
-  // Senza questa unificazione l'ultimo blocco disegnato copre completamente il precedente.
+  // SCALE UNIFORME: stesso fattore mm->px su entrambi gli assi -> niente
+  // ovalizzazione. Centro il bounding-box nel viewport.
+  var scl=Math.min(vw/(rg+mg*2), vh/(rg+mg*2));
+  function px(v){
+    return [pd+vw/2+(v[ax1]-c1)*scl, pd+vh/2-(v[ax2]-c2)*scl];
+  }
+  // Lista mista BG + A + B, ordinata per profondita' lungo axD (painter's
+  // algorithm). Cosi' triangoli vicini coprono quelli lontani -> mesh dense
+  // 100%, niente trasparenza.
   function pickItems(tris, max, color){
     if(!tris || !tris.length) return [];
     var step=Math.max(1, Math.ceil(tris.length/max));
@@ -4361,9 +4371,14 @@ function misICP_paintView(cv, triA, triB, trisBg, ax1, ax2, axD, title){
     }
     return out;
   }
+  // Background tenue (alpha bassa) cosi' la dentatura si intuisce senza
+  // disturbare la lettura della mesh A/B.
   var COL_BG = { f:'rgba(180,185,195,0.22)', s:'rgba(160,165,175,0.18)' };
-  var COL_A  = { f:'rgba(26,95,158,0.55)',   s:'rgba(14,61,102,0.7)'    };
-  var COL_B  = { f:'rgba(217,119,6,0.55)',   s:'rgba(133,79,11,0.7)'    };
+  // A e B 100% OPACHI: niente trasparenza, le mesh sono dense come richiesto.
+  // Il painter's algorithm garantisce che i triangoli davanti coprano quelli
+  // dietro in modo ordinato.
+  var COL_A  = { f:'rgb(26,95,158)',  s:'rgb(14,61,102)' };
+  var COL_B  = { f:'rgb(217,119,6)',  s:'rgb(133,79,11)' };
   var allItems = pickItems(trisBg, 6000, COL_BG)
     .concat(pickItems(triA, 8000, COL_A))
     .concat(pickItems(triB, 8000, COL_B));
@@ -4377,22 +4392,22 @@ function misICP_paintView(cv, triA, triB, trisBg, ax1, ax2, axD, title){
   });
   ctx.restore();
   // Legenda A/B in alto a sinistra dentro il viewport
-  var lpd=6, lh=16, lw=70;
+  var lpd=6, lh=18, lw=72;
   ctx.save();
-  ctx.fillStyle='rgba(255,255,255,0.92)';
+  ctx.fillStyle='rgba(255,255,255,0.95)';
   ctx.fillRect(pd+lpd, pd+lpd, lw, lh);
-  ctx.strokeStyle='rgba(0,0,0,0.1)'; ctx.lineWidth=0.5;
+  ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=0.5;
   ctx.strokeRect(pd+lpd, pd+lpd, lw, lh);
   // dot A
   ctx.fillStyle='#1A5F9E'; ctx.beginPath();
-  ctx.arc(pd+lpd+5, pd+lpd+lh/2, 2.2, 0, Math.PI*2); ctx.fill();
+  ctx.arc(pd+lpd+5, pd+lpd+5.5, 2.4, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle='#0F1923'; ctx.font='bold 7px monospace'; ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.fillText('A Riferimento', pd+lpd+10, pd+lpd+5);
+  ctx.fillText('A Riferimento', pd+lpd+11, pd+lpd+5.5);
   // dot B
   ctx.fillStyle='#D97706'; ctx.beginPath();
-  ctx.arc(pd+lpd+5, pd+lpd+lh-4, 2.2, 0, Math.PI*2); ctx.fill();
+  ctx.arc(pd+lpd+5, pd+lpd+lh-5.5, 2.4, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle='#0F1923';
-  ctx.fillText('B Misurato', pd+lpd+10, pd+lpd+lh-4);
+  ctx.fillText('B Misurato', pd+lpd+11, pd+lpd+lh-5.5);
   ctx.restore();
   // Footer scuro col titolo della vista
   ctx.fillStyle='rgba(31,41,55,0.7)'; ctx.fillRect(pd,pd+vh,vw,th);
