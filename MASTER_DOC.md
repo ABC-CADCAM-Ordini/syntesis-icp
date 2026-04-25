@@ -603,3 +603,105 @@ Pendenze su altri moduli:
 ---
 
 *Fine appendice 2026-04-25 — v7.3.8.001 deploy SUCCESS commit 92df1543 — Sezione redatta da Claude in sessione lunga con Francesco Biaggini, dalla notte del 2026-04-25 alla mattina dello stesso giorno*
+
+
+# Appendice B — v7.3.9.001 (2026-04-25 pomeriggio)
+
+## B.1 Sintesi del rilascio
+
+Versione `v7.3.9.001`. Commit di chiusura: `5111c84e` (cancellazione legacy). Deploy Railway SUCCESS alle 12:09 UTC. Live su `https://syntesis-icp-production.up.railway.app/` e su `https://app.syntesis-icp.com/`.
+
+Lo scopo del rilascio è duplice: pulire l'architettura della splash e dei moduli, ripristinare la parità del PDF Clinico con la versione del Comparator del 22/04 (16+ pagine inclusi i confronti inter-centroide).
+
+## B.2 Pulizia architetturale
+
+Il vecchio modello a tre tessere (Misurare, Sostituire, Analizzare) era una stratificazione storica: i primi due erano moduli standalone (`syntesis-calibrator-v4.html` e `syntesis-icp-replacer.html`), mentre Analizzare conteneva una versione integrata di entrambi i workflow oltre alla nuova analisi MUA. La duplicazione era diventata onere di manutenzione: ogni fix andava replicato.
+
+Il rilascio v7.3.9.001 dismette i due file standalone e consolida tutto in `syntesis-analyzer-v3b.html`, che ora è l'unica destinazione operativa. La splash ridotta a tessera unica esprime questa scelta: una sola porta d'ingresso, l'ambiente unificato.
+
+Endpoint Python rimossi da `backend/main.py`:
+
+```python
+@app.get("/replacer")    # rimosso
+@app.get("/calibrare")   # rimosso (con il suo fallback raw GitHub di 16 righe)
+```
+
+Il file `main.py` passa da 366 a 341 righe. Gli endpoint dismessi rispondono ora `404 Not Found`. L'endpoint `/` continua a servire `index.html`, `/analizzare` continua a servire l'analyzer.
+
+File legacy cancellati dal repo:
+
+- `backend/static/syntesis-calibrator-v4.html` — il Comparator standalone (~3300 righe)
+- `backend/static/syntesis-icp-replacer.html` — il Replacer standalone
+
+## B.3 Splash a tessera unica
+
+`backend/static/index.html`. La grid CSS a tre colonne (`#splash .sp-cards{display:grid; grid-template-columns:1fr 1fr 1fr}`) è stata sostituita da un layout flex centrato con larghezza massima 560 px. Le tre classi cromatiche `.measure`, `.replace`, `.analyze` (azzurro, verde, ambra) sono state rimosse: la tessera unica usa solo la palette blu (`#0052A3`).
+
+La nuova tessera ha dimensioni più generose (padding 42×38, titolo 26 px, numero 78 px in opacità 0.06) e descrive sinteticamente i quattro workflow integrati:
+
+> Workflow integrati: Analizza · Accoppia · Misura · Sostituisci  
+> Mappa sottosquadri · Asse medio · Divergenze  
+> Report PDF e Excel multi-tipo · Fresatura avanzata
+
+Il bottone esegue direttamente `window.location='/analizzare'`. Etichetta della versione: `v7.3.9.001`.
+
+## B.4 Multi-report PDF e Excel: cosa è già attivo
+
+Il refactor del sistema di generazione report era stato sviluppato in working copy locale durante una sessione precedente ma non era stato pushato su `main`. Questo rilascio lo pubblica. Il sistema espone quattro voci nel menu "Scarica report" del modulo Misurare di Analizzare:
+
+| Voce | Funzione | Output |
+|---|---|---|
+| Clinico (PDF) | `misICP_renderClinicalPDF(data)` | Cover + N pagine cilindro + N(N-1)/2 pagine coppie inter-centroide |
+| Taratura (PDF) | `misICP_renderCalibrationPDF(data)` | Cover + sintesi metrologica + RMSD + anisotropia XY/Z |
+| Analisi (PDF) | `misICP_renderAnalysisPDF(data)` | Versione estesa con coppie e raw data (~20 pagine) |
+| Tabella dati (Excel) | `misICP_renderExcel(data)` | Quattro fogli `.xlsx` italiani |
+
+Punto di ingresso unificato: `misICP_generateReport(kind)` con `kind ∈ {'clinico','taratura','analisi','excel'}`. La funzione legacy `misICP_generatePDF()` resta come alias retro-compatibile e mappa internamente su `'clinico'`.
+
+I dati comuni a tutti i report sono prodotti da una sola funzione, `misICP_buildReportData()`, che restituisce l'oggetto canonico con `pairs`, `nCyl`, `rmsdUm`, `interCentroidPairs`, e così via. Ogni renderer riceve questo oggetto e produce il proprio output: la struttura mantiene una single source of truth e separa il calcolo dal layout.
+
+I fogli Excel hanno intestazioni in italiano (`Cilindri`, `Coppie`, `Parametri`, `Metadati`) per coerenza con la lingua dell'interfaccia. Il Report Taratura include nomi file, data e orario in cover, come il Clinico.
+
+## B.5 Ripristino delle pagine coppie inter-centroide
+
+Il PDF Clinico del 22/04 prodotto dal Comparator originale aveva 16 pagine: cover, 5 pagine cilindro, 10 pagine coppie inter-centroide (combinazioni $C(5,2) = 10$). Il PDF prodotto dal modulo Misurare di Analizzare aveva invece solo 6 pagine (cover + 5 cilindri): le 10 pagine coppie erano scomparse nel passaggio dalla versione esterna `pdf-gen.js` alla funzione interna semplificata.
+
+Il refactor ora pubblicato ripristina la parità. La funzione `misICP_renderClinicalPDF` aggiunge esplicitamente il loop sulle coppie inter-centroide:
+
+```javascript
+data.interCentroidPairs.forEach(function(ic, pi){
+  doc.addPage();
+  misICP_pdfDrawInterCentroidPage(doc, data, pi);
+  misICP_pdfFooter(doc,
+    'Syntesis-ICP - Distanza inter-centroide #'+ic.i+'-#'+ic.j,
+    'Pag. '+(1+data.nCyl+pi+1)+' / '+totPages,
+    false);
+});
+```
+
+La funzione `misICP_pdfDrawInterCentroidPage` (riga ~4642 del file analyzer) costruisce ogni pagina coppia con: header con badge cromatico classificato per soglia `Δ` (verde <50 µm, ambra <100 µm, arancio <200 µm, rosso oltre), mappa di proiezione PCA globale dei centroidi (proiezione condivisa tra tutte le pagine per avere stessa scala), tabella distanza A vs distanza B post-ICP, riga "Δ" con valore in micrometri.
+
+Per cinque scanbody il PDF Clinico ora ha 16 pagine; per quattro ne avrebbe 11 (cover + 4 cilindri + 6 coppie); per sei ne avrebbe 22 (cover + 6 cilindri + 15 coppie). La formula `1 + N + N·(N-1)/2` cresce in modo quadratico col numero di scanbody.
+
+## B.6 Lezione operativa: working copy non pushata
+
+Il sintomo iniziale era che il PDF prodotto dall'Analyzer fosse parziale (6 pagine invece di 16). L'ipotesi naturale era un bug nella funzione di generazione. La verifica ha mostrato invece che il codice corretto era già scritto nel file locale ma non pushato su `main`: il file su GitHub aveva 2.467 MB e 0 occorrenze del pattern `interCentroidPairs`, mentre la copia locale aveva 2.498 MB e 30 occorrenze. La differenza, 31 KB, è esattamente l'intera implementazione multi-report.
+
+La lezione è prosaica ma utile: prima di sviluppare di nuovo qualcosa che sembra mancare, confrontare la working copy locale con il branch remoto. In sessioni lunghe distribuite su più giorni, è facile che codice già scritto non sia mai uscito dalla sandbox di sviluppo. Il diff tra `wc -c file_locale.html` e il valore restituito da GitHub raw è il primo controllo da fare.
+
+## B.7 Stato del sistema
+
+Live URLs attivi: `https://syntesis-icp-production.up.railway.app/`, `https://app.syntesis-icp.com/` (CNAME register.it). Endpoint Python: `/`, `/analizzare`, `/api/analyze`, `/api/report/{id}`, `/api/leaderboard`, `/api/analyze-public`, `/api/health`. Modulo unificato in `backend/static/syntesis-analyzer-v3b.html` (12 249 righe, 2.499 MB).
+
+Il file `syntesis-analyzer-v3b.html` ora coincide tra working copy e produzione: nessuna divergenza pendente.
+
+## B.8 Pendenze rimandate
+
+- Affinamento dei tre nuovi report (Taratura, Analisi, Excel) sulla base del feedback reale di Francesco dopo i primi utilizzi clinici. Una v7.3.9.002 può intervenire su layout, contenuti, ordinamento dei fogli Excel.
+- DS1 cap-clustering DBSCAN: prototipo validato 6/6 e 5/5 sui casi di test, integrazione invasiva rimandata.
+- Filtro Upper passo 2 (5→4 candidati): rimandato.
+- DNS register.it CNAME `app.syntesis-icp.com`: rimandato (Francesco "importa poco ora").
+
+---
+
+*Fine appendice B — v7.3.9.001 deploy SUCCESS commit 5111c84e — Sezione redatta da Claude il pomeriggio del 2026-04-25*
