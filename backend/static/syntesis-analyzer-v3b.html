@@ -4666,67 +4666,123 @@ function misICP_pdfFooter(doc, title, pageInfo, darkBg){
  * Disegna la copertina comune (sfondo scuro, anello, badge, info, mappa).
  */
 function misICP_pdfDrawCover(doc, data, reportTitle){
+  // COVER CLINICO v7.3.9.021: anello smooth gradient + logo bianco
   var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
   function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
   function setTxt (hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+  function setDraw(hex){ var c=misICP_hexRGB(hex); doc.setDrawColor(c[0],c[1],c[2]); }
 
   doc.setFillColor(13,27,42); doc.rect(0,0,W,H,'F');
   doc.setFillColor(255,215,0); doc.rect(0,0,W,3,'F');
   doc.setFillColor(245,158,11); doc.rect(0,3,W,1.5,'F');
 
-  // Titolo
-  doc.setFont('helvetica','bold'); doc.setFontSize(22); setTxt('#FFFFFF');
-  doc.text('Syntesis-ICP', W/2, 28, {align:'center'});
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#B0B8C1');
-  doc.text(reportTitle, W/2, 34, {align:'center'});
-
-  // Anello score
-  var cx2=W/2, cy2=72, ringR=22;
-  doc.setDrawColor(40,50,65); doc.setLineWidth(6);
-  doc.circle(cx2, cy2, ringR, 'S');
-  var pct = data.score/100;
-  var segs = 64;
-  var colRGB = misICP_hexRGB(data.lv.col);
-  doc.setDrawColor(colRGB[0], colRGB[1], colRGB[2]);
-  doc.setLineWidth(6);
-  var prev=null;
-  for(var sI=0; sI<=segs*pct; sI++){
-    var ang = -Math.PI/2 + (sI/segs)*Math.PI*2;
-    var x = cx2 + ringR*Math.cos(ang);
-    var y = cy2 + ringR*Math.sin(ang);
-    if(prev) doc.line(prev[0], prev[1], x, y);
-    prev=[x,y];
+  // Logo Synthesis bianco grande
+  var whiteLogoSrc = (function(){
+    try {
+      var imgEl = document.querySelector('img.logo-img');
+      if(!imgEl || !imgEl.complete || !imgEl.naturalWidth) return null;
+      var c = document.createElement('canvas');
+      c.width = imgEl.naturalWidth; c.height = imgEl.naturalHeight;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(imgEl, 0, 0);
+      var imgData = ctx.getImageData(0, 0, c.width, c.height);
+      var d = imgData.data;
+      for(var i=0; i<d.length; i+=4){
+        if(d[i+3] > 0){ d[i]=255; d[i+1]=255; d[i+2]=255; }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      return c.toDataURL('image/png');
+    } catch(e){ return null; }
+  })();
+  if(whiteLogoSrc){
+    try { doc.addImage(whiteLogoSrc, 'PNG', (W-65)/2, 13, 65, 19); } catch(e){}
   }
-  doc.setFont('helvetica','bold'); doc.setFontSize(24); setTxt(data.lv.col);
-  doc.text(data.score.toFixed(2), cx2, cy2+2, {align:'center'});
-  doc.setFontSize(8); setTxt('#7A90A4');
-  doc.text('/100', cx2, cy2+8, {align:'center'});
 
-  // Badge label
-  var pillY=100, pillH=10, pillW=50, pillX=(W-pillW)/2;
-  var bgRGB=misICP_hexRGB(data.lv.bg);
+  doc.setFont('helvetica','bold'); doc.setFontSize(20); setTxt('#FFFFFF');
+  doc.text('Syntesis-ICP', W/2, 40, {align:'center'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#B0B8C1');
+  doc.text(reportTitle, W/2, 46, {align:'center'});
+
+  // Anello smooth gradient conico
+  var scoreRingSrc = (function(){
+    var sizePx = 700;
+    var c = document.createElement('canvas');
+    c.width = sizePx; c.height = sizePx;
+    var ctx = c.getContext('2d');
+    var cx = sizePx/2, cy = sizePx/2;
+    var lineW = sizePx * 0.085;
+    var ringR = (sizePx - lineW)/2 - 10;
+
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = lineW;
+    ctx.strokeStyle = '#28323F';
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringR, 0, 2*Math.PI);
+    ctx.stroke();
+
+    var pct = Math.max(0, Math.min(1, (data.score||0)/100));
+    if(pct > 0){
+      var baseCol = (data.lv && data.lv.col) ? data.lv.col : '#0D9E6E';
+      var stroke;
+      if(typeof ctx.createConicGradient === 'function'){
+        var grad = ctx.createConicGradient(-Math.PI/2, cx, cy);
+        grad.addColorStop(0,                       '#FFE05C');
+        grad.addColorStop(Math.min(0.18, pct*0.4), '#FFCC55');
+        grad.addColorStop(Math.min(0.45, pct*0.75),'#F59E0B');
+        grad.addColorStop(pct,                     baseCol);
+        grad.addColorStop(1,                       baseCol);
+        stroke = grad;
+      } else {
+        stroke = baseCol;
+      }
+      ctx.strokeStyle = stroke;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(cx, cy, ringR, -Math.PI/2, -Math.PI/2 + pct * 2*Math.PI);
+      ctx.stroke();
+
+      ctx.shadowColor = baseCol;
+      ctx.shadowBlur = sizePx * 0.04;
+      ctx.lineWidth = lineW * 0.4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, ringR, -Math.PI/2, -Math.PI/2 + pct * 2*Math.PI);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    return c.toDataURL('image/png');
+  })();
+  var ringSize = 50, ringX = (W - ringSize)/2, ringY = 53;
+  if(scoreRingSrc){
+    try { doc.addImage(scoreRingSrc, 'PNG', ringX, ringY, ringSize, ringSize); } catch(e){}
+  }
+  setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(22);
+  doc.text((data.score||0).toFixed(2), W/2, ringY + ringSize/2 + 1, {align:'center'});
+  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.text('/100', W/2, ringY + ringSize/2 + 6, {align:'center'});
+
+  // Badge giudizio
+  var pillY = ringY + ringSize + 6, pillH = 11, pillW = 78, pillX = (W-pillW)/2;
+  var bgRGB = misICP_hexRGB(data.lv.bg);
   doc.setFillColor(bgRGB[0],bgRGB[1],bgRGB[2]);
   doc.roundedRect(pillX, pillY, pillW, pillH, 4, 4, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt(data.lv.fg);
-  doc.text(data.lv.label.toUpperCase(), W/2, pillY+6.8, {align:'center'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); setTxt(data.lv.fg);
+  doc.text(data.lv.label.toUpperCase(), W/2, pillY+7.5, {align:'center'});
 
   // Info box
-  var infoY=120;
-  var infos=[
+  var infoY = pillY + pillH + 8;
+  var infos = [
     ['File A (riferimento)', data.fileA],
     ['File B (confronto)',   data.fileB],
     ['N scanbody',           String(data.nCyl)],
-    ['RMSD ICP',             (data.rmsdUm).toFixed(1)+' \u03bcm'],
+    ['RMSD ICP',             (data.rmsdUm).toFixed(1)+' \u00b5m'],
     ['Data analisi',         misICP_fmtDateTime(data.timestamp)]
   ];
   infos.forEach(function(row,ii){
     var rowY = infoY + ii*8;
-    setTxt('#7A90A4');
-    doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(7);
     doc.text(row[0], ml+4, rowY);
-    setTxt('#FFFFFF');
-    doc.setFont('helvetica','bold'); doc.setFontSize(9);
-    doc.text(row[1], W-mr-4, rowY, {align:'right'});
+    setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.text(String(row[1]), W-mr-4, rowY, {align:'right'});
     doc.setDrawColor(40,50,65); doc.setLineWidth(0.15);
     doc.line(ml+4, rowY+1.5, W-mr-4, rowY+1.5);
   });
@@ -4738,10 +4794,9 @@ function misICP_pdfDrawCover(doc, data, reportTitle){
   var mapCanvas=document.createElement('canvas');
   mapCanvas.width=880; mapCanvas.height=480;
   misICP_drawColorMap(mapCanvas, data.pairs);
-  var mapH=70;
+  var mapH = 60;
   doc.addImage(mapCanvas.toDataURL('image/png'), 'PNG', ml, mapY+3, cw, mapH);
 
-  // Legenda
   var legY = mapY + 3 + mapH + 4;
   var levels=[
     {c:'#639922', lbl:'0-50 Ottimo'},
@@ -6548,59 +6603,60 @@ function misICP_updateLabels(){
   if(!vp) return;
   var rect = vp.getBoundingClientRect();
   var W = rect.width, H = rect.height;
-  // FIX v7.3.9.021: replica pattern Analizza con leader line.
-  // Pulisco le linee SVG (riuso il layer #labelLines)
+
+  // FIX v7.3.9.021: leader line in SCREEN-SPACE.
+  // Bug precedente: offset 8mm lungo camera.up.world -> direzione casuale dipendente
+  // dall'orientamento della camera. La camera \u00e8 framed sul modello (target!=origin),
+  // quindi un offset world-space non corrisponde a "verso l'alto" sullo schermo.
+  // Soluzione: proietto il centroide, poi offset in pixel sull'asse Y schermo.
   var svg = document.getElementById('labelLines');
   if(svg){
-    // FIX v7.3.9.021: riattivo il layer (era spento da _setAnalyzaArtifactsVisible
-    // all'ingresso in Misurare, quindi le linee non si vedevano)
     svg.style.display = '';
     while(svg.firstChild) svg.removeChild(svg.firstChild);
   }
-  // Direzione "alto" della camera per offset coerente con la vista corrente.
-  // In Misurare non ho l'asse del cilindro nel pair (struct cA/cB/d3 only),
-  // quindi uso camera.up come direzione di stacco label.
-  var upDir = camera.up.clone().normalize();
   var pairs = misICP_result.pairs;
+  var LABEL_OFFSET_PX = 56;
   for(var i=0;i<pairs.length;i++){
     var el = misICP_labels[i];
     if(!el) continue;
     var p = pairs[i];
     if(p.iB<0 || !p.cA){ el.style.display='none'; continue; }
-    // Anchor: centroide A nel mondo. Label: 8mm sopra (lungo upDir camera).
+
     var anchor = new THREE.Vector3(p.cA[0], p.cA[1], p.cA[2]);
-    var labelPos = anchor.clone().addScaledVector(upDir, 8);
     var va = anchor.clone().project(camera);
-    var vl = labelPos.clone().project(camera);
-    if(va.z > 1 || va.z < -1 || vl.z > 1 || vl.z < -1){ el.style.display='none'; continue; }
+    if(va.z > 1 || va.z < -1){ el.style.display='none'; continue; }
     var anchorX = (va.x * 0.5 + 0.5) * W;
     var anchorY = (-va.y * 0.5 + 0.5) * H;
-    var labelX  = (vl.x * 0.5 + 0.5) * W;
-    var labelY  = (-vl.y * 0.5 + 0.5) * H;
+
     el.style.display = '';
-    el.style.left = labelX + 'px';
-    el.style.top  = labelY + 'px';
-    // Disegno la linea di congiunzione nel SVG (anchor -> label)
+    var labelW = el.offsetWidth || 60;
+    var labelH = el.offsetHeight || 22;
+    var labelCenterX = anchorX;
+    var labelCenterY = anchorY - LABEL_OFFSET_PX;
+    el.style.left = (labelCenterX - labelW/2) + 'px';
+    el.style.top  = (labelCenterY - labelH/2) + 'px';
+
     if(svg){
       var color = (p.level && p.level.col) ? p.level.col : '#639922';
+      var lineFromX = labelCenterX;
+      var lineFromY = labelCenterY + labelH/2;
       var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', anchorX);
-      line.setAttribute('y1', anchorY);
-      line.setAttribute('x2', labelX);
-      line.setAttribute('y2', labelY);
+      line.setAttribute('x1', lineFromX);
+      line.setAttribute('y1', lineFromY);
+      line.setAttribute('x2', anchorX);
+      line.setAttribute('y2', anchorY);
       line.setAttribute('stroke', color);
       line.setAttribute('stroke-width', '1.5');
-      line.setAttribute('opacity', '0.75');
+      line.setAttribute('opacity', '0.8');
       svg.appendChild(line);
       var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       dot.setAttribute('cx', anchorX);
       dot.setAttribute('cy', anchorY);
       dot.setAttribute('r', 3);
       dot.setAttribute('fill', color);
-      dot.setAttribute('opacity', '0.9');
+      dot.setAttribute('opacity', '0.95');
       svg.appendChild(dot);
     }
-    // Evidenzia se corrisponde al selezionato
     if(misICP_selectedIdx === i) el.classList.add('sel');
     else                         el.classList.remove('sel');
   }
