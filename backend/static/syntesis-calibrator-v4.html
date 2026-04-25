@@ -3014,12 +3014,21 @@ function exportPDF(){
       ['Deviazione Y', (dyum>=0?'+':'')+dyum+' µm', '', ''],
       ['Deviazione Z (verticale)', (dzum>=0?'+':'')+dzum+' µm', '', ''],
     ];
-    if(axInfo){
+    // Fix v7.3.8.002: sempre presenti tutte le righe della tabella misurazioni.
+    // Se il dato non è disponibile, mostra "n/d" invece di omettere la riga.
+    // Coerenza visiva tra report di casi diversi e diagnostica esplicita.
+    if(axInfo && axInfo.angleDeg !== null && axInfo.angleDeg !== undefined){
       var axLv=clinAxis(axInfo.angleDeg);
       rows.push(['Angolo asse cilindro', axInfo.angleDeg.toFixed(3)+'°', axLv.label, '']);
+    } else {
+      rows.push(['Angolo asse cilindro', 'n/d', '—', '']);
     }
     rows.push(['Centroide A (X,Y,Z)', pp.a[0].toFixed(3)+', '+pp.a[1].toFixed(3)+', '+pp.a[2].toFixed(3)+' mm', '', '']);
-    if(pp.b) rows.push(['Centroide B allineato', pp.b[0].toFixed(3)+', '+pp.b[1].toFixed(3)+', '+pp.b[2].toFixed(3)+' mm', '', '']);
+    if(pp.b){
+      rows.push(['Centroide B allineato', pp.b[0].toFixed(3)+', '+pp.b[1].toFixed(3)+', '+pp.b[2].toFixed(3)+' mm', '', '']);
+    } else {
+      rows.push(['Centroide B allineato', 'n/d (ICP non riuscito)', '—', '']);
+    }
 
     doc.autoTable({
       startY:y,
