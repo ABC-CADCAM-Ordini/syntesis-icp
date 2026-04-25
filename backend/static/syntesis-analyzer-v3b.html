@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.007</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Plus Jakarta Sans',sans-serif;--mono:'DM Mono',monospace}
@@ -323,6 +323,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
+      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.007</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -905,6 +906,9 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
+window.ANALIZZA_BUILD = '7.3.9.007';
+window.ANALIZZA_BUILD_DATE = '2026-04-25';
+console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
 var analysisMode='misura'; // 'misura' (default, analisi angolare) | 'accoppia' (export STL)
@@ -4511,7 +4515,8 @@ function misICP_buildReportData(){
       dxy: pp.dxy, d3: pp.d3,
       trisA: pp.trisA, trisB: pp.trisBt,
       iA: pp.iA, iB: pp.iB,
-      axAngleDeg: pp.axAngleDeg
+      axAngleDeg: pp.axAngleDeg,
+      axA: pp.axA, axBt: pp.axBt
     };
   }).filter(function(pp){return pp.b !== null;});
   if(!pdfPairs.length) throw new Error('Nessuna coppia valida per il report.');
@@ -4553,7 +4558,12 @@ function misICP_buildReportData(){
     interCentroidPairs: interCentroidPairs,
     fileA: (misICP_result.fileA||'A').replace(/\.stl$/i,'').slice(0,40),
     fileB: (misICP_result.fileB||'B').replace(/\.stl$/i,'').slice(0,40),
+    fileAfull: misICP_result.fileA || '',
+    fileBfull: misICP_result.fileB || '',
     rmsdUm: misICP_result.rmsdUm,
+    avgAngle: (misICP_result.avgAngle != null) ? misICP_result.avgAngle : 0,
+    icpR: misICP_result.R || [[1,0,0],[0,1,0],[0,0,1]],
+    icpT: misICP_result.t || [0,0,0],
     nCyl: pdfPairs.length,
     timestamp: new Date()
   };
@@ -5457,7 +5467,7 @@ function misICP_renderClinicalPDF(data){
   var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.007)', null, true);
 
   // Pagina 2: Note metodologiche (statica, identica per ogni report)
   doc.addPage();
@@ -5509,7 +5519,7 @@ function misICP_renderCalibrationPDF(data){
 
   // Cover identica al Clinico ma con sottotitolo "Taratura"
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Taratura');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Taratura (Analizza v7.3.9)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Taratura (Analizza v7.3.9.007)', null, true);
 
   // ── PAGINA 2: SINTESI METROLOGICA ─────────────────────────────────
   doc.addPage();
@@ -5753,90 +5763,291 @@ function misICP_renderExcel(data){
   }
   var wb = XLSX.utils.book_new();
 
-  // Foglio 1: Cilindri
-  var cilHeader = ['#', 'Centroide A X (mm)', 'Centroide A Y (mm)', 'Centroide A Z (mm)',
-                   'Centroide B X (mm)', 'Centroide B Y (mm)', 'Centroide B Z (mm)',
-                   'Deviazione X (μm)', 'Deviazione Y (μm)', 'Deviazione Z (μm)',
-                   '|D| 3D (μm)', '|D| XY (μm)', 'Angolo asse A-B (deg)',
-                   'Classe |D| 3D', 'Classe asse'];
+  var fileAfull = data.fileAfull || data.fileA || 'A';
+  var fileBfull = data.fileBfull || data.fileB || 'B';
+  var dtStr = misICP_fmtDateTime(data.timestamp);
+  var dtIso = data.timestamp ? data.timestamp.toISOString() : '';
+  var avgAngle = (data.avgAngle != null) ? data.avgAngle : 0;
+  var lvLabel = (data.lv && data.lv.label) ? data.lv.label : 'n/d';
+
+  // Header di tracciabilità ripetuto su ogni foglio operativo
+  function buildHeader(sheetTitle){
+    return [
+      ['SYNTESIS-ICP - ' + sheetTitle],
+      ['File A (riferimento)',  fileAfull],
+      ['File B (confronto)',    fileBfull],
+      ['Data analisi',          dtStr],
+      ['N. scanbody analizzati', data.nCyl],
+      ['RMSD ICP globale (μm)',  Number((data.rmsdUm||0).toFixed(2))],
+      ['Voto globale',           Number((data.score||0).toFixed(2)) + ' / 100  (' + lvLabel + ')'],
+      []
+    ];
+  }
+
+  // ─────────────────────────────────────────────────────
+  // FOGLIO 1: SOMMARIO
+  // ─────────────────────────────────────────────────────
+  var summary = [
+    ['SYNTESIS-ICP — REPORT MISURE'],
+    [],
+    ['IDENTIFICAZIONE'],
+    ['File A (riferimento)',   fileAfull],
+    ['File B (confronto)',     fileBfull],
+    ['Data analisi (locale)',  dtStr],
+    ['Data analisi (ISO 8601)', dtIso],
+    [],
+    ['RISULTATI GLOBALI'],
+    ['N. scanbody analizzati',  data.nCyl,                            ''],
+    ['RMSD ICP globale',        Number((data.rmsdUm||0).toFixed(2)),  'μm'],
+    ['Angolo asse medio',       Number(avgAngle.toFixed(3)),          'deg'],
+    ['Voto globale',            Number((data.score||0).toFixed(2)),   '/100'],
+    ['Classificazione',         lvLabel,                              ''],
+    ['Scala mappa colorimetrica', data.scaleUm,                       'μm'],
+    [],
+    ['SOFTWARE'],
+    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.007)'],
+    ['Produttore',   'Biaggini Medical Devices S.r.l.'],
+    ['Sito',         'https://syntesis-icp.com'],
+    [],
+    ['NOTE METODOLOGICHE'],
+    ['Algoritmo allineamento', 'Kabsch + SVD + ICP iterativo'],
+    ['Riferimento misure',     'Centroidi e assi degli scanbody (cap-based PCA)'],
+    ['Unità centroidi',        'mm'],
+    ['Unità deviazioni',       'μm (1/1000 mm)'],
+    ['Unità angoli',           'gradi sessagesimali']
+  ];
+  var wsS = XLSX.utils.aoa_to_sheet(summary);
+  wsS['!cols'] = [{wch:32},{wch:46},{wch:10}];
+  wsS['!merges'] = [{s:{r:0,c:0},e:{r:0,c:2}}];
+  XLSX.utils.book_append_sheet(wb, wsS, 'Sommario');
+
+  // ─────────────────────────────────────────────────────
+  // FOGLIO 2: CILINDRI (esteso con indici, assi, triangoli)
+  // ─────────────────────────────────────────────────────
+  var cilHeader = [
+    '#', 'Idx A', 'Idx B',
+    'Centroide A X (mm)', 'Centroide A Y (mm)', 'Centroide A Z (mm)',
+    'Centroide B X (mm)', 'Centroide B Y (mm)', 'Centroide B Z (mm)',
+    'Asse A dir X', 'Asse A dir Y', 'Asse A dir Z',
+    'Asse B dir X', 'Asse B dir Y', 'Asse B dir Z',
+    'Deviazione X (μm)', 'Deviazione Y (μm)', 'Deviazione Z (μm)',
+    '|D| 3D (μm)', '|D| XY (μm)',
+    'Angolo asse A-B (deg)',
+    'Triangoli A', 'Triangoli B',
+    'Classe |D| 3D', 'Classe asse'
+  ];
   var cilData = data.pairs.map(function(p, i){
     var ax = data.cylAxes[i];
     var d3um = Math.round(p.d3*1000);
     var clv = misICP_clinLevel(d3um);
     var axLvl = ax ? misICP_clinAx(ax.angleDeg).label : 'n/d';
+    var axA = p.axA || [null,null,null];
+    var axB = p.axBt || [null,null,null];
+    var nA = (p.trisA && p.trisA.length) || 0;
+    var nB = (p.trisB && p.trisB.length) || 0;
     return [
       i+1,
-      Number(p.a[0].toFixed(3)), Number(p.a[1].toFixed(3)), Number(p.a[2].toFixed(3)),
-      Number(p.b[0].toFixed(3)), Number(p.b[1].toFixed(3)), Number(p.b[2].toFixed(3)),
+      (p.iA != null ? p.iA : ''),
+      (p.iB != null ? p.iB : ''),
+      Number(p.a[0].toFixed(4)), Number(p.a[1].toFixed(4)), Number(p.a[2].toFixed(4)),
+      Number(p.b[0].toFixed(4)), Number(p.b[1].toFixed(4)), Number(p.b[2].toFixed(4)),
+      (axA[0]!=null) ? Number(axA[0].toFixed(6)) : '',
+      (axA[1]!=null) ? Number(axA[1].toFixed(6)) : '',
+      (axA[2]!=null) ? Number(axA[2].toFixed(6)) : '',
+      (axB[0]!=null) ? Number(axB[0].toFixed(6)) : '',
+      (axB[1]!=null) ? Number(axB[1].toFixed(6)) : '',
+      (axB[2]!=null) ? Number(axB[2].toFixed(6)) : '',
       Math.round(p.dx*1000), Math.round(p.dy*1000), Math.round(p.dz*1000),
       d3um, Math.round(p.dxy*1000),
       ax ? Number(ax.angleDeg.toFixed(3)) : '',
-      clv.label,
-      axLvl
+      nA, nB,
+      clv.label, axLvl
     ];
   });
-  var ws1 = XLSX.utils.aoa_to_sheet([cilHeader].concat(cilData));
-  ws1['!cols'] = cilHeader.map(function(){return {wch:14};});
+  var cilSheet = buildHeader('Cilindri (centroidi, assi, deviazioni)').concat([cilHeader]).concat(cilData);
+  var ws1 = XLSX.utils.aoa_to_sheet(cilSheet);
+  ws1['!cols'] = cilHeader.map(function(h){
+    if(h === '#') return {wch:5};
+    if(/^Idx/.test(h)) return {wch:6};
+    if(/Triangoli/.test(h)) return {wch:11};
+    if(/Classe/.test(h)) return {wch:14};
+    return {wch:14};
+  });
   XLSX.utils.book_append_sheet(wb, ws1, 'Cilindri');
 
-  // Foglio 2: Coppie inter-centroide
-  var cpHeader = ['Coppia', 'Cilindro i', 'Cilindro j', 'Distanza A (μm)', 'Distanza B (μm)', 'Δ (μm)', '|Δ| (μm)', 'Valutazione'];
-  var cpData = data.interCentroidPairs.map(function(c, ci){
-    return [
-      '#'+c.i+'-#'+c.j,
-      c.i, c.j,
-      Number(c.distA_um.toFixed(1)),
-      Number(c.distB_um.toFixed(1)),
-      Number(c.delta_um.toFixed(1)),
-      Number(Math.abs(c.delta_um).toFixed(1)),
-      c.lv.label
-    ];
+  // ─────────────────────────────────────────────────────
+  // FOGLIO 3: COPPIE INTER-CENTROIDE (con vettori completi)
+  // ─────────────────────────────────────────────────────
+  var cpHeader = [
+    'Coppia', 'Cilindro i', 'Cilindro j',
+    'A: dx (mm)', 'A: dy (mm)', 'A: dz (mm)', 'Distanza A (μm)',
+    'B: dx (mm)', 'B: dy (mm)', 'B: dz (mm)', 'Distanza B (μm)',
+    'Δ (μm)', '|Δ| (μm)',
+    'Vett. B-A: dx (μm)', 'Vett. B-A: dy (μm)', 'Vett. B-A: dz (μm)',
+    'Valutazione'
+  ];
+  var cpData = [];
+  for(var ii=0; ii<data.pairs.length; ii++){
+    for(var jj=ii+1; jj<data.pairs.length; jj++){
+      var pi = data.pairs[ii], pj = data.pairs[jj];
+      var dxA = pj.a[0]-pi.a[0], dyA = pj.a[1]-pi.a[1], dzA = pj.a[2]-pi.a[2];
+      var dxB = pj.b[0]-pi.b[0], dyB = pj.b[1]-pi.b[1], dzB = pj.b[2]-pi.b[2];
+      var distA_um = Math.sqrt(dxA*dxA+dyA*dyA+dzA*dzA)*1000;
+      var distB_um = Math.sqrt(dxB*dxB+dyB*dyB+dzB*dzB)*1000;
+      var delta_um = distB_um - distA_um;
+      var diffX_um = (dxB - dxA) * 1000;
+      var diffY_um = (dyB - dyA) * 1000;
+      var diffZ_um = (dzB - dzA) * 1000;
+      // Recupera la valutazione clinica già calcolata (matcha per indici 1-based)
+      var lvCp = '';
+      for(var kk=0; kk<data.interCentroidPairs.length; kk++){
+        var c = data.interCentroidPairs[kk];
+        if(c.i === ii+1 && c.j === jj+1){ lvCp = c.lv.label; break; }
+      }
+      cpData.push([
+        '#'+(ii+1)+'-#'+(jj+1),
+        ii+1, jj+1,
+        Number(dxA.toFixed(4)), Number(dyA.toFixed(4)), Number(dzA.toFixed(4)),
+        Number(distA_um.toFixed(1)),
+        Number(dxB.toFixed(4)), Number(dyB.toFixed(4)), Number(dzB.toFixed(4)),
+        Number(distB_um.toFixed(1)),
+        Number(delta_um.toFixed(1)),
+        Number(Math.abs(delta_um).toFixed(1)),
+        Number(diffX_um.toFixed(1)),
+        Number(diffY_um.toFixed(1)),
+        Number(diffZ_um.toFixed(1)),
+        lvCp
+      ]);
+    }
+  }
+  var cpSheet = buildHeader('Coppie inter-centroide (passive fit)').concat([cpHeader]).concat(cpData);
+  var ws2 = XLSX.utils.aoa_to_sheet(cpSheet);
+  ws2['!cols'] = cpHeader.map(function(h){
+    if(/^Coppia$/.test(h)) return {wch:11};
+    if(/^Cilindro/.test(h)) return {wch:9};
+    if(/Valutazione/.test(h)) return {wch:14};
+    return {wch:15};
   });
-  var ws2 = XLSX.utils.aoa_to_sheet([cpHeader].concat(cpData));
-  ws2['!cols'] = cpHeader.map(function(){return {wch:14};});
   XLSX.utils.book_append_sheet(wb, ws2, 'Coppie');
 
-  // Foglio 3: Parametri ICP
+  // ─────────────────────────────────────────────────────
+  // FOGLIO 4: TRASFORMAZIONE ICP (R, t, rotazione equivalente)
+  // ─────────────────────────────────────────────────────
+  var R = data.icpR || [[1,0,0],[0,1,0],[0,0,1]];
+  var t = data.icpT || [0,0,0];
+  var tNorm = Math.sqrt(t[0]*t[0] + t[1]*t[1] + t[2]*t[2]);
+  // Angolo rotazione totale dalla traccia: cos(θ) = (trace(R) - 1) / 2
+  var trR = R[0][0] + R[1][1] + R[2][2];
+  var cosT = (trR - 1) / 2;
+  if(cosT > 1)  cosT = 1;
+  if(cosT < -1) cosT = -1;
+  var rotAngleDeg = Math.acos(cosT) * 180 / Math.PI;
+  var icpData = [
+    ['Trasformazione rigida applicata a B per allinearlo ad A:  B\' = R · B + t'],
+    [],
+    ['MATRICE ROTAZIONE R (3x3)'],
+    ['', 'colonna 0', 'colonna 1', 'colonna 2'],
+    ['riga 0', Number(R[0][0].toFixed(8)), Number(R[0][1].toFixed(8)), Number(R[0][2].toFixed(8))],
+    ['riga 1', Number(R[1][0].toFixed(8)), Number(R[1][1].toFixed(8)), Number(R[1][2].toFixed(8))],
+    ['riga 2', Number(R[2][0].toFixed(8)), Number(R[2][1].toFixed(8)), Number(R[2][2].toFixed(8))],
+    [],
+    ['VETTORE TRASLAZIONE t'],
+    ['tx (mm)',  Number(t[0].toFixed(6))],
+    ['ty (mm)',  Number(t[1].toFixed(6))],
+    ['tz (mm)',  Number(t[2].toFixed(6))],
+    ['|t| (mm)', Number(tNorm.toFixed(6))],
+    [],
+    ['ROTAZIONE EQUIVALENTE'],
+    ['Angolo rotazione totale (deg)', Number(rotAngleDeg.toFixed(4))],
+    ['Traccia(R)',                    Number(trR.toFixed(8))],
+    [],
+    ['CONVERGENZA ICP'],
+    ['RMSD finale (mm)', Number(((data.rmsdUm||0)/1000).toFixed(6))],
+    ['RMSD finale (μm)', Number((data.rmsdUm||0).toFixed(2))]
+  ];
+  var icpSheet = buildHeader('Trasformazione ICP').concat(icpData);
+  var ws3 = XLSX.utils.aoa_to_sheet(icpSheet);
+  ws3['!cols'] = [{wch:32},{wch:18},{wch:18},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Trasformazione ICP');
+
+  // ─────────────────────────────────────────────────────
+  // FOGLIO 5: PARAMETRI E SOGLIE CLINICHE
+  // ─────────────────────────────────────────────────────
   var paramData = [
     ['Parametro', 'Valore', 'Unità'],
-    ['RMSD ICP globale', Number(data.rmsdUm.toFixed(2)), 'μm'],
-    ['N scanbody analizzati', data.nCyl, ''],
-    ['Voto globale', Number(data.score.toFixed(2)), '/100'],
-    ['Classificazione', data.lv.label, ''],
-    ['Scala mappa colorimetrica', data.scaleUm, 'μm'],
+    ['RMSD ICP globale',          Number((data.rmsdUm||0).toFixed(2)),    'μm'],
+    ['Angolo asse medio',         Number(avgAngle.toFixed(3)),            'deg'],
+    ['N. scanbody analizzati',    data.nCyl,                              ''],
+    ['Voto globale',              Number((data.score||0).toFixed(2)),     '/100'],
+    ['Classificazione',           lvLabel,                                ''],
+    ['Scala mappa colorimetrica', data.scaleUm,                           'μm'],
     [],
-    ['SOGLIE CLINICHE |D| 3D', '', ''],
-    ['Ottimo (<)', 50, 'μm'],
-    ['Accettabile (<)', 100, 'μm'],
-    ['Rischioso (<)', 150, 'μm'],
-    ['Tensione (<)', 250, 'μm'],
-    ['Fuori (>=)', 250, 'μm'],
+    ['SOGLIE CLINICHE |D| 3D'],
+    ['Ottimo (<)',         50,  'μm'],
+    ['Accettabile (<)',   100,  'μm'],
+    ['Rischioso (<)',     150,  'μm'],
+    ['Tensione (<)',      250,  'μm'],
+    ['Fuori (>=)',        250,  'μm'],
     [],
-    ['SOGLIE CLINICHE ANGOLO ASSE', '', ''],
-    ['Ottimo (<)', 0.5, 'deg'],
-    ['Accettabile (<)', 1.0, 'deg'],
-    ['Rischioso (<)', 2.0, 'deg'],
-    ['Tensione (>=)', 2.0, 'deg']
+    ['SOGLIE CLINICHE ANGOLO ASSE'],
+    ['Ottimo (<)',        0.5, 'deg'],
+    ['Accettabile (<)',   1.0, 'deg'],
+    ['Rischioso (<)',     2.0, 'deg'],
+    ['Tensione (>=)',     2.0, 'deg'],
+    [],
+    ['SOGLIE INTER-CENTROIDE |Δ|'],
+    ['Ottimo (<)',         50,  'μm'],
+    ['Buono (<)',         100,  'μm'],
+    ['Accettabile (<)',   200,  'μm'],
+    ['Verifica (>=)',     200,  'μm']
   ];
-  var ws3 = XLSX.utils.aoa_to_sheet(paramData);
-  ws3['!cols'] = [{wch:30},{wch:18},{wch:10}];
-  XLSX.utils.book_append_sheet(wb, ws3, 'Parametri');
+  var paramSheet = buildHeader('Parametri e soglie cliniche').concat(paramData);
+  var ws4 = XLSX.utils.aoa_to_sheet(paramSheet);
+  ws4['!cols'] = [{wch:32},{wch:18},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws4, 'Parametri');
 
-  // Foglio 4: Metadati
+  // ─────────────────────────────────────────────────────
+  // FOGLIO 6: METADATI (tracciabilità completa)
+  // ─────────────────────────────────────────────────────
+  var ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+  var slugA = misICP_slugifyFilename(fileAfull);
+  var slugB = misICP_slugifyFilename(fileBfull);
   var metaData = [
     ['Campo', 'Valore'],
-    ['File A (riferimento)', data.fileA],
-    ['File B (confronto)', data.fileB],
-    ['Data analisi', misICP_fmtDateTime(data.timestamp)],
-    ['Software', 'Syntesis-ICP - Misurare (Analizza v7.3.9)'],
-    ['Produttore', 'Biaggini Medical Devices S.r.l.'],
-    ['Sito', 'https://syntesis-icp.com']
+    ['File A originale (nome completo)', fileAfull],
+    ['File A slug filesystem',           slugA],
+    ['File B originale (nome completo)', fileBfull],
+    ['File B slug filesystem',           slugB],
+    ['Data analisi (locale)',            dtStr],
+    ['Data analisi (ISO 8601)',          dtIso],
+    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.007)'],
+    ['Produttore',                       'Biaggini Medical Devices S.r.l.'],
+    ['Sito',                             'https://syntesis-icp.com'],
+    ['User-Agent browser',               ua]
   ];
-  var ws4 = XLSX.utils.aoa_to_sheet(metaData);
-  ws4['!cols'] = [{wch:24},{wch:42}];
-  XLSX.utils.book_append_sheet(wb, ws4, 'Metadati');
+  var ws5 = XLSX.utils.aoa_to_sheet(metaData);
+  ws5['!cols'] = [{wch:34},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, ws5, 'Metadati');
 
   return wb;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// HELPER: slugify nome file e timestamp completo (data + ora)
+// ────────────────────────────────────────────────────────────────────
+function misICP_slugifyFilename(s){
+  if(!s) return 'file';
+  var slug = String(s).replace(/\.stl$/i, '')
+                       .replace(/[^A-Za-z0-9_\-]+/g, '_')
+                       .replace(/_+/g, '_')
+                       .replace(/^_+|_+$/g, '');
+  return slug.slice(0, 40) || 'file';
+}
+function misICP_dateTimeSlug(d){
+  d = d || new Date();
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate())
+         + '-' + pad(d.getHours()) + pad(d.getMinutes());
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -5903,8 +6114,12 @@ function misICP_generateReport(kind){
         showStatus('Report Analisi salvato.');
       } else if(kind === 'excel'){
         var wb = misICP_renderExcel(data);
-        XLSX.writeFile(wb, 'SyntesisICP_DatiTabellari_'+dateSlug+'.xlsx');
-        showStatus('Tabella Excel salvata.');
+        var slugA = misICP_slugifyFilename(misICP_result.fileA || data.fileAfull || data.fileA || 'A');
+        var slugB = misICP_slugifyFilename(misICP_result.fileB || data.fileBfull || data.fileB || 'B');
+        var dtSlug = misICP_dateTimeSlug(data.timestamp);
+        var xlsxName = 'SyntesisICP_Misure_' + slugA + '__vs__' + slugB + '_' + dtSlug + '.xlsx';
+        XLSX.writeFile(wb, xlsxName);
+        showStatus('Tabella Excel salvata: ' + xlsxName);
       } else {
         throw new Error('Tipo report sconosciuto: '+kind);
       }
