@@ -803,7 +803,15 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
           <div class="mis-sum-cell"><div class="mis-sum-lbl">Score</div><div class="mis-sum-val" id="misSumScore">--</div><div class="mis-sum-sub" id="misSumLabel">su 100</div></div>
         </div>
         <button class="mis-reset-btn" onclick="misICP_reset()">Ricomincia</button>
-        <button class="mis-btn-run on" id="misBtnPdf" onclick="misICP_generatePDF()" style="margin-top:6px">Scarica report PDF</button>
+        <div id="misReportMenu" style="margin-top:6px;position:relative">
+          <button class="mis-btn-run on" id="misBtnReport" onclick="misICP_toggleReportMenu(event)" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:8px 12px"><span>Scarica report</span><span style="font-size:11px;opacity:0.8">&#9662;</span></button>
+          <div id="misReportDrop" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(13,27,42,0.15);z-index:50;overflow:hidden">
+            <button onclick="misICP_generateReport('clinico')" style="display:block;width:100%;padding:10px 12px;border:none;background:transparent;text-align:left;cursor:pointer;font-family:var(--mono);font-size:11px;border-bottom:1px solid #f0f4f8" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'"><b>Clinico (PDF)</b><br><span style="font-size:9px;color:var(--gray)">Report completo per il caso</span></button>
+            <button onclick="misICP_generateReport('taratura')" style="display:block;width:100%;padding:10px 12px;border:none;background:transparent;text-align:left;cursor:pointer;font-family:var(--mono);font-size:11px;border-bottom:1px solid #f0f4f8" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'"><b>Taratura (PDF)</b><br><span style="font-size:9px;color:var(--gray)">Metrologia scanner</span></button>
+            <button onclick="misICP_generateReport('analisi')" style="display:block;width:100%;padding:10px 12px;border:none;background:transparent;text-align:left;cursor:pointer;font-family:var(--mono);font-size:11px;border-bottom:1px solid #f0f4f8" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'"><b>Analisi (PDF)</b><br><span style="font-size:9px;color:var(--gray)">Esteso con coppie e raw data</span></button>
+            <button onclick="misICP_generateReport('excel')" style="display:block;width:100%;padding:10px 12px;border:none;background:transparent;text-align:left;cursor:pointer;font-family:var(--mono);font-size:11px" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'"><b>Tabella dati (Excel)</b><br><span style="font-size:9px;color:var(--gray)">Quattro fogli .xlsx</span></button>
+          </div>
+        </div>
       </div>
       <div class="mis-scb-list-wrap" id="misScbListWrap" style="display:none">
         <div class="mis-scb-list-title">Scanbody (clicca per evidenziare)</div>
@@ -879,6 +887,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 
 // ╔══════════════════════════════════════════════════════════════════╗
@@ -4311,270 +4320,989 @@ function misICP_paintView(cv, triA, triB, trisBg, ax1, ax2, axD, title){
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  PIPELINE PDF: 1 copertina + 1 pagina per scanbody                ║
+// ║  PIPELINE REPORT MULTI-FORMATO (v7.3.9.001)                       ║
+// ║                                                                   ║
+// ║  Quattro tipi di report sulla stessa sorgente dati:               ║
+// ║    - clinico    (PDF, ~16 pagine: cover + cilindri + coppie)      ║
+// ║    - taratura   (PDF, ~6 pagine: metrologia, no mesh 3D)          ║
+// ║    - analisi    (PDF, ~20 pagine: clinico + matrici + raw data)   ║
+// ║    - excel      (XLSX, 4 fogli: cilindri/coppie/parametri/meta)   ║
+// ║                                                                   ║
+// ║  Architettura:                                                    ║
+// ║    misICP_buildReportData() -> oggetto comune                     ║
+// ║    misICP_renderClinicalPDF(data, doc) -> riempie il doc          ║
+// ║    misICP_renderCalibrationPDF(data, doc)                         ║
+// ║    misICP_renderAnalysisPDF(data, doc)                            ║
+// ║    misICP_renderExcel(data) -> .xlsx via SheetJS                  ║
+// ║                                                                   ║
+// ║  Punto di ingresso: misICP_generateReport(kind)                   ║
+// ║  La vecchia misICP_generatePDF() resta come alias = clinico       ║
 // ╚══════════════════════════════════════════════════════════════════╝
-function misICP_generatePDF(){
-  if(!window.jspdf){
-    misICP_showError('jsPDF non caricato. Attendi qualche secondo e riprova.');
-    return;
+
+/**
+ * Costruisce il dataset comune che alimenta tutti e 4 i report.
+ * Sorgente: misICP_result (popolato da misICP_run dopo l'ICP).
+ */
+function misICP_buildReportData(){
+  if(!misICP_result || !misICP_result.pairs || !misICP_result.pairs.length){
+    throw new Error('Nessun allineamento ICP disponibile. Esegui prima l\'ICP.');
   }
+  var pairs = misICP_result.pairs;
+  // Ricostruisco gli oggetti pdfPairs come prima
+  var pdfPairs = pairs.map(function(pp){
+    return {
+      a: pp.cA, b: pp.cB,
+      dx: pp.dx, dy: pp.dy, dz: pp.dz,
+      dxy: pp.dxy, d3: pp.d3,
+      trisA: pp.trisA, trisB: pp.trisBt,
+      iA: pp.iA, iB: pp.iB,
+      axAngleDeg: pp.axAngleDeg
+    };
+  }).filter(function(pp){return pp.b !== null;});
+  if(!pdfPairs.length) throw new Error('Nessuna coppia valida per il report.');
+
+  var cylAxes = pairs.filter(function(pp){return pp.iB>=0;}).map(function(pp){
+    return { angleDeg: pp.axAngleDeg };
+  });
+
+  var score = misICP_calcScore(pdfPairs, cylAxes);
+  var lv = misICP_scoreLabel(score);
+  var scaleUm = misICP_getScaleUm(pdfPairs);
+
+  // Coppie inter-centroide A vs B (10 coppie se 5 cilindri, NxN/2 in generale)
+  var interCentroidPairs = [];
+  for(var i=0; i<pdfPairs.length; i++){
+    for(var j=i+1; j<pdfPairs.length; j++){
+      var pi = pdfPairs[i], pj = pdfPairs[j];
+      var dxA=pj.a[0]-pi.a[0], dyA=pj.a[1]-pi.a[1], dzA=pj.a[2]-pi.a[2];
+      var dxB=pj.b[0]-pi.b[0], dyB=pj.b[1]-pi.b[1], dzB=pj.b[2]-pi.b[2];
+      var distA_um = Math.sqrt(dxA*dxA+dyA*dyA+dzA*dzA)*1000;
+      var distB_um = Math.sqrt(dxB*dxB+dyB*dyB+dzB*dzB)*1000;
+      var delta_um = distB_um - distA_um;
+      var lvCpl;
+      var absD = Math.abs(delta_um);
+      if(absD < 50)        lvCpl = {label:'Ottimo',      col:'#639922'};
+      else if(absD < 100)  lvCpl = {label:'Buono',       col:'#84B025'};
+      else if(absD < 200)  lvCpl = {label:'Accettabile', col:'#D97706'};
+      else                 lvCpl = {label:'Verifica',    col:'#EF4444'};
+      interCentroidPairs.push({i:i+1, j:j+1, distA_um:distA_um, distB_um:distB_um, delta_um:delta_um, lv:lvCpl});
+    }
+  }
+
+  return {
+    pairs: pdfPairs,
+    cylAxes: cylAxes,
+    score: score,
+    lv: lv,
+    scaleUm: scaleUm,
+    interCentroidPairs: interCentroidPairs,
+    fileA: (misICP_result.fileA||'A').replace(/\.stl$/i,'').slice(0,40),
+    fileB: (misICP_result.fileB||'B').replace(/\.stl$/i,'').slice(0,40),
+    rmsdUm: misICP_result.rmsdUm,
+    nCyl: pdfPairs.length,
+    timestamp: new Date()
+  };
+}
+
+/**
+ * Helper: formattazione data e ora.
+ */
+function misICP_fmtDateTime(d){
+  var dd = String(d.getDate()).padStart(2,'0');
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var yy = d.getFullYear();
+  var hh = String(d.getHours()).padStart(2,'0');
+  var mi = String(d.getMinutes()).padStart(2,'0');
+  return dd+'/'+mm+'/'+yy+' '+hh+':'+mi;
+}
+function misICP_fmtDate(d){
+  var dd = String(d.getDate()).padStart(2,'0');
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var yy = d.getFullYear();
+  return dd+'/'+mm+'/'+yy;
+}
+
+/**
+ * Helper: footer comune di pagina (testo + bordi oro).
+ * @param {jsPDF} doc
+ * @param {string} title - es. "Report Clinico"
+ * @param {string} pageInfo - es. "Pag. 2 / 16"
+ * @param {boolean} darkBg - vero solo per la cover
+ */
+function misICP_pdfFooter(doc, title, pageInfo, darkBg){
+  var W=210, H=297, ml=14, mr=14;
+  if(darkBg){
+    doc.setFillColor(255,215,0); doc.rect(0,H-3,W,3,'F');
+    doc.setFillColor(245,158,11); doc.rect(0,H-4.5,W,1.5,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7);
+    doc.setTextColor(255,204,85);
+    doc.text(title+'  -  Biaggini Medical Devices S.r.l.', W/2, H-6, {align:'center'});
+  } else {
+    doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    doc.setTextColor(122,144,164);
+    doc.text(title, ml, H-4);
+    if(pageInfo) doc.text(pageInfo, W-mr, H-4, {align:'right'});
+  }
+}
+
+/**
+ * Disegna la copertina comune (sfondo scuro, anello, badge, info, mappa).
+ */
+function misICP_pdfDrawCover(doc, data, reportTitle){
+  var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
+  function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
+  function setTxt (hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+
+  doc.setFillColor(13,27,42); doc.rect(0,0,W,H,'F');
+  doc.setFillColor(255,215,0); doc.rect(0,0,W,3,'F');
+  doc.setFillColor(245,158,11); doc.rect(0,3,W,1.5,'F');
+
+  // Titolo
+  doc.setFont('helvetica','bold'); doc.setFontSize(22); setTxt('#FFFFFF');
+  doc.text('Syntesis-ICP', W/2, 28, {align:'center'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#B0B8C1');
+  doc.text(reportTitle, W/2, 34, {align:'center'});
+
+  // Anello score
+  var cx2=W/2, cy2=72, ringR=22;
+  doc.setDrawColor(40,50,65); doc.setLineWidth(6);
+  doc.circle(cx2, cy2, ringR, 'S');
+  var pct = data.score/100;
+  var segs = 64;
+  var colRGB = misICP_hexRGB(data.lv.col);
+  doc.setDrawColor(colRGB[0], colRGB[1], colRGB[2]);
+  doc.setLineWidth(6);
+  var prev=null;
+  for(var sI=0; sI<=segs*pct; sI++){
+    var ang = -Math.PI/2 + (sI/segs)*Math.PI*2;
+    var x = cx2 + ringR*Math.cos(ang);
+    var y = cy2 + ringR*Math.sin(ang);
+    if(prev) doc.line(prev[0], prev[1], x, y);
+    prev=[x,y];
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(24); setTxt(data.lv.col);
+  doc.text(data.score.toFixed(2), cx2, cy2+2, {align:'center'});
+  doc.setFontSize(8); setTxt('#7A90A4');
+  doc.text('/100', cx2, cy2+8, {align:'center'});
+
+  // Badge label
+  var pillY=100, pillH=10, pillW=50, pillX=(W-pillW)/2;
+  var bgRGB=misICP_hexRGB(data.lv.bg);
+  doc.setFillColor(bgRGB[0],bgRGB[1],bgRGB[2]);
+  doc.roundedRect(pillX, pillY, pillW, pillH, 4, 4, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt(data.lv.fg);
+  doc.text(data.lv.label.toUpperCase(), W/2, pillY+6.8, {align:'center'});
+
+  // Info box
+  var infoY=120;
+  var infos=[
+    ['File A (riferimento)', data.fileA],
+    ['File B (confronto)',   data.fileB],
+    ['N scanbody',           String(data.nCyl)],
+    ['RMSD ICP',             (data.rmsdUm).toFixed(1)+' \u03bcm'],
+    ['Data analisi',         misICP_fmtDateTime(data.timestamp)]
+  ];
+  infos.forEach(function(row,ii){
+    var rowY = infoY + ii*8;
+    setTxt('#7A90A4');
+    doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    doc.text(row[0], ml+4, rowY);
+    setTxt('#FFFFFF');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.text(row[1], W-mr-4, rowY, {align:'right'});
+    doc.setDrawColor(40,50,65); doc.setLineWidth(0.15);
+    doc.line(ml+4, rowY+1.5, W-mr-4, rowY+1.5);
+  });
+
+  // Mappa colorimetrica
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#FFCC55');
+  var mapY = infoY + 5*8 + 6;
+  doc.text('MAPPA COLORIMETRICA - POSIZIONI SCANBODY', ml, mapY);
+  var mapCanvas=document.createElement('canvas');
+  mapCanvas.width=880; mapCanvas.height=480;
+  misICP_drawColorMap(mapCanvas, data.pairs);
+  var mapH=70;
+  doc.addImage(mapCanvas.toDataURL('image/png'), 'PNG', ml, mapY+3, cw, mapH);
+
+  // Legenda
+  var legY = mapY + 3 + mapH + 4;
+  var levels=[
+    {c:'#639922', lbl:'0-50 Ottimo'},
+    {c:'#D97706', lbl:'50-100 Accett.'},
+    {c:'#F97316', lbl:'100-150 Risch.'},
+    {c:'#EF4444', lbl:'150-250 Tens.'},
+    {c:'#A855F7', lbl:'>250 Fuori'}
+  ];
+  var segW=cw/levels.length;
+  levels.forEach(function(l,li){
+    var lx=ml+li*segW;
+    var cRGB=misICP_hexRGB(l.c);
+    doc.setFillColor(cRGB[0],cRGB[1],cRGB[2]);
+    doc.rect(lx, legY, segW-1, 3, 'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); setTxt('#B0B8C1');
+    doc.text(l.lbl, lx+1, legY+7);
+  });
+}
+
+/**
+ * Disegna la pagina dettaglio di un singolo cilindro (3 viste mesh + tabella).
+ * Usato dal Clinico e dall'Analisi.
+ */
+function misICP_pdfDrawCylinderPage(doc, data, ci){
+  var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
+  function setTxt(hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+
+  var p = data.pairs[ci];
+  var d3um = Math.round(p.d3*1000);
+  var dxum = Math.round(p.dx*1000);
+  var dyum = Math.round(p.dy*1000);
+  var dzum = Math.round(p.dz*1000);
+  var dxyum= Math.round(p.dxy*1000);
+  var clv = misICP_clinLevel(d3um);
+
+  // Header colorato
+  var clBgRGB = misICP_hexRGB(clv.bg);
+  doc.setFillColor(clBgRGB[0], clBgRGB[1], clBgRGB[2]);
+  doc.rect(0,0,W,16,'F');
+  var clRGB = misICP_hexRGB(clv.col);
+  doc.setFillColor(clRGB[0], clRGB[1], clRGB[2]);
+  doc.rect(0,0,5,16,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); setTxt(clv.fg);
+  doc.text('Cilindro #'+(ci+1), ml+2, 10.5);
+  doc.setFontSize(9);
+  doc.text(clv.label+'  -  '+d3um+' \u03bcm  |D3D|', ml+2, 15);
+  setTxt('#0F1923');
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('Voto globale: '+data.score.toFixed(2)+'/100', W-mr, 10.5, {align:'right'});
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.text(data.fileA+' vs '+data.fileB, W-mr, 15, {align:'right'});
+
+  // VISUALIZZAZIONE MESH 3D
+  var y = 22;
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
+  doc.text('VISUALIZZAZIONE MESH 3D', ml, y); y+=3;
+  var viewW=(cw-8)/3, viewH=42;
+  var views=[
+    {ax1:0, ax2:1, axD:2, label:'Vista XY (dall\'alto)'},
+    {ax1:0, ax2:2, axD:1, label:'Vista XZ (frontale)'},
+    {ax1:1, ax2:2, axD:0, label:'Vista YZ (laterale)'}
+  ];
+  views.forEach(function(v,vi){
+    var vx = ml + vi*(viewW+4);
+    var cvV=document.createElement('canvas');
+    cvV.width=Math.round(viewW*4); cvV.height=Math.round(viewH*4);
+    misICP_paintView(cvV, p.trisA, p.trisB, null, v.ax1, v.ax2, v.axD, v.label);
+    doc.addImage(cvV.toDataURL('image/png'), 'PNG', vx, y, viewW, viewH);
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); setTxt('#7A90A4');
+    doc.text(v.label, vx+viewW/2, y+viewH+3, {align:'center'});
+  });
+  y += viewH + 8;
+
+  // ANALISI DEVIAZIONE (card)
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
+  doc.text('ANALISI DEVIAZIONE', ml, y); y+=3;
+  var cardW=cw, cardH=40;
+  var cvCard=document.createElement('canvas');
+  cvCard.width=Math.round(cardW*4); cvCard.height=Math.round(cardH*4);
+  misICP_drawCard(cvCard, dxum, dyum, dzum, d3um, data.scaleUm, p.trisB ? (data.cylAxes[ci] && data.cylAxes[ci].angleDeg) : null);
+  doc.addImage(cvCard.toDataURL('image/png'), 'PNG', ml, y, cardW, cardH);
+  y += cardH + 6;
+
+  // TABELLA MISURAZIONI
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
+  doc.text('TABELLA MISURAZIONI', ml, y); y+=2;
+  var axDeg = data.cylAxes[ci] ? data.cylAxes[ci].angleDeg : 0;
+  var axLvl = misICP_clinAx(axDeg);
+  var tbRows = [
+    ['|D| 3D totale',          d3um+' \u03bcm',                           clv.label],
+    ['Deviazione XY (piano)',  dxyum+' \u03bcm',                          misICP_clinLevel(dxyum).label],
+    ['Deviazione X',           (dxum>=0?'+':'')+dxum+' \u03bcm',          ''],
+    ['Deviazione Y',           (dyum>=0?'+':'')+dyum+' \u03bcm',          ''],
+    ['Deviazione Z (verticale)', (dzum>=0?'+':'')+dzum+' \u03bcm',        ''],
+    ['Angolo asse cilindro',   axDeg.toFixed(3)+' deg',                   axLvl.label],
+    ['Centroide A (X,Y,Z)',    p.a[0].toFixed(3)+', '+p.a[1].toFixed(3)+', '+p.a[2].toFixed(3)+' mm', ''],
+    ['Centroide B allineato',  p.b[0].toFixed(3)+', '+p.b[1].toFixed(3)+', '+p.b[2].toFixed(3)+' mm', '']
+  ];
+  doc.autoTable({
+    startY: y,
+    margin: {left:ml, right:mr},
+    head: [['Parametro','Valore','Valutazione']],
+    body: tbRows,
+    theme: 'grid',
+    styles: {font:'helvetica', fontSize:8, cellPadding:2, textColor:[33,37,41], lineColor:[214,228,240], lineWidth:0.2},
+    headStyles: {fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:7},
+    columnStyles: {0:{cellWidth:60}, 1:{halign:'right', font:'courier'}, 2:{halign:'right', fontSize:7}}
+  });
+}
+
+/**
+ * Disegna una pagina di distanza inter-centroide (dato indice della coppia).
+ * Usato dal Clinico (10 pagine se 5 cilindri) e dall'Analisi.
+ */
+function misICP_pdfDrawInterCentroidPage(doc, data, pi){
+  var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
+  function setTxt(hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+
+  var ic = data.interCentroidPairs[pi];
+
+  // Header
+  doc.setFillColor(247,249,252);
+  doc.rect(0,0,W,16,'F');
+  doc.setFillColor(0,101,179);
+  doc.rect(0,0,5,16,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); setTxt('#0F1923');
+  doc.text('Distanza Inter-Centroide #'+ic.i+'-#'+ic.j, ml+2, 9);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); setTxt('#7A90A4');
+  doc.text('Coppia '+(pi+1)+'/'+data.interCentroidPairs.length+'   A (rif.) vs B (post-ICP)', ml+2, 14);
+  // Delta a destra
+  var dRGB = misICP_hexRGB(ic.lv.col);
+  doc.setFillColor(dRGB[0],dRGB[1],dRGB[2],0.15);
+  doc.roundedRect(W-mr-40, 4, 40, 9, 2, 2, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.setTextColor(dRGB[0],dRGB[1],dRGB[2]);
+  doc.text((ic.delta_um>=0?'+':'')+ic.delta_um.toFixed(1)+'\u03bcm', W-mr-2, 9.8, {align:'right'});
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.text(ic.lv.label, W-mr-2, 13.5, {align:'right'});
+
+  // Diagramma topologico (rete dei 5 cilindri con la coppia evidenziata)
+  var diagY = 22;
+  var diagH = 90;
+  var cvDiag = document.createElement('canvas');
+  cvDiag.width = Math.round(cw*4); cvDiag.height = Math.round(diagH*4);
+  misICP_drawCentroidGraph(cvDiag, data, pi);
+  doc.addImage(cvDiag.toDataURL('image/png'), 'PNG', ml, diagY, cw, diagH);
+
+  // Box riassuntivo distanze
+  var bxY = diagY + diagH + 6;
+  doc.setFillColor(255,255,255);
+  doc.setDrawColor(214,228,240); doc.setLineWidth(0.3);
+  doc.roundedRect(ml, bxY, cw, 30, 2, 2, 'FD');
+
+  var colW = cw/4;
+  var labels = ['DISTANZA A', 'DISTANZA B', 'DIFFERENZA', 'VALUTAZIONE'];
+  var values = [
+    ic.distA_um.toFixed(1)+'\u03bcm',
+    ic.distB_um.toFixed(1)+'\u03bcm',
+    (ic.delta_um>=0?'+':'')+ic.delta_um.toFixed(1)+'\u03bcm',
+    ic.lv.label
+  ];
+  var subValues = [
+    (ic.distA_um/1000).toFixed(4)+' mm',
+    (ic.distB_um/1000).toFixed(4)+' mm',
+    '',
+    'B vicino ad A'
+  ];
+  for(var c=0; c<4; c++){
+    var cx = ml + c*colW + colW/2;
+    setTxt('#7A90A4');
+    doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    doc.text(labels[c], cx, bxY+5, {align:'center'});
+    if(c===2){
+      var dRGB2 = misICP_hexRGB(ic.lv.col);
+      doc.setTextColor(dRGB2[0],dRGB2[1],dRGB2[2]);
+    } else if(c===3){
+      var dRGB3 = misICP_hexRGB(ic.lv.col);
+      doc.setTextColor(dRGB3[0],dRGB3[1],dRGB3[2]);
+    } else {
+      setTxt('#0F1923');
+    }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    doc.text(values[c], cx, bxY+14, {align:'center'});
+    if(subValues[c]){
+      setTxt('#7A90A4');
+      doc.setFont('helvetica','normal'); doc.setFontSize(7);
+      doc.text(subValues[c], cx, bxY+22, {align:'center'});
+    }
+  }
+  // Soglie
+  setTxt('#7A90A4');
+  doc.setFont('helvetica','normal'); doc.setFontSize(6);
+  doc.text('0-50\u03bcm Ottimo  50-100\u03bcm Buono  100-200\u03bcm Accettabile  >200\u03bcm Verifica', ml+cw/2, bxY+28, {align:'center'});
+
+  // Tabella confronto con le altre coppie
+  var tbY = bxY + 36;
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
+  doc.text('Confronto con le altre coppie:', ml, tbY); tbY+=2;
+  var rows = data.interCentroidPairs.map(function(c, ci){
+    var isCurrent = (ci === pi);
+    return [
+      (isCurrent?'> ':'')+'#'+c.i+'-#'+c.j+(isCurrent?' (questa)':''),
+      c.distA_um.toFixed(1),
+      c.distB_um.toFixed(1),
+      (c.delta_um>=0?'+':'')+c.delta_um.toFixed(1),
+      c.lv.label
+    ];
+  });
+  doc.autoTable({
+    startY: tbY,
+    margin: {left:ml, right:mr},
+    head: [['Coppia','A (\u03bcm)','B (\u03bcm)','Delta','Note']],
+    body: rows,
+    theme: 'grid',
+    styles: {font:'helvetica', fontSize:8, cellPadding:1.5, textColor:[33,37,41], lineColor:[214,228,240], lineWidth:0.15},
+    headStyles: {fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:7},
+    columnStyles: {
+      0:{cellWidth:32},
+      1:{halign:'right', font:'courier', cellWidth:24},
+      2:{halign:'right', font:'courier', cellWidth:24},
+      3:{halign:'right', font:'courier', cellWidth:22},
+      4:{halign:'left', fontSize:7}
+    },
+    didParseCell: function(d){
+      if(d.row.index === pi && d.section === 'body'){
+        d.cell.styles.fillColor = [241, 245, 249];
+        d.cell.styles.fontStyle = 'bold';
+      }
+    }
+  });
+}
+
+/**
+ * Disegna il grafo dei centroidi con la coppia corrente evidenziata.
+ */
+function misICP_drawCentroidGraph(cv, data, currentPi){
+  var ctx = cv.getContext('2d');
+  var W = cv.width, H = cv.height;
+  ctx.clearRect(0,0,W,H);
+
+  // Calcola bounding box dei centroidi A
+  var xs=[], ys=[];
+  data.pairs.forEach(function(p){ xs.push(p.a[0]); ys.push(p.a[1]); });
+  var xMin = Math.min.apply(null,xs), xMax = Math.max.apply(null,xs);
+  var yMin = Math.min.apply(null,ys), yMax = Math.max.apply(null,ys);
+  var pad = 0.15;
+  var dx = Math.max(1e-3, xMax-xMin);
+  var dy = Math.max(1e-3, yMax-yMin);
+  xMin -= pad*dx; xMax += pad*dx;
+  yMin -= pad*dy; yMax += pad*dy;
+
+  function tx(v){ return ((v-xMin)/(xMax-xMin)) * (W*0.85) + W*0.075; }
+  function ty(v){ return H - (((v-yMin)/(yMax-yMin)) * (H*0.85) + H*0.075); }
+
+  // Disegna tutte le coppie come linee tenui
+  data.interCentroidPairs.forEach(function(c, ci){
+    var pi = data.pairs[c.i-1], pj = data.pairs[c.j-1];
+    if(ci === currentPi){
+      ctx.strokeStyle = '#0065B3';
+      ctx.lineWidth = 6;
+    } else {
+      ctx.strokeStyle = 'rgba(120,140,160,0.3)';
+      ctx.lineWidth = 2;
+    }
+    ctx.beginPath();
+    ctx.moveTo(tx(pi.a[0]), ty(pi.a[1]));
+    ctx.lineTo(tx(pj.a[0]), ty(pj.a[1]));
+    ctx.stroke();
+  });
+
+  // Etichetta sulla coppia corrente
+  var current = data.interCentroidPairs[currentPi];
+  if(current){
+    var pi = data.pairs[current.i-1], pj = data.pairs[current.j-1];
+    var mx = (tx(pi.a[0]) + tx(pj.a[0]))/2;
+    var my = (ty(pi.a[1]) + ty(pj.a[1]))/2;
+    ctx.font = 'bold 26px Helvetica';
+    ctx.fillStyle = '#0065B3';
+    ctx.textAlign = 'center';
+    ctx.fillText(current.distA_um.toFixed(1)+'\u03bcm', mx, my-12);
+    ctx.fillStyle = '#D97706';
+    ctx.fillText(current.distB_um.toFixed(1)+'\u03bcm', mx, my+18);
+  }
+
+  // Disegna i nodi (cilindri)
+  data.pairs.forEach(function(p, idx){
+    var x = tx(p.a[0]), y = ty(p.a[1]);
+    var isInPair = (current && (idx+1===current.i || idx+1===current.j));
+    ctx.fillStyle = isInPair ? '#0065B3' : 'rgba(120,140,160,0.5)';
+    ctx.beginPath();
+    ctx.arc(x, y, isInPair?22:14, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold '+ (isInPair?22:16) +'px Helvetica';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(idx+1), x, y);
+    if(isInPair){
+      ctx.fillStyle = '#0065B3';
+      ctx.font = 'bold 14px Helvetica';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('A'+(idx+1), x+22, y-22);
+      ctx.fillStyle = '#D97706';
+      ctx.fillText('B'+(idx+1), x-22, y+34);
+    }
+  });
+
+  // Legenda
+  ctx.font = '14px Helvetica';
+  ctx.fillStyle = 'rgba(80,90,100,0.85)';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('A = riferimento  -  B = post-ICP', 12, H-22);
+}
+
+// ────────────────────────────────────────────────────────────────────
+// REPORT CLINICO (PDF) — cover + cilindri + coppie inter-centroide
+// ────────────────────────────────────────────────────────────────────
+function misICP_renderClinicalPDF(data){
+  var doc = new window.jspdf.jsPDF({unit:'mm', format:'a4', compress:true});
+  var W=210, H=297;
+  var totPages = 1 + data.nCyl + data.interCentroidPairs.length;
+
+  misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9) - Biaggini Medical Devices S.r.l.', null, true);
+
+  // Pagine cilindri
+  data.pairs.forEach(function(p, ci){
+    doc.addPage();
+    misICP_pdfDrawCylinderPage(doc, data, ci);
+    misICP_pdfFooter(doc,
+      'Syntesis-ICP - Cilindro #'+(ci+1)+' di '+data.nCyl,
+      'Pag. '+(ci+2)+' / '+totPages,
+      false);
+  });
+
+  // Pagine coppie inter-centroide (le 10 mancanti, ora aggiunte)
+  data.interCentroidPairs.forEach(function(ic, pi){
+    doc.addPage();
+    misICP_pdfDrawInterCentroidPage(doc, data, pi);
+    misICP_pdfFooter(doc,
+      'Syntesis-ICP - Distanza inter-centroide #'+ic.i+'-#'+ic.j,
+      'Pag. '+(1+data.nCyl+pi+1)+' / '+totPages,
+      false);
+  });
+
+  return doc;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// REPORT TARATURA (PDF) — focus metrologico, no mesh 3D
+// ────────────────────────────────────────────────────────────────────
+function misICP_renderCalibrationPDF(data){
+  var doc = new window.jspdf.jsPDF({unit:'mm', format:'a4', compress:true});
+  var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
+  function setTxt(hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+  function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
+
+  // Cover identica al Clinico ma con sottotitolo "Taratura"
+  misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Taratura');
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Taratura (Analizza v7.3.9) - Biaggini Medical Devices S.r.l.', null, true);
+
+  // ── PAGINA 2: SINTESI METROLOGICA ─────────────────────────────────
+  doc.addPage();
+  setTxt('#0F1923');
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('Sintesi Metrologica', ml, 25);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#7A90A4');
+  doc.text('Indicatori globali di qualità dell\'allineamento ICP', ml, 32);
+
+  var y = 42;
+  // RMSD globale
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
+  doc.text('RMSD ICP GLOBALE', ml, y); y+=4;
+  setTxt('#0F1923');
+  doc.setFont('helvetica','bold'); doc.setFontSize(28);
+  doc.text(data.rmsdUm.toFixed(2)+' \u03bcm', ml, y+8);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); setTxt('#7A90A4');
+  doc.text('Errore quadratico medio del fit Kabsch+SVD+ICP. Valori sotto 50 \u03bcm indicano allineamento eccellente, sopra 200 \u03bcm allineamento problematico.', ml, y+15, {maxWidth: cw});
+  y += 30;
+
+  // Tabella anisotropia (XY vs Z)
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
+  doc.text('ANISOTROPIA: deviazione XY vs Z per scanbody', ml, y); y+=2;
+  var anisoRows = data.pairs.map(function(p, i){
+    var dxyum = Math.round(p.dxy*1000);
+    var dzum = Math.round(Math.abs(p.dz)*1000);
+    var ratio = dzum > 0 ? (dxyum/dzum).toFixed(2) : (dxyum > 0 ? '\u221e' : 'n/d');
+    return [
+      '#'+(i+1),
+      dxyum+' \u03bcm',
+      dzum+' \u03bcm',
+      ratio
+    ];
+  });
+  doc.autoTable({
+    startY: y,
+    margin: {left:ml, right:mr},
+    head: [['Scanbody','Dev. XY','Dev. |Z|','Rapporto XY/Z']],
+    body: anisoRows,
+    theme: 'grid',
+    styles: {font:'helvetica', fontSize:8, cellPadding:2, textColor:[33,37,41], lineColor:[214,228,240], lineWidth:0.2},
+    headStyles: {fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:7},
+    columnStyles: {0:{halign:'center'}, 1:{halign:'right', font:'courier'}, 2:{halign:'right', font:'courier'}, 3:{halign:'right', font:'courier'}}
+  });
+  y = doc.lastAutoTable.finalY + 8;
+  doc.setFont('helvetica','italic'); doc.setFontSize(7); setTxt('#7A90A4');
+  doc.text('Un sistema ben calibrato ha XY/Z elevato: deviazioni laterali maggiori di quelle verticali (lo scanner ha precisione assiale superiore).', ml, y, {maxWidth: cw});
+  y += 8;
+
+  // Statistiche aggregate
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
+  doc.text('STATISTICHE AGGREGATE DEVIAZIONI 3D', ml, y); y+=2;
+  var d3s = data.pairs.map(function(p){return Math.round(p.d3*1000);}).sort(function(a,b){return a-b;});
+  var n = d3s.length;
+  var mean = d3s.reduce(function(s,v){return s+v;},0)/n;
+  var med = n%2===0 ? (d3s[n/2-1]+d3s[n/2])/2 : d3s[(n-1)/2];
+  var std = Math.sqrt(d3s.reduce(function(s,v){return s+(v-mean)*(v-mean);},0)/n);
+  var statsRows = [
+    ['Media',          mean.toFixed(1)+' \u03bcm'],
+    ['Mediana',        med.toFixed(1)+' \u03bcm'],
+    ['Deviazione std', std.toFixed(1)+' \u03bcm'],
+    ['Minimo',         d3s[0]+' \u03bcm'],
+    ['Massimo',        d3s[n-1]+' \u03bcm'],
+    ['Range',          (d3s[n-1]-d3s[0])+' \u03bcm']
+  ];
+  doc.autoTable({
+    startY: y,
+    margin: {left:ml, right:mr},
+    body: statsRows,
+    theme: 'plain',
+    styles: {font:'helvetica', fontSize:8, cellPadding:1.5},
+    columnStyles: {0:{cellWidth:60, textColor:[122,144,164]}, 1:{font:'courier', fontStyle:'bold', textColor:[15,25,35]}}
+  });
+
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Sintesi metrologica', 'Pag. 2', false);
+
+  // ── PAGINA 3: ANGOLI ASSI E COPPIE ────────────────────────────────
+  doc.addPage();
+  setTxt('#0F1923');
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('Divergenze Angolari', ml, 25);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#7A90A4');
+  doc.text('Angoli tra assi A e B per ciascun scanbody (post-ICP)', ml, 32);
+
+  y = 42;
+  var angRows = data.pairs.map(function(p, i){
+    var ax = data.cylAxes[i];
+    var deg = ax ? ax.angleDeg : null;
+    var degStr = deg !== null ? deg.toFixed(3)+'\u00b0' : 'n/d';
+    var lvl = deg !== null ? misICP_clinAx(deg).label : '\u2014';
+    return ['#'+(i+1), degStr, lvl];
+  });
+  doc.autoTable({
+    startY: y,
+    margin: {left:ml, right:mr},
+    head: [['Scanbody','Angolo asse A-B','Valutazione']],
+    body: angRows,
+    theme: 'grid',
+    styles: {font:'helvetica', fontSize:8, cellPadding:2, textColor:[33,37,41], lineColor:[214,228,240], lineWidth:0.2},
+    headStyles: {fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:7},
+    columnStyles: {0:{halign:'center', cellWidth:30}, 1:{halign:'right', font:'courier'}, 2:{halign:'right', fontSize:7}}
+  });
+  y = doc.lastAutoTable.finalY + 12;
+
+  // Distribuzione delle 10 differenze inter-centroide
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
+  doc.text('DISTRIBUZIONE DIFFERENZE INTER-CENTROIDE', ml, y); y+=2;
+  var deltas = data.interCentroidPairs.map(function(c){return c.delta_um;});
+  var dn = deltas.length;
+  if(dn > 0){
+    var sorted = deltas.slice().sort(function(a,b){return a-b;});
+    var dmean = deltas.reduce(function(s,v){return s+v;},0)/dn;
+    var dmed = dn%2===0 ? (sorted[dn/2-1]+sorted[dn/2])/2 : sorted[(dn-1)/2];
+    var dstd = Math.sqrt(deltas.reduce(function(s,v){return s+(v-dmean)*(v-dmean);},0)/dn);
+    var dabs = deltas.map(function(d){return Math.abs(d);});
+    var dabsMean = dabs.reduce(function(s,v){return s+v;},0)/dn;
+    var distrRows = [
+      ['Numero coppie',  String(dn)],
+      ['Media (signed)', dmean.toFixed(1)+' \u03bcm'],
+      ['Mediana',        dmed.toFixed(1)+' \u03bcm'],
+      ['Deviazione std', dstd.toFixed(1)+' \u03bcm'],
+      ['Media |\u0394|', dabsMean.toFixed(1)+' \u03bcm'],
+      ['|\u0394| max',   Math.max.apply(null,dabs).toFixed(1)+' \u03bcm']
+    ];
+    doc.autoTable({
+      startY: y,
+      margin: {left:ml, right:mr},
+      body: distrRows,
+      theme: 'plain',
+      styles: {font:'helvetica', fontSize:8, cellPadding:1.5},
+      columnStyles: {0:{cellWidth:60, textColor:[122,144,164]}, 1:{font:'courier', fontStyle:'bold', textColor:[15,25,35]}}
+    });
+  }
+
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Divergenze angolari', 'Pag. 3', false);
+
+  return doc;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// REPORT ANALISI (PDF) — Clinico esteso con matrici e raw data
+// ────────────────────────────────────────────────────────────────────
+function misICP_renderAnalysisPDF(data){
+  // Riusa la pipeline Clinico, poi appende pagine extra
+  var doc = misICP_renderClinicalPDF(data);
+  var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
+  function setTxt(hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+
+  // ── APPENDICE A: matrice distanze inter-centroide A vs B ─────────
+  doc.addPage();
+  setTxt('#0F1923');
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('Appendice A - Matrice distanze A vs B', ml, 25);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#7A90A4');
+  doc.text('Distanze inter-centroide misurate: A (riferimento) sopra la diagonale, B (post-ICP) sotto.', ml, 32, {maxWidth:cw});
+
+  var n = data.nCyl;
+  // Costruisce la matrice
+  function distAB(i, j, useB){
+    if(i===j) return 0;
+    var pi = data.pairs[i], pj = data.pairs[j];
+    var ai = useB ? pi.b : pi.a;
+    var aj = useB ? pj.b : pj.a;
+    var dx=aj[0]-ai[0], dy=aj[1]-ai[1], dz=aj[2]-ai[2];
+    return Math.sqrt(dx*dx+dy*dy+dz*dz)*1000;
+  }
+  var head = [''].concat(data.pairs.map(function(p,i){return '#'+(i+1);}));
+  var body = [];
+  for(var i=0; i<n; i++){
+    var row = ['#'+(i+1)];
+    for(var j=0; j<n; j++){
+      if(i===j) row.push('—');
+      else if(j>i) row.push(distAB(i,j,false).toFixed(1)); // A sopra
+      else row.push(distAB(i,j,true).toFixed(1));            // B sotto
+    }
+    body.push(row);
+  }
+  doc.autoTable({
+    startY: 42,
+    margin: {left:ml, right:mr},
+    head: [head],
+    body: body,
+    theme: 'grid',
+    styles: {font:'courier', fontSize:8, cellPadding:1.5, halign:'right', textColor:[33,37,41], lineColor:[214,228,240], lineWidth:0.15},
+    headStyles: {fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:7, halign:'center'},
+    columnStyles: {0:{fontStyle:'bold', textColor:[122,144,164], halign:'left'}}
+  });
+  var afterY = doc.lastAutoTable.finalY + 8;
+  doc.setFont('helvetica','italic'); doc.setFontSize(7); setTxt('#7A90A4');
+  doc.text('Valori in micrometri. La matrice è simmetrica per costruzione: A[i][j] = A[j][i] e B[i][j] = B[j][i]. La triangolare superiore mostra le distanze nel riferimento (file A); quella inferiore mostra le stesse coppie misurate dopo allineamento ICP del file B.', ml, afterY, {maxWidth:cw});
+
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Matrice distanze', 'Appendice A', false);
+
+  // ── APPENDICE B: raw data ─────────────────────────────────────────
+  doc.addPage();
+  setTxt('#0F1923');
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('Appendice B - Dati grezzi', ml, 25);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#7A90A4');
+  doc.text('Tutte le metriche numeriche per cilindro, in formato esportabile.', ml, 32);
+
+  var rawRows = data.pairs.map(function(p, i){
+    var ax = data.cylAxes[i];
+    return [
+      '#'+(i+1),
+      p.a[0].toFixed(3),
+      p.a[1].toFixed(3),
+      p.a[2].toFixed(3),
+      p.b[0].toFixed(3),
+      p.b[1].toFixed(3),
+      p.b[2].toFixed(3),
+      Math.round(p.dx*1000),
+      Math.round(p.dy*1000),
+      Math.round(p.dz*1000),
+      Math.round(p.d3*1000),
+      ax ? ax.angleDeg.toFixed(3) : 'n/d'
+    ];
+  });
+  doc.autoTable({
+    startY: 42,
+    margin: {left:ml, right:mr},
+    head: [['#','Ax','Ay','Az','Bx','By','Bz','dX','dY','dZ','|D|','Asse°']],
+    body: rawRows,
+    theme: 'grid',
+    styles: {font:'courier', fontSize:6.5, cellPadding:1, halign:'right', textColor:[33,37,41], lineColor:[214,228,240], lineWidth:0.15},
+    headStyles: {fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:6, halign:'center'},
+    columnStyles: {0:{fontStyle:'bold', textColor:[122,144,164], halign:'center'}}
+  });
+
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Dati grezzi', 'Appendice B', false);
+
+  return doc;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// EXPORT EXCEL — 4 fogli (Cilindri / Coppie / Parametri / Metadati)
+// ────────────────────────────────────────────────────────────────────
+function misICP_renderExcel(data){
+  if(!window.XLSX){
+    throw new Error('SheetJS non caricato. Ricarica la pagina e riprova.');
+  }
+  var wb = XLSX.utils.book_new();
+
+  // Foglio 1: Cilindri
+  var cilHeader = ['#', 'Centroide A X (mm)', 'Centroide A Y (mm)', 'Centroide A Z (mm)',
+                   'Centroide B X (mm)', 'Centroide B Y (mm)', 'Centroide B Z (mm)',
+                   'Deviazione X (μm)', 'Deviazione Y (μm)', 'Deviazione Z (μm)',
+                   '|D| 3D (μm)', '|D| XY (μm)', 'Angolo asse A-B (deg)',
+                   'Classe |D| 3D', 'Classe asse'];
+  var cilData = data.pairs.map(function(p, i){
+    var ax = data.cylAxes[i];
+    var d3um = Math.round(p.d3*1000);
+    var clv = misICP_clinLevel(d3um);
+    var axLvl = ax ? misICP_clinAx(ax.angleDeg).label : 'n/d';
+    return [
+      i+1,
+      Number(p.a[0].toFixed(3)), Number(p.a[1].toFixed(3)), Number(p.a[2].toFixed(3)),
+      Number(p.b[0].toFixed(3)), Number(p.b[1].toFixed(3)), Number(p.b[2].toFixed(3)),
+      Math.round(p.dx*1000), Math.round(p.dy*1000), Math.round(p.dz*1000),
+      d3um, Math.round(p.dxy*1000),
+      ax ? Number(ax.angleDeg.toFixed(3)) : '',
+      clv.label,
+      axLvl
+    ];
+  });
+  var ws1 = XLSX.utils.aoa_to_sheet([cilHeader].concat(cilData));
+  ws1['!cols'] = cilHeader.map(function(){return {wch:14};});
+  XLSX.utils.book_append_sheet(wb, ws1, 'Cilindri');
+
+  // Foglio 2: Coppie inter-centroide
+  var cpHeader = ['Coppia', 'Cilindro i', 'Cilindro j', 'Distanza A (μm)', 'Distanza B (μm)', 'Δ (μm)', '|Δ| (μm)', 'Valutazione'];
+  var cpData = data.interCentroidPairs.map(function(c, ci){
+    return [
+      '#'+c.i+'-#'+c.j,
+      c.i, c.j,
+      Number(c.distA_um.toFixed(1)),
+      Number(c.distB_um.toFixed(1)),
+      Number(c.delta_um.toFixed(1)),
+      Number(Math.abs(c.delta_um).toFixed(1)),
+      c.lv.label
+    ];
+  });
+  var ws2 = XLSX.utils.aoa_to_sheet([cpHeader].concat(cpData));
+  ws2['!cols'] = cpHeader.map(function(){return {wch:14};});
+  XLSX.utils.book_append_sheet(wb, ws2, 'Coppie');
+
+  // Foglio 3: Parametri ICP
+  var paramData = [
+    ['Parametro', 'Valore', 'Unità'],
+    ['RMSD ICP globale', Number(data.rmsdUm.toFixed(2)), 'μm'],
+    ['N scanbody analizzati', data.nCyl, ''],
+    ['Voto globale', Number(data.score.toFixed(2)), '/100'],
+    ['Classificazione', data.lv.label, ''],
+    ['Scala mappa colorimetrica', data.scaleUm, 'μm'],
+    [],
+    ['SOGLIE CLINICHE |D| 3D', '', ''],
+    ['Ottimo (<)', 50, 'μm'],
+    ['Accettabile (<)', 100, 'μm'],
+    ['Rischioso (<)', 150, 'μm'],
+    ['Tensione (<)', 250, 'μm'],
+    ['Fuori (>=)', 250, 'μm'],
+    [],
+    ['SOGLIE CLINICHE ANGOLO ASSE', '', ''],
+    ['Ottimo (<)', 0.5, 'deg'],
+    ['Accettabile (<)', 1.0, 'deg'],
+    ['Rischioso (<)', 2.0, 'deg'],
+    ['Tensione (>=)', 2.0, 'deg']
+  ];
+  var ws3 = XLSX.utils.aoa_to_sheet(paramData);
+  ws3['!cols'] = [{wch:30},{wch:18},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Parametri');
+
+  // Foglio 4: Metadati
+  var metaData = [
+    ['Campo', 'Valore'],
+    ['File A (riferimento)', data.fileA],
+    ['File B (confronto)', data.fileB],
+    ['Data analisi', misICP_fmtDateTime(data.timestamp)],
+    ['Software', 'Syntesis-ICP - Misurare (Analizza v7.3.9)'],
+    ['Produttore', 'Biaggini Medical Devices S.r.l.'],
+    ['Sito', 'https://syntesis-icp.com']
+  ];
+  var ws4 = XLSX.utils.aoa_to_sheet(metaData);
+  ws4['!cols'] = [{wch:24},{wch:42}];
+  XLSX.utils.book_append_sheet(wb, ws4, 'Metadati');
+
+  return wb;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// DISPATCHER + UI helpers
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * Toggle del menu drop-down "Scarica report".
+ */
+function misICP_toggleReportMenu(e){
+  if(e) e.stopPropagation();
+  var d = document.getElementById('misReportDrop');
+  if(!d) return;
+  var isOpen = d.style.display === 'block';
+  d.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen){
+    setTimeout(function(){
+      document.addEventListener('click', misICP_closeReportMenu, {once:true});
+    }, 0);
+  }
+}
+function misICP_closeReportMenu(){
+  var d = document.getElementById('misReportDrop');
+  if(d) d.style.display = 'none';
+}
+
+/**
+ * Punto di ingresso unico per i 4 tipi di report.
+ */
+function misICP_generateReport(kind){
+  misICP_closeReportMenu();
   if(!misICP_result || !misICP_result.pairs || !misICP_result.pairs.length){
     misICP_showError('Nessun allineamento ICP disponibile. Esegui prima l\'ICP.');
     return;
   }
-  var btn=document.getElementById('misBtnPdf');
-  if(btn){ btn.classList.add('busy'); btn.textContent='Generazione PDF in corso...'; }
+  if(kind !== 'excel' && !window.jspdf){
+    misICP_showError('jsPDF non caricato. Attendi qualche secondo e riprova.');
+    return;
+  }
+  if(kind === 'excel' && !window.XLSX){
+    misICP_showError('Libreria Excel non caricata. Ricarica la pagina e riprova.');
+    return;
+  }
+  var btn=document.getElementById('misBtnReport');
+  if(btn){ btn.classList.add('busy'); btn.innerHTML='<span>Generazione in corso...</span>'; }
   misICP_clearError();
 
   setTimeout(function(){
     try {
-      // Costruisco gli oggetti che si aspetta la pipeline del Comparator
-      // (struttura: p.pairs[i].a, .b, .dx, .dy, .dz, .dxy, .d3, .trisA, .trisB)
-      var pairs=misICP_result.pairs;
-      var pdfPairs = pairs.map(function(pp){
-        return {
-          a: pp.cA,
-          b: pp.cB,
-          dx: pp.dx, dy: pp.dy, dz: pp.dz,
-          dxy: pp.dxy, d3: pp.d3,
-          trisA: pp.trisA,
-          trisB: pp.trisBt
-        };
-      }).filter(function(pp){return pp.b !== null;}); // solo pairs con corrispondenza
-      if(!pdfPairs.length) throw new Error('Nessuna coppia valida per il report.');
+      var data = misICP_buildReportData();
+      var dateSlug = new Date().toISOString().slice(0,10).replace(/-/g,'');
 
-      var cylAxes = pairs.filter(function(pp){return pp.iB>=0;}).map(function(pp){
-        return { angleDeg: pp.axAngleDeg };
-      });
-
-      var score = misICP_calcScore(pdfPairs, cylAxes);
-      var lv = misICP_scoreLabel(score);
-      var scaleUm = misICP_getScaleUm(pdfPairs);
-
-      var doc = new window.jspdf.jsPDF({unit:'mm', format:'a4', compress:true});
-      var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
-
-      function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
-      function setTxt (hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
-
-      // ══════════════════════════════════════════════════════════════
-      // PAGINA 1: COPERTINA (sfondo scuro, anello score, badge, mappa)
-      // ══════════════════════════════════════════════════════════════
-      doc.setFillColor(13,27,42); doc.rect(0,0,W,H,'F');
-
-      // Barre oro sopra/sotto
-      doc.setFillColor(255,215,0); doc.rect(0,0,W,3,'F');
-      doc.setFillColor(245,158,11); doc.rect(0,3,W,1.5,'F');
-
-      // Titolo "Syntesis-ICP"
-      doc.setFont('helvetica','bold'); doc.setFontSize(22); setTxt('#FFFFFF');
-      doc.text('Syntesis-ICP', W/2, 28, {align:'center'});
-      doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#B0B8C1');
-      doc.text('Precision Scanner Report', W/2, 34, {align:'center'});
-
-      // Anello score (simulato con circonferenze)
-      var cx2=W/2, cy2=72, ringR=22;
-      // Anello di sfondo
-      doc.setDrawColor(40,50,65); doc.setLineWidth(6);
-      doc.circle(cx2, cy2, ringR, 'S');
-      // Anello colorato per score
-      var pct = score/100;
-      var segs = 64;
-      var colRGB = misICP_hexRGB(lv.col);
-      doc.setDrawColor(colRGB[0], colRGB[1], colRGB[2]);
-      doc.setLineWidth(6);
-      // Approssimazione con segmenti (jsPDF non ha arco nativo)
-      var prev=null;
-      for(var sI=0; sI<=segs*pct; sI++){
-        var ang = -Math.PI/2 + (sI/segs)*Math.PI*2;
-        var x = cx2 + ringR*Math.cos(ang);
-        var y = cy2 + ringR*Math.sin(ang);
-        if(prev) doc.line(prev[0], prev[1], x, y);
-        prev=[x,y];
+      if(kind === 'clinico'){
+        var doc = misICP_renderClinicalPDF(data);
+        doc.save('SyntesisICP_Clinico_'+dateSlug+'.pdf');
+        showStatus('Report Clinico salvato.');
+      } else if(kind === 'taratura'){
+        var doc2 = misICP_renderCalibrationPDF(data);
+        doc2.save('SyntesisICP_Taratura_'+dateSlug+'.pdf');
+        showStatus('Report Taratura salvato.');
+      } else if(kind === 'analisi'){
+        var doc3 = misICP_renderAnalysisPDF(data);
+        doc3.save('SyntesisICP_Analisi_'+dateSlug+'.pdf');
+        showStatus('Report Analisi salvato.');
+      } else if(kind === 'excel'){
+        var wb = misICP_renderExcel(data);
+        XLSX.writeFile(wb, 'SyntesisICP_DatiTabellari_'+dateSlug+'.xlsx');
+        showStatus('Tabella Excel salvata.');
+      } else {
+        throw new Error('Tipo report sconosciuto: '+kind);
       }
-      // Score numerico
-      doc.setFont('helvetica','bold'); doc.setFontSize(24); setTxt(lv.col);
-      doc.text(score.toFixed(2), cx2, cy2+2, {align:'center'});
-      doc.setFontSize(8); setTxt('#7A90A4');
-      doc.text('/100', cx2, cy2+8, {align:'center'});
-
-      // Badge label
-      var pillY=100, pillH=10, pillW=50, pillX=(W-pillW)/2;
-      var bgRGB=misICP_hexRGB(lv.bg);
-      doc.setFillColor(bgRGB[0],bgRGB[1],bgRGB[2]);
-      doc.roundedRect(pillX, pillY, pillW, pillH, 4, 4, 'F');
-      doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt(lv.fg);
-      doc.text(lv.label.toUpperCase(), W/2, pillY+6.8, {align:'center'});
-
-      // Info box (4 campi)
-      var infoY=120;
-      var fileA=(misICP_result.fileA||'A').replace(/\.stl$/i,'').slice(0,30);
-      var fileB=(misICP_result.fileB||'B').replace(/\.stl$/i,'').slice(0,30);
-      var dateStr=new Date().toLocaleDateString('it-IT');
-      var infos=[
-        ['File A (riferimento)', fileA],
-        ['File B (confronto)',   fileB],
-        ['N scanbody',           String(pdfPairs.length)],
-        ['RMSD ICP',             (misICP_result.rmsdUm).toFixed(1)+' \u03bcm'],
-        ['Data analisi',         dateStr]
-      ];
-      infos.forEach(function(row,ii){
-        var rowY = infoY + ii*8;
-        setTxt('#7A90A4');
-        doc.setFont('helvetica','normal'); doc.setFontSize(7);
-        doc.text(row[0], ml+4, rowY);
-        setTxt('#FFFFFF');
-        doc.setFont('helvetica','bold'); doc.setFontSize(9);
-        doc.text(row[1], W-mr-4, rowY, {align:'right'});
-        // Linea separatore
-        doc.setDrawColor(40,50,65); doc.setLineWidth(0.15);
-        doc.line(ml+4, rowY+1.5, W-mr-4, rowY+1.5);
-      });
-
-      // Mappa colorimetrica 2D (PCA plane)
-      doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#FFCC55');
-      var mapY = infoY + 5*8 + 6;
-      doc.text('MAPPA COLORIMETRICA - POSIZIONI SCANBODY', ml, mapY);
-      var mapCanvas=document.createElement('canvas');
-      mapCanvas.width=880; mapCanvas.height=480;
-      misICP_drawColorMap(mapCanvas, pdfPairs);
-      var mapH=70;
-      doc.addImage(mapCanvas.toDataURL('image/png'), 'PNG', ml, mapY+3, cw, mapH);
-
-      // Legenda livelli clinici
-      var legY = mapY + 3 + mapH + 4;
-      var levels=[
-        {c:'#639922', lbl:'0-50 Ottimo'},
-        {c:'#D97706', lbl:'50-100 Accett.'},
-        {c:'#F97316', lbl:'100-150 Risch.'},
-        {c:'#EF4444', lbl:'150-250 Tens.'},
-        {c:'#A855F7', lbl:'>250 Fuori'}
-      ];
-      var segW=cw/levels.length;
-      levels.forEach(function(l,li){
-        var lx=ml+li*segW;
-        var cRGB=misICP_hexRGB(l.c);
-        doc.setFillColor(cRGB[0],cRGB[1],cRGB[2]);
-        doc.rect(lx, legY, segW-1, 3, 'F');
-        doc.setFont('helvetica','normal'); doc.setFontSize(6); setTxt('#B0B8C1');
-        doc.text(l.lbl, lx+1, legY+7);
-      });
-
-      // Footer copertina
-      doc.setFillColor(255,215,0); doc.rect(0,H-3,W,3,'F');
-      doc.setFillColor(245,158,11); doc.rect(0,H-4.5,W,1.5,'F');
-      doc.setFont('helvetica','bold'); doc.setFontSize(7); setTxt('#FFCC55');
-      doc.text('Syntesis-ICP  -  Misurare (Analizza v6)  -  Biaggini Medical Devices S.r.l.', W/2, H-6, {align:'center'});
-
-      // ══════════════════════════════════════════════════════════════
-      // PAGINE 2..N+1: una pagina per scanbody
-      // ══════════════════════════════════════════════════════════════
-      pdfPairs.forEach(function(p, ci){
-        doc.addPage();
-        var d3um = Math.round(p.d3*1000);
-        var dxum = Math.round(p.dx*1000);
-        var dyum = Math.round(p.dy*1000);
-        var dzum = Math.round(p.dz*1000);
-        var dxyum= Math.round(p.dxy*1000);
-        var clv = misICP_clinLevel(d3um);
-
-        // Header colorato per livello clinico
-        var clBgRGB = misICP_hexRGB(clv.bg);
-        doc.setFillColor(clBgRGB[0], clBgRGB[1], clBgRGB[2]);
-        doc.rect(0,0,W,16,'F');
-        var clRGB = misICP_hexRGB(clv.col);
-        doc.setFillColor(clRGB[0], clRGB[1], clRGB[2]);
-        doc.rect(0,0,5,16,'F');
-        // Titolo cilindro
-        doc.setFont('helvetica','bold'); doc.setFontSize(14); setTxt(clv.fg);
-        doc.text('Cilindro #'+(ci+1), ml+2, 10.5);
-        doc.setFontSize(9);
-        doc.text(clv.label+'  -  '+d3um+' \u03bcm  |D3D|', ml+2, 15);
-        // Score globale a destra
-        setTxt('#0F1923');
-        doc.setFont('helvetica','bold'); doc.setFontSize(11);
-        doc.text('Voto globale: '+score.toFixed(2)+'/100', W-mr, 10.5, {align:'right'});
-        doc.setFontSize(8); doc.setFont('helvetica','normal');
-        doc.text(fileA+' vs '+fileB, W-mr, 15, {align:'right'});
-
-        // VISUALIZZAZIONE MESH 3D (3 viste)
-        var y = 22;
-        doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
-        doc.text('VISUALIZZAZIONE MESH 3D', ml, y); y+=3;
-        var viewW=(cw-8)/3, viewH=42;
-        var views=[
-          {ax1:0, ax2:1, axD:2, label:'Vista XY (dall\'alto)'},
-          {ax1:0, ax2:2, axD:1, label:'Vista XZ (frontale)'},
-          {ax1:1, ax2:2, axD:0, label:'Vista YZ (laterale)'}
-        ];
-        views.forEach(function(v,vi){
-          var vx = ml + vi*(viewW+4);
-          var cvV=document.createElement('canvas');
-          cvV.width=Math.round(viewW*4); cvV.height=Math.round(viewH*4);
-          misICP_paintView(cvV, p.trisA, p.trisB, null, v.ax1, v.ax2, v.axD, v.label);
-          doc.addImage(cvV.toDataURL('image/png'), 'PNG', vx, y, viewW, viewH);
-          doc.setFont('helvetica','normal'); doc.setFontSize(6); setTxt('#7A90A4');
-          doc.text(v.label, vx+viewW/2, y+viewH+3, {align:'center'});
-        });
-        y += viewH + 8;
-
-        // ANALISI DEVIAZIONE (card gauge+compass+bars)
-        doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
-        doc.text('ANALISI DEVIAZIONE', ml, y); y+=3;
-        var cardW=cw, cardH=40;
-        var cvCard=document.createElement('canvas');
-        cvCard.width=Math.round(cardW*4); cvCard.height=Math.round(cardH*4);
-        misICP_drawCard(cvCard, dxum, dyum, dzum, d3um, scaleUm, p.trisB ? (cylAxes[ci] && cylAxes[ci].angleDeg) : null);
-        doc.addImage(cvCard.toDataURL('image/png'), 'PNG', ml, y, cardW, cardH);
-        y += cardH + 6;
-
-        // TABELLA MISURAZIONI (autotable)
-        doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
-        doc.text('TABELLA MISURAZIONI', ml, y); y+=2;
-        var axDeg = cylAxes[ci] ? cylAxes[ci].angleDeg : 0;
-        var axLvl = misICP_clinAx(axDeg);
-        var tbRows = [
-          ['|D| 3D totale',          d3um+' \u03bcm',                           clv.label],
-          ['Deviazione XY (piano)',  dxyum+' \u03bcm',                          misICP_clinLevel(dxyum).label],
-          ['Deviazione X',           (dxum>=0?'+':'')+dxum+' \u03bcm',          ''],
-          ['Deviazione Y',           (dyum>=0?'+':'')+dyum+' \u03bcm',          ''],
-          ['Deviazione Z (verticale)', (dzum>=0?'+':'')+dzum+' \u03bcm',        ''],
-          ['Angolo asse cilindro',   axDeg.toFixed(3)+' deg',                   axLvl.label],
-          ['Centroide A (X,Y,Z)',    p.a[0].toFixed(3)+', '+p.a[1].toFixed(3)+', '+p.a[2].toFixed(3)+' mm', ''],
-          ['Centroide B allineato',  p.b[0].toFixed(3)+', '+p.b[1].toFixed(3)+', '+p.b[2].toFixed(3)+' mm', '']
-        ];
-        doc.autoTable({
-          startY: y,
-          margin: {left:ml, right:mr},
-          head: [['Parametro','Valore','Valutazione']],
-          body: tbRows,
-          theme: 'grid',
-          styles: {font:'helvetica', fontSize:8, cellPadding:2, textColor:[33,37,41], lineColor:[214,228,240], lineWidth:0.2},
-          headStyles: {fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:7},
-          columnStyles: {0:{cellWidth:60}, 1:{halign:'right', font:'courier'}, 2:{halign:'right', fontSize:7}}
-        });
-
-        // Footer pagina cilindro
-        doc.setFont('helvetica','normal'); doc.setFontSize(7); setTxt('#7A90A4');
-        doc.text('Syntesis-ICP  -  Cilindro #'+(ci+1)+' di '+pdfPairs.length, ml, H-4);
-        doc.text('Pag. '+(ci+2)+' / '+(pdfPairs.length+1), W-mr, H-4, {align:'right'});
-      });
-
-      // Salvataggio
-      var fname='PrecisionReport_v7_'+new Date().toISOString().slice(0,10)+'.pdf';
-      doc.save(fname);
-      showStatus('Report PDF salvato: '+fname);
     }
     catch(err){
-      console.error('[Misurare PDF] Generazione fallita:', err);
-      misICP_showError('Errore generazione PDF: '+(err.message||err));
+      console.error('[Report] Generazione fallita:', err);
+      misICP_showError('Errore generazione report: '+(err.message||err));
     }
     finally {
-      var btn=document.getElementById('misBtnPdf');
-      if(btn){ btn.classList.remove('busy'); btn.textContent='Scarica report PDF'; }
+      var btn=document.getElementById('misBtnReport');
+      if(btn){ btn.classList.remove('busy'); btn.innerHTML='<span>Scarica report</span><span style="font-size:11px;opacity:0.8">&#9662;</span>'; }
     }
   }, 40);
 }
+
+/**
+ * Alias di retrocompatibilità: vecchio bottone PDF -> Clinico.
+ */
+function misICP_generatePDF(){
+  return misICP_generateReport('clinico');
+}
+
 
 
 // ╔══════════════════════════════════════════════════════════════════╗
