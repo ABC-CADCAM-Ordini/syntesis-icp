@@ -419,3 +419,187 @@ Quando lavori in questa sessione:
 ---
 
 *Fine documento — Syntesis-ICP v7.2.0.012 — 2026-04-13*
+
+---
+---
+
+# APPENDICE 2026-04-25 — v7.3.8.001 FRESATURA AVANZATA
+
+> Questa appendice consolida le evoluzioni dalla v7.2.0.012 alla v7.3.8.001.
+> Documento principale invariato sopra; tutto ciò che è stato aggiunto nelle ultime
+> due settimane di lavoro è descritto qui, in forma compatta.
+
+## A.1 Stato del sistema al 2026-04-25
+
+**Versione live:** v7.3.8.001
+**URL produzione:** https://syntesis-icp-production.up.railway.app/, alias https://app.syntesis-icp.com/
+**Commit corrente main:** `92df1543` (deploy SUCCESS Railway 2026-04-25 10:44 UTC)
+**File principale:** `backend/static/syntesis-analyzer-v3b.html` (11.521 righe, 2.46 MB dopo l'integrazione fresabilità)
+
+## A.2 Roadmap di versioning v7.3.x
+
+Da v7.2.0.012 a v7.3.8.001 il prodotto ha attraversato due fasi distinte: una di consolidamento del motore ICP (v7.3.0–v7.3.7), una di estensione clinica (v7.3.8).
+
+| Versione | Data | Contenuto sintetico |
+|----------|------|---------------------|
+| v7.3.6.003 | 2026-04-25 notte | Hotfix template mode 1T3 (singolo scanbody multi-isole) |
+| v7.3.6.004 | 2026-04-25 notte | Flip CAD SR 180°X, ricalibrazione SOSTITUIRE_CULL_CYL[SR] |
+| v7.3.7.001 | 2026-04-25 notte | Raffina ICP reale (sostituisce no-op precedente) |
+| v7.3.7.002 | 2026-04-25 notte | Filtro Upper falsi positivi via n_cap≥30 |
+| v7.3.7.003 | 2026-04-25 notte | Raffina ICP robusto: outlier rejection Tukey-like, convergenza ΔRMSD<1e-4 |
+| v7.3.7.004 | 2026-04-25 notte | Weighted ICP: peso 5x cap, 1x cilindro (cap guida planarità, cilindro centra assi) |
+| **v7.3.8.001** | **2026-04-25 mattina** | **Fresatura avanzata + fix z-index legenda sottosquadri** |
+
+## A.3 La nuova feature v7.3.8.001 — Fresatura avanzata
+
+### A.3.1 Cosa fa
+
+Dopo l'analisi di Misura, l'utente clicca un nuovo bottone "**Fresatura avanzata →**" in fondo al pannello "Asse medio e divergenze". Il pannello Misura viene sostituito dal pannello Fresabilità, che risponde a una domanda clinica precisa: *gli angoli dei MUA sono compatibili con la macchina di fresatura su cui il cliente IPD lavorerà?*
+
+### A.3.2 Modello matematico
+
+Specifica completa: `FRESABILITY_MODEL_v0.5.md` (consegnato in sessione 2026-04-25, fonte di verità).
+
+Per ogni MUA con asse $\vec{n}_i$ e un asse di setup della macchina $\vec{n}_\text{setup}$:
+
+$$\theta_i = \arccos(|\vec{n}_i \cdot \vec{n}_\text{setup}|)$$
+
+Il MUA è fresabile se $\theta_i \leq \alpha_\text{max}$ della macchina scelta. Tre modalità per scegliere $\vec{n}_\text{setup}$:
+
+- **Modalità A — Asse medio**: media normalizzata degli assi MUA (formula chiusa, già esistente in Misura)
+- **Modalità B — Minimax**: ottimizzazione che minimizza il massimo $\theta_i$ del gruppo. Algoritmo: Nelder-Mead 2D in coordinate sferiche, partenza dall'asse medio. Convergenza in ~20-30 iterazioni
+- **Modalità C — Custom**: l'utente afferra l'asse di setup nello spazio 3D e lo trascina liberamente tramite trackball virtuale (Shoemake arcball, 1985). A ogni frame i $\theta_i$ si ricalcolano e i colori dei MUA si aggiornano live
+
+Classificazione clinica a tre classi per MUA:
+- **Ottimo** (verde): $\theta_i \leq 0.5 \alpha_\text{max}$
+- **Accettabile** (giallo): $0.5 \alpha_\text{max} < \theta_i \leq \alpha_\text{max}$
+- **Non fresabile** (rosso): $\theta_i > \alpha_\text{max}$
+
+Verdetto gruppo: fresabile se tutti i singoli MUA sono fresabili.
+
+### A.3.3 Database macchine
+
+Persistente in `localStorage` con chiave `syntesisIcp.fresability.v1`. Contiene 5 macchine builtin (VHF S5 30°, VHF R5 35°, Jiny F5T Pro 30°, Dental Plus X1.8 33°, SK-5A 30°) più macchine custom create dall'utente.
+
+Le builtin non sono eliminabili. L'utente può aggiungerne, modificarne, eliminarle.
+
+### A.3.4 Vincolo: solo 5 assi
+
+Decisione clinica di Francesco (2026-04-25): "i 4 assi fresano quasi solo denti naturali e no connessioni MUA dato che i canali vite sono cilindrici e impossibile trovare 3, 4 o 6 MUA perfettamente paralleli".
+
+Conseguenza nel modello: nessun selettore "4 vs 5 assi" nell'UI. Tutti i fresatori del database sono 5 assi. Argomento matematico in §2.3 di `FRESABILITY_MODEL_v0.5.md`: il canale vite cilindrico richiede 2 DOF rotazionali per allineamento fresa/asse-MUA, e 1 DOF (i 4 assi) non basta nelle arcate reali.
+
+### A.3.5 Architettura di integrazione
+
+L'analisi di fresabilità è un'**estensione opzionale di Misura**, non un modulo separato.
+
+- Sorgente unica degli assi MUA: `muaObjects[].axisDir`. Niente ricalcolo, niente disallineamento numerico tra Misura e Fresabilità
+- Pannello sostitutivo: `openFresability()` nasconde i 3 pannelli Misura (`panelMuaList`, `panelAngleList`, `panelAxisInfo`) e mostra `panelFresabilita`. `closeFresability()` fa il contrario
+- Stato `analysisMode = 'fresabilita'` durante la sessione (5° valore dopo `misura`, `accoppia`, `misurare`, `sostituire`)
+- Hook non invasivo su `calculateAngles()`: wrapping che richiama `fresRecompute()` quando il pannello è aperto. Il codice originale di Misura è invariato
+- Persistenza completa: macchina selezionata, modalità, asse custom, database custom — tutto in localStorage
+
+### A.3.6 File modificati
+
+Solo `backend/static/syntesis-analyzer-v3b.html`. Aggiunte 558 righe (25 KB):
+- DOM: bottone "Fresatura avanzata" + pannello `panelFresabilita`
+- JS: blocco "FRESABILITA' AVANZATA" prima di `function setMode()` (database, calcoli, trackball, open/close, hook)
+
+Nessuna modifica a `main.py`, `icp_engine.py`, `pdf_gen.py`, `requirements.txt`, infrastruttura Railway.
+
+### A.3.7 Bugfix collaterale (incluso nello stesso commit)
+
+Z-index dello stacking dei layer fluttuanti correttto:
+- `undercutLegend`: 5 → 9
+- `clinicalBanner`: 6 → 10
+- `layersPanel`: 8 (invariato)
+
+Causa: `layersPanel` (z=8) copriva la legenda sottosquadri (z=5) e il banner clinico (z=6) quando entrambi attivi in alto a sinistra dello stesso layout. Segnalato da Francesco con screenshot 2026-04-25 12:36.
+
+## A.4 Documenti di specifica prodotti in sessione 2026-04-25
+
+Tutti consegnati in `/mnt/user-data/outputs/`:
+
+1. `FRESABILITY_MODEL_v0.5.md` — specifica matematica completa della fresabilità (290 righe)
+2. `IMPLEMENTATION_PLAN_v0.md` — architettura software, algoritmi, struttura dati, tappe di sviluppo
+3. `fresability_module.js` — modulo JS autonomo con i calcoli (test Node.js: 26/26 passed)
+4. `test_fresability.js` — suite di test della matematica
+5. `fresabilita_standalone.html` — pagina di test interattivo standalone (file unico, no dipendenze esterne)
+6. `syntesis-analyzer-v3b_v7.3.8.001-dev.html` — file completo modificato (copia di backup)
+7. `syntesis-analyzer-v3b.PATCH.diff` — diff -u della patch applicata
+8. `sezione_cono_MUA.png` — quote del CAD MUA misurato (16°, h=4.75mm)
+
+## A.5 Lezioni apprese in questa sessione
+
+**1. Disciplina specifica → codice.** La sessione 2026-04-25 ha consolidato il principio "documento prima del codice". Cinque iterazioni del modello (v0.1 → v0.5) hanno chiuso le ambiguità progettuali prima della scrittura dei 558 righe finali. Nessuna riscrittura, nessuna regressione.
+
+**2. Standalone come passaggio intermedio.** Aver costruito `fresabilita_standalone.html` come pagina autonoma prima di toccare il file live ha permesso a Francesco di validare il design (trackball, modalità, palette) in 5 minuti, evitando il rischio di scoprire problemi UX dentro il modulo da 11k righe.
+
+**3. Trappola del Railway redeploy.** `serviceInstanceRedeploy` ridipliogia l'**ultima build buildata**, non l'ultimo commit. Per deploy di un commit nuovo serve `serviceInstanceDeploy` con `commitSha` esplicito. Documentato in §A.6.
+
+**4. Architettura additiva vs sostitutiva.** Francesco ha guidato la decisione cruciale di tenere Misura e Fresabilità separate logicamente (non fonderle), ma con sorgente dati unica. Ha protetto un modulo live (Misura) usato dai clienti senza rallentare l'aggiunta della nuova feature.
+
+## A.6 Procedure operative aggiornate
+
+### A.6.1 Deploy di un commit nuovo su Railway
+
+`serviceInstanceRedeploy` non basta se Railway non ha rilevato il push. Procedura corretta:
+
+```python
+# 1. Push del commit (via GitHub API)
+PUT /repos/{owner}/{repo}/contents/{path}
+# → ottieni commit_sha dalla risposta
+
+# 2. Deploy esplicito del commit specifico
+mutation {
+  serviceInstanceDeploy(
+    serviceId: "b7671e12-545a-428e-9c2b-542916e8eff6",
+    environmentId: "f944a213-371c-4377-9d4f-9c3eb2da3fb2",
+    commitSha: "{commit_sha}"
+  )
+}
+```
+
+Verificare poi che `meta.commitHash` del nuovo deployment corrisponda al commit pushato.
+
+### A.6.2 Verifica integrazione su file servito
+
+Dopo deploy, fare hard refresh e controllare:
+
+```bash
+URL="https://syntesis-icp-production.up.railway.app/analizzare?nocache=$(date +%s)"
+curl -s "$URL" > /tmp/served.html
+grep -c "{stringa_chiave_della_feature}" /tmp/served.html  # deve essere ≥ 1
+```
+
+Se la dimensione del file servito non è cambiata o il marker non è presente, il deploy non ha pubblicato il commit giusto.
+
+## A.7 Catalogo file di sessione (locali)
+
+Working directory del lavoro intercorso:
+
+```
+/home/claude/icp_tests/fixtures/    # STL di test (1T3, OS, SR, Ds3_Reverse, ...)
+/home/claude/deploy/repo/           # snapshot canonico post v7.3.7.004
+/home/claude/repo_live/              # snapshot post v7.3.8.001 (fresabilità)
+/home/claude/standalone/             # standalone fresabilità HTML autonomo
+/mnt/user-data/outputs/              # consegne ufficiali a Francesco
+```
+
+## A.8 Pendenze tecniche identificate (non bloccanti)
+
+Da `FRESABILITY_MODEL_v0.5` §7, caselle aperte ma non bloccanti per il rilascio:
+
+1. Catalogo iniziale macchine: i 5 modelli proposti vanno bene o IPD raccomanda macchine diverse?
+2. Nomenclatura classi: "ottimo / accettabile / non fresabile" coerente con stile IPD?
+3. Soglia diagnostica di coppia: 2$\alpha_\text{max}$ adattiva o fissa?
+
+Pendenze su altri moduli:
+
+- DS1 cap-clustering DBSCAN: prototipo validato (6/6 e 5/5 sui casi di test), integrazione invasiva rimandata a v7.3.9 o successiva
+- DNS register.it: CNAME app.syntesis-icp.com da bdxfubdr a tqxxdh7s.up.railway.app (Francesco: "importa poco ora")
+- Master-doc principale (sezioni 1-14): aggiornato dalla v7.2.0.012; questa appendice ne è la continuazione
+
+---
+
+*Fine appendice 2026-04-25 — v7.3.8.001 deploy SUCCESS commit 92df1543 — Sezione redatta da Claude in sessione lunga con Francesco Biaggini, dalla notte del 2026-04-25 alla mattina dello stesso giorno*
