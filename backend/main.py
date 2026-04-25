@@ -128,7 +128,7 @@ async def analyzer_page():
 
 @app.get("/statistiche", include_in_schema=False)
 async def statistiche_page():
-    _st = _STATIC_DIR / "syntesis-statistiche-v7.4.0.001.html"
+    _st = _STATIC_DIR / "syntesis-statistiche-v7.4.0.002.html"
     if _st.exists():
         return FileResponse(str(_st), headers=_NO_STORE_HEADERS)
     return JSONResponse({"error": "Statistiche not found"}, status_code=404)
