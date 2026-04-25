@@ -517,14 +517,14 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
       <div class="sub">Trascina un file .stl oppure usa il pannello a destra</div>
     </div>
     <div id="labelLayer"><svg id="labelLines" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible"></svg></div>
-    <div id="undercutLegend" style="display:none;position:absolute;top:16px;left:16px;background:rgba(10,10,15,0.85);border:1px solid #333;border-radius:8px;padding:8px 12px;z-index:5;font-family:var(--mono);font-size:10px;color:#fff;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.5)">
+    <div id="undercutLegend" style="display:none;position:absolute;top:16px;left:16px;background:rgba(10,10,15,0.85);border:1px solid #333;border-radius:8px;padding:8px 12px;z-index:9;font-family:var(--mono);font-size:10px;color:#fff;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.5)">
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#aaa;margin-bottom:6px">Mappa sottosquadri</div>
       <div style="width:180px;height:14px;border-radius:3px;background:linear-gradient(to right,#0033cc 0%,#00b8ff 33%,#44ff66 55%,#ffff00 72%,#ff6b00 89%,#e60000 100%);margin-bottom:4px"></div>
       <div style="display:flex;justify-content:space-between;font-size:9px;color:#ccc"><span>0&deg;</span><span>30&deg;</span><span>60&deg;</span><span>90&deg;</span></div>
       <div style="display:flex;justify-content:space-between;font-size:8px;color:#999;margin-top:4px"><span>safe</span><span>warning</span><span>sottosquadro</span></div>
       <div style="margin-top:6px;padding-top:6px;border-top:1px solid #333;font-size:8px;color:#888"><span style="display:inline-block;width:10px;height:10px;background:#bfbfc4;vertical-align:middle;margin-right:4px;border-radius:2px"></span> canale vite (escluso)</div>
     </div>
-    <div id="clinicalBanner" style="display:none;position:absolute;top:14px;left:50%;transform:translateX(-50%);border-radius:999px;padding:6px 14px 6px 8px;z-index:6;align-items:center;gap:10px;box-shadow:0 4px 14px rgba(0,0,0,0.3);pointer-events:none;max-width:calc(100% - 32px)">
+    <div id="clinicalBanner" style="display:none;position:absolute;top:14px;left:50%;transform:translateX(-50%);border-radius:999px;padding:6px 14px 6px 8px;z-index:10;align-items:center;gap:10px;box-shadow:0 4px 14px rgba(0,0,0,0.3);pointer-events:none;max-width:calc(100% - 32px)">
       <div id="clinicalBannerIcon" style="width:22px;height:22px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0"></div>
       <div id="clinicalBannerText" style="font-family:var(--mono);font-size:11px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
     </div>
@@ -671,6 +671,44 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
     <div class="panel-section" id="panelAxisInfo">
       <div class="panel-label">Asse medio e divergenze</div>
       <div id="axisInfo"><div style="font-family:var(--mono);font-size:10px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
+      <button id="btnOpenFresability" onclick="openFresability()" disabled style="margin-top:10px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.06em;border:1.5px solid var(--blue);border-radius:7px;background:var(--white);color:var(--blue);cursor:pointer;transition:all .15s">Fresatura avanzata &rarr;</button>
+    </div>
+
+    <!-- ===== PANNELLO FRESABILITA' (sostituisce Misura quando attivo) ===== -->
+    <div class="panel-section" id="panelFresabilita" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <button onclick="closeFresability()" style="border:none;background:transparent;color:var(--gray);cursor:pointer;padding:4px;font-size:14px;line-height:1">&larr;</button>
+        <div class="panel-label" style="margin:0;flex:1">Fresatura avanzata</div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Macchina</div>
+        <select id="fresMachineSelect" onchange="fresOnMachineChange()" style="width:100%;padding:6px 8px;font-family:var(--mono);font-size:11px;border:1px solid var(--border);border-radius:5px;background:var(--white);color:var(--dark);cursor:pointer"></select>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding:5px 8px;background:var(--light);border-radius:4px;font-family:var(--mono);font-size:10px">
+          <span id="fresMachineName">VHF S5</span>
+          <span style="color:var(--gray)">&alpha;<sub>max</sub> = <b id="fresMachineAlpha" style="color:var(--blue);font-size:13px">30&deg;</b></span>
+        </div>
+        <div style="display:flex;gap:5px;margin-top:6px">
+          <button onclick="fresAddCustom()" style="flex:1;padding:5px;font-family:var(--mono);font-size:9px;border:1px solid var(--border);border-radius:4px;background:var(--white);color:var(--dark);cursor:pointer">+ Custom</button>
+          <button id="fresBtnRemove" onclick="fresRemoveCustom()" style="flex:1;padding:5px;font-family:var(--mono);font-size:9px;border:1px solid var(--red);border-radius:4px;background:var(--white);color:var(--red);cursor:pointer;display:none">Elimina</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Asse di setup</div>
+        <label style="display:flex;align-items:center;gap:6px;padding:5px;border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:11px"><input type="radio" name="fresMode" value="mean" checked onchange="fresOnModeChange('mean')"><span>Asse medio</span></label>
+        <label style="display:flex;align-items:center;gap:6px;padding:5px;border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:11px"><input type="radio" name="fresMode" value="minimax" onchange="fresOnModeChange('minimax')"><span>Ottimizzato (minimax)</span></label>
+        <label style="display:flex;align-items:center;gap:6px;padding:5px;border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:11px"><input type="radio" name="fresMode" value="custom" onchange="fresOnModeChange('custom')"><span>Custom (trascina nella scena)</span></label>
+        <div id="fresCustomInfo" style="font-family:var(--mono);font-size:9px;color:var(--gray);padding:0 5px;margin-top:2px"></div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">MUA del gruppo</div>
+        <div id="fresMuaList" style="border:1px solid var(--border);border-radius:5px;padding:4px;background:var(--white);max-height:240px;overflow-y:auto"></div>
+        <div id="fresDiagnostic" style="font-family:var(--mono);font-size:9px;color:var(--gold);font-style:italic;padding:4px 0"></div>
+      </div>
+
+      <div id="fresVerdict" style="padding:12px;border-radius:6px;text-align:center;font-family:var(--mono);font-weight:800;font-size:12px;letter-spacing:.6px;background:var(--gray);color:var(--white)">--</div>
     </div>
 
     <div class="panel-section" id="panelExport" style="display:none">
@@ -2404,6 +2442,526 @@ function setMode(mode){
   if(mode === 'misurare')      return selectWorkflow('misurare');
   if(mode === 'sostituire')    return selectWorkflow('sostituire');
 }
+
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  FRESABILITA' AVANZATA — modulo additivo (v0.5 specifica)         ║
+// ║                                                                   ║
+// ║  Spec: FRESABILITY_MODEL_v0.5.md                                  ║
+// ║  Estensione opzionale di Misura, attivata tramite il bottone      ║
+// ║  "Fresatura avanzata". Sostituisce temporaneamente i pannelli     ║
+// ║  Misura, lasciando la scena 3D inalterata.                        ║
+// ║                                                                   ║
+// ║  Sorgente unica degli assi MUA: muaObjects[].axisDir.             ║
+// ║  Persistenza: localStorage syntesisIcp.fresability.v1.            ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// ===== Catalogo macchine builtin =====
+var FRES_BUILTIN_MACHINES = [
+  { id: 'vhf_s5',    name: 'VHF S5',           alphaMax: 30, builtin: true },
+  { id: 'vhf_r5',    name: 'VHF R5',           alphaMax: 35, builtin: true },
+  { id: 'jiny_f5t',  name: 'Jiny F5T Pro',     alphaMax: 30, builtin: true },
+  { id: 'dp_x18',    name: 'Dental Plus X1.8', alphaMax: 33, builtin: true },
+  { id: 'sk_5a',     name: 'SK-5A',            alphaMax: 30, builtin: true }
+];
+var FRES_STORAGE_KEY = 'syntesisIcp.fresability.v1';
+var FRES_PROXIMITY_DEG = 2.0;
+
+// ===== Stato runtime fresabilità =====
+var fresState = {
+  db: null,                    // { machines, selectedId, lastCustomAxis }
+  mode: 'mean',                // 'mean' | 'minimax' | 'custom'
+  meanAxis: null,              // THREE.Vector3
+  minimaxAxis: null,           // THREE.Vector3
+  customAxis: null,            // THREE.Vector3
+  setupAxis: null,             // THREE.Vector3 attivo
+  arrowGroup: null,            // Three.js group per la freccia rossa
+  pickerSphere: null,          // sfera di pickup all'estremità della freccia
+  dragging: false,
+  dragLast: null,              // ultimo punto su sfera virtuale
+  isOpen: false,               // vero quando il pannello è attivo
+  pendingMouseHandlers: null   // riferimenti agli handler per cleanup
+};
+
+// ===== Persistenza =====
+function fresLoadDB(){
+  try {
+    var raw = localStorage.getItem(FRES_STORAGE_KEY);
+    if(!raw) return fresDefaultDB();
+    var data = JSON.parse(raw);
+    if(data.version !== 1) return fresDefaultDB();
+    var customs = (data.machines || []).filter(function(m){ return !m.builtin; });
+    return {
+      version: 1,
+      machines: FRES_BUILTIN_MACHINES.concat(customs),
+      selectedId: data.selectedId || 'vhf_s5',
+      lastCustomAxis: data.lastCustomAxis || null,
+      lastMode: data.lastMode || 'mean'
+    };
+  } catch(e){
+    console.warn('[Fresabilita] errore lettura storage', e);
+    return fresDefaultDB();
+  }
+}
+function fresDefaultDB(){
+  return { version: 1, machines: FRES_BUILTIN_MACHINES.slice(), selectedId: 'vhf_s5', lastCustomAxis: null, lastMode: 'mean' };
+}
+function fresSaveDB(){
+  try { localStorage.setItem(FRES_STORAGE_KEY, JSON.stringify(fresState.db)); } catch(e){ console.warn('[Fresabilita] errore scrittura storage', e); }
+}
+
+// ===== Math utility =====
+function fresAngleAxesDeg(a, b){
+  var c = Math.abs(a.x*b.x + a.y*b.y + a.z*b.z);
+  return Math.acos(Math.min(c,1)) * 180/Math.PI;
+}
+function fresClassify(theta, alphaMax){
+  if(theta <= 0.5*alphaMax) return { name: 'ottimo',        color: '#639922' };
+  if(theta <= alphaMax)     return { name: 'accettabile',   color: '#D97706' };
+  return                            { name: 'non-fresabile', color: '#EF4444' };
+}
+
+// ===== Asse medio (Modalità A) =====
+function fresComputeMeanAxis(axes){
+  if(!axes || axes.length === 0) return new THREE.Vector3(0,0,1);
+  var ref = axes[0];
+  var sx = 0, sy = 0, sz = 0;
+  for(var i=0; i<axes.length; i++){
+    var a = axes[i];
+    var sign = (a.x*ref.x + a.y*ref.y + a.z*ref.z) >= 0 ? 1 : -1;
+    sx += sign * a.x; sy += sign * a.y; sz += sign * a.z;
+  }
+  var v = new THREE.Vector3(sx, sy, sz);
+  if(v.length() < 1e-9) return new THREE.Vector3(0,0,1);
+  return v.normalize();
+}
+
+// ===== Asse minimax (Modalità B) - Nelder-Mead 2D in coordinate sferiche =====
+function fresSphericalToVec(theta, phi){
+  var st = Math.sin(theta);
+  return new THREE.Vector3(st*Math.cos(phi), st*Math.sin(phi), Math.cos(theta));
+}
+function fresVecToSpherical(v){
+  return [Math.acos(Math.max(-1, Math.min(1, v.z))), Math.atan2(v.y, v.x)];
+}
+function fresMaxDivergence(theta, phi, axes){
+  var n = fresSphericalToVec(theta, phi);
+  var maxD = 0;
+  for(var i=0; i<axes.length; i++){
+    var d = fresAngleAxesDeg(axes[i], n);
+    if(d > maxD) maxD = d;
+  }
+  return maxD;
+}
+function fresComputeMinimaxAxis(axes){
+  if(!axes || axes.length === 0) return new THREE.Vector3(0,0,1);
+  var n0 = fresComputeMeanAxis(axes);
+  var sph = fresVecToSpherical(n0);
+  // Nelder-Mead 2D
+  var step = 0.05, alpha=1, gamma=2, rho=0.5, sigma=0.5;
+  var s = [
+    { x:[sph[0],         sph[1]      ], v: fresMaxDivergence(sph[0],         sph[1],      axes) },
+    { x:[sph[0]+step,    sph[1]      ], v: fresMaxDivergence(sph[0]+step,    sph[1],      axes) },
+    { x:[sph[0],         sph[1]+step ], v: fresMaxDivergence(sph[0],         sph[1]+step, axes) }
+  ];
+  for(var iter=0; iter<200; iter++){
+    s.sort(function(a,b){ return a.v - b.v; });
+    var spread = Math.max(Math.abs(s[2].x[0]-s[0].x[0]), Math.abs(s[2].x[1]-s[0].x[1]));
+    if(spread < 1e-5) break;
+    var c = [(s[0].x[0]+s[1].x[0])/2, (s[0].x[1]+s[1].x[1])/2];
+    var r = [c[0] + alpha*(c[0]-s[2].x[0]), c[1] + alpha*(c[1]-s[2].x[1])];
+    var rv = fresMaxDivergence(r[0], r[1], axes);
+    if(rv < s[0].v){
+      var e = [c[0] + gamma*(r[0]-c[0]), c[1] + gamma*(r[1]-c[1])];
+      var ev = fresMaxDivergence(e[0], e[1], axes);
+      s[2] = (ev < rv) ? { x: e, v: ev } : { x: r, v: rv };
+    } else if(rv < s[1].v){
+      s[2] = { x: r, v: rv };
+    } else {
+      var cc = [c[0] + rho*(s[2].x[0]-c[0]), c[1] + rho*(s[2].x[1]-c[1])];
+      var cv = fresMaxDivergence(cc[0], cc[1], axes);
+      if(cv < s[2].v){
+        s[2] = { x: cc, v: cv };
+      } else {
+        for(var i=1; i<3; i++){
+          s[i].x[0] = s[0].x[0] + sigma*(s[i].x[0]-s[0].x[0]);
+          s[i].x[1] = s[0].x[1] + sigma*(s[i].x[1]-s[0].x[1]);
+          s[i].v = fresMaxDivergence(s[i].x[0], s[i].x[1], axes);
+        }
+      }
+    }
+  }
+  s.sort(function(a,b){ return a.v - b.v; });
+  return fresSphericalToVec(s[0].x[0], s[0].x[1]);
+}
+
+// ===== Costruzione e aggiornamento freccia di setup =====
+function fresBuildArrow(){
+  if(fresState.arrowGroup){ scene.remove(fresState.arrowGroup); fresState.arrowGroup = null; }
+  fresState.arrowGroup = new THREE.Group();
+  fresState.arrowGroup.name = 'FresabilitaArrow';
+
+  // Origine: centro del gruppo MUA, oppure origine se nessun MUA
+  var origin = new THREE.Vector3(0, 0, 0);
+  var aligned = muaObjects.filter(function(m){ return m.aligned; });
+  if(aligned.length > 0){
+    aligned.forEach(function(m){ origin.add(m.position); });
+    origin.divideScalar(aligned.length);
+  }
+
+  var len = 25;
+  var dir = new THREE.Vector3(0, 0, 1);
+  var arrow = new THREE.ArrowHelper(dir, origin, len, 0xEF4444, 6, 4);
+  fresState.arrowGroup.add(arrow);
+  fresState.arrowGroup.userData.origin = origin;
+  fresState.arrowGroup.userData.length = len;
+  fresState.arrowGroup.userData.arrow = arrow;
+
+  // Pickup sphere
+  var pickGeo = new THREE.SphereGeometry(2.5, 16, 16);
+  var pickMat = new THREE.MeshBasicMaterial({ color: 0xEF4444, transparent: true, opacity: 0.7 });
+  fresState.pickerSphere = new THREE.Mesh(pickGeo, pickMat);
+  fresState.pickerSphere.position.copy(origin).addScaledVector(dir, len);
+  fresState.pickerSphere.userData.isFresPicker = true;
+  fresState.arrowGroup.add(fresState.pickerSphere);
+
+  scene.add(fresState.arrowGroup);
+}
+function fresUpdateArrow(){
+  if(!fresState.arrowGroup || !fresState.setupAxis) return;
+  var d = fresState.setupAxis.clone().normalize();
+  fresState.arrowGroup.userData.arrow.setDirection(d);
+  var origin = fresState.arrowGroup.userData.origin;
+  var len = fresState.arrowGroup.userData.length;
+  fresState.pickerSphere.position.copy(origin).addScaledVector(d, len);
+}
+
+// ===== Calcolo principale =====
+function fresRecompute(){
+  if(!fresState.isOpen) return;
+  var aligned = muaObjects.filter(function(m){ return m.aligned; });
+  if(aligned.length < 2){
+    document.getElementById('fresMuaList').innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--gray);padding:6px">Servono almeno 2 MUA accoppiati</div>';
+    document.getElementById('fresVerdict').textContent = '--';
+    document.getElementById('fresVerdict').style.background = 'var(--gray)';
+    document.getElementById('fresDiagnostic').textContent = '';
+    return;
+  }
+  var axes = aligned.map(function(m){ return m.axisDir.clone().normalize(); });
+
+  // Calcola medio e minimax sempre (servono per feedback prossimità)
+  fresState.meanAxis = fresComputeMeanAxis(axes);
+  fresState.minimaxAxis = fresComputeMinimaxAxis(axes);
+
+  // Asse di setup attivo
+  if(fresState.mode === 'mean'){
+    fresState.setupAxis = fresState.meanAxis.clone();
+  } else if(fresState.mode === 'minimax'){
+    fresState.setupAxis = fresState.minimaxAxis.clone();
+  } else {
+    if(!fresState.customAxis) fresState.customAxis = fresState.meanAxis.clone();
+    fresState.setupAxis = fresState.customAxis.clone();
+  }
+  fresUpdateArrow();
+
+  // Macchina + alphaMax
+  var m = fresState.db.machines.filter(function(x){ return x.id === fresState.db.selectedId; })[0];
+  if(!m) m = fresState.db.machines[0];
+  var alphaMax = m.alphaMax;
+
+  // Per-MUA
+  var html = '';
+  var maxTheta = 0, maxIdx = -1;
+  axes.forEach(function(a, i){
+    var theta = fresAngleAxesDeg(a, fresState.setupAxis);
+    var cls = fresClassify(theta, alphaMax);
+    if(theta > maxTheta){ maxTheta = theta; maxIdx = i; }
+    html += '<div style="display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;padding:5px 8px;font-family:var(--mono);font-size:11px"><span style="width:10px;height:10px;border-radius:50%;background:' + cls.color + '"></span><span>MUA #' + aligned[i].num + '</span><span style="font-weight:800;color:' + cls.color + '">' + theta.toFixed(1) + '&deg;</span></div>';
+  });
+  document.getElementById('fresMuaList').innerHTML = html;
+
+  // Verdetto
+  var verdEl = document.getElementById('fresVerdict');
+  if(maxTheta <= alphaMax){
+    verdEl.style.background = '#639922';
+    verdEl.style.color = '#fff';
+    verdEl.innerHTML = 'FRESABILE<div style="font-size:9px;font-weight:400;margin-top:2px;opacity:0.95">su ' + m.name + ' &middot; max ' + maxTheta.toFixed(1) + '&deg;</div>';
+  } else {
+    verdEl.style.background = '#EF4444';
+    verdEl.style.color = '#fff';
+    verdEl.innerHTML = 'NON FRESABILE<div style="font-size:9px;font-weight:400;margin-top:2px;opacity:0.95">MUA #' + aligned[maxIdx].num + ' a ' + maxTheta.toFixed(1) + '&deg; supera &alpha;<sub>max</sub>=' + alphaMax + '&deg;</div>';
+  }
+
+  // Coppie diagnostiche critiche
+  var threshold = 2 * alphaMax;
+  var critPairs = [];
+  for(var i=0; i<axes.length; i++){
+    for(var j=i+1; j<axes.length; j++){
+      var t = fresAngleAxesDeg(axes[i], axes[j]);
+      if(t > threshold){
+        critPairs.push({ i: aligned[i].num, j: aligned[j].num, t: t });
+      }
+    }
+  }
+  var diagEl = document.getElementById('fresDiagnostic');
+  if(critPairs.length === 0){
+    diagEl.textContent = '';
+  } else {
+    diagEl.textContent = 'Coppie critiche (>' + threshold + '\u00B0): ' + critPairs.slice(0,3).map(function(p){ return '#' + p.i + '-#' + p.j + ': ' + p.t.toFixed(1) + '\u00B0'; }).join(' \u00B7 ');
+  }
+
+  // Custom info + prossimità
+  var infoEl = document.getElementById('fresCustomInfo');
+  if(fresState.mode === 'custom' && fresState.customAxis){
+    var dMean = fresAngleAxesDeg(fresState.customAxis, fresState.meanAxis);
+    var dMmx  = fresAngleAxesDeg(fresState.customAxis, fresState.minimaxAxis);
+    var hint = '';
+    if(dMean < FRES_PROXIMITY_DEG) hint = ' \u2190 vicino al medio';
+    else if(dMmx < FRES_PROXIMITY_DEG) hint = ' \u2190 vicino al minimax';
+    infoEl.textContent = '\u0394 medio = ' + dMean.toFixed(1) + '\u00B0 \u00B7 \u0394 minimax = ' + dMmx.toFixed(1) + '\u00B0' + hint;
+  } else {
+    infoEl.textContent = '';
+  }
+}
+
+// ===== UI binding =====
+function fresRebuildMachineSelect(){
+  var sel = document.getElementById('fresMachineSelect');
+  if(!sel) return;
+  sel.innerHTML = '';
+  fresState.db.machines.forEach(function(m){
+    var opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.name + (m.builtin ? '' : ' (custom)');
+    sel.appendChild(opt);
+  });
+  sel.value = fresState.db.selectedId;
+  var cur = fresState.db.machines.filter(function(x){ return x.id === fresState.db.selectedId; })[0];
+  if(cur){
+    document.getElementById('fresMachineName').textContent = cur.name;
+    document.getElementById('fresMachineAlpha').textContent = cur.alphaMax + '\u00B0';
+    document.getElementById('fresBtnRemove').style.display = cur.builtin ? 'none' : '';
+  }
+}
+function fresOnMachineChange(){
+  var sel = document.getElementById('fresMachineSelect');
+  fresState.db.selectedId = sel.value;
+  fresSaveDB();
+  fresRebuildMachineSelect();
+  fresRecompute();
+}
+function fresOnModeChange(mode){
+  fresState.mode = mode;
+  fresState.db.lastMode = mode;
+  fresSaveDB();
+  if(mode === 'custom' && !fresState.customAxis){
+    if(fresState.db.lastCustomAxis){
+      fresState.customAxis = new THREE.Vector3().fromArray(fresState.db.lastCustomAxis);
+    } else if(fresState.meanAxis){
+      fresState.customAxis = fresState.meanAxis.clone();
+    }
+  }
+  fresRecompute();
+}
+function fresAddCustom(){
+  var name = prompt('Nome macchina custom:');
+  if(!name) return;
+  var alphaStr = prompt('\u03B1max in gradi (5-60):', '30');
+  var alpha = parseFloat(alphaStr);
+  if(isNaN(alpha) || alpha < 5 || alpha > 60){ alert('\u03B1 non valido'); return; }
+  var id, n = 1;
+  do { id = 'custom_' + n++; } while(fresState.db.machines.some(function(m){ return m.id === id; }));
+  fresState.db.machines.push({ id: id, name: name.trim(), alphaMax: alpha, builtin: false });
+  fresState.db.selectedId = id;
+  fresSaveDB();
+  fresRebuildMachineSelect();
+  fresRecompute();
+}
+function fresRemoveCustom(){
+  var id = fresState.db.selectedId;
+  var cur = fresState.db.machines.filter(function(x){ return x.id === id; })[0];
+  if(!cur || cur.builtin) return;
+  if(!confirm('Eliminare la macchina "' + cur.name + '"?')) return;
+  fresState.db.machines = fresState.db.machines.filter(function(x){ return x.id !== id; });
+  fresState.db.selectedId = 'vhf_s5';
+  fresSaveDB();
+  fresRebuildMachineSelect();
+  fresRecompute();
+}
+
+// ===== Aggiornamento bottone "Fresatura avanzata" abilitato/disabilitato =====
+function fresUpdateOpenButton(){
+  var btn = document.getElementById('btnOpenFresability');
+  if(!btn) return;
+  var aligned = muaObjects.filter(function(m){ return m.aligned; });
+  btn.disabled = (aligned.length < 2);
+  btn.style.opacity = btn.disabled ? '0.4' : '1';
+  btn.style.cursor = btn.disabled ? 'not-allowed' : 'pointer';
+}
+
+// ===== Apertura / chiusura pannello =====
+function openFresability(){
+  // Inizializza database se prima volta
+  if(!fresState.db) fresState.db = fresLoadDB();
+
+  // Nascondi pannelli Misura, mostra pannello Fresabilità
+  var panMua  = document.getElementById('panelMuaList');
+  var panAng  = document.getElementById('panelAngleList');
+  var panAx   = document.getElementById('panelAxisInfo');
+  var panFres = document.getElementById('panelFresabilita');
+  if(panMua)  panMua.style.display  = 'none';
+  if(panAng)  panAng.style.display  = 'none';
+  if(panAx)   panAx.style.display   = 'none';
+  if(panFres) panFres.style.display = '';
+
+  analysisMode = 'fresabilita';
+  fresState.isOpen = true;
+
+  // Restora modalità da storage
+  fresState.mode = fresState.db.lastMode || 'mean';
+  var radio = document.querySelector('input[name="fresMode"][value="' + fresState.mode + '"]');
+  if(radio) radio.checked = true;
+
+  // Carica asse custom se persistito
+  if(fresState.db.lastCustomAxis){
+    fresState.customAxis = new THREE.Vector3().fromArray(fresState.db.lastCustomAxis);
+  }
+
+  fresRebuildMachineSelect();
+  fresBuildArrow();
+  fresAttachMouseHandlers();
+  fresRecompute();
+
+  showStatus('Fresatura avanzata: analisi compatibilita\u0301 macchina');
+}
+
+function closeFresability(){
+  // Salva asse custom se presente
+  if(fresState.customAxis){
+    fresState.db.lastCustomAxis = fresState.customAxis.toArray();
+    fresSaveDB();
+  }
+
+  // Rimuovi freccia di setup dalla scena
+  if(fresState.arrowGroup){
+    scene.remove(fresState.arrowGroup);
+    fresState.arrowGroup = null;
+    fresState.pickerSphere = null;
+  }
+  fresDetachMouseHandlers();
+
+  // Ripristina pannelli Misura
+  var panMua  = document.getElementById('panelMuaList');
+  var panAng  = document.getElementById('panelAngleList');
+  var panAx   = document.getElementById('panelAxisInfo');
+  var panFres = document.getElementById('panelFresabilita');
+  if(panMua)  panMua.style.display  = '';
+  if(panAng)  panAng.style.display  = '';
+  if(panAx)   panAx.style.display   = '';
+  if(panFres) panFres.style.display = 'none';
+
+  analysisMode = 'misura';
+  fresState.isOpen = false;
+  showStatus('Tornato a Misura');
+}
+
+// ===== Trackball virtuale (Shoemake arcball) =====
+function fresScreenToSphere(x, y){
+  var rect = renderer.domElement.getBoundingClientRect();
+  var nx = ((x - rect.left) / rect.width)  * 2 - 1;
+  var ny = -((y - rect.top)  / rect.height) * 2 + 1;
+  var r2 = nx*nx + ny*ny;
+  if(r2 <= 1){
+    return new THREE.Vector3(nx, ny, Math.sqrt(1 - r2));
+  }
+  var r = Math.sqrt(r2);
+  return new THREE.Vector3(nx/r, ny/r, 0);
+}
+function fresIsClickOnPicker(x, y){
+  if(!fresState.pickerSphere) return false;
+  var rect = renderer.domElement.getBoundingClientRect();
+  var px = ((x - rect.left) / rect.width)  * 2 - 1;
+  var py = -((y - rect.top)  / rect.height) * 2 + 1;
+  var ray = new THREE.Raycaster();
+  ray.setFromCamera({ x: px, y: py }, camera);
+  return ray.intersectObject(fresState.pickerSphere).length > 0;
+}
+
+function fresOnMouseDown(e){
+  if(!fresState.isOpen) return;
+  if(fresState.mode !== 'custom') return;
+  if(e.button !== 0) return;
+  if(fresIsClickOnPicker(e.clientX, e.clientY)){
+    fresState.dragging = true;
+    fresState.dragLast = fresScreenToSphere(e.clientX, e.clientY);
+    if(controls && typeof controls.enabled !== 'undefined') controls.enabled = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}
+function fresOnMouseMove(e){
+  if(!fresState.dragging) return;
+  var cur = fresScreenToSphere(e.clientX, e.clientY);
+  var last = fresState.dragLast;
+  var axis = new THREE.Vector3().crossVectors(last, cur);
+  var len = axis.length();
+  if(len > 1e-6){
+    var angle = Math.atan2(len, last.dot(cur));
+    axis.normalize();
+    var camQuat = camera.quaternion.clone();
+    var worldAxis = axis.clone().applyQuaternion(camQuat);
+    var q = new THREE.Quaternion().setFromAxisAngle(worldAxis, angle);
+    fresState.customAxis.applyQuaternion(q).normalize();
+    fresState.setupAxis = fresState.customAxis.clone();
+    fresUpdateArrow();
+    fresRecompute();
+  }
+  fresState.dragLast = cur;
+  e.stopPropagation();
+  e.preventDefault();
+}
+function fresOnMouseUp(e){
+  if(fresState.dragging){
+    fresState.dragging = false;
+    if(controls && typeof controls.enabled !== 'undefined') controls.enabled = true;
+    if(fresState.customAxis){
+      fresState.db.lastCustomAxis = fresState.customAxis.toArray();
+      fresSaveDB();
+    }
+  }
+}
+function fresAttachMouseHandlers(){
+  if(fresState.pendingMouseHandlers) return;
+  var dom = renderer.domElement;
+  fresState.pendingMouseHandlers = {
+    md: fresOnMouseDown, mm: fresOnMouseMove, mu: fresOnMouseUp
+  };
+  // Capture phase per intercettare prima degli OrbitControls
+  dom.addEventListener('mousedown', fresOnMouseDown, true);
+  window.addEventListener('mousemove', fresOnMouseMove, true);
+  window.addEventListener('mouseup', fresOnMouseUp, true);
+}
+function fresDetachMouseHandlers(){
+  if(!fresState.pendingMouseHandlers) return;
+  var dom = renderer.domElement;
+  dom.removeEventListener('mousedown', fresOnMouseDown, true);
+  window.removeEventListener('mousemove', fresOnMouseMove, true);
+  window.removeEventListener('mouseup', fresOnMouseUp, true);
+  fresState.pendingMouseHandlers = null;
+}
+
+// ===== Hook su alignAll: aggiornare bottone abilitato/disabilitato =====
+// La chiamata viene piazzata in calculateAngles via wrapping non invasivo.
+(function(){
+  if(typeof calculateAngles === 'function'){
+    var _origCalc = calculateAngles;
+    calculateAngles = function(){
+      _origCalc.apply(this, arguments);
+      try { fresUpdateOpenButton(); if(fresState.isOpen) fresRecompute(); } catch(e){}
+    };
+  }
+})();
+
 
 
 // ╔══════════════════════════════════════════════════════════════════╗
