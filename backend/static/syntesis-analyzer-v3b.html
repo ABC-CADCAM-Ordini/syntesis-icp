@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.007</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.008</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Plus Jakarta Sans',sans-serif;--mono:'DM Mono',monospace}
@@ -63,7 +63,10 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .empty-state .title{font-size:18px;font-weight:800;color:var(--white);opacity:.6;margin-bottom:8px}
 .empty-state .sub{font-size:12px;font-family:var(--mono);opacity:.4;color:var(--white)}
 .empty-state.hidden{display:none}
-.panel{width:320px;background:var(--white);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;padding:14px;display:flex;flex-direction:column;gap:10px}
+.panel{width:320px;min-width:240px;background:var(--white);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:1;padding:14px;display:flex;flex-direction:column;gap:10px}
+@media (max-width:1100px){.panel{width:280px;padding:12px}}
+@media (max-width:860px){.panel{width:250px;padding:10px;font-size:10px}}
+@media (max-width:680px){.panel{width:220px;padding:8px}}
 .panel-section{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--light)}
 .panel-section.clinical-section{border-width:1.5px;border-color:var(--blue);background:var(--white);box-shadow:0 2px 8px rgba(0,82,163,0.06)}
 .panel-section.clinical-section.ok{border-color:var(--green);box-shadow:0 2px 8px rgba(13,158,110,0.08)}
@@ -130,7 +133,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .tree-node .del-btn:hover{background:var(--red);color:var(--white);border-color:var(--red)}
 
 /* Divergence labels */
-.divergence-label{position:absolute;transform:translate(-50%,-50%);padding:3px 8px;border-radius:12px;font-family:var(--mono);font-size:10px;font-weight:800;color:#fff;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.4);z-index:3;opacity:0.95;border:1px solid rgba(255,255,255,0.15)}
+.divergence-label{position:absolute;transform:translate(-50%,-50%);padding:3px 9px;border-radius:11px;font-family:var(--mono);font-size:10px;font-weight:800;color:#fff;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35);z-index:3;opacity:1;border:1.5px solid rgba(255,255,255,0.25)}
 .divergence-label.good{background:var(--green)}
 .divergence-label.warn{background:var(--gold)}
 .divergence-label.risk{background:#F97316}
@@ -323,7 +326,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.007</span>
+      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.008</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -906,7 +909,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '7.3.9.007';
+window.ANALIZZA_BUILD = '7.3.9.008';
 window.ANALIZZA_BUILD_DATE = '2026-04-25';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2341,6 +2344,10 @@ function selectWorkflow(wf){
   // Se sto uscendo da Misurare verso un altro workflow, smonto il viewport ICP
   if(prev === 'misurare' && wf !== 'misurare'){
     try { misICP_unmountViewport(); } catch(e){ console.warn('[Misurare] unmount fallito:', e); }
+    // FIX v7.3.9.008: riaccendi artefatti Analizza se torni in analizza/accoppia
+    if(wf === 'analizza' || wf === 'accoppia'){
+      try { _setAnalyzaArtifactsVisible(true); } catch(e){}
+    }
   }
   // Se sto uscendo da Sostituire verso un altro workflow, riaccendo Analizza
   // (placeholder: nella fase 3 questo diventera' _setSostituireArtifactsVisible(false))
@@ -2394,6 +2401,8 @@ function selectWorkflow(wf){
   }
   else if(wf === 'misurare'){
     analysisMode = 'misurare';
+    // FIX v7.3.9.008: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
+    try { _setAnalyzaArtifactsVisible(false); } catch(e){}
     if(panAng)  panAng.style.display  = 'none';
     if(panAx)   panAx.style.display   = 'none';
     if(panExp)  panExp.style.display  = 'none';
@@ -5467,7 +5476,7 @@ function misICP_renderClinicalPDF(data){
   var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.007)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.008)', null, true);
 
   // Pagina 2: Note metodologiche (statica, identica per ogni report)
   doc.addPage();
@@ -5519,7 +5528,7 @@ function misICP_renderCalibrationPDF(data){
 
   // Cover identica al Clinico ma con sottotitolo "Taratura"
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Taratura');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Taratura (Analizza v7.3.9.007)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Taratura (Analizza v7.3.9.008)', null, true);
 
   // ── PAGINA 2: SINTESI METROLOGICA ─────────────────────────────────
   doc.addPage();
@@ -5805,7 +5814,7 @@ function misICP_renderExcel(data){
     ['Scala mappa colorimetrica', data.scaleUm,                       'μm'],
     [],
     ['SOFTWARE'],
-    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.007)'],
+    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.008)'],
     ['Produttore',   'Biaggini Medical Devices S.r.l.'],
     ['Sito',         'https://syntesis-icp.com'],
     [],
@@ -6020,7 +6029,7 @@ function misICP_renderExcel(data){
     ['File B slug filesystem',           slugB],
     ['Data analisi (locale)',            dtStr],
     ['Data analisi (ISO 8601)',          dtIso],
-    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.007)'],
+    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.008)'],
     ['Produttore',                       'Biaggini Medical Devices S.r.l.'],
     ['Sito',                             'https://syntesis-icp.com'],
     ['User-Agent browser',               ua]
