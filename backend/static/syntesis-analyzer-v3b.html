@@ -4705,6 +4705,495 @@ function misICP_pdfDrawCover(doc, data, reportTitle){
   });
 }
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  DISEGNI TECNICI SCHEMATICI                                       ║
+// ║                                                                   ║
+// ║  Cilindro stilizzato in proiezione assonometrica: due ellissi     ║
+// ║  (top e bottom) + corpo laterale con gradiente per dare effetto   ║
+// ║  3D senza ricorrere a mesh reali. Usato nelle pagine introduttive ║
+// ║  per illustrare cosa misura il report.                            ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+/**
+ * Disegna un cilindro stilizzato sul canvas (proiezione assonometrica).
+ * cx, cy = centro geometrico; r = raggio in pixel; h = altezza in pixel.
+ * tilt = angolo radiante di inclinazione rispetto alla verticale.
+ * color = { fill, stroke, fillLight }.
+ */
+function misICP_drawTechCylinder(ctx, cx, cy, r, h, tilt, color){
+  tilt = tilt || 0;
+  var ca = Math.cos(tilt), sa = Math.sin(tilt);
+  // Vettore assiale (dall'asse del cilindro)
+  var ax = sa * h/2, ay = -ca * h/2;
+  // Top center e bottom center
+  var tx_ = cx + ax, ty_ = cy + ay;
+  var bx_ = cx - ax, by_ = cy - ay;
+  // Ellisse: assi proiettati. Asse maggiore perpendicolare al tilt.
+  var rx = r * ca + r * 0.3 * Math.abs(sa);
+  var ry = r * 0.3 * Math.abs(ca) + r * Math.abs(sa);
+  var ellAng = tilt; // rotazione dell'ellisse
+  ctx.save();
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = color.stroke;
+  // Bottom cap (visibile)
+  ctx.fillStyle = color.fill;
+  ctx.beginPath();
+  ctx.ellipse(bx_, by_, r, r*0.3, ellAng, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+  // Corpo laterale: 4 vertici delle ellissi top e bottom collegati
+  // I due "punti laterali" delle ellissi nel piano della carta
+  var perp_x = ca, perp_y = sa; // versore perpendicolare al tilt
+  var p1 = [tx_ + perp_x * r, ty_ + perp_y * r];
+  var p2 = [bx_ + perp_x * r, by_ + perp_y * r];
+  var p3 = [bx_ - perp_x * r, by_ - perp_y * r];
+  var p4 = [tx_ - perp_x * r, ty_ - perp_y * r];
+  // Riempimento corpo con gradiente lineare perpendicolare al tilt
+  var grad = ctx.createLinearGradient(p4[0], p4[1], p1[0], p1[1]);
+  grad.addColorStop(0, color.fill);
+  grad.addColorStop(0.5, color.fillLight || color.fill);
+  grad.addColorStop(1, color.fill);
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(p1[0], p1[1]);
+  ctx.lineTo(p2[0], p2[1]);
+  ctx.lineTo(p3[0], p3[1]);
+  ctx.lineTo(p4[0], p4[1]);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // Top cap (sempre sopra)
+  ctx.fillStyle = color.fillLight || color.fill;
+  ctx.beginPath();
+  ctx.ellipse(tx_, ty_, r, r*0.3, ellAng, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+  return { tx:tx_, ty:ty_, bx:bx_, by:by_, cx:cx, cy:cy };
+}
+
+/**
+ * Disegna una freccia con label sopra.
+ */
+function misICP_drawTechArrow(ctx, x1, y1, x2, y2, label, color){
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  // Frecce alle estremita'
+  var ang = Math.atan2(y2-y1, x2-x1);
+  var ah = 6;
+  function arrowHead(px, py, angIn){
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px - ah*Math.cos(angIn-0.4), py - ah*Math.sin(angIn-0.4));
+    ctx.lineTo(px - ah*Math.cos(angIn+0.4), py - ah*Math.sin(angIn+0.4));
+    ctx.closePath();
+    ctx.fill();
+  }
+  arrowHead(x2, y2, ang);
+  arrowHead(x1, y1, ang + Math.PI);
+  if(label){
+    var mx = (x1+x2)/2, my = (y1+y2)/2;
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var tw = ctx.measureText(label).width + 8;
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+    ctx.lineWidth = 0.5;
+    ctx.fillRect(mx - tw/2, my - 8, tw, 16);
+    ctx.strokeRect(mx - tw/2, my - 8, tw, 16);
+    ctx.fillStyle = color;
+    ctx.fillText(label, mx, my);
+    ctx.textBaseline = 'alphabetic';
+  }
+  ctx.restore();
+}
+
+/**
+ * Disegna un punto centrato (centroide) con label.
+ */
+function misICP_drawTechCentroidDot(ctx, cx, cy, label, color){
+  ctx.save();
+  // Cerchio piccolo
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3.5, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Cross hair (mirino)
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 8, cy); ctx.lineTo(cx - 5, cy);
+  ctx.moveTo(cx + 5, cy); ctx.lineTo(cx + 8, cy);
+  ctx.moveTo(cx, cy - 8); ctx.lineTo(cx, cy - 5);
+  ctx.moveTo(cx, cy + 5); ctx.lineTo(cx, cy + 8);
+  ctx.stroke();
+  if(label){
+    ctx.fillStyle = color;
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, cx + 10, cy - 10);
+  }
+  ctx.restore();
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PAGINA 2: NOTE METODOLOGICHE                                     ║
+// ║                                                                   ║
+// ║  Cosa misura il report e come. Pagina statica, identica per tutti ║
+// ║  i report futuri.                                                 ║
+// ╚══════════════════════════════════════════════════════════════════╝
+function misICP_pdfDrawMethodologyPage(doc){
+  var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
+  function setTxt(hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+
+  // Header
+  doc.setFillColor(247,249,252); doc.rect(0,0,W,16,'F');
+  doc.setFillColor(0,101,179);   doc.rect(0,0,5,16,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); setTxt('#0F1923');
+  doc.text('Note metodologiche', ml+2, 9);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); setTxt('#7A90A4');
+  doc.text('Cosa misura il report e come', ml+2, 14);
+
+  // SEZIONE 1: PIPELINE DI ANALISI
+  var y = 24;
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt('#0065B3');
+  doc.text('PIPELINE DI ANALISI', ml, y);
+  y += 5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); setTxt('#0F1923');
+  var pipelineText = 'Il report confronta due scansioni STL della stessa arcata: A (riferimento, master) e B (misurato, scansione corrente). L\'algoritmo ICP (Iterative Closest Point) roto-trasla rigidamente B su A minimizzando la somma dei quadrati delle distanze fra i centroidi degli scanbody. Le mesh non vengono deformate: vengono solo allineate nello spazio. Tutte le misure di scostamento vengono calcolate dopo l\'allineamento.';
+  var lines = doc.splitTextToSize(pipelineText, cw);
+  doc.text(lines, ml, y);
+  y += lines.length * 4 + 4;
+
+  // Pipeline schematica orizzontale
+  var pipeY = y;
+  var pipeH = 16;
+  var stages = [
+    { lbl: 'File A\n(riferimento)', col: '#0065B3' },
+    { lbl: 'File B\n(misurato)',    col: '#D97706' },
+    { lbl: 'ICP\nallineamento',     col: '#7A90A4' },
+    { lbl: 'Misure\nscostamenti',   col: '#639922' }
+  ];
+  var sw = (cw - 24) / stages.length;
+  stages.forEach(function(st, i){
+    var sx = ml + i*(sw+8);
+    var rgb = misICP_hexRGB(st.col);
+    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+    doc.roundedRect(sx, pipeY, sw, pipeH, 2, 2, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+    var l = st.lbl.split('\n');
+    doc.text(l[0], sx+sw/2, pipeY+6, {align:'center'});
+    doc.text(l[1], sx+sw/2, pipeY+11, {align:'center'});
+    if(i < stages.length-1){
+      doc.setDrawColor(122,144,164); doc.setLineWidth(0.6);
+      doc.line(sx+sw+1, pipeY+pipeH/2, sx+sw+7, pipeY+pipeH/2);
+      // freccia
+      doc.line(sx+sw+5, pipeY+pipeH/2-1.5, sx+sw+7, pipeY+pipeH/2);
+      doc.line(sx+sw+5, pipeY+pipeH/2+1.5, sx+sw+7, pipeY+pipeH/2);
+    }
+  });
+  y = pipeY + pipeH + 8;
+
+  // SEZIONE 2: MISURE PER OGNI CILINDRO (3 diagrammi affiancati)
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt('#0065B3');
+  doc.text('MISURE PER OGNI CILINDRO', ml, y);
+  y += 4;
+
+  var diagW = (cw - 8) / 3;
+  var diagH_ = 50;
+
+  // Tre canvas affiancati: centroide / |D| 3D / angolo asse
+  var dx = ml;
+  ['centroide', 'd3d', 'angle'].forEach(function(kind, idx){
+    var cv = document.createElement('canvas');
+    cv.width = Math.round(diagW*4); cv.height = Math.round(diagH_*4);
+    var ctx = cv.getContext('2d');
+    var W2 = cv.width, H2 = cv.height;
+    ctx.fillStyle = '#fafbfc'; ctx.fillRect(0,0,W2,H2);
+    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1; ctx.strokeRect(0.5,0.5,W2-1,H2-1);
+
+    var COL_A = { fill:'#1A5F9E', fillLight:'#4D89C0', stroke:'#0F3D66' };
+    var COL_B = { fill:'#D97706', fillLight:'#F09238', stroke:'#854B0B' };
+
+    if(kind === 'centroide'){
+      // Un solo cilindro con punto centroide
+      var ginfo = misICP_drawTechCylinder(ctx, W2/2, H2/2, 30, 90, 0, COL_A);
+      misICP_drawTechCentroidDot(ctx, W2/2, H2/2, 'centroide', '#EF4444');
+      // Titolo
+      ctx.fillStyle = '#0F1923'; ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText('Centroide', W2/2, 8);
+    } else if(kind === 'd3d'){
+      // Due cilindri sfalsati con freccia |D|
+      misICP_drawTechCylinder(ctx, W2/2 - 22, H2/2 + 8, 26, 80, 0, COL_A);
+      misICP_drawTechCylinder(ctx, W2/2 + 22, H2/2 - 8, 26, 80, 0, COL_B);
+      // Frecce ai centri
+      misICP_drawTechCentroidDot(ctx, W2/2 - 22, H2/2 + 8, 'A', '#0F3D66');
+      misICP_drawTechCentroidDot(ctx, W2/2 + 22, H2/2 - 8, 'B', '#854B0B');
+      misICP_drawTechArrow(ctx, W2/2 - 22, H2/2 + 8, W2/2 + 22, H2/2 - 8, '|D|', '#EF4444');
+      ctx.fillStyle = '#0F1923'; ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText('|D| 3D', W2/2, 8);
+    } else if(kind === 'angle'){
+      // Due cilindri inclinati di angoli diversi
+      misICP_drawTechCylinder(ctx, W2/2 - 32, H2/2, 22, 90, -0.05, COL_A);
+      misICP_drawTechCylinder(ctx, W2/2 + 32, H2/2, 22, 90, 0.30, COL_B);
+      // Assi proiettati lungo l'altezza
+      ctx.save();
+      ctx.strokeStyle = '#0F3D66'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+      ctx.beginPath();
+      ctx.moveTo(W2/2 - 32 - Math.sin(-0.05)*60, H2/2 + Math.cos(-0.05)*60);
+      ctx.lineTo(W2/2 - 32 + Math.sin(-0.05)*60, H2/2 - Math.cos(-0.05)*60);
+      ctx.stroke();
+      ctx.strokeStyle = '#854B0B';
+      ctx.beginPath();
+      ctx.moveTo(W2/2 + 32 - Math.sin(0.30)*60, H2/2 + Math.cos(0.30)*60);
+      ctx.lineTo(W2/2 + 32 + Math.sin(0.30)*60, H2/2 - Math.cos(0.30)*60);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      // Arco theta tra gli assi (in alto al centro)
+      ctx.strokeStyle = '#EF4444'; ctx.lineWidth = 2; ctx.fillStyle = '#EF4444';
+      ctx.beginPath();
+      ctx.arc(W2/2, H2/2 - 50, 22, -Math.PI/2 - 0.05, -Math.PI/2 + 0.30);
+      ctx.stroke();
+      ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('\u03b8', W2/2, H2/2 - 26);
+      ctx.fillStyle = '#0F1923'; ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText('Angolo asse', W2/2, 8);
+    }
+    doc.addImage(cv.toDataURL('image/png'), 'PNG', dx, y, diagW, diagH_);
+    dx += diagW + 4;
+  });
+  y += diagH_ + 3;
+
+  // Caption sotto i 3 diagrammi
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); setTxt('#374151');
+  var capCyl = [
+    { l:'Centroide:',     t:' centro di massa geometrico dello scanbody (cilindro+disco). E\' il punto di riferimento per ogni misura.' },
+    { l:'|D| 3D:',        t:' distanza euclidea fra centroide A e centroide B post-ICP. Tabulata anche nelle componenti X, Y, Z e nella proiezione XY.' },
+    { l:'Angolo asse:',   t:' angolo \u03b8 fra l\'asse del cilindro A e l\'asse del cilindro B. Calcolato col metodo cap-based PCA (insensibile alla mescolanza di triangoli del disco).' }
+  ];
+  capCyl.forEach(function(c){
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
+    doc.text(c.l, ml, y);
+    var lblW = doc.getTextWidth(c.l);
+    doc.setFont('helvetica','normal'); setTxt('#374151');
+    var capLines = doc.splitTextToSize(c.t, cw - lblW);
+    doc.text(capLines, ml + lblW, y);
+    y += capLines.length * 3.6 + 1.5;
+  });
+  y += 2;
+
+  // SEZIONE 3: MISURE INTER-CENTROIDE
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt('#0065B3');
+  doc.text('MISURE INTER-CENTROIDE', ml, y);
+  y += 4;
+
+  // Diagramma centrale: 4 cilindri (A1, A2, B1, B2) e due segmenti
+  var cv2 = document.createElement('canvas');
+  var dW = cw, dH = 56;
+  cv2.width = Math.round(dW*4); cv2.height = Math.round(dH*4);
+  var ctx2 = cv2.getContext('2d');
+  var Wd = cv2.width, Hd = cv2.height;
+  ctx2.fillStyle = '#fafbfc'; ctx2.fillRect(0,0,Wd,Hd);
+  ctx2.strokeStyle = '#e5e7eb'; ctx2.lineWidth = 1; ctx2.strokeRect(0.5,0.5,Wd-1,Hd-1);
+  var COL_A = { fill:'#1A5F9E', fillLight:'#4D89C0', stroke:'#0F3D66' };
+  var COL_B = { fill:'#D97706', fillLight:'#F09238', stroke:'#854B0B' };
+  // Posizioni: A1 left, A2 right, con B leggermente sfalsati
+  var cyA = Hd/2 + 18;
+  var x1 = Wd*0.18, x2 = Wd*0.82;
+  // B sfalsati
+  var bx1 = x1 + 14, by1 = cyA + 6;
+  var bx2 = x2 - 8,  by2 = cyA - 4;
+  // Disegna B prima (sotto)
+  misICP_drawTechCylinder(ctx2, bx1, by1, 22, 70, 0, COL_B);
+  misICP_drawTechCylinder(ctx2, bx2, by2, 22, 70, 0, COL_B);
+  // Disegna A sopra
+  misICP_drawTechCylinder(ctx2, x1, cyA, 22, 70, 0, COL_A);
+  misICP_drawTechCylinder(ctx2, x2, cyA, 22, 70, 0, COL_A);
+  // Punti centro
+  misICP_drawTechCentroidDot(ctx2, x1, cyA, 'A1', '#0F3D66');
+  misICP_drawTechCentroidDot(ctx2, x2, cyA, 'A2', '#0F3D66');
+  misICP_drawTechCentroidDot(ctx2, bx1, by1, 'B1', '#854B0B');
+  misICP_drawTechCentroidDot(ctx2, bx2, by2, 'B2', '#854B0B');
+  // Segmento Distanza A (blu solido) tra A1 e A2
+  ctx2.save();
+  ctx2.strokeStyle = '#0065B3'; ctx2.lineWidth = 3; ctx2.lineCap = 'round';
+  ctx2.beginPath(); ctx2.moveTo(x1, cyA); ctx2.lineTo(x2, cyA); ctx2.stroke();
+  ctx2.restore();
+  // Segmento Distanza B (arancione tratteggiato) tra B1 e B2
+  ctx2.save();
+  ctx2.strokeStyle = '#D97706'; ctx2.lineWidth = 2; ctx2.setLineDash([8,5]);
+  ctx2.beginPath(); ctx2.moveTo(bx1, by1); ctx2.lineTo(bx2, by2); ctx2.stroke();
+  ctx2.restore();
+  // Label "Distanza A" sopra il segmento blu
+  ctx2.font = 'bold 12px monospace'; ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
+  ctx2.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx2.fillRect((x1+x2)/2 - 50, cyA - 18, 100, 14);
+  ctx2.strokeStyle = 'rgba(0,0,0,0.10)';
+  ctx2.strokeRect((x1+x2)/2 - 50, cyA - 18, 100, 14);
+  ctx2.fillStyle = '#0065B3';
+  ctx2.fillText('Distanza A', (x1+x2)/2, cyA - 11);
+  // Label "Distanza B" sotto il segmento arancione
+  ctx2.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx2.fillRect((bx1+bx2)/2 - 50, (by1+by2)/2 + 6, 100, 14);
+  ctx2.strokeStyle = 'rgba(0,0,0,0.10)';
+  ctx2.strokeRect((bx1+bx2)/2 - 50, (by1+by2)/2 + 6, 100, 14);
+  ctx2.fillStyle = '#D97706';
+  ctx2.fillText('Distanza B', (bx1+bx2)/2, (by1+by2)/2 + 13);
+  // Titolo
+  ctx2.fillStyle = '#0F1923'; ctx2.font = 'bold 13px monospace';
+  ctx2.textAlign = 'center'; ctx2.textBaseline = 'top';
+  ctx2.fillText('Distanza inter-centroide', Wd/2, 8);
+  doc.addImage(cv2.toDataURL('image/png'), 'PNG', ml, y, dW, dH);
+  y += dH + 3;
+
+  // Caption inter-centroide
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#0065B3');
+  doc.text('Distanza A:', ml, y);
+  doc.setFont('helvetica','normal'); setTxt('#374151');
+  var ic1 = doc.splitTextToSize(' distanza euclidea tra il centroide A_i e il centroide A_j (riferimento, master).', cw - 22);
+  doc.text(ic1, ml + 22, y); y += ic1.length * 3.6 + 1.5;
+  doc.setFont('helvetica','bold'); setTxt('#D97706');
+  doc.text('Distanza B:', ml, y);
+  doc.setFont('helvetica','normal'); setTxt('#374151');
+  var ic2 = doc.splitTextToSize(' distanza euclidea tra il centroide B_i e il centroide B_j post-ICP (dopo allineamento). La differenza \u0394 = B - A rivela errori di stitching e drift di scansione che l\'ICP non puo\' correggere perche\' sono interni alla scansione B.', cw - 22);
+  doc.text(ic2, ml + 22, y); y += ic2.length * 3.6 + 1.5;
+  doc.setFont('helvetica','bold'); setTxt('#0F1923');
+  doc.text('Significato clinico:', ml, y);
+  doc.setFont('helvetica','normal'); setTxt('#374151');
+  var ic3 = doc.splitTextToSize(' la passive fit di una struttura su impianti dipende dalla coerenza delle distanze relative tra scanbody, non solo dalla posizione assoluta dei singoli. Errori inter-centroide oltre 100\u03bcm su distanze tra scanbody adiacenti sono il primo segnale di scansioni inaffidabili per protesi avvitate.', cw - 32);
+  doc.text(ic3, ml + 32, y);
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PAGINA 3: GLOSSARIO E SOGLIE CLINICHE                            ║
+// ║                                                                   ║
+// ║  Definizioni dei termini tecnici + tabella soglie + come leggere  ║
+// ║  il documento.                                                    ║
+// ╚══════════════════════════════════════════════════════════════════╝
+function misICP_pdfDrawGlossaryPage(doc){
+  var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
+  function setTxt(hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+
+  // Header
+  doc.setFillColor(247,249,252); doc.rect(0,0,W,16,'F');
+  doc.setFillColor(0,101,179);   doc.rect(0,0,5,16,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); setTxt('#0F1923');
+  doc.text('Glossario e soglie cliniche', ml+2, 9);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); setTxt('#7A90A4');
+  doc.text('Definizioni dei termini tecnici e criteri di lettura', ml+2, 14);
+
+  // SEZIONE 1: SOGLIE CLINICHE
+  var y = 24;
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt('#0065B3');
+  doc.text('SOGLIE CLINICHE PER |D| 3D', ml, y);
+  y += 4;
+
+  doc.autoTable({
+    startY: y,
+    margin: { left:ml, right:mr },
+    head: [['Range', 'Etichetta', 'Interpretazione clinica']],
+    body: [
+      ['0 - 50 \u03bcm',     'Ottimo',      'Scostamento entro la tolleranza di scansione. Idoneo per protesi avvitate ad alta precisione.'],
+      ['50 - 100 \u03bcm',   'Accettabile', 'Scostamento clinicamente compatibile con la maggior parte delle protesi avvitate.'],
+      ['100 - 150 \u03bcm',  'Rischio',     'Scostamento al limite. Verificare con prova clinica e considerare ri-scansione.'],
+      ['150 - 250 \u03bcm',  'Tensione',    'Scostamento incompatibile con passive fit. Tensione attesa sui pilastri.'],
+      ['> 250 \u03bcm',      'Fuori',       'Scansione non utilizzabile. Ripetere acquisizione e verificare protocolli.']
+    ],
+    theme: 'grid',
+    styles: { font:'helvetica', fontSize:8, cellPadding:1.8, textColor:[33,37,41], lineColor:[214,228,240], lineWidth:0.2 },
+    headStyles: { fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:7.5 },
+    columnStyles: {
+      0: { cellWidth:30, halign:'center', font:'courier' },
+      1: { cellWidth:28, halign:'center', fontStyle:'bold' },
+      2: { halign:'left' }
+    },
+    didParseCell: function(d){
+      if(d.section === 'body' && d.column.index === 1){
+        var colors = ['#639922','#84B025','#D97706','#EF4444','#A855F7'];
+        var rgb = misICP_hexRGB(colors[d.row.index]);
+        d.cell.styles.textColor = rgb;
+      }
+    }
+  });
+  y = doc.lastAutoTable.finalY + 6;
+
+  // SEZIONE 2: SOGLIE INTER-CENTROIDE
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt('#0065B3');
+  doc.text('SOGLIE PER DIFFERENZA INTER-CENTROIDE \u0394 = B \u2212 A', ml, y);
+  y += 4;
+  doc.autoTable({
+    startY: y,
+    margin: { left:ml, right:mr },
+    head: [['|\u0394|', 'Etichetta', 'Interpretazione']],
+    body: [
+      ['< 50 \u03bcm',        'Ottimo',      'Distanza B coincide con A entro la tolleranza dello scanner.'],
+      ['50 - 100 \u03bcm',    'Buono',       'Differenza ridotta, scansione coerente.'],
+      ['100 - 200 \u03bcm',   'Accettabile', 'Differenza apprezzabile ma compatibile con protesi avvitate semplici.'],
+      ['> 200 \u03bcm',       'Verifica',    'Differenza non trascurabile. Possibile drift di scansione, valutare ri-acquisizione.']
+    ],
+    theme: 'grid',
+    styles: { font:'helvetica', fontSize:8, cellPadding:1.8, textColor:[33,37,41], lineColor:[214,228,240], lineWidth:0.2 },
+    headStyles: { fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:7.5 },
+    columnStyles: {
+      0: { cellWidth:30, halign:'center', font:'courier' },
+      1: { cellWidth:28, halign:'center', fontStyle:'bold' },
+      2: { halign:'left' }
+    }
+  });
+  y = doc.lastAutoTable.finalY + 6;
+
+  // SEZIONE 3: GLOSSARIO
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt('#0065B3');
+  doc.text('GLOSSARIO', ml, y);
+  y += 4;
+
+  var glossary = [
+    ['Scanbody',          'Cilindro di scansione avvitato sull\'impianto (o sul moncone su modello fisico). Geometria nota e calibrata, serve allo scanner per calcolare la posizione spaziale dell\'impianto sottostante.'],
+    ['Mesh STL',          'Rappresentazione discreta della superficie scansionata, costituita da una lista di triangoli (vertici + facce). Formato standard per ogni scanner intraorale e da banco.'],
+    ['Centroide',         'Centro di massa geometrico di un cluster di triangoli (cilindro+disco di uno scanbody). Punto di riferimento univoco per misure di scostamento.'],
+    ['ICP',               'Iterative Closest Point. Algoritmo di allineamento rigido fra due nuvole di punti: trova rotazione + traslazione che minimizzano la somma dei quadrati delle distanze fra punti corrispondenti. Non deforma le mesh.'],
+    ['RMSD',              'Root Mean Square Deviation. Radice della media dei quadrati delle distanze residue dopo allineamento ICP. Indica la qualita\' globale del match A-B.'],
+    ['Asse cilindro',     'Direzione assiale dello scanbody, perpendicolare al disco di base. Calcolato col metodo cap-based PCA: si individuano le due basi del cilindro (top cap e bottom cap), si calcola la normale di ognuna via PCA, si media. Insensibile alla mescolanza di triangoli del disco col corpo del cilindro.'],
+    ['Passive fit',       'Aderenza senza tensioni meccaniche di una protesi multi-impianto sui pilastri. Richiede coerenza submillimetrica delle distanze inter-impianto fra modello virtuale e situazione reale.'],
+    ['Stitching',         'Fusione di pi\u00f9 acquisizioni parziali in una mesh unica. Errori di stitching producono distorsioni cumulative che ICP non puo\' correggere: si rivelano nelle distanze inter-centroide.'],
+    ['Drift',             'Deriva progressiva dell\'allineamento durante l\'acquisizione di una scansione lunga. Tipico delle scansioni full-arch eseguite senza marker di riferimento intermedi.']
+  ];
+
+  doc.setFontSize(8);
+  glossary.forEach(function(g){
+    doc.setFont('helvetica','bold'); setTxt('#0F1923');
+    doc.text(g[0], ml, y);
+    var lblW = 26;
+    doc.setFont('helvetica','normal'); setTxt('#374151');
+    var gl = doc.splitTextToSize(g[1], cw - lblW);
+    doc.text(gl, ml + lblW, y);
+    y += gl.length * 3.5 + 1.5;
+  });
+
+  // SEZIONE 4: COME LEGGERE IL REPORT
+  y += 3;
+  if(y < H - 35){
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt('#0065B3');
+    doc.text('COME LEGGERE IL REPORT', ml, y);
+    y += 4;
+    var howTo = 'La cover sintetizza il voto globale e la mappa colorimetrica dell\'arcata. Le pagine cilindro mostrano per ogni scanbody le viste 3D mesh, le componenti dello scostamento e l\'angolo asse. Le pagine inter-centroide confrontano la lunghezza A-B di ogni coppia di scanbody: la differenza rivela la coerenza dimensionale globale della scansione, indipendentemente dalle posizioni assolute. Per protesi avvitate multi-impianto, le pagine inter-centroide sono il criterio piu\' rilevante.';
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); setTxt('#374151');
+    var ht = doc.splitTextToSize(howTo, cw);
+    doc.text(ht, ml, y);
+  }
+}
+
 /**
  * Disegna la pagina dettaglio di un singolo cilindro (3 viste mesh + tabella).
  * Usato dal Clinico e dall'Analisi.
@@ -4963,10 +5452,28 @@ function misICP_drawCentroidGraph(cv, data, currentPi){
 function misICP_renderClinicalPDF(data){
   var doc = new window.jspdf.jsPDF({unit:'mm', format:'a4', compress:true});
   var W=210, H=297;
-  var totPages = 1 + data.nCyl + data.interCentroidPairs.length;
+  // 1 cover + 2 pagine documentazione + N cilindri + M coppie inter-centroide
+  var docPages = 2;
+  var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
   misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9)', null, true);
+
+  // Pagina 2: Note metodologiche (statica, identica per ogni report)
+  doc.addPage();
+  misICP_pdfDrawMethodologyPage(doc);
+  misICP_pdfFooter(doc,
+    'Syntesis-ICP - Note metodologiche',
+    'Pag. 2 / '+totPages,
+    false);
+
+  // Pagina 3: Glossario e soglie cliniche (statica, identica per ogni report)
+  doc.addPage();
+  misICP_pdfDrawGlossaryPage(doc);
+  misICP_pdfFooter(doc,
+    'Syntesis-ICP - Glossario e soglie',
+    'Pag. 3 / '+totPages,
+    false);
 
   // Pagine cilindri
   data.pairs.forEach(function(p, ci){
@@ -4974,17 +5481,17 @@ function misICP_renderClinicalPDF(data){
     misICP_pdfDrawCylinderPage(doc, data, ci);
     misICP_pdfFooter(doc,
       'Syntesis-ICP - Cilindro #'+(ci+1)+' di '+data.nCyl,
-      'Pag. '+(ci+2)+' / '+totPages,
+      'Pag. '+(1+docPages+ci+1)+' / '+totPages,
       false);
   });
 
-  // Pagine coppie inter-centroide (le 10 mancanti, ora aggiunte)
+  // Pagine coppie inter-centroide
   data.interCentroidPairs.forEach(function(ic, pi){
     doc.addPage();
     misICP_pdfDrawInterCentroidPage(doc, data, pi);
     misICP_pdfFooter(doc,
       'Syntesis-ICP - Distanza inter-centroide #'+ic.i+'-#'+ic.j,
-      'Pag. '+(1+data.nCyl+pi+1)+' / '+totPages,
+      'Pag. '+(1+docPages+data.nCyl+pi+1)+' / '+totPages,
       false);
   });
 
