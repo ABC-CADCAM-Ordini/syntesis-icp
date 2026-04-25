@@ -119,37 +119,12 @@ def check_rate_limit(user_id: str):
 
 # ── Endpoint analisi principale ───────────────────────────────────────────────
 
-@app.get("/replacer", include_in_schema=False)
-async def replacer_page():
-    _rep = _STATIC_DIR / "syntesis-icp-replacer.html"
-    if _rep.exists():
-        return FileResponse(str(_rep), headers=_NO_STORE_HEADERS)
-    return JSONResponse({"error": "Replacer not found"}, status_code=404)
-
 @app.get("/analizzare", include_in_schema=False)
 async def analyzer_page():
     _an = _STATIC_DIR / "syntesis-analyzer-v3b.html"
     if _an.exists():
         return FileResponse(str(_an), headers=_NO_STORE_HEADERS)
     return JSONResponse({"error": "Analyzer not found"}, status_code=404)
-
-@app.get("/calibrare", include_in_schema=False)
-async def calibrare_page():
-    _cal = _STATIC_DIR / "syntesis-calibrator-v4.html"
-    if _cal.exists():
-        return FileResponse(str(_cal), headers=_NO_STORE_HEADERS)
-    # Fallback: serve da GitHub raw se il file locale non è presente
-    import httpx
-    raw_url = "https://raw.githubusercontent.com/ABC-CADCAM-Ordini/syntesis-icp/main/backend/static/syntesis-calibrator-v4.html"
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.get(raw_url)
-            if r.status_code == 200:
-                from fastapi.responses import HTMLResponse
-                return HTMLResponse(content=r.text, headers=_NO_STORE_HEADERS)
-    except Exception:
-        pass
-    return JSONResponse({"error": "Calibrare not found"}, status_code=404)
 
 @app.post("/api/analyze")
 async def analyze(
