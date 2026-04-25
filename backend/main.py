@@ -126,6 +126,13 @@ async def analyzer_page():
         return FileResponse(str(_an), headers=_NO_STORE_HEADERS)
     return JSONResponse({"error": "Analyzer not found"}, status_code=404)
 
+@app.get("/statistiche", include_in_schema=False)
+async def statistiche_page():
+    _st = _STATIC_DIR / "syntesis-statistiche-v7.4.0.001.html"
+    if _st.exists():
+        return FileResponse(str(_st), headers=_NO_STORE_HEADERS)
+    return JSONResponse({"error": "Statistiche not found"}, status_code=404)
+
 @app.post("/api/analyze")
 async def analyze(
     file_a: UploadFile = File(..., description="STL riferimento"),
