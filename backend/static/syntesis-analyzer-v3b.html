@@ -3287,31 +3287,84 @@ function misICP_applyTform(tris,R,t){
     });
   });
 }
-// Asse del cilindro da face-normals (verbatim dal Comparator)
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ASSE DEL CILINDRO: metodo cap-based (verbatim dal Comparator)   ║
+// ╠══════════════════════════════════════════════════════════════════╣
+// ║  Lavora sui vertici dei triangoli, non sulle face-normals: cosi  ║
+// ║  e' insensibile al fatto che il cluster contenga sia il cilindro ║
+// ║  vero e proprio sia il disco/base. Il metodo:                    ║
+// ║    1. PCA sui punti -> asse approssimativo                       ║
+// ║    2. Proietto i punti sull'asse PCA, prendo il top 18% e bottom ║
+// ║       18% come due "cap" (le due basi del cilindro)              ║
+// ║    3. Per ogni cap, PCA: l'autovettore con varianza minima e' la ║
+// ║       normale al piano del cap                                   ║
+// ║    4. Asse del cilindro = media delle due normali (orientate     ║
+// ║       coerentemente con l'asse PCA)                              ║
+// ║                                                                  ║
+// ║  In presenza di 5 scanbody clinici corretti questo metodo da'    ║
+// ║  angoli sotto 0.5deg, contro 0.8-3.1deg dell'approccio           ║
+// ║  face-normal usato in v7.3.9.001.                                ║
+// ╚══════════════════════════════════════════════════════════════════╝
 function misICP_cylAxis(tris){
-  if(!tris || tris.length<6) return null;
-  var normals=[];
-  tris.forEach(function(t){
-    var ax=t[1][0]-t[0][0], ay=t[1][1]-t[0][1], az=t[1][2]-t[0][2];
-    var bx=t[2][0]-t[0][0], by=t[2][1]-t[0][1], bz=t[2][2]-t[0][2];
-    var nx=ay*bz-az*by, ny=az*bx-ax*bz, nz=ax*by-ay*bx;
-    var L=Math.sqrt(nx*nx+ny*ny+nz*nz);
-    if(L>1e-9){ normals.push([nx/L,ny/L,nz/L]); }
+  if(!tris || tris.length<3) return [0,0,1];
+  // Step 0: raccolgo tutti i vertici (con duplicati: la PCA e' invariante)
+  var pts=[];
+  tris.forEach(function(t){ t.forEach(function(v){ pts.push(v); }); });
+  var n=pts.length;
+  if(n<9) return [0,0,1];
+  // Step 1: centroide
+  var cx=0, cy=0, cz=0;
+  pts.forEach(function(v){ cx+=v[0]/n; cy+=v[1]/n; cz+=v[2]/n; });
+  var ptsc=pts.map(function(v){ return [v[0]-cx, v[1]-cy, v[2]-cz]; });
+  // Step 2: PCA sui punti per asse approssimativo
+  var cov=[[0,0,0],[0,0,0],[0,0,0]];
+  ptsc.forEach(function(v){
+    for(var i=0;i<3;i++) for(var j=0;j<3;j++) cov[i][j]+=v[i]*v[j]/n;
   });
-  if(normals.length<3) return null;
-  // Covariance delle normali; l'autovettore con autovalore MINIMO e' l'asse del cilindro
-  var M=[[0,0,0],[0,0,0],[0,0,0]];
-  normals.forEach(function(n){
-    for(var i=0;i<3;i++)for(var j=0;j<3;j++) M[i][j]+=n[i]*n[j];
+  var eig=misICP_jacobi3(cov);
+  var ord=[0,1,2].sort(function(a,b){ return eig.vals[b]-eig.vals[a]; });
+  var ev0=eig.vals[ord[0]], ev1=eig.vals[ord[1]];
+  // Se i due autovalori maggiori sono simili (ev1/ev0 > 0.6) il cilindro e'
+  // tozzo: l'asse coincide col 3o autovettore (varianza minima).
+  // Altrimenti il cilindro e' lungo: asse = 1o autovettore (varianza massima).
+  var axIdx=(ev0>0 && ev1/ev0>0.6) ? ord[2] : ord[0];
+  var axPCA=[eig.vecs[0][axIdx], eig.vecs[1][axIdx], eig.vecs[2][axIdx]];
+  // Step 3: proietto i punti sull'asse PCA, prendo i due cap estremi
+  var proj=ptsc.map(function(v){ return v[0]*axPCA[0]+v[1]*axPCA[1]+v[2]*axPCA[2]; });
+  var pmin=proj.reduce(function(a,b){ return a<b?a:b; });
+  var pmax=proj.reduce(function(a,b){ return a>b?a:b; });
+  var H=pmax-pmin, thresh=H*0.18;
+  var capTop=[], capBot=[];
+  ptsc.forEach(function(v,i){
+    if(proj[i]>pmax-thresh) capTop.push(v);
+    else if(proj[i]<pmin+thresh) capBot.push(v);
   });
-  var ej=misICP_jacobi3(M);
-  var minIdx=0;
-  if(ej.vals[1]<ej.vals[minIdx]) minIdx=1;
-  if(ej.vals[2]<ej.vals[minIdx]) minIdx=2;
-  var ax=[ej.vecs[0][minIdx],ej.vecs[1][minIdx],ej.vecs[2][minIdx]];
-  var L=Math.sqrt(ax[0]*ax[0]+ax[1]*ax[1]+ax[2]*ax[2]);
-  if(L<1e-9) return null;
-  return [ax[0]/L, ax[1]/L, ax[2]/L];
+  // Step 4: PCA su ogni cap, normale = autovettore con varianza minima
+  function capNormal(cap){
+    if(cap.length<6) return null;
+    var cc=[0,0,0];
+    cap.forEach(function(v){ cc[0]+=v[0]/cap.length; cc[1]+=v[1]/cap.length; cc[2]+=v[2]/cap.length; });
+    var cv=[[0,0,0],[0,0,0],[0,0,0]];
+    cap.forEach(function(v){
+      var d=[v[0]-cc[0], v[1]-cc[1], v[2]-cc[2]];
+      for(var i=0;i<3;i++) for(var j=0;j<3;j++) cv[i][j]+=d[i]*d[j]/cap.length;
+    });
+    var eg=misICP_jacobi3(cv);
+    var od=[0,1,2].sort(function(a,b){ return eg.vals[b]-eg.vals[a]; });
+    return [eg.vecs[0][od[2]], eg.vecs[1][od[2]], eg.vecs[2][od[2]]];
+  }
+  var nTop=capNormal(capTop);
+  var nBot=capNormal(capBot);
+  if(!nTop && !nBot) return axPCA; // fallback
+  if(!nTop) nTop=nBot;
+  if(!nBot) nBot=nTop;
+  // Allineo i due versori coerentemente con l'asse PCA
+  if(nTop[0]*axPCA[0]+nTop[1]*axPCA[1]+nTop[2]*axPCA[2]<0){ nTop=[-nTop[0],-nTop[1],-nTop[2]]; }
+  if(nBot[0]*axPCA[0]+nBot[1]*axPCA[1]+nBot[2]*axPCA[2]<0){ nBot=[-nBot[0],-nBot[1],-nBot[2]]; }
+  // Asse cilindro = media delle due normali
+  var ax=[nTop[0]+nBot[0], nTop[1]+nBot[1], nTop[2]+nBot[2]];
+  var len=Math.sqrt(ax[0]*ax[0]+ax[1]*ax[1]+ax[2]*ax[2])||1;
+  return [ax[0]/len, ax[1]/len, ax[2]/len];
 }
 function misICP_axisAngleDeg(a,b){
   if(!a || !b) return 0;
@@ -4103,9 +4156,10 @@ function misICP_drawColorMap(cv, pairs){
   if(!cv || !pairs || !pairs.length) return;
   var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
   ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#f9fafb'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='#ffffff'; ctx.fillRect(2,2,W-4,H-4);
-  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1; ctx.strokeRect(2,2,W-4,H-4);
+  // Sfondo dark coerente con la cover (#0d1b2a)
+  ctx.fillStyle='#0d1b2a'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#142433'; ctx.fillRect(2,2,W-4,H-4);
+  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1; ctx.strokeRect(2,2,W-4,H-4);
   var padL=52, padR=40, padT=36, padB=60;
   var vw=W-padL-padR, vh=H-padT-padB;
   var n=pairs.length;
@@ -4139,17 +4193,17 @@ function misICP_drawColorMap(cv, pairs){
   function sc(p1,p2){ return [padL+(p1-(c1-rg/2-margin))*scl, padT+vh-(p2-(c2-rg/2-margin))*scl]; }
 
   var gs=5;
-  ctx.strokeStyle='rgba(220,228,235,0.55)'; ctx.lineWidth=0.5; ctx.setLineDash([3,4]);
+  ctx.strokeStyle='rgba(176,184,193,0.18)'; ctx.lineWidth=0.5; ctx.setLineDash([3,4]);
   for(var g1=Math.floor((mn1-margin)/gs)*gs; g1<=(mx1+margin); g1+=gs){
     var gpx=sc(g1,0)[0]; if(gpx<padL-1 || gpx>padL+vw+1) continue;
     ctx.beginPath(); ctx.moveTo(gpx,padT); ctx.lineTo(gpx,padT+vh); ctx.stroke();
-    ctx.fillStyle='rgba(150,160,170,0.55)'; ctx.font='7px monospace'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(176,184,193,0.55)'; ctx.font='7px monospace'; ctx.textAlign='center';
     ctx.fillText(g1.toFixed(0),gpx,padT+vh+12);
   }
   for(var g2=Math.floor((mn2-margin)/gs)*gs; g2<=(mx2+margin); g2+=gs){
     var gpy=sc(0,g2)[1]; if(gpy<padT-1 || gpy>padT+vh+1) continue;
     ctx.beginPath(); ctx.moveTo(padL,gpy); ctx.lineTo(padL+vw,gpy); ctx.stroke();
-    ctx.fillStyle='rgba(150,160,170,0.55)'; ctx.font='7px monospace'; ctx.textAlign='right';
+    ctx.fillStyle='rgba(176,184,193,0.55)'; ctx.font='7px monospace'; ctx.textAlign='right';
     ctx.fillText(g2.toFixed(0),padL-4,gpy+3);
   }
   ctx.setLineDash([]);
@@ -4168,7 +4222,7 @@ function misICP_drawColorMap(cv, pairs){
     ctx.lineCap='round'; ctx.lineJoin='round';
     [20,12,5].forEach(function(lw,li){
       ctx.beginPath(); ap.forEach(function(pt,i){ if(i===0) ctx.moveTo(pt[0],pt[1]); else ctx.lineTo(pt[0],pt[1]); });
-      ctx.strokeStyle='rgba(180,200,215,'+(0.10+li*0.06)+')'; ctx.lineWidth=lw; ctx.stroke();
+      ctx.strokeStyle='rgba(120,160,200,'+(0.10+li*0.06)+')'; ctx.lineWidth=lw; ctx.stroke();
     });
   }
 
@@ -4179,7 +4233,7 @@ function misICP_drawColorMap(cv, pairs){
     var pb=pcaProj(pp.b[0],pp.b[1],pp.b[2]), spb=sc(pb[0],pb[1]);
     var hr=Math.min(32, Math.max(16, d3um/20+16));
     var g=ctx.createRadialGradient(spb[0],spb[1],0,spb[0],spb[1],hr);
-    g.addColorStop(0, lv.col+'44'); g.addColorStop(0.6, lv.col+'18'); g.addColorStop(1,'transparent');
+    g.addColorStop(0, lv.col+'66'); g.addColorStop(0.6, lv.col+'22'); g.addColorStop(1,'transparent');
     ctx.fillStyle=g; ctx.beginPath(); ctx.arc(spb[0],spb[1],hr,0,Math.PI*2); ctx.fill();
   });
 
@@ -4201,15 +4255,15 @@ function misICP_drawColorMap(cv, pairs){
     ctx.closePath(); ctx.fill();
   });
 
-  // Posizioni A
+  // Posizioni A (cerchi blu chiaro su dark)
   pairs.forEach(function(pp,i){
     var pa=pcaProj(pp.a[0],pp.a[1],pp.a[2]), spa=sc(pa[0],pa[1]);
     ctx.beginPath(); ctx.arc(spa[0],spa[1],12,0,Math.PI*2);
-    ctx.strokeStyle='rgba(26,95,158,0.22)'; ctx.lineWidth=3; ctx.stroke();
+    ctx.strokeStyle='rgba(120,180,235,0.32)'; ctx.lineWidth=3; ctx.stroke();
     ctx.beginPath(); ctx.arc(spa[0],spa[1],7,0,Math.PI*2);
-    ctx.fillStyle='rgba(26,95,158,0.07)'; ctx.fill();
-    ctx.strokeStyle='#1a5f9e'; ctx.lineWidth=1.5; ctx.stroke();
-    ctx.fillStyle='#1a5f9e'; ctx.font='bold 8px monospace';
+    ctx.fillStyle='rgba(20,36,51,0.85)'; ctx.fill();
+    ctx.strokeStyle='#7ab8eb'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle='#cfe5fa'; ctx.font='bold 8px monospace';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(''+(i+1),spa[0],spa[1]); ctx.textBaseline='alphabetic';
   });
@@ -4220,9 +4274,9 @@ function misICP_drawColorMap(cv, pairs){
     var d3um=Math.round(pp.d3*1000), lv=misICP_clinLevel(d3um);
     var pb=pcaProj(pp.b[0],pp.b[1],pp.b[2]), spb=sc(pb[0],pb[1]);
     ctx.beginPath(); ctx.arc(spb[0],spb[1],10,0,Math.PI*2);
-    ctx.fillStyle=lv.col+'28'; ctx.fill();
+    ctx.fillStyle=lv.col+'40'; ctx.fill();
     ctx.beginPath(); ctx.arc(spb[0],spb[1],6,0,Math.PI*2);
-    ctx.fillStyle=lv.col; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle=lv.col; ctx.fill(); ctx.strokeStyle='#0d1b2a'; ctx.lineWidth=2; ctx.stroke();
     ctx.fillStyle='#fff'; ctx.font='bold 8px monospace';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(''+(i+1),spb[0],spb[1]); ctx.textBaseline='alphabetic';
@@ -4232,11 +4286,11 @@ function misICP_drawColorMap(cv, pairs){
 
   // Scale bar 10 mm
   var sbLen=10*scl, sbX=padL+vw-sbLen-4, sbY=padT+vh+36;
-  ctx.strokeStyle='#374151'; ctx.lineWidth=2; ctx.lineCap='square';
+  ctx.strokeStyle='#9ca3af'; ctx.lineWidth=2; ctx.lineCap='square';
   ctx.beginPath(); ctx.moveTo(sbX,sbY); ctx.lineTo(sbX+sbLen,sbY); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(sbX,sbY-3); ctx.lineTo(sbX,sbY+3); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(sbX+sbLen,sbY-3); ctx.lineTo(sbX+sbLen,sbY+3); ctx.stroke();
-  ctx.fillStyle='#374151'; ctx.font='8px monospace'; ctx.textAlign='center';
+  ctx.fillStyle='#cbd5e1'; ctx.font='8px monospace'; ctx.textAlign='center';
   ctx.fillText('10 mm', sbX+sbLen/2, sbY+11);
 
   // Color scale bar destra
@@ -4246,25 +4300,25 @@ function misICP_drawColorMap(cv, pairs){
   cg.addColorStop(0.5,'#F97316'); cg.addColorStop(0.7,'#D97706');
   cg.addColorStop(1,'#639922');
   ctx.fillStyle=cg; ctx.fillRect(csX,padT,csW,csH);
-  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=0.5; ctx.strokeRect(csX,padT,csW,csH);
+  ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=0.5; ctx.strokeRect(csX,padT,csW,csH);
   [[0,'0'],[50,'50'],[100,'100'],[150,'150'],[250,'250'],[500,'500']].forEach(function(t){
     var ty=padT+csH-(t[0]/500)*csH;
-    ctx.strokeStyle='#fff'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(csX,ty); ctx.lineTo(csX+csW,ty); ctx.stroke();
-    ctx.fillStyle='#6b7280'; ctx.font='7px monospace'; ctx.textAlign='left';
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(csX,ty); ctx.lineTo(csX+csW,ty); ctx.stroke();
+    ctx.fillStyle='#cbd5e1'; ctx.font='7px monospace'; ctx.textAlign='left';
     ctx.fillText(t[1], csX+csW+3, ty+3);
   });
   ctx.fillStyle='#9ca3af'; ctx.font='7px monospace'; ctx.textAlign='center';
   ctx.fillText('\u03bcm', csX+csW/2, padT+csH+10);
 
-  // Legenda
+  // Legenda (chiara su sfondo dark)
   var lgY=padT+vh+46;
   ctx.beginPath(); ctx.arc(padL+6,lgY,5,0,Math.PI*2);
-  ctx.strokeStyle='#1a5f9e'; ctx.lineWidth=1.5; ctx.fillStyle='rgba(26,95,158,0.08)'; ctx.fill(); ctx.stroke();
-  ctx.fillStyle='#374151'; ctx.font='8px monospace'; ctx.textAlign='left';
+  ctx.strokeStyle='#7ab8eb'; ctx.lineWidth=1.5; ctx.fillStyle='rgba(120,180,235,0.18)'; ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#cbd5e1'; ctx.font='8px monospace'; ctx.textAlign='left';
   ctx.fillText('A = riferimento', padL+14, lgY+3);
   ctx.beginPath(); ctx.arc(padL+115,lgY,5,0,Math.PI*2);
-  ctx.fillStyle='#EF4444'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
-  ctx.fillStyle='#374151'; ctx.fillText('B = misurato (ICP)', padL+123, lgY+3);
+  ctx.fillStyle='#EF4444'; ctx.fill(); ctx.strokeStyle='#0d1b2a'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.fillStyle='#cbd5e1'; ctx.fillText('B = misurato (ICP)', padL+123, lgY+3);
   var planeAngle=Math.acos(Math.min(1,Math.abs(u3[2])))*180/Math.PI;
   ctx.fillStyle='#9ca3af'; ctx.font='7px monospace'; ctx.textAlign='right';
   ctx.fillText('Piano best-fit perp. Z: '+planeAngle.toFixed(1)+'\u00b0', padL+vw, lgY+3);
@@ -4294,26 +4348,53 @@ function misICP_paintView(cv, triA, triB, trisBg, ax1, ax2, axD, title){
   });
   var rg=Math.max(mx1-mn1, mx2-mn2)||1, c1=(mn1+mx1)/2, c2=(mn2+mx2)/2, mg=rg*0.08;
   function px(v){ return [pd+((v[ax1]-(c1-rg/2-mg))/(rg+mg*2))*vw, pd+vh-((v[ax2]-(c2-rg/2-mg))/(rg+mg*2))*vh]; }
-  function drawTris(tris, fill, stroke, max){
-    if(!tris || !tris.length) return;
+  // Costruisco una lista MISTA di triangoli (BG + A + B) ordinata per profondita': cosi'
+  // i triangoli di A (blu) e B (arancione) si interleavano e si vedono entrambi.
+  // Senza questa unificazione l'ultimo blocco disegnato copre completamente il precedente.
+  function pickItems(tris, max, color){
+    if(!tris || !tris.length) return [];
     var step=Math.max(1, Math.ceil(tris.length/max));
-    var items=[];
+    var out=[];
     for(var i=0;i<tris.length;i+=step){
       var t=tris[i];
-      items.push({ t:t, d:(t[0][axD]+t[1][axD]+t[2][axD])/3 });
+      out.push({ t:t, d:(t[0][axD]+t[1][axD]+t[2][axD])/3, c:color });
     }
-    items.sort(function(a,b){return a.d-b.d;});
-    ctx.save(); ctx.fillStyle=fill; ctx.strokeStyle=stroke; ctx.lineWidth=0.3;
-    items.forEach(function(item){
-      var t=item.t, p0=px(t[0]), p1=px(t[1]), p2=px(t[2]);
-      ctx.beginPath(); ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-    });
-    ctx.restore();
+    return out;
   }
-  drawTris(trisBg, 'rgba(180,185,195,0.22)', 'rgba(160,165,175,0.18)', 6000);
-  drawTris(triA,   'rgba(26,95,158,0.5)',    'rgba(14,61,102,0.6)',    10000);
-  drawTris(triB,   'rgba(186,117,23,0.5)',   'rgba(133,79,11,0.6)',    10000);
+  var COL_BG = { f:'rgba(180,185,195,0.22)', s:'rgba(160,165,175,0.18)' };
+  var COL_A  = { f:'rgba(26,95,158,0.55)',   s:'rgba(14,61,102,0.7)'    };
+  var COL_B  = { f:'rgba(217,119,6,0.55)',   s:'rgba(133,79,11,0.7)'    };
+  var allItems = pickItems(trisBg, 6000, COL_BG)
+    .concat(pickItems(triA, 8000, COL_A))
+    .concat(pickItems(triB, 8000, COL_B));
+  allItems.sort(function(a,b){ return a.d - b.d; });
+  ctx.save(); ctx.lineWidth=0.3;
+  allItems.forEach(function(item){
+    var t=item.t, p0=px(t[0]), p1=px(t[1]), p2=px(t[2]);
+    ctx.fillStyle=item.c.f; ctx.strokeStyle=item.c.s;
+    ctx.beginPath(); ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  });
+  ctx.restore();
+  // Legenda A/B in alto a sinistra dentro il viewport
+  var lpd=6, lh=16, lw=70;
+  ctx.save();
+  ctx.fillStyle='rgba(255,255,255,0.92)';
+  ctx.fillRect(pd+lpd, pd+lpd, lw, lh);
+  ctx.strokeStyle='rgba(0,0,0,0.1)'; ctx.lineWidth=0.5;
+  ctx.strokeRect(pd+lpd, pd+lpd, lw, lh);
+  // dot A
+  ctx.fillStyle='#1A5F9E'; ctx.beginPath();
+  ctx.arc(pd+lpd+5, pd+lpd+lh/2, 2.2, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0F1923'; ctx.font='bold 7px monospace'; ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.fillText('A Riferimento', pd+lpd+10, pd+lpd+5);
+  // dot B
+  ctx.fillStyle='#D97706'; ctx.beginPath();
+  ctx.arc(pd+lpd+5, pd+lpd+lh-4, 2.2, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0F1923';
+  ctx.fillText('B Misurato', pd+lpd+10, pd+lpd+lh-4);
+  ctx.restore();
+  // Footer scuro col titolo della vista
   ctx.fillStyle='rgba(31,41,55,0.7)'; ctx.fillRect(pd,pd+vh,vw,th);
   ctx.fillStyle='#fff'; ctx.font='bold 9px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(title, W/2, pd+vh+th/2); ctx.textBaseline='alphabetic';
@@ -4441,7 +4522,13 @@ function misICP_pdfFooter(doc, title, pageInfo, darkBg){
     doc.setFont('helvetica','normal'); doc.setFontSize(7);
     doc.setTextColor(122,144,164);
     doc.text(title, ml, H-4);
-    if(pageInfo) doc.text(pageInfo, W-mr, H-4, {align:'right'});
+    // Brand al centro per coerenza con la cover
+    doc.setFont('helvetica','italic'); doc.setFontSize(6.5);
+    doc.text('Biaggini Medical Devices S.r.l.', W/2, H-4, {align:'center'});
+    if(pageInfo){
+      doc.setFont('helvetica','normal'); doc.setFontSize(7);
+      doc.text(pageInfo, W-mr, H-4, {align:'right'});
+    }
   }
 }
 
@@ -4654,15 +4741,23 @@ function misICP_pdfDrawInterCentroidPage(doc, data, pi){
   doc.text('Distanza Inter-Centroide #'+ic.i+'-#'+ic.j, ml+2, 9);
   doc.setFont('helvetica','normal'); doc.setFontSize(8); setTxt('#7A90A4');
   doc.text('Coppia '+(pi+1)+'/'+data.interCentroidPairs.length+'   A (rif.) vs B (post-ICP)', ml+2, 14);
-  // Delta a destra
+  // Badge Delta a destra: box piu' alto e con tinta piu' chiara per leggibilita',
+  // niente alpha fill (non funziona in modo uniforme su jsPDF), uso un mix manuale.
   var dRGB = misICP_hexRGB(ic.lv.col);
-  doc.setFillColor(dRGB[0],dRGB[1],dRGB[2],0.15);
-  doc.roundedRect(W-mr-40, 4, 40, 9, 2, 2, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  // Mix con bianco al 85% (manualmente, niente alpha): col_bg = 0.15*col + 0.85*255
+  var bgR = Math.round(dRGB[0]*0.15 + 255*0.85);
+  var bgG = Math.round(dRGB[1]*0.15 + 255*0.85);
+  var bgB = Math.round(dRGB[2]*0.15 + 255*0.85);
+  var badgeX = W-mr-44, badgeY = 3, badgeW = 44, badgeH = 12;
+  doc.setFillColor(bgR, bgG, bgB);
+  doc.setDrawColor(dRGB[0], dRGB[1], dRGB[2]);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 2, 2, 'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
   doc.setTextColor(dRGB[0],dRGB[1],dRGB[2]);
-  doc.text((ic.delta_um>=0?'+':'')+ic.delta_um.toFixed(1)+'\u03bcm', W-mr-2, 9.8, {align:'right'});
+  doc.text((ic.delta_um>=0?'+':'')+ic.delta_um.toFixed(1)+'\u03bcm', badgeX+badgeW/2, badgeY+5.4, {align:'center'});
   doc.setFontSize(7); doc.setFont('helvetica','normal');
-  doc.text(ic.lv.label, W-mr-2, 13.5, {align:'right'});
+  doc.text(ic.lv.label, badgeX+badgeW/2, badgeY+9.8, {align:'center'});
 
   // Diagramma topologico (rete dei 5 cilindri con la coppia evidenziata)
   var diagY = 22;
@@ -4760,6 +4855,14 @@ function misICP_pdfDrawInterCentroidPage(doc, data, pi){
 /**
  * Disegna il grafo dei centroidi con la coppia corrente evidenziata.
  */
+/**
+ * Disegna il grafo dei centroidi con la coppia corrente evidenziata.
+ * Le etichette delle distanze A e B vengono ruotate lungo la direzione del
+ * segmento, esattamente come nel Comparator del 22/04: questo evita la
+ * sovrapposizione coi cerchi nodali su coppie corte (es. #4-#5).
+ * Le anteprime degli scanbody mostrano solo il numero, niente piu' label
+ * "A1"/"B1" sovrapposte ai cerchi adiacenti.
+ */
 function misICP_drawCentroidGraph(cv, data, currentPi){
   var ctx = cv.getContext('2d');
   var W = cv.width, H = cv.height;
@@ -4770,74 +4873,126 @@ function misICP_drawCentroidGraph(cv, data, currentPi){
   data.pairs.forEach(function(p){ xs.push(p.a[0]); ys.push(p.a[1]); });
   var xMin = Math.min.apply(null,xs), xMax = Math.max.apply(null,xs);
   var yMin = Math.min.apply(null,ys), yMax = Math.max.apply(null,ys);
-  var pad = 0.15;
+  var pad = 0.18;
   var dx = Math.max(1e-3, xMax-xMin);
   var dy = Math.max(1e-3, yMax-yMin);
   xMin -= pad*dx; xMax += pad*dx;
   yMin -= pad*dy; yMax += pad*dy;
 
+  // Mantengo l'aspect ratio per non distorcere la disposizione spaziale
   function tx(v){ return ((v-xMin)/(xMax-xMin)) * (W*0.85) + W*0.075; }
   function ty(v){ return H - (((v-yMin)/(yMax-yMin)) * (H*0.85) + H*0.075); }
 
-  // Disegna tutte le coppie come linee tenui
+  // PASSO 1: tutte le coppie come linee tenui di sfondo (skip della corrente)
   data.interCentroidPairs.forEach(function(c, ci){
+    if(ci === currentPi) return;
     var pi = data.pairs[c.i-1], pj = data.pairs[c.j-1];
-    if(ci === currentPi){
-      ctx.strokeStyle = '#0065B3';
-      ctx.lineWidth = 6;
-    } else {
-      ctx.strokeStyle = 'rgba(120,140,160,0.3)';
-      ctx.lineWidth = 2;
-    }
+    ctx.strokeStyle = 'rgba(150,165,180,0.35)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(tx(pi.a[0]), ty(pi.a[1]));
     ctx.lineTo(tx(pj.a[0]), ty(pj.a[1]));
     ctx.stroke();
   });
 
-  // Etichetta sulla coppia corrente
+  // PASSO 2: la coppia CORRENTE evidenziata con due linee parallele
+  // (una blu = A, una arancione tratteggiata = B post-ICP)
   var current = data.interCentroidPairs[currentPi];
   if(current){
     var pi = data.pairs[current.i-1], pj = data.pairs[current.j-1];
-    var mx = (tx(pi.a[0]) + tx(pj.a[0]))/2;
-    var my = (ty(pi.a[1]) + ty(pj.a[1]))/2;
-    ctx.font = 'bold 26px Helvetica';
-    ctx.fillStyle = '#0065B3';
+    var x1 = tx(pi.a[0]), y1 = ty(pi.a[1]);
+    var x2 = tx(pj.a[0]), y2 = ty(pj.a[1]);
+    // Linea principale blu (A = riferimento)
+    ctx.strokeStyle = '#0065B3';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    // Linea arancione tratteggiata (B = misurato post-ICP), leggermente offset
+    var seglen = Math.sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1)) || 1;
+    var nx = -(y2-y1)/seglen, ny = (x2-x1)/seglen;
+    var off = 6;
+    ctx.strokeStyle = '#D97706';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([8,5]);
+    ctx.beginPath();
+    ctx.moveTo(x1+nx*off, y1+ny*off);
+    ctx.lineTo(x2+nx*off, y2+ny*off);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineCap = 'butt';
+
+    // PASSO 3: etichette distanze RUOTATE lungo l'angolo del segmento
+    // (come nel Comparator del 22/04). L'angolo viene corretto se il segmento
+    // e' "head-down" cosi' il testo non risulta capovolto.
+    var ang = Math.atan2(y2-y1, x2-x1);
+    if(ang > Math.PI/2)  ang -= Math.PI;
+    if(ang < -Math.PI/2) ang += Math.PI;
+    var mx = (x1 + x2)/2, my = (y1 + y2)/2;
+
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.rotate(ang);
+    ctx.font = 'bold 22px Helvetica, Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(current.distA_um.toFixed(1)+'\u03bcm', mx, my-12);
+    ctx.textBaseline = 'middle';
+    // Sfondo chiaro semitrasparente dietro le etichette per renderle leggibili
+    var labelA = current.distA_um.toFixed(1)+'\u03bcm';
+    var labelB = current.distB_um.toFixed(1)+'\u03bcm';
+    var wA = ctx.measureText(labelA).width;
+    var wB = ctx.measureText(labelB).width;
+    var maxW = Math.max(wA, wB) + 16;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(-maxW/2, -32, maxW, 56);
+    ctx.fillStyle = '#0065B3';
+    ctx.fillText(labelA, 0, -10);
     ctx.fillStyle = '#D97706';
-    ctx.fillText(current.distB_um.toFixed(1)+'\u03bcm', mx, my+18);
+    ctx.fillText(labelB, 0, 14);
+    ctx.restore();
   }
 
-  // Disegna i nodi (cilindri)
+  // PASSO 4: nodi (cilindri) — solo numero, niente label A1/B1 sovrapposte
   data.pairs.forEach(function(p, idx){
     var x = tx(p.a[0]), y = ty(p.a[1]);
     var isInPair = (current && (idx+1===current.i || idx+1===current.j));
-    ctx.fillStyle = isInPair ? '#0065B3' : 'rgba(120,140,160,0.5)';
+    var radius = isInPair ? 18 : 12;
+    // Cerchio
+    ctx.fillStyle = isInPair ? '#0065B3' : 'rgba(180,195,210,0.7)';
     ctx.beginPath();
-    ctx.arc(x, y, isInPair?22:14, 0, Math.PI*2);
+    ctx.arc(x, y, radius, 0, Math.PI*2);
     ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold '+ (isInPair?22:16) +'px Helvetica';
+    // Bordo bianco per leggibilita' su qualsiasi sfondo
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Numero al centro
+    ctx.fillStyle = isInPair ? '#FFFFFF' : '#3F4F61';
+    ctx.font = 'bold ' + (isInPair?20:14) + 'px Helvetica, Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(idx+1), x, y);
-    if(isInPair){
-      ctx.fillStyle = '#0065B3';
-      ctx.font = 'bold 14px Helvetica';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText('A'+(idx+1), x+22, y-22);
-      ctx.fillStyle = '#D97706';
-      ctx.fillText('B'+(idx+1), x-22, y+34);
-    }
+    ctx.textBaseline = 'alphabetic';
   });
 
-  // Legenda
-  ctx.font = '14px Helvetica';
-  ctx.fillStyle = 'rgba(80,90,100,0.85)';
+  // Legenda compatta in basso a sinistra
+  ctx.font = '11px Helvetica, Arial, sans-serif';
+  ctx.fillStyle = 'rgba(60,75,90,0.9)';
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText('A = riferimento  -  B = post-ICP', 12, H-22);
+  ctx.textBaseline = 'middle';
+  var lgY = H - 14;
+  // dot blu A
+  ctx.beginPath(); ctx.arc(16, lgY, 4, 0, Math.PI*2);
+  ctx.fillStyle = '#0065B3'; ctx.fill();
+  ctx.fillStyle = 'rgba(60,75,90,0.9)';
+  ctx.fillText('A = riferimento', 24, lgY);
+  // dot arancione B
+  ctx.beginPath(); ctx.arc(150, lgY, 4, 0, Math.PI*2);
+  ctx.fillStyle = '#D97706'; ctx.fill();
+  ctx.fillStyle = 'rgba(60,75,90,0.9)';
+  ctx.fillText('B = post-ICP', 158, lgY);
+  ctx.textBaseline = 'alphabetic';
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -4849,7 +5004,7 @@ function misICP_renderClinicalPDF(data){
   var totPages = 1 + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9) - Biaggini Medical Devices S.r.l.', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9)', null, true);
 
   // Pagine cilindri
   data.pairs.forEach(function(p, ci){
@@ -4885,7 +5040,7 @@ function misICP_renderCalibrationPDF(data){
 
   // Cover identica al Clinico ma con sottotitolo "Taratura"
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Taratura');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Taratura (Analizza v7.3.9) - Biaggini Medical Devices S.r.l.', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Taratura (Analizza v7.3.9)', null, true);
 
   // ── PAGINA 2: SINTESI METROLOGICA ─────────────────────────────────
   doc.addPage();
