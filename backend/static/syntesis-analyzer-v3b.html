@@ -4152,17 +4152,21 @@ function misICP_drawCard(cv,dxum,dyum,dzum,d3um,scaleUm,axDeg){
 }
 
 // Mappa colorimetrica 2D con PCA best-fit plane (Comparator)
-function misICP_drawColorMap(cv, pairs){
+function misICP_drawColorMap(cv, pairs, opts){
   if(!cv || !pairs || !pairs.length) return;
+  opts = opts || {};
+  // opts.compact = true     -> riduce padT/padB per layout pagina coppie
+  // opts.highlightPair      -> { iA, iB, distA_um, distB_um, lv } sovrappone
+  //                            il segmento della coppia corrente con le sue
+  //                            distanze A e B come label ruotata.
   var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
   ctx.clearRect(0,0,W,H);
-  // Sfondo CHIARO come nel report del 22/04: massima leggibilita' dei micron
-  // delle distanze e dei numeri sui nodi. Il box bianco crea contrasto sulla
-  // cover dark senza richiedere palette dark complicata.
   ctx.fillStyle='#f9fafb'; ctx.fillRect(0,0,W,H);
   ctx.fillStyle='#ffffff'; ctx.fillRect(2,2,W-4,H-4);
   ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1; ctx.strokeRect(2,2,W-4,H-4);
-  var padL=52, padR=40, padT=36, padB=60;
+  var padL=52, padR=40;
+  var padT = opts.compact ? 14 : 36;
+  var padB = opts.compact ? 50 : 60;
   var vw=W-padL-padR, vh=H-padT-padB;
   var n=pairs.length;
   var cmx=0, cmy=0, cmz=0;
@@ -4257,17 +4261,72 @@ function misICP_drawColorMap(cv, pairs){
     ctx.closePath(); ctx.fill();
   });
 
+  // EVIDENZIAZIONE COPPIA CORRENTE (solo se opts.highlightPair)
+  // Disegno qui (dopo i vettori A->B, prima dei nodi A) cosi' il segmento blu
+  // della distanza inter-centroide passa SOTTO i nodi (che lo coprono in
+  // corrispondenza degli endpoint) ma SOPRA la heatmap. La label delle due
+  // distanze e' ruotata lungo il segmento, con sfondo bianco per leggibilita'.
+  if(opts.highlightPair){
+    var hp = opts.highlightPair;
+    var pi = pairs[hp.iA], pj = pairs[hp.iB];
+    if(pi && pj){
+      var paI=pcaProj(pi.a[0],pi.a[1],pi.a[2]), spaI=sc(paI[0],paI[1]);
+      var paJ=pcaProj(pj.a[0],pj.a[1],pj.a[2]), spaJ=sc(paJ[0],paJ[1]);
+      // Segmento blu solido A_i-A_j (= distanza A inter-centroide)
+      ctx.strokeStyle='#0065B3'; ctx.lineWidth=4; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(spaI[0],spaI[1]); ctx.lineTo(spaJ[0],spaJ[1]); ctx.stroke();
+      ctx.lineCap='butt';
+      // Label ruotata con le due distanze A (blu) e B (arancione).
+      // La differenza A vs B (qualche um su decine di mm) NON e' visibile a
+      // scala reale; il valore informativo e' nei numeri delle label.
+      var ang2=Math.atan2(spaJ[1]-spaI[1], spaJ[0]-spaI[0]);
+      if(ang2 > Math.PI/2)  ang2 -= Math.PI;
+      if(ang2 < -Math.PI/2) ang2 += Math.PI;
+      var mxL=(spaI[0]+spaJ[0])/2, myL=(spaI[1]+spaJ[1])/2;
+      ctx.save();
+      ctx.translate(mxL, myL);
+      ctx.rotate(ang2);
+      ctx.font='bold 10px monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      var labA=hp.distA_um.toFixed(1)+'\u03bcm';
+      var labB=hp.distB_um.toFixed(1)+'\u03bcm';
+      var wA=ctx.measureText(labA).width, wB=ctx.measureText(labB).width;
+      var maxWl=Math.max(wA,wB)+12;
+      ctx.fillStyle='rgba(255,255,255,0.95)';
+      ctx.strokeStyle='rgba(0,0,0,0.10)'; ctx.lineWidth=0.6;
+      ctx.fillRect(-maxWl/2, -16, maxWl, 30);
+      ctx.strokeRect(-maxWl/2, -16, maxWl, 30);
+      ctx.fillStyle='#0065B3'; ctx.fillText(labA, 0, -5);
+      ctx.fillStyle='#D97706'; ctx.fillText(labB, 0, 8);
+      ctx.restore();
+    }
+  }
+
   // Posizioni A (cerchi blu su sfondo chiaro)
+  // Se opts.highlightPair attivo, i due nodi della coppia corrente vengono
+  // disegnati con stile evidenziato (riempimento blu pieno, numero bianco).
   pairs.forEach(function(pp,i){
     var pa=pcaProj(pp.a[0],pp.a[1],pp.a[2]), spa=sc(pa[0],pa[1]);
-    ctx.beginPath(); ctx.arc(spa[0],spa[1],12,0,Math.PI*2);
-    ctx.strokeStyle='rgba(26,95,158,0.22)'; ctx.lineWidth=3; ctx.stroke();
-    ctx.beginPath(); ctx.arc(spa[0],spa[1],7,0,Math.PI*2);
-    ctx.fillStyle='rgba(26,95,158,0.07)'; ctx.fill();
-    ctx.strokeStyle='#1a5f9e'; ctx.lineWidth=1.5; ctx.stroke();
-    ctx.fillStyle='#1a5f9e'; ctx.font='bold 8px monospace';
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(''+(i+1),spa[0],spa[1]); ctx.textBaseline='alphabetic';
+    var inPair = !!(opts.highlightPair && (i===opts.highlightPair.iA || i===opts.highlightPair.iB));
+    if(inPair){
+      ctx.beginPath(); ctx.arc(spa[0],spa[1],13,0,Math.PI*2);
+      ctx.strokeStyle='rgba(26,95,158,0.35)'; ctx.lineWidth=3; ctx.stroke();
+      ctx.beginPath(); ctx.arc(spa[0],spa[1],8,0,Math.PI*2);
+      ctx.fillStyle='#0065B3'; ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='bold 9px monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(''+(i+1),spa[0],spa[1]); ctx.textBaseline='alphabetic';
+    } else {
+      ctx.beginPath(); ctx.arc(spa[0],spa[1],12,0,Math.PI*2);
+      ctx.strokeStyle='rgba(26,95,158,0.22)'; ctx.lineWidth=3; ctx.stroke();
+      ctx.beginPath(); ctx.arc(spa[0],spa[1],7,0,Math.PI*2);
+      ctx.fillStyle='rgba(26,95,158,0.07)'; ctx.fill();
+      ctx.strokeStyle='#1a5f9e'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.fillStyle='#1a5f9e'; ctx.font='bold 8px monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(''+(i+1),spa[0],spa[1]); ctx.textBaseline='alphabetic';
+    }
   });
 
   // Posizioni B + label
@@ -4774,9 +4833,12 @@ function misICP_pdfDrawInterCentroidPage(doc, data, pi){
   doc.setFontSize(7); doc.setFont('helvetica','normal');
   doc.text(ic.lv.label, badgeX+badgeW/2, badgeY+9.8, {align:'center'});
 
-  // Diagramma topologico (rete dei 5 cilindri con la coppia evidenziata)
+  // Diagramma topologico: stile mappa cover (arcata + heatmap + color bar)
+  // con la coppia corrente evidenziata in blu spesso. Altezza 115mm scelta
+  // per dare alla mappa proporzioni simili a quelle della cover (~130mm)
+  // mantenendo spazio per box riassuntivo + tabella sotto.
   var diagY = 22;
-  var diagH = 90;
+  var diagH = 115;
   var cvDiag = document.createElement('canvas');
   cvDiag.width = Math.round(cw*4); cvDiag.height = Math.round(diagH*4);
   misICP_drawCentroidGraph(cvDiag, data, pi);
@@ -4868,221 +4930,32 @@ function misICP_pdfDrawInterCentroidPage(doc, data, pi){
 }
 
 /**
- * Disegna il grafo dei centroidi con la coppia corrente evidenziata.
- */
-/**
- * Disegna il grafo dei centroidi con la coppia corrente evidenziata.
+ * Wrapper: la mappa nelle pagine "Distanza Inter-Centroide" e' identica alla
+ * mappa colorimetrica della cover (griglia, arcata, vettori A->B, heatmap,
+ * color bar, scale bar 10mm) ma con la coppia corrente sovrapposta:
+ *   - segmento blu spesso A_i-A_j  (= distanza A inter-centroide)
+ *   - label ruotata coi due valori delle distanze A e B
+ *   - i due nodi A coinvolti vengono ridisegnati con stile evidenziato
  *
- * GEOMETRIA CORRETTA: per la coppia evidenziata mostro QUATTRO endpoint
- * distinti (A_i, A_j, B_i, B_j) e due segmenti distinti:
- *   - segmento blu solido = distanza A (riferimento), tra A_i e A_j
- *   - segmento arancione tratteggiato = distanza B (post-ICP), tra B_i e B_j
- *
- * Lo scostamento residuo B-A di ogni endpoint e' nell'ordine dei micron
- * (10-50 um) su distanze di 10-50 mm, cioe' 0.05-0.5% e quindi invisibile
- * a occhio nudo sul canvas. Lo amplifico fino a 12 px di shift visivo
- * preservando direzione e segno: il lettore capisce a colpo d'occhio
- * perche' distanza A e distanza B differiscono.
- *
- * Le etichette delle distanze sono ruotate lungo l'angolo del segmento
- * blu (riferimento), come nel Comparator del 22/04.
+ * La differenza fra distanza A e distanza B (qualche micron su decine di mm)
+ * non e' visualmente rappresentabile a scala reale: il valore informativo e'
+ * nei numeri delle label e nella heatmap colorata sui nodi B.
  */
 function misICP_drawCentroidGraph(cv, data, currentPi){
-  var ctx = cv.getContext('2d');
-  var W = cv.width, H = cv.height;
-  ctx.clearRect(0,0,W,H);
-
-  // Bounding box su A E B (cosi' B amplificato non esce mai dal viewport)
-  var xs=[], ys=[];
-  data.pairs.forEach(function(p){
-    xs.push(p.a[0]); ys.push(p.a[1]);
-    if(p.b){ xs.push(p.b[0]); ys.push(p.b[1]); }
-  });
-  var xMin = Math.min.apply(null,xs), xMax = Math.max.apply(null,xs);
-  var yMin = Math.min.apply(null,ys), yMax = Math.max.apply(null,ys);
-  var pad = 0.18;
-  var dx = Math.max(1e-3, xMax-xMin);
-  var dy = Math.max(1e-3, yMax-yMin);
-  xMin -= pad*dx; xMax += pad*dx;
-  yMin -= pad*dy; yMax += pad*dy;
-
-  function tx(v){ return ((v-xMin)/(xMax-xMin)) * (W*0.85) + W*0.075; }
-  function ty(v){ return H - (((v-yMin)/(yMax-yMin)) * (H*0.85) + H*0.075); }
-
-  // Pre-calcolo posizioni canvas dei nodi A e B con AMPLIFICAZIONE
-  // dell'offset B-A. Target: 10-12 px di shift visivo per chi e' "in pair",
-  // direzione preservata. Cap: max 14 px (per non far uscire B dal cerchio A).
-  var nodes = data.pairs.map(function(p){
-    var ax = tx(p.a[0]), ay = ty(p.a[1]);
-    if(!p.b) return { ax:ax, ay:ay, bx:ax, by:ay, hasB:false };
-    var bxRaw = tx(p.b[0]), byRaw = ty(p.b[1]);
-    var dpx = bxRaw - ax, dpy = byRaw - ay;
-    var dlen = Math.sqrt(dpx*dpx + dpy*dpy);
-    var bx, by;
-    if(dlen < 0.05){
-      // Scostamento reale numericamente nullo (caso limite): metto un offset
-      // simbolico orizzontale di 8 px cosi' B comunque si vede staccato da A
-      bx = ax + 8; by = ay;
-    } else {
-      // Amplificazione: target 11 px se piu' piccolo, niente amplificazione se gia' grande
-      var target = 11;
-      var amp = (dlen < target) ? (target / dlen) : 1;
-      bx = ax + dpx * amp;
-      by = ay + dpy * amp;
-      // Cap a 14 px per non fuoriuscire dal cerchio
-      var newLen = Math.sqrt((bx-ax)*(bx-ax)+(by-ay)*(by-ay));
-      if(newLen > 14){
-        var k = 14 / newLen;
-        bx = ax + (bx-ax)*k;
-        by = ay + (by-ay)*k;
-      }
+  var ic = data.interCentroidPairs[currentPi];
+  if(!ic){ misICP_drawColorMap(cv, data.pairs, { compact: true }); return; }
+  misICP_drawColorMap(cv, data.pairs, {
+    compact: true,
+    highlightPair: {
+      iA: ic.i - 1,
+      iB: ic.j - 1,
+      distA_um: ic.distA_um,
+      distB_um: ic.distB_um,
+      lv: ic.lv
     }
-    return { ax:ax, ay:ay, bx:bx, by:by, hasB:true };
   });
-
-  var current = data.interCentroidPairs[currentPi];
-  var iIdx = current ? current.i-1 : -1;
-  var jIdx = current ? current.j-1 : -1;
-
-  // PASSO 1: linee tenui di sfondo per le coppie non correnti (solo A-A)
-  data.interCentroidPairs.forEach(function(c, ci){
-    if(ci === currentPi) return;
-    var ni = nodes[c.i-1], nj = nodes[c.j-1];
-    ctx.strokeStyle = 'rgba(150,165,180,0.32)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(ni.ax, ni.ay);
-    ctx.lineTo(nj.ax, nj.ay);
-    ctx.stroke();
-  });
-
-  // PASSO 2: la coppia CORRENTE — due segmenti GEOMETRICAMENTE distinti
-  if(current && iIdx>=0 && jIdx>=0){
-    var ni = nodes[iIdx], nj = nodes[jIdx];
-
-    // Segmento blu solido A_i -> A_j (DISTANZA A = riferimento)
-    ctx.strokeStyle = '#0065B3';
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(ni.ax, ni.ay);
-    ctx.lineTo(nj.ax, nj.ay);
-    ctx.stroke();
-
-    // Segmento arancione tratteggiato B_i -> B_j (DISTANZA B = post-ICP)
-    if(ni.hasB && nj.hasB){
-      ctx.strokeStyle = '#D97706';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([8,5]);
-      ctx.beginPath();
-      ctx.moveTo(ni.bx, ni.by);
-      ctx.lineTo(nj.bx, nj.by);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    ctx.lineCap = 'butt';
-
-    // PASSO 3: etichette delle distanze, ruotate lungo l'angolo del
-    // segmento blu A. Sfondo bianco per leggibilita' su segmenti che
-    // attraversano nodi di sfondo.
-    var ang = Math.atan2(nj.ay - ni.ay, nj.ax - ni.ax);
-    if(ang > Math.PI/2)  ang -= Math.PI;
-    if(ang < -Math.PI/2) ang += Math.PI;
-    var mxA = (ni.ax + nj.ax)/2, myA = (ni.ay + nj.ay)/2;
-
-    ctx.save();
-    ctx.translate(mxA, myA);
-    ctx.rotate(ang);
-    ctx.font = 'bold 20px Helvetica, Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    var labelA = current.distA_um.toFixed(1)+'\u03bcm';
-    var labelB = current.distB_um.toFixed(1)+'\u03bcm';
-    var wA = ctx.measureText(labelA).width;
-    var wB = ctx.measureText(labelB).width;
-    var maxW = Math.max(wA, wB) + 18;
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    ctx.strokeStyle = 'rgba(0,0,0,0.06)';
-    ctx.lineWidth = 0.6;
-    ctx.fillRect(-maxW/2, -28, maxW, 50);
-    ctx.strokeRect(-maxW/2, -28, maxW, 50);
-    ctx.fillStyle = '#0065B3';
-    ctx.fillText(labelA, 0, -10);
-    ctx.fillStyle = '#D97706';
-    ctx.fillText(labelB, 0, 12);
-    ctx.restore();
-  }
-
-  // PASSO 4: nodi
-  // Coppia evidenziata: due cerchi distinti A (blu, grande) e B (arancione, piccolo).
-  // Coppia non evidenziata: solo cerchio neutro grigio chiaro.
-  data.pairs.forEach(function(p, idx){
-    var n = nodes[idx];
-    var inPair = (idx === iIdx || idx === jIdx);
-    if(!inPair){
-      // Cilindro non evidenziato
-      ctx.fillStyle = 'rgba(180,195,210,0.7)';
-      ctx.beginPath();
-      ctx.arc(n.ax, n.ay, 11, 0, Math.PI*2);
-      ctx.fill();
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = '#3F4F61';
-      ctx.font = 'bold 13px Helvetica, Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(idx+1), n.ax, n.ay);
-    } else {
-      // Cilindro evidenziato: prima cerchio B arancione (sotto), poi cerchio A blu (sopra)
-      if(n.hasB){
-        ctx.fillStyle = '#D97706';
-        ctx.beginPath();
-        ctx.arc(n.bx, n.by, 8, 0, Math.PI*2);
-        ctx.fill();
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-      ctx.fillStyle = '#0065B3';
-      ctx.beginPath();
-      ctx.arc(n.ax, n.ay, 14, 0, Math.PI*2);
-      ctx.fill();
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // Numero del cilindro al centro del nodo A
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 16px Helvetica, Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(idx+1), n.ax, n.ay);
-    }
-    ctx.textBaseline = 'alphabetic';
-  });
-
-  // Legenda compatta in basso a sinistra
-  ctx.font = '11px Helvetica, Arial, sans-serif';
-  ctx.fillStyle = 'rgba(60,75,90,0.9)';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  var lgY = H - 14;
-  // dot blu A
-  ctx.beginPath(); ctx.arc(16, lgY, 4, 0, Math.PI*2);
-  ctx.fillStyle = '#0065B3'; ctx.fill();
-  ctx.fillStyle = 'rgba(60,75,90,0.9)';
-  ctx.fillText('A = riferimento', 24, lgY);
-  // dot arancione B
-  ctx.beginPath(); ctx.arc(150, lgY, 4, 0, Math.PI*2);
-  ctx.fillStyle = '#D97706'; ctx.fill();
-  ctx.fillStyle = 'rgba(60,75,90,0.9)';
-  ctx.fillText('B = post-ICP', 158, lgY);
-  // Nota sull'amplificazione
-  ctx.fillStyle = 'rgba(120,135,150,0.85)';
-  ctx.font = 'italic 9px Helvetica, Arial, sans-serif';
-  ctx.fillText('(scostamento B-A amplificato per visibilita\')', 250, lgY);
-  ctx.textBaseline = 'alphabetic';
 }
+
 
 // ────────────────────────────────────────────────────────────────────
 // REPORT CLINICO (PDF) — cover + cilindri + coppie inter-centroide
