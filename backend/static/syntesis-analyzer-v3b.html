@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.018</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.019</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Source Sans 3','Source Sans Pro',sans-serif;--mono:'Source Sans 3','Source Sans Pro',sans-serif}
@@ -321,7 +321,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .mis-tree-slider-row input[type=range]{flex:1;height:12px;accent-color:#0065B3;cursor:pointer;margin:0}
 .mis-tree-val{font-size:9px;color:var(--gray);min-width:30px;text-align:right}
 
-/* Certificato Taratura modal v7.3.9.018 */
+/* Certificato Taratura modal v7.3.9.019 */
 .calmodal-back{position:fixed;inset:0;background:rgba(15,25,35,.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px}
 .calmodal-back.show{display:flex}
 .calmodal{background:#fff;border-radius:14px;max-width:600px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,25,35,.3);font-family:var(--font)}
@@ -352,7 +352,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.018</span>
+      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.019</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -935,7 +935,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '7.3.9.018';
+window.ANALIZZA_BUILD = '7.3.9.019';
 window.ANALIZZA_BUILD_DATE = '2026-04-25';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2370,7 +2370,7 @@ function selectWorkflow(wf){
   // Se sto uscendo da Misurare verso un altro workflow, smonto il viewport ICP
   if(prev === 'misurare' && wf !== 'misurare'){
     try { misICP_unmountViewport(); } catch(e){ console.warn('[Misurare] unmount fallito:', e); }
-    // FIX v7.3.9.018: riaccendi artefatti Analizza se torni in analizza/accoppia
+    // FIX v7.3.9.019: riaccendi artefatti Analizza se torni in analizza/accoppia
     if(wf === 'analizza' || wf === 'accoppia'){
       try { _setAnalyzaArtifactsVisible(true); } catch(e){}
     }
@@ -2427,7 +2427,7 @@ function selectWorkflow(wf){
   }
   else if(wf === 'misurare'){
     analysisMode = 'misurare';
-    // FIX v7.3.9.018: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
+    // FIX v7.3.9.019: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
     try { _setAnalyzaArtifactsVisible(false); } catch(e){}
     if(panAng)  panAng.style.display  = 'none';
     if(panAx)   panAx.style.display   = 'none';
@@ -5502,7 +5502,7 @@ function misICP_renderClinicalPDF(data){
   var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.018)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.019)', null, true);
 
   // Pagina 2: Note metodologiche (statica, identica per ogni report)
   doc.addPage();
@@ -5548,7 +5548,7 @@ function misICP_renderClinicalPDF(data){
 // ────────────────────────────────────────────────────────────────────
 
 
-// ── CERTIFICATO DI TARATURA v7.3.9.018 ─────────────────────────────
+// ── CERTIFICATO DI TARATURA v7.3.9.019 ─────────────────────────────
 // Modal di raccolta metadati + helpers di classificazione PASS/VERIFICA/FAIL
 // Soglie industriali standard: PASS \u2264 50\u03bcm, VERIFICA 50-100\u03bcm, FAIL > 100\u03bcm
 // (per angoli: PASS \u2264 0.5\u00b0, VERIFICA 0.5-1.0\u00b0, FAIL > 1.0\u00b0)
@@ -5623,21 +5623,73 @@ function misICP_submitCalibration(){
 
 
 function misICP_renderCalibrationPDF(data, calibMeta){
-  // CERTIFICATO DI TARATURA v7.3.9.018
-  // 6 pagine: Cover | Frontespizio | Procedura+Sintesi | Metodologia | Dettaglio+Mappa | Inter-centroide+Firme
+  // CERTIFICATO DI TARATURA v7.3.9.019 = Report Clinico + ID Macchina + Firme
   if(!calibMeta){
     calibMeta = { type:'\u2014', maker:'\u2014', model:'\u2014', sn:'\u2014',
       client:'\u2014', site:'\u2014', tech:'\u2014', notes:'',
       certId:'SYN-CAL-NOMETA', dateStr:'\u2014', timeStr:'\u2014' };
   }
   var doc = new window.jspdf.jsPDF({unit:'mm', format:'a4', compress:true});
+  var idPages  = 1, docPages = 2, sigPages = 1;
+  var totPages = 1 + idPages + docPages + data.nCyl + data.interCentroidPairs.length + sigPages;
+
+  // P1: Cover Taratura (logo bianco + anello smooth + ID cert al posto del badge giudizio)
+  misICP_pdfDrawCalibrationCover(doc, data, calibMeta);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Certificato di Taratura ' + calibMeta.certId, null, true);
+
+  // P2: ID Macchina/Installazione
+  doc.addPage();
+  misICP_pdfDrawCalibrationIdPage(doc, calibMeta, data);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Identificazione', 'Pag. 2 / ' + totPages, false);
+
+  // P3: Note metodologiche (riusa Clinico)
+  doc.addPage();
+  misICP_pdfDrawMethodologyPage(doc);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Note metodologiche', 'Pag. 3 / ' + totPages, false);
+
+  // P4: Glossario e soglie (riusa Clinico)
+  doc.addPage();
+  misICP_pdfDrawGlossaryPage(doc);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Glossario e soglie', 'Pag. 4 / ' + totPages, false);
+
+  // P5..(4+N): Cilindri (riusa Clinico)
+  data.pairs.forEach(function(p, ci){
+    doc.addPage();
+    misICP_pdfDrawCylinderPage(doc, data, ci);
+    misICP_pdfFooter(doc, 'Syntesis-ICP - Cilindro #'+(ci+1)+' di '+data.nCyl,
+      'Pag. '+(4+ci+1)+' / '+totPages, false);
+  });
+
+  // P(5+N)..(4+N+M): Coppie inter-centroide (riusa Clinico)
+  data.interCentroidPairs.forEach(function(ic, pi){
+    doc.addPage();
+    misICP_pdfDrawInterCentroidPage(doc, data, pi);
+    misICP_pdfFooter(doc, 'Syntesis-ICP - Distanza inter-centroide #'+ic.i+'-#'+ic.j,
+      'Pag. '+(4+data.nCyl+pi+1)+' / '+totPages, false);
+  });
+
+  // Ultima pagina: Validazione e firme
+  doc.addPage();
+  misICP_pdfDrawCalibrationSignaturesPage(doc, calibMeta, data);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Validazione e firme',
+    'Pag. ' + totPages + ' / ' + totPages, false);
+
+  return doc;
+}
+
+// Cover Taratura: stile Clinico con logo bianco, anello smooth, ID cert al posto del giudizio
+function misICP_pdfDrawCalibrationCover(doc, data, calibMeta){
   var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
-  function setTxt(hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
   function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
+  function setTxt (hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
   function setDraw(hex){ var c=misICP_hexRGB(hex); doc.setDrawColor(c[0],c[1],c[2]); }
 
-  // ── Helper: genera versione BIANCA del logo via canvas (per fondo scuro) ──
-  function makeWhiteLogoDataUrl(){
+  doc.setFillColor(13,27,42); doc.rect(0,0,W,H,'F');
+  doc.setFillColor(255,215,0); doc.rect(0,0,W,3,'F');
+  doc.setFillColor(245,158,11); doc.rect(0,3,W,1.5,'F');
+
+  // Logo bianco (canvas pixel inversion del logo nero)
+  var whiteLogoSrc = (function(){
     try {
       var imgEl = document.querySelector('img.logo-img');
       if(!imgEl || !imgEl.complete || !imgEl.naturalWidth) return null;
@@ -5648,619 +5700,236 @@ function misICP_renderCalibrationPDF(data, calibMeta){
       var imgData = ctx.getImageData(0, 0, c.width, c.height);
       var d = imgData.data;
       for(var i=0; i<d.length; i+=4){
-        // Mantengo alpha del pixel originale, forzo RGB a bianco solo se non trasparente
         if(d[i+3] > 0){ d[i]=255; d[i+1]=255; d[i+2]=255; }
       }
       ctx.putImageData(imgData, 0, 0);
       return c.toDataURL('image/png');
-    } catch(e){ console.warn('[Taratura PDF] white logo failed:', e); return null; }
+    } catch(e){ return null; }
+  })();
+  if(whiteLogoSrc){
+    try { doc.addImage(whiteLogoSrc, 'PNG', (W-65)/2, 13, 65, 19); } catch(e){}
   }
 
-  // ── Helper: render anello SMOOTH via canvas, ritorna PNG dataURL ──
-  function makeScoreRingDataUrl(score, hexColor, sizePx){
-    sizePx = sizePx || 600;
+  doc.setFont('helvetica','bold'); doc.setFontSize(20); setTxt('#FFFFFF');
+  doc.text('Syntesis-ICP', W/2, 40, {align:'center'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#B0B8C1');
+  doc.text('Precision Scanner Report - Taratura', W/2, 46, {align:'center'});
+
+  // Anello smooth via canvas
+  var scoreRingSrc = (function(){
+    var sizePx = 600;
     var c = document.createElement('canvas');
     c.width = sizePx; c.height = sizePx;
     var ctx = c.getContext('2d');
     var cx = sizePx/2, cy = sizePx/2;
     var lineW = sizePx * 0.085;
     var ringR = (sizePx - lineW)/2 - 8;
-    // Anello base scuro
     ctx.lineCap = 'butt';
     ctx.lineWidth = lineW;
     ctx.strokeStyle = '#28323F';
     ctx.beginPath();
     ctx.arc(cx, cy, ringR, 0, 2*Math.PI);
     ctx.stroke();
-    // Arco colorato proporzionale (smooth grazie al canvas arc)
-    var pct = Math.max(0, Math.min(1, (score||0)/100));
+    var pct = Math.max(0, Math.min(1, (data.score||0)/100));
     if(pct > 0){
-      ctx.strokeStyle = hexColor || '#0D9E6E';
+      ctx.strokeStyle = (data.lv && data.lv.col) ? data.lv.col : '#0D9E6E';
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.arc(cx, cy, ringR, -Math.PI/2, -Math.PI/2 + pct * 2*Math.PI);
       ctx.stroke();
     }
     return c.toDataURL('image/png');
-  }
-
-  // Pre-genero asset visuali della cover (sincroni: img \u00e8 gi\u00e0 inline data URI)
-  var whiteLogoSrc = makeWhiteLogoDataUrl();
-  var scoreRingSrc = makeScoreRingDataUrl(data.score, data.lv && data.lv.col, 600);
-
-  // Range di riferimento cromatico (NESSUN giudizio testuale)
-  var COL_GREEN  = '#0D9E6E', RGB_GREEN  = [13,158,110];
-  var COL_AMBER  = '#D97706', RGB_AMBER  = [217,119,6];
-  var COL_RED    = '#DC2626', RGB_RED    = [220,38,38];
-  function rangeColorUm(v){
-    if(v <= 50)        return {hex:COL_GREEN, rgb:RGB_GREEN};
-    else if(v <= 100)  return {hex:COL_AMBER, rgb:RGB_AMBER};
-    else               return {hex:COL_RED,   rgb:RGB_RED};
-  }
-  function rangeColorDeg(v){
-    if(v <= 0.5)       return {hex:COL_GREEN, rgb:RGB_GREEN};
-    else if(v <= 1.0)  return {hex:COL_AMBER, rgb:RGB_AMBER};
-    else               return {hex:COL_RED,   rgb:RGB_RED};
-  }
-
-  function pdfFoot(pageNum, total){
-    var fy = H - 12;
-    setDraw('#D6E4F0'); doc.setLineWidth(0.2);
-    doc.line(ml, fy, W-mr, fy);
-    setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(7);
-    doc.text('Syntesis-ICP \u00b7 Certificato di Taratura \u00b7 ' + calibMeta.certId, ml, fy+5);
-    doc.text('Pag. ' + pageNum + ' / ' + total, W-mr, fy+5, {align:'right'});
-  }
-
-  function drawHeaderStrip(title){
-    setFill('#0065B3'); doc.rect(0, 0, W, 14, 'F');
-    setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(10);
-    doc.text('SYNTESIS-ICP \u00b7 ' + title, ml, 9);
-    doc.setFont('helvetica','normal'); doc.setFontSize(8);
-    doc.text(calibMeta.certId, W-mr, 9, {align:'right'});
-  }
-
-  function drawInfoBox(x, y, width, title, rows){
-    var rowH = 6.5, headH = 8;
-    var totH = headH + rows.length * rowH + 3;
-    setDraw('#D6E4F0'); doc.setLineWidth(0.3);
-    doc.rect(x, y, width, totH);
-    setFill('#F0F5FA'); doc.rect(x, y, width, headH, 'F');
-    setDraw('#D6E4F0'); doc.line(x, y+headH, x+width, y+headH);
-    setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(8);
-    doc.text(title, x+3, y+headH-2.5);
-    setTxt('#0F1923'); doc.setFont('helvetica','normal'); doc.setFontSize(9);
-    for(var i=0;i<rows.length;i++){
-      var ry = y + headH + (i+1) * rowH - 1.5;
-      setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(8);
-      doc.text(rows[i][0], x+3, ry);
-      setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(9);
-      var valStr = String(rows[i][1] || '\u2014');
-      if(valStr.length > 60) valStr = valStr.substring(0,57) + '...';
-      doc.text(valStr, x+50, ry);
-    }
-    return totH;
-  }
-
-  // Pre-calcolo metriche
-  var rmsd = data.rmsdUm || 0;
-  var d3s = data.pairs.map(function(p){return Math.round(p.d3*1000);});
-  var d3max = d3s.length ? Math.max.apply(null, d3s) : 0;
-  var d3mean = d3s.length ? d3s.reduce(function(s,v){return s+v;},0)/d3s.length : 0;
-  var deltaAbs = data.interCentroidPairs.map(function(c){return Math.abs(c.delta_um);});
-  var dAbsMax = deltaAbs.length ? Math.max.apply(null, deltaAbs) : 0;
-  var dAbsMean = deltaAbs.length ? deltaAbs.reduce(function(s,v){return s+v;},0)/deltaAbs.length : 0;
-  var angles = data.cylAxes.map(function(a){return a.angleDeg||0;});
-  var angMax = angles.length ? Math.max.apply(null, angles) : 0;
-  var angMean = data.avgAngle != null ? data.avgAngle : (angles.length ? angles.reduce(function(s,v){return s+v;},0)/angles.length : 0);
-
-  // ============================================================
-  // PAGINA 1: COVER stile NASA con logo BIANCO e anello SMOOTH
-  // ============================================================
-  setFill('#0D1B2A'); doc.rect(0, 0, W, H, 'F');
-  setFill('#FFD700'); doc.rect(0, 0, W, 3, 'F');
-  setFill('#F59E0B'); doc.rect(0, 3, W, 1.5, 'F');
-
-  // Logo bianco al centro alto
-  if(whiteLogoSrc){
-    try { doc.addImage(whiteLogoSrc, 'PNG', (W-75)/2, 18, 75, 22); }
-    catch(e){
-      setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(22);
-      doc.text('Syntesis', W/2, 30, {align:'center'});
-    }
-  } else {
-    setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(22);
-    doc.text('Syntesis', W/2, 30, {align:'center'});
-  }
-
-  // Titolo certificato
-  setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(20);
-  doc.text('CERTIFICATO DI TARATURA', W/2, 56, {align:'center'});
-  setTxt('#B0B8C1'); doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  doc.text('Verifica metrologica iniziale di sistema', W/2, 62, {align:'center'});
-
-  // Anello score SMOOTH (canvas-based)
-  var ringSize = 72; // mm
-  var ringX = (W - ringSize)/2;
-  var ringY = 75;
+  })();
+  var ringSize = 50, ringX = (W - ringSize)/2, ringY = 53;
   if(scoreRingSrc){
-    try { doc.addImage(scoreRingSrc, 'PNG', ringX, ringY, ringSize, ringSize); }
-    catch(e){ console.warn('[Taratura PDF] addImage ring failed:', e); }
+    try { doc.addImage(scoreRingSrc, 'PNG', ringX, ringY, ringSize, ringSize); } catch(e){}
   }
-  // Numero score sovrapposto al centro dell'anello
-  setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(28);
+  setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(22);
   doc.text((data.score||0).toFixed(2), W/2, ringY + ringSize/2 + 1, {align:'center'});
-  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(8);
-  doc.text('/100', W/2, ringY + ringSize/2 + 8, {align:'center'});
-  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
-  doc.text('SCORE METROLOGICO', W/2, ringY + ringSize + 6, {align:'center'});
+  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.text('/100', W/2, ringY + ringSize/2 + 6, {align:'center'});
 
-  // Pillola con ID Certificato
-  var pillY = 162, pillH = 11, pillW = 78, pillX = (W-pillW)/2;
+  // Pillola ID Cert al posto del badge giudizio
+  var pillY = ringY + ringSize + 6, pillH = 11, pillW = 78, pillX = (W-pillW)/2;
   setFill('#1A2C3F'); doc.roundedRect(pillX, pillY, pillW, pillH, 4, 4, 'F');
   setDraw('#FFD700'); doc.setLineWidth(0.4);
   doc.roundedRect(pillX, pillY, pillW, pillH, 4, 4, 'S');
   setTxt('#FFD700'); doc.setFont('helvetica','bold'); doc.setFontSize(10);
   doc.text(calibMeta.certId, W/2, pillY+7.5, {align:'center'});
 
-  // Box info
-  var infoY = 185;
+  // Info box stile Clinico
+  var infoY = pillY + pillH + 8;
   var infos = [
-    ['File A (riferimento)', data.fileA || '\u2014'],
-    ['File B (confronto)',   data.fileB || '\u2014'],
-    ['N scanbody',           String(data.nCyl || data.pairs.length)],
-    ['RMSD ICP',             (data.rmsdUm||0).toFixed(1)+' \u00b5m'],
+    ['File A (riferimento)', data.fileA],
+    ['File B (confronto)',   data.fileB],
+    ['N scanbody',           String(data.nCyl)],
+    ['RMSD ICP',             (data.rmsdUm).toFixed(1)+' \u00b5m'],
     ['Data emissione',       calibMeta.dateStr + ' \u2022 ' + calibMeta.timeStr]
   ];
-  infos.forEach(function(row, ii){
-    var rowY = infoY + ii*9;
-    setTxt('#7A90A4');
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+  infos.forEach(function(row,ii){
+    var rowY = infoY + ii*8;
+    setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(7);
     doc.text(row[0], ml+4, rowY);
-    setTxt('#FFFFFF');
-    doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
+    setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(9);
     doc.text(String(row[1]), W-mr-4, rowY, {align:'right'});
     doc.setDrawColor(40,50,65); doc.setLineWidth(0.15);
-    doc.line(ml+4, rowY+1.8, W-mr-4, rowY+1.8);
+    doc.line(ml+4, rowY+1.5, W-mr-4, rowY+1.5);
   });
 
-  // Footer cover
-  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(8);
-  doc.text('Biaggini Medical Devices S.r.l.', W/2, H-20, {align:'center'});
-  setTxt('#FFD700'); doc.setFont('helvetica','italic'); doc.setFontSize(7);
-  doc.text('syntesis-icp.com \u00b7 Precision Scanner', W/2, H-14, {align:'center'});
+  // Mappa colorimetrica (come Clinico)
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setTxt('#FFCC55');
+  var mapY = infoY + 5*8 + 6;
+  doc.text('MAPPA COLORIMETRICA - POSIZIONI SCANBODY', ml, mapY);
+  var mapCanvas = document.createElement('canvas');
+  mapCanvas.width=880; mapCanvas.height=480;
+  misICP_drawColorMap(mapCanvas, data.pairs);
+  var mapH = 60;
+  doc.addImage(mapCanvas.toDataURL('image/png'), 'PNG', ml, mapY+3, cw, mapH);
 
-  pdfFoot(1, 6);
+  // Legenda
+  var legY = mapY + 3 + mapH + 4;
+  var levels=[
+    {c:'#639922', lbl:'0-50 \u00b5m'}, {c:'#D97706', lbl:'50-100 \u00b5m'},
+    {c:'#F97316', lbl:'100-150 \u00b5m'}, {c:'#EF4444', lbl:'150-250 \u00b5m'},
+    {c:'#A855F7', lbl:'>250 \u00b5m'}
+  ];
+  var segW=cw/levels.length;
+  levels.forEach(function(l,li){
+    var lx=ml+li*segW;
+    var cRGB=misICP_hexRGB(l.c);
+    doc.setFillColor(cRGB[0],cRGB[1],cRGB[2]);
+    doc.rect(lx, legY, segW-1, 3, 'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); setTxt('#B0B8C1');
+    doc.text(l.lbl, lx+1, legY+7);
+  });
+}
 
-  // ============================================================
-  // PAGINA 2: FRONTESPIZIO IDENTIFICATIVO
-  // ============================================================
-  doc.addPage();
-  drawHeaderStrip('IDENTIFICAZIONE');
+function misICP_pdfDrawCalibrationIdPage(doc, calibMeta, data){
+  var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
+  function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
+  function setTxt (hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+  function setDraw(hex){ var c=misICP_hexRGB(hex); doc.setDrawColor(c[0],c[1],c[2]); }
+
+  setFill('#0065B3'); doc.rect(0, 0, W, 14, 'F');
+  setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('SYNTESIS-ICP \u00b7 IDENTIFICAZIONE', ml, 9);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.text(calibMeta.certId, W-mr, 9, {align:'right'});
+
+  function drawInfoBox(x, y, width, title, rows){
+    var rowH=6.5, headH=8, totH=headH+rows.length*rowH+3;
+    setDraw('#D6E4F0'); doc.setLineWidth(0.3);
+    doc.rect(x, y, width, totH);
+    setFill('#F0F5FA'); doc.rect(x, y, width, headH, 'F');
+    setDraw('#D6E4F0'); doc.line(x, y+headH, x+width, y+headH);
+    setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    doc.text(title, x+3, y+headH-2.5);
+    for(var i=0;i<rows.length;i++){
+      var ry = y + headH + (i+1)*rowH - 1.5;
+      setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(8);
+      doc.text(rows[i][0], x+3, ry);
+      setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      var v = String(rows[i][1] || '\u2014');
+      if(v.length > 60) v = v.substring(0,57) + '...';
+      doc.text(v, x+50, ry);
+    }
+    return totH;
+  }
 
   var y = 25;
-  var imgEl0 = document.querySelector('img.logo-img');
-  if(imgEl0 && imgEl0.src){
-    try { doc.addImage(imgEl0.src, 'PNG', W-mr-40, 22, 40, 12); } catch(e){}
-  }
   setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(15);
-  doc.text('Dati identificativi', ml, y); y += 5;
+  doc.text('Dati identificativi del certificato', ml, y); y += 5;
   setTxt('#7A90A4'); doc.setFont('helvetica','italic'); doc.setFontSize(9);
-  doc.text('Identificazione di macchina, sito di installazione, operazione e file di riferimento.', ml, y);
+  doc.text('Identificazione di macchina sotto verifica, sito di installazione, operazione e file di riferimento.', ml, y);
   y += 10;
 
   var h = drawInfoBox(ml, y, cw, 'MACCHINA SOTTO VERIFICA', [
-    ['Tipologia',          calibMeta.type],
-    ['Produttore',         calibMeta.maker],
-    ['Modello',            calibMeta.model],
-    ['Numero di serie',    calibMeta.sn]
-  ]);
-  y += h + 6;
+    ['Tipologia',         calibMeta.type],
+    ['Produttore',        calibMeta.maker],
+    ['Modello',           calibMeta.model],
+    ['Numero di serie',   calibMeta.sn]
+  ]); y += h + 6;
   h = drawInfoBox(ml, y, cw, 'INSTALLAZIONE', [
-    ['Cliente',            calibMeta.client],
-    ['Sede installazione', calibMeta.site],
-    ['Tecnico',            calibMeta.tech]
-  ]);
-  y += h + 6;
+    ['Cliente',             calibMeta.client],
+    ['Sede installazione',  calibMeta.site],
+    ['Tecnico installatore', calibMeta.tech]
+  ]); y += h + 6;
   h = drawInfoBox(ml, y, cw, 'OPERAZIONE', [
-    ['Data taratura',      calibMeta.dateStr + '  alle  ' + calibMeta.timeStr],
-    ['Procedura',          'Allineamento Kabsch + SVD + ICP iterativo'],
-    ['Software',           'Syntesis-ICP - Misurare (Analizza v7.3.9.018)']
-  ]);
-  y += h + 6;
+    ['Data taratura', calibMeta.dateStr + '  alle  ' + calibMeta.timeStr],
+    ['Procedura',     'Allineamento Kabsch + SVD + ICP iterativo'],
+    ['Software',      'Syntesis-ICP - Misurare (Analizza v7.3.9.019)']
+  ]); y += h + 6;
   h = drawInfoBox(ml, y, cw, 'FILE DI RIFERIMENTO', [
-    ['Master STL',         data.fileAfull || data.fileA || '\u2014'],
-    ['Output macchina',    data.fileBfull || data.fileB || '\u2014'],
-    ['N. scanbody',        String(data.nCyl || data.pairs.length)]
+    ['Master STL',      data.fileAfull || data.fileA || '\u2014'],
+    ['Output macchina', data.fileBfull || data.fileB || '\u2014'],
+    ['N. scanbody',     String(data.nCyl || data.pairs.length)]
   ]);
+}
 
-  pdfFoot(2, 6);
+function misICP_pdfDrawCalibrationSignaturesPage(doc, calibMeta, data){
+  var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
+  function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
+  function setTxt (hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+  function setDraw(hex){ var c=misICP_hexRGB(hex); doc.setDrawColor(c[0],c[1],c[2]); }
 
-  // ============================================================
-  // PAGINA 3: PROCEDURA + SINTESI METROLOGICA
-  // ============================================================
-  doc.addPage();
-  drawHeaderStrip('PROCEDURA E RISULTATI');
+  setFill('#0065B3'); doc.rect(0, 0, W, 14, 'F');
+  setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('SYNTESIS-ICP \u00b7 VALIDAZIONE E FIRME', ml, 9);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.text(calibMeta.certId, W-mr, 9, {align:'right'});
 
-  y = 25;
+  var y = 25;
   setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(13);
-  doc.text('Procedura applicata', ml, y); y += 6;
-  setTxt('#0F1923'); doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  var procText = "Confronto metrologico tra il file master di riferimento e l'output della macchina sotto verifica eseguito tramite algoritmo Kabsch + SVD + ICP iterativo, basato sul rilevamento dei centroidi e degli assi degli scanbody mediante PCA cap-based. Le deviazioni lineari sono espresse in micrometri (\u00b5m), gli angoli in gradi sessagesimali.";
-  var procLines = doc.splitTextToSize(procText, cw);
-  doc.text(procLines, ml, y);
-  y += procLines.length * 4.2 + 8;
-
-  setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('Range di riferimento metrologico', ml, y); y += 5;
-  setTxt('#7A90A4'); doc.setFont('helvetica','italic'); doc.setFontSize(8);
-  doc.text('I valori vengono colorati in base alla zona di appartenenza, senza giudizio di idoneit\u00e0.', ml, y); y += 4;
-  doc.autoTable({
-    startY: y, margin:{left:ml, right:mr},
-    head: [['Zona','Deviazione lineare','Angolo asse']],
-    body: [
-      ['',     '\u2264 50 \u00b5m',    '\u2264 0.5\u00b0'],
-      ['',     '50 - 100 \u00b5m',     '0.5\u00b0 - 1.0\u00b0'],
-      ['',     '> 100 \u00b5m',        '> 1.0\u00b0']
-    ],
-    theme:'grid',
-    styles:{font:'helvetica', fontSize:9, cellPadding:2.5, lineColor:[214,228,240], lineWidth:0.2},
-    headStyles:{fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:8},
-    columnStyles:{0:{halign:'center', cellWidth:18}, 1:{halign:'left'}, 2:{halign:'left'}},
-    didParseCell:function(d){
-      if(d.section==='body' && d.column.index===0){
-        if(d.row.index===0) d.cell.styles.fillColor = RGB_GREEN;
-        if(d.row.index===1) d.cell.styles.fillColor = RGB_AMBER;
-        if(d.row.index===2) d.cell.styles.fillColor = RGB_RED;
-      }
-    }
-  });
-  y = doc.lastAutoTable.finalY + 8;
-
-  setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('Sintesi metrologica', ml, y); y += 4;
-  var sintBody = [
-    ['RMSD ICP globale',                       rmsd.toFixed(2)+' \u00b5m',    rangeColorUm(rmsd)],
-    ['Deviazione 3D media (cilindri)',         d3mean.toFixed(1)+' \u00b5m',  rangeColorUm(d3mean)],
-    ['Deviazione 3D massima (cilindri)',       d3max+' \u00b5m',              rangeColorUm(d3max)],
-    ['|\u0394| inter-centroide media',         dAbsMean.toFixed(1)+' \u00b5m',rangeColorUm(dAbsMean)],
-    ['|\u0394| inter-centroide massima',       dAbsMax.toFixed(1)+' \u00b5m', rangeColorUm(dAbsMax)],
-    ['Angolo asse A-B medio',                  angMean.toFixed(3)+'\u00b0',   rangeColorDeg(angMean)],
-    ['Angolo asse A-B massimo',                angMax.toFixed(3)+'\u00b0',    rangeColorDeg(angMax)]
-  ];
-  doc.autoTable({
-    startY: y, margin:{left:ml, right:mr},
-    head: [['Indicatore','Valore misurato']],
-    body: sintBody.map(function(r){return [r[0], r[1]];}),
-    theme:'grid',
-    styles:{font:'helvetica', fontSize:9, cellPadding:2.5, lineColor:[214,228,240], lineWidth:0.2},
-    headStyles:{fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:8},
-    columnStyles:{
-      0:{halign:'left', cellWidth:120, textColor:[15,25,35]},
-      1:{halign:'right', font:'courier', fontStyle:'bold', cellWidth:62}
-    },
-    didParseCell:function(d){
-      if(d.section==='body' && d.column.index===1){
-        var ri = d.row.index;
-        if(sintBody[ri]) d.cell.styles.textColor = sintBody[ri][2].rgb;
-      }
-    }
-  });
-
-  pdfFoot(3, 6);
-
-  // ============================================================
-  // PAGINA 4: METODOLOGIA E DEFINIZIONE DELLE MISURE
-  // ============================================================
-  doc.addPage();
-  drawHeaderStrip('METODOLOGIA');
-
-  y = 25;
-  setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(13);
-  doc.text('Definizione delle misure rilevate', ml, y); y += 5;
-  setTxt('#7A90A4'); doc.setFont('helvetica','italic'); doc.setFontSize(8.5);
-  doc.text('Cosa rappresenta ogni grandezza riportata nelle tabelle che seguono e come viene ricavata.', ml, y);
+  doc.text('Validazione del certificato di taratura', ml, y); y += 6;
+  setTxt('#7A90A4'); doc.setFont('helvetica','italic'); doc.setFontSize(9);
+  doc.text('Conferma di consegna e accettazione del documento da parte di tecnico installatore e cliente.', ml, y);
   y += 10;
 
-  // Box: pipeline di calcolo
-  setFill('#F0F5FA'); doc.rect(ml, y, cw, 22, 'F');
-  setDraw('#D6E4F0'); doc.setLineWidth(0.3);
-  doc.rect(ml, y, cw, 22);
-  setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(9);
-  doc.text('PIPELINE DI CALCOLO', ml+3, y+5);
-  setTxt('#0F1923'); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
-  var pipeText = '1) Parsing dei file STL (master e output) e segmentazione cilindrica degli scanbody.\n' +
-                 '2) Estrazione di centroide e asse di ogni cilindro tramite PCA cap-based (la cap superiore\n    funge da riferimento di orientamento, l\'asse \u00e8 l\'autovettore principale dei punti).\n' +
-                 '3) Allineamento rigido master-output via Kabsch + SVD seguito da iterazioni ICP per il fit fine.\n' +
-                 '4) Calcolo delle deviazioni cilindro-per-cilindro nel sistema mondo post-ICP.';
-  var pipeLines = doc.splitTextToSize(pipeText, cw - 6);
-  doc.text(pipeLines, ml+3, y+10);
-  y += 28;
-
-  // Definizioni delle misure
-  setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('Grandezze misurate per ogni cilindro', ml, y); y += 5;
-
-  var defs = [
-    {
-      name: 'dX, dY, dZ',
-      formula: 'dX = X_B - X_A    dY = Y_B - Y_A    dZ = Z_B - Z_A',
-      desc: 'Componenti della differenza vettoriale tra il centroide del cilindro nel file di confronto (B) e quello nel file di riferimento (A), nel sistema di coordinate mondo dopo allineamento ICP. Espresse in micrometri.'
-    },
-    {
-      name: 'dXY',
-      formula: 'dXY = sqrt(dX^2 + dY^2)',
-      desc: 'Modulo della deviazione lineare nel piano orizzontale XY (parallelo al piano occlusale). Indica lo scostamento laterale del centroide tra master e output.'
-    },
-    {
-      name: '|D| 3D',
-      formula: '|D| = sqrt(dX^2 + dY^2 + dZ^2)',
-      desc: 'Modulo della deviazione lineare totale tra centroide A e centroide B. \u00c8 la distanza euclidea 3D tra i due punti dopo allineamento.'
-    },
-    {
-      name: 'Angolo asse A-B',
-      formula: 'angolo = arccos( | axisA \u00b7 axisB | )',
-      desc: 'Angolo tra l\'asse del cilindro nel master (axisA) e quello nell\'output (axisB), entrambi normalizzati. Il valore assoluto del prodotto scalare gestisce l\'ambiguit\u00e0 di verso dell\'asse PCA.'
-    },
-    {
-      name: 'RMSD ICP globale',
-      formula: 'RMSD = sqrt( mean( ||p_B - T(p_A)||^2 ) )',
-      desc: 'Errore quadratico medio del fit ICP tra le superfici dei due STL. Indica la qualit\u00e0 generale dell\'allineamento; non \u00e8 una deviazione di un singolo cilindro ma del fit complessivo.'
-    },
-    {
-      name: '|\u0394| inter-centroide',
-      formula: '\u0394 = dist(B_i, B_j) - dist(A_i, A_j)',
-      desc: 'Differenza tra la distanza inter-centroide nel master e nell\'output, per ogni coppia di cilindri. Indica la deformazione relativa del pattern di scanbody (passive fit).'
-    }
-  ];
-
-  setFont = doc.setFont; // alias
-  defs.forEach(function(d){
-    // Nome grandezza
-    setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(10);
-    doc.text(d.name, ml, y);
-    // Formula in courier
-    setTxt('#0F1923'); doc.setFont('courier','bold'); doc.setFontSize(8.5);
-    doc.text(d.formula, ml + 38, y);
-    y += 4;
-    // Descrizione
-    setTxt('#5A6F86'); doc.setFont('helvetica','normal'); doc.setFontSize(8);
-    var dl = doc.splitTextToSize(d.desc, cw - 4);
-    doc.text(dl, ml+2, y);
-    y += dl.length * 3.8 + 3.5;
-  });
-
-  pdfFoot(4, 6);
-
-  // ============================================================
-  // PAGINA 5: MISURE DETTAGLIATE PER SCANBODY + MAPPA
-  // ============================================================
-  doc.addPage();
-  drawHeaderStrip('MISURE DETTAGLIATE');
-
-  y = 25;
-  setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('Tabella deviazioni cilindro per cilindro', ml, y); y += 4;
-  setTxt('#7A90A4'); doc.setFont('helvetica','italic'); doc.setFontSize(8);
-  doc.text('Per la definizione esatta di ogni colonna vedere la pagina 4 (Metodologia).', ml, y); y += 3;
-
-  // Tabella estesa: dx, dy, dz, dxy, |D|, angolo
-  var sbData = data.pairs.map(function(p, i){
-    var dXum = Math.round(p.dx * 1000);
-    var dYum = Math.round(p.dy * 1000);
-    var dZum = Math.round(p.dz * 1000);
-    var dXYum = Math.round(p.dxy * 1000);
-    var d3um  = Math.round(p.d3 * 1000);
-    var ang   = data.cylAxes[i] ? data.cylAxes[i].angleDeg : 0;
-    return {
-      row:[
-        '#'+(i+1),
-        (dXum>=0?'+':'')+dXum,
-        (dYum>=0?'+':'')+dYum,
-        (dZum>=0?'+':'')+dZum,
-        String(dXYum),
-        String(d3um),
-        ang.toFixed(3)+'\u00b0'
-      ],
-      colD: rangeColorUm(d3um),
-      colA: rangeColorDeg(ang)
-    };
-  });
-  doc.autoTable({
-    startY: y, margin:{left:ml, right:mr},
-    head: [['#','dX (\u00b5m)','dY (\u00b5m)','dZ (\u00b5m)','dXY (\u00b5m)','|D| 3D (\u00b5m)','Angolo asse']],
-    body: sbData.map(function(s){return s.row;}),
-    theme:'grid',
-    styles:{font:'helvetica', fontSize:8.5, cellPadding:2, lineColor:[214,228,240], lineWidth:0.2},
-    headStyles:{fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:7.5},
-    columnStyles:{
-      0:{halign:'center', cellWidth:14, fontStyle:'bold'},
-      1:{halign:'right', font:'courier'},
-      2:{halign:'right', font:'courier'},
-      3:{halign:'right', font:'courier'},
-      4:{halign:'right', font:'courier'},
-      5:{halign:'right', font:'courier', fontStyle:'bold'},
-      6:{halign:'right', font:'courier', fontStyle:'bold'}
-    },
-    didParseCell:function(d){
-      if(d.section==='body'){
-        var ri = d.row.index;
-        if(sbData[ri]){
-          if(d.column.index===5) d.cell.styles.textColor = sbData[ri].colD.rgb;
-          if(d.column.index===6) d.cell.styles.textColor = sbData[ri].colA.rgb;
-        }
-      }
-    }
-  });
-  y = doc.lastAutoTable.finalY + 8;
-
-  // Mappa di posizione cilindri
-  setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('Mappa di posizione (vista dall\'alto)', ml, y); y += 4;
-  setTxt('#7A90A4'); doc.setFont('helvetica','italic'); doc.setFontSize(8);
-  doc.text('Cerchi colorati in base al modulo di deviazione 3D di ogni cilindro.', ml, y); y += 3;
-
-  var xs = data.pairs.map(function(p){return p.a[0];});
-  var ys = data.pairs.map(function(p){return p.a[1];});
-  var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
-  var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
-  var rangeX = (maxX-minX) || 1, rangeY = (maxY-minY) || 1;
-  var pad = 0.18;
-  minX -= rangeX*pad; maxX += rangeX*pad;
-  minY -= rangeY*pad; maxY += rangeY*pad;
-  rangeX = maxX-minX; rangeY = maxY-minY;
-
-  var mapW = cw, mapH = 70;
-  var mapX = ml, mapY = y;
-  var dataAspect = rangeX / rangeY;
-  var boxAspect = mapW / mapH;
-  var drawW, drawH, drawX, drawY;
-  if(dataAspect > boxAspect){
-    drawW = mapW; drawH = mapW / dataAspect;
-    drawX = mapX; drawY = mapY + (mapH - drawH)/2;
-  } else {
-    drawH = mapH; drawW = mapH * dataAspect;
-    drawX = mapX + (mapW - drawW)/2; drawY = mapY;
-  }
-  setFill('#F7F9FC'); doc.rect(mapX, mapY, mapW, mapH, 'F');
-  setDraw('#D6E4F0'); doc.setLineWidth(0.3); doc.rect(mapX, mapY, mapW, mapH);
-  setDraw('#E8F0F8'); doc.setLineWidth(0.15);
-  for(var gx=0; gx<=4; gx++){
-    var gxp = mapX + (gx/4)*mapW;
-    doc.line(gxp, mapY, gxp, mapY+mapH);
-  }
-  for(var gy=0; gy<=3; gy++){
-    var gyp = mapY + (gy/3)*mapH;
-    doc.line(mapX, gyp, mapX+mapW, gyp);
-  }
-
-  function dataToScreen(dx, dy){
-    var nx = (dx - minX) / rangeX;
-    var ny = (dy - minY) / rangeY;
-    return [drawX + nx * drawW, drawY + (1 - ny) * drawH];
-  }
-  data.pairs.forEach(function(p, i){
-    var pos = dataToScreen(p.a[0], p.a[1]);
-    var d3um = Math.round(p.d3 * 1000);
-    var col = rangeColorUm(d3um);
-    setFill(col.hex);
-    doc.circle(pos[0], pos[1], 5, 'F');
-    setDraw('#FFFFFF'); doc.setLineWidth(1.0);
-    doc.circle(pos[0], pos[1], 5, 'S');
-    setTxt('#FFFFFF'); doc.setFont('helvetica','bold'); doc.setFontSize(8);
-    doc.text('#'+(i+1), pos[0], pos[1]+1.1, {align:'center'});
-    setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
-    doc.text(d3um + ' \u00b5m', pos[0]+8, pos[1]);
-  });
-
-  // Legenda mappa
-  y = mapY + mapH + 4;
-  setTxt('#7A90A4'); doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
-  doc.text('LEGENDA RANGE 3D:', ml, y);
-  var legX = ml + 35;
-  setFill(COL_GREEN); doc.circle(legX, y-1.3, 2.2, 'F');
-  setTxt('#0F1923'); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
-  doc.text('\u2264 50 \u00b5m', legX+3.5, y);
-  setFill(COL_AMBER); doc.circle(legX+34, y-1.3, 2.2, 'F');
-  doc.text('50 - 100 \u00b5m', legX+37.5, y);
-  setFill(COL_RED); doc.circle(legX+76, y-1.3, 2.2, 'F');
-  doc.text('> 100 \u00b5m', legX+79.5, y);
-
-  pdfFoot(5, 6);
-
-  // ============================================================
-  // PAGINA 6: INTER-CENTROIDE + NOTE + FIRME
-  // ============================================================
-  doc.addPage();
-  drawHeaderStrip('VALIDAZIONE E FIRME');
-
-  y = 25;
-  setTxt('#0065B3'); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('Distanze inter-centroide (passive fit)', ml, y); y += 4;
-  var cpData = data.interCentroidPairs.map(function(c){
-    var absD = Math.abs(c.delta_um);
-    return {
-      row: ['#'+c.i+'-#'+c.j, c.distA_um.toFixed(0)+' \u00b5m', c.distB_um.toFixed(0)+' \u00b5m',
-            c.delta_um.toFixed(1), absD.toFixed(1)],
-      col: rangeColorUm(absD)
-    };
-  });
-  doc.autoTable({
-    startY: y, margin:{left:ml, right:mr},
-    head: [['Coppia','Distanza A','Distanza B','\u0394 (\u00b5m)','|\u0394| (\u00b5m)']],
-    body: cpData.map(function(c){return c.row;}),
-    theme:'grid',
-    styles:{font:'helvetica', fontSize:8.5, cellPadding:2, lineColor:[214,228,240], lineWidth:0.2},
-    headStyles:{fillColor:[247,249,252], textColor:[122,144,164], fontStyle:'bold', fontSize:7.5},
-    columnStyles:{
-      0:{halign:'center', cellWidth:25, fontStyle:'bold'},
-      1:{halign:'right', font:'courier'},
-      2:{halign:'right', font:'courier'},
-      3:{halign:'right', font:'courier'},
-      4:{halign:'right', font:'courier', fontStyle:'bold'}
-    },
-    didParseCell:function(d){
-      if(d.section==='body' && d.column.index===4){
-        var ri = d.row.index;
-        if(cpData[ri]) d.cell.styles.textColor = cpData[ri].col.rgb;
-      }
-    }
-  });
-  y = doc.lastAutoTable.finalY + 8;
-
-  // Note operative
   setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(11);
   doc.text('Note operative', ml, y); y += 5;
   var noteText = calibMeta.notes && calibMeta.notes.length > 0
-    ? calibMeta.notes
-    : '(nessuna nota operativa registrata)';
+    ? calibMeta.notes : '(nessuna nota operativa registrata)';
   var noteLines = doc.splitTextToSize(noteText, cw - 6);
-  var noteH = Math.max(14, noteLines.length * 4.5 + 4);
+  var noteH = Math.max(16, noteLines.length * 4.5 + 4);
   setDraw('#D6E4F0'); doc.setLineWidth(0.3);
   doc.rect(ml, y, cw, noteH);
   setTxt('#0F1923'); doc.setFont('helvetica','normal'); doc.setFontSize(9);
   doc.text(noteLines, ml+3, y+5);
-  y += noteH + 8;
+  y += noteH + 12;
 
-  // Blocco CONSEGNA
-  setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('Consegna del rapporto', ml, y); y += 4;
-  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+  setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text('Consegna del rapporto', ml, y); y += 5;
+  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(9);
   var consText = 'Il sottoscritto ' + calibMeta.tech + ' (tecnico installatore) attesta di aver eseguito le procedure di taratura iniziale del sistema sotto verifica e di consegnare al cliente il presente certificato.';
   var consLines = doc.splitTextToSize(consText, cw);
   doc.text(consLines, ml, y);
-  y += consLines.length * 4 + 5;
+  y += consLines.length * 4.2 + 8;
   setTxt('#7A90A4'); doc.setFont('helvetica','bold'); doc.setFontSize(8);
   doc.text('DATA', ml, y);
   doc.text('FIRMA TECNICO INSTALLATORE', ml + 70, y);
   setDraw('#0F1923'); doc.setLineWidth(0.4);
-  doc.line(ml, y+8, ml+55, y+8);
-  doc.line(ml+70, y+8, W-mr, y+8);
-  y += 14;
+  doc.line(ml, y+10, ml+55, y+10);
+  doc.line(ml+70, y+10, W-mr, y+10);
+  y += 18;
 
-  // Blocco ACCETTAZIONE
-  setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text('Accettazione del rapporto', ml, y); y += 4;
-  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
-  var accText = 'Il sottoscritto ' + calibMeta.client + ' (cliente) dichiara di aver ricevuto il presente certificato di taratura e di aver preso visione delle misure metrologiche riportate.';
+  setTxt('#0F1923'); doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text('Accettazione del rapporto', ml, y); y += 5;
+  setTxt('#7A90A4'); doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  var accText = 'Il sottoscritto ' + calibMeta.client + ' (cliente) dichiara di aver ricevuto il presente certificato di taratura e di aver preso visione delle misure metrologiche riportate nel documento.';
   var accLines = doc.splitTextToSize(accText, cw);
   doc.text(accLines, ml, y);
-  y += accLines.length * 4 + 5;
+  y += accLines.length * 4.2 + 8;
   setTxt('#7A90A4'); doc.setFont('helvetica','bold'); doc.setFontSize(8);
   doc.text('DATA', ml, y);
   doc.text('FIRMA CLIENTE / RESPONSABILE', ml + 70, y);
   setDraw('#0F1923'); doc.setLineWidth(0.4);
-  doc.line(ml, y+8, ml+55, y+8);
-  doc.line(ml+70, y+8, W-mr, y+8);
+  doc.line(ml, y+10, ml+55, y+10);
+  doc.line(ml+70, y+10, W-mr, y+10);
 
   setTxt('#7A90A4'); doc.setFont('helvetica','italic'); doc.setFontSize(7);
-  var legalText = 'Questo certificato \u00e8 generato automaticamente da Syntesis-ICP a partire dal confronto metrologico dei file STL forniti. Il documento riporta le misure rilevate senza giudizio di idoneit\u00e0; l\'interpretazione clinica o industriale dei valori \u00e8 a carico del tecnico e del cliente. Non sostituisce procedure di qualifica metrologica accreditate ISO 17025.';
+  var legalText = 'Questo certificato \u00e8 generato automaticamente da Syntesis-ICP a partire dal confronto metrologico dei file STL forniti. Il documento riporta le misure rilevate nel sistema di riferimento Kabsch+SVD+ICP. L\'interpretazione clinica o industriale dei valori \u00e8 a carico del tecnico e del cliente. Non sostituisce procedure di qualifica metrologica accreditate ISO 17025.';
   var legalLines = doc.splitTextToSize(legalText, cw);
   doc.text(legalLines, ml, H-26);
-
-  pdfFoot(6, 6);
-
-  return doc;
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -6409,7 +6078,7 @@ function misICP_renderExcel(data){
     ['Scala mappa colorimetrica', data.scaleUm,                       'μm'],
     [],
     ['SOFTWARE'],
-    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.018)'],
+    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.019)'],
     ['Produttore',   'Biaggini Medical Devices S.r.l.'],
     ['Sito',         'https://syntesis-icp.com'],
     [],
@@ -6624,7 +6293,7 @@ function misICP_renderExcel(data){
     ['File B slug filesystem',           slugB],
     ['Data analisi (locale)',            dtStr],
     ['Data analisi (ISO 8601)',          dtIso],
-    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.018)'],
+    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.019)'],
     ['Produttore',                       'Biaggini Medical Devices S.r.l.'],
     ['Sito',                             'https://syntesis-icp.com'],
     ['User-Agent browser',               ua]
@@ -6699,7 +6368,7 @@ function misICP_generateReport(kind){
   if(btn){ btn.classList.add('busy'); btn.innerHTML='<span>Generazione in corso...</span>'; }
   misICP_clearError();
 
-  // FIX v7.3.9.018: per Taratura apri modal di raccolta metadati invece di generare subito
+  // FIX v7.3.9.019: per Taratura apri modal di raccolta metadati invece di generare subito
   if(kind === 'taratura'){
     var btn0 = document.getElementById('misBtnReport');
     if(btn0){ btn0.classList.remove('busy'); btn0.innerHTML = '<span>Scarica report</span><span style="font-size:11px;opacity:0.8">&#9662;</span>'; }
@@ -6818,11 +6487,11 @@ function misICP_updateLabels(){
   if(!vp) return;
   var rect = vp.getBoundingClientRect();
   var W = rect.width, H = rect.height;
-  // FIX v7.3.9.018: replica pattern Analizza con leader line.
+  // FIX v7.3.9.019: replica pattern Analizza con leader line.
   // Pulisco le linee SVG (riuso il layer #labelLines)
   var svg = document.getElementById('labelLines');
   if(svg){
-    // FIX v7.3.9.018: riattivo il layer (era spento da _setAnalyzaArtifactsVisible
+    // FIX v7.3.9.019: riattivo il layer (era spento da _setAnalyzaArtifactsVisible
     // all'ingresso in Misurare, quindi le linee non si vedevano)
     svg.style.display = '';
     while(svg.firstChild) svg.removeChild(svg.firstChild);
@@ -9507,29 +9176,20 @@ function buildPaletteGrid(){
 }
 
 function switchSettingsTab(which){
-  var envTab = document.getElementById('settingsTabEnv');
-  var machTab = document.getElementById('settingsTabMach');
-  var envBtn = document.getElementById('settingsTabEnvBtn');
-  var machBtn = document.getElementById('settingsTabMachBtn');
-  if(which === 'env'){
-    envTab.style.display = 'block';
-    machTab.style.display = 'none';
-    envBtn.style.color = 'var(--blue)';
-    envBtn.style.fontWeight = '800';
-    envBtn.style.borderBottom = '2px solid var(--blue)';
-    machBtn.style.color = 'var(--gray)';
-    machBtn.style.fontWeight = 'normal';
-    machBtn.style.borderBottom = 'none';
-  } else {
-    envTab.style.display = 'none';
-    machTab.style.display = 'block';
-    machBtn.style.color = 'var(--blue)';
-    machBtn.style.fontWeight = '800';
-    machBtn.style.borderBottom = '2px solid var(--blue)';
-    envBtn.style.color = 'var(--gray)';
-    envBtn.style.fontWeight = 'normal';
-    envBtn.style.borderBottom = 'none';
-  }
+  var tabs = {
+    env:  {tab: document.getElementById('settingsTabEnv'),  btn: document.getElementById('settingsTabEnvBtn')},
+    mach: {tab: document.getElementById('settingsTabMach'), btn: document.getElementById('settingsTabMachBtn')},
+    ui:   {tab: document.getElementById('settingsTabUi'),   btn: document.getElementById('settingsTabUiBtn')}
+  };
+  Object.keys(tabs).forEach(function(k){
+    var T = tabs[k]; if(!T.tab || !T.btn) return;
+    var active = (k === which);
+    T.tab.style.display = active ? 'block' : 'none';
+    T.btn.style.color = active ? 'var(--blue)' : 'var(--gray)';
+    T.btn.style.fontWeight = active ? '800' : 'normal';
+    T.btn.style.borderBottom = active ? '2px solid var(--blue)' : 'none';
+  });
+  if(which === 'ui' && typeof refreshUiZoomButtons === 'function') refreshUiZoomButtons();
 }
 
 
@@ -9563,6 +9223,58 @@ try {
     }
   }
 } catch(e){}
+
+
+
+// ── UI ZOOM v7.3.9.019 ─────────────────────────────────────────────
+// Scaling globale del testo interfaccia. Salva preferenza in localStorage.
+var SYNTESIS_UI_ZOOM_KEY = 'syntesis_ui_zoom';
+
+function applyUiZoom(zoom){
+  zoom = parseFloat(zoom);
+  if(!zoom || isNaN(zoom)) zoom = 1.0;
+  zoom = Math.max(0.7, Math.min(1.5, zoom));
+  // body.style.zoom funziona su Chrome/Safari/Edge. Per Firefox uso transform fallback.
+  try {
+    document.body.style.zoom = String(zoom);
+    // Firefox fallback (zoom not supported nativamente)
+    if(navigator.userAgent.indexOf('Firefox') >= 0){
+      document.body.style.transform = 'scale(' + zoom + ')';
+      document.body.style.transformOrigin = '0 0';
+      document.body.style.width = (100/zoom) + '%';
+      document.body.style.height = (100/zoom) + '%';
+    }
+  } catch(e){ console.warn('[UI zoom] apply failed:', e); }
+  try { localStorage.setItem(SYNTESIS_UI_ZOOM_KEY, String(zoom)); } catch(e){}
+  if(typeof refreshUiZoomButtons === 'function') refreshUiZoomButtons();
+}
+
+function loadUiZoom(){
+  try {
+    var z = parseFloat(localStorage.getItem(SYNTESIS_UI_ZOOM_KEY));
+    if(z && z >= 0.7 && z <= 1.5){ applyUiZoom(z); }
+  } catch(e){}
+}
+
+function refreshUiZoomButtons(){
+  var current = 1.0;
+  try { current = parseFloat(localStorage.getItem(SYNTESIS_UI_ZOOM_KEY)) || 1.0; } catch(e){}
+  var ids = [['uiZoomBtn90', 0.9], ['uiZoomBtn100', 1.0], ['uiZoomBtn115', 1.15], ['uiZoomBtn130', 1.3]];
+  ids.forEach(function(p){
+    var el = document.getElementById(p[0]); if(!el) return;
+    var active = Math.abs(current - p[1]) < 0.01;
+    el.style.borderColor = active ? 'var(--blue)' : 'var(--border)';
+    el.style.background = active ? '#E6F0FA' : '#fff';
+    el.style.color = active ? 'var(--blue)' : 'var(--dark)';
+  });
+}
+
+// Carica il preferito utente all'avvio (DOMContentLoaded)
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', loadUiZoom);
+} else {
+  loadUiZoom();
+}
 
 function openSettings(){
   // Backup per Annulla
@@ -13437,6 +13149,7 @@ window.addEventListener('DOMContentLoaded',init);
     <div style="display:flex;gap:2px;border-bottom:1px solid #E2E8F0;margin-bottom:18px">
       <div id="settingsTabEnvBtn" onclick="switchSettingsTab('env')" style="padding:8px 14px;font-family:var(--mono);font-size:11px;color:var(--blue);font-weight:800;border-bottom:2px solid var(--blue);margin-bottom:-1px;cursor:pointer;letter-spacing:.03em">Ambiente</div>
       <div id="settingsTabMachBtn" onclick="switchSettingsTab('mach')" style="padding:8px 14px;font-family:var(--mono);font-size:11px;color:var(--gray);cursor:pointer;letter-spacing:.03em">Macchine</div>
+      <div id="settingsTabUiBtn" onclick="switchSettingsTab('ui')" style="padding:8px 14px;font-family:var(--mono);font-size:11px;color:var(--gray);cursor:pointer;letter-spacing:.03em">Interfaccia</div>
     </div>
 
     <!-- === TAB AMBIENTE === -->
@@ -13589,6 +13302,20 @@ window.addEventListener('DOMContentLoaded',init);
       </div>
     </div>
 
+    <!-- === TAB INTERFACCIA === -->
+    <div id="settingsTabUi" style="display:none">
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Dimensione testo interfaccia</label>
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <button id="uiZoomBtn90" onclick="applyUiZoom(0.9)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:12px">A&#8722;</span><span style="font-size:8px;color:var(--gray);font-weight:500">90%</span></button>
+          <button id="uiZoomBtn100" onclick="applyUiZoom(1.0)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:14px">A</span><span style="font-size:8px;color:var(--gray);font-weight:500">100%</span></button>
+          <button id="uiZoomBtn115" onclick="applyUiZoom(1.15)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:15px">A&#43;</span><span style="font-size:8px;color:var(--gray);font-weight:500">115%</span></button>
+          <button id="uiZoomBtn130" onclick="applyUiZoom(1.3)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:17px">A&#43;&#43;</span><span style="font-size:8px;color:var(--gray);font-weight:500">130%</span></button>
+        </div>
+        <div style="margin-top:10px;padding:10px 12px;background:#F7F9FC;border:1px solid #E2E8F0;border-radius:6px;font-family:var(--font);font-size:10px;color:var(--gray);line-height:1.5">La preferenza viene salvata nel browser e applicata a ogni riapertura. Lo zoom influisce su tutto il testo dell'interfaccia, non sulla risoluzione del modello 3D.</div>
+      </div>
+    </div>
+
     <!-- Footer -->
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="cancelSettings()" style="padding:6px 14px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla</button>
@@ -13732,7 +13459,7 @@ window.onSyntesisViewModeChange = function(mode){
 </script>
 
 
-<!-- Modal Certificato Taratura v7.3.9.018 -->
+<!-- Modal Certificato Taratura v7.3.9.019 -->
 <div class="calmodal-back" id="calibrationModal">
   <div class="calmodal">
     <div class="calmodal-h">
