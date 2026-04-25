@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.013</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.014</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Source Sans 3','Source Sans Pro',sans-serif;--mono:'Source Sans 3','Source Sans Pro',sans-serif}
@@ -328,7 +328,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.013</span>
+      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.014</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -911,7 +911,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '7.3.9.013';
+window.ANALIZZA_BUILD = '7.3.9.014';
 window.ANALIZZA_BUILD_DATE = '2026-04-25';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2346,7 +2346,7 @@ function selectWorkflow(wf){
   // Se sto uscendo da Misurare verso un altro workflow, smonto il viewport ICP
   if(prev === 'misurare' && wf !== 'misurare'){
     try { misICP_unmountViewport(); } catch(e){ console.warn('[Misurare] unmount fallito:', e); }
-    // FIX v7.3.9.013: riaccendi artefatti Analizza se torni in analizza/accoppia
+    // FIX v7.3.9.014: riaccendi artefatti Analizza se torni in analizza/accoppia
     if(wf === 'analizza' || wf === 'accoppia'){
       try { _setAnalyzaArtifactsVisible(true); } catch(e){}
     }
@@ -2403,7 +2403,7 @@ function selectWorkflow(wf){
   }
   else if(wf === 'misurare'){
     analysisMode = 'misurare';
-    // FIX v7.3.9.013: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
+    // FIX v7.3.9.014: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
     try { _setAnalyzaArtifactsVisible(false); } catch(e){}
     if(panAng)  panAng.style.display  = 'none';
     if(panAx)   panAx.style.display   = 'none';
@@ -5478,7 +5478,7 @@ function misICP_renderClinicalPDF(data){
   var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.013)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.014)', null, true);
 
   // Pagina 2: Note metodologiche (statica, identica per ogni report)
   doc.addPage();
@@ -5530,7 +5530,7 @@ function misICP_renderCalibrationPDF(data){
 
   // Cover identica al Clinico ma con sottotitolo "Taratura"
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Taratura');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Taratura (Analizza v7.3.9.013)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Taratura (Analizza v7.3.9.014)', null, true);
 
   // ── PAGINA 2: SINTESI METROLOGICA ─────────────────────────────────
   doc.addPage();
@@ -5816,7 +5816,7 @@ function misICP_renderExcel(data){
     ['Scala mappa colorimetrica', data.scaleUm,                       'μm'],
     [],
     ['SOFTWARE'],
-    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.013)'],
+    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.014)'],
     ['Produttore',   'Biaggini Medical Devices S.r.l.'],
     ['Sito',         'https://syntesis-icp.com'],
     [],
@@ -6031,7 +6031,7 @@ function misICP_renderExcel(data){
     ['File B slug filesystem',           slugB],
     ['Data analisi (locale)',            dtStr],
     ['Data analisi (ISO 8601)',          dtIso],
-    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.013)'],
+    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.014)'],
     ['Produttore',                       'Biaggini Medical Devices S.r.l.'],
     ['Sito',                             'https://syntesis-icp.com'],
     ['User-Agent browser',               ua]
@@ -6217,10 +6217,15 @@ function misICP_updateLabels(){
   if(!vp) return;
   var rect = vp.getBoundingClientRect();
   var W = rect.width, H = rect.height;
-  // FIX v7.3.9.013: replica pattern Analizza con leader line.
+  // FIX v7.3.9.014: replica pattern Analizza con leader line.
   // Pulisco le linee SVG (riuso il layer #labelLines)
   var svg = document.getElementById('labelLines');
-  if(svg){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
+  if(svg){
+    // FIX v7.3.9.014: riattivo il layer (era spento da _setAnalyzaArtifactsVisible
+    // all'ingresso in Misurare, quindi le linee non si vedevano)
+    svg.style.display = '';
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+  }
   // Direzione "alto" della camera per offset coerente con la vista corrente.
   // In Misurare non ho l'asse del cilindro nel pair (struct cA/cB/d3 only),
   // quindi uso camera.up come direzione di stacco label.
