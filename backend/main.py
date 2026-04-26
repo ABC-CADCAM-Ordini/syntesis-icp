@@ -31,7 +31,8 @@ from database import (
     set_gdrive_credentials, get_gdrive_credentials, clear_gdrive_credentials,
     set_project_gdrive_folder,
     list_user_contacts, create_user_contact, update_user_contact,
-    delete_user_contact, reconcile_pending_contacts
+    delete_user_contact, reconcile_pending_contacts,
+    get_user_storage_status, log_usage, can_upload_bytes, PLAN_LIMITS
 )
 import gdrive  # v7.3.9.048: modulo OAuth + Drive API
 from security_config import validate_security_config
@@ -970,6 +971,19 @@ async def me_delete_contact(contact_id: str,
     if not ok:
         raise HTTPException(404, detail="Contatto non trovato.")
     return {"ok": True}
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.054 - CONSUMO STORAGE
+# Free: 1 GB/mese. Reset il 1\xb0 di ogni mese (UTC).
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/me/storage")
+async def me_storage(current_user: dict = Depends(verify_token)):
+    """Ritorna stato consumo mensile dell'utente: plan, used, limit, %, periodo."""
+    status = await get_user_storage_status(current_user["user_id"])
+    return status
     try:
         refresh_token = gdrive.decrypt_token(creds["refresh_token_encrypted"])
         service = gdrive.get_drive_service(refresh_token)
