@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <!-- Syntesis-ICP - Dashboard utente
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
-     v7.3.9.048 - Backend utente: mie analisi, profilo, classifica -->
+     v7.3.9.068 - Backend utente: mie analisi, profilo, classifica -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Syntesis-ICP - Area personale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* v7.3.9.067 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
-/* v7.3.9.067 - Cornice nera sobria, una sola, niente animazione */
+/* v7.3.9.068 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
+/* v7.3.9.068 - Cornice nera sobria, una sola, niente animazione */
 html{background:#0F1923;margin:0;padding:0}
 body{
   margin:18px !important;
@@ -24,7 +24,7 @@ body{
   overflow-x:hidden !important;
   box-shadow:0 4px 24px rgba(0,0,0,.4) !important;
 }
-/* v7.3.9.067 - Scrollbar custom dentro la cornice */
+/* v7.3.9.068 - Scrollbar custom dentro la cornice */
 body::-webkit-scrollbar{width:10px}
 body::-webkit-scrollbar-track{background:transparent}
 body::-webkit-scrollbar-thumb{background:rgba(122,144,164,.35);border-radius:5px}
@@ -271,7 +271,7 @@ body{
 .contact-card .cc-actions .danger:hover{background:#FEE2E2}
 .cc-drive-icon{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green);margin-right:4px;vertical-align:middle}
 
-/* v7.3.9.067 - Hero stats card */
+/* v7.3.9.068 - Hero stats card */
 .hs-card{
   background:var(--white);border:1px solid var(--border);border-radius:10px;
   padding:16px 18px;position:relative;overflow:hidden;transition:.18s;
@@ -316,7 +316,7 @@ body{
 .storage-foot a:hover{text-decoration:underline}
 .storage-ok{color:var(--green);font-weight:700}
 
-/* v7.3.9.067 - Leaderboard pubblica (uguale al modulo principale) */
+/* v7.3.9.068 - Leaderboard pubblica (uguale al modulo principale) */
 .lb-filter-row{display:flex;gap:6px;align-items:flex-start;flex-wrap:nowrap;margin-bottom:8px}
 .lb-filter-label{font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;padding-top:7px;min-width:60px;font-family:var(--font)}
 .lb-filters{display:flex;gap:5px;flex-wrap:wrap;flex:1}
@@ -342,7 +342,7 @@ body{
 .lb-score-bar{height:4px;border-radius:2px;margin-top:3px}
 .lb-empty{padding:40px;text-align:center;color:var(--gray);font-family:var(--mono);font-size:13px}
 
-/* v7.3.9.067 - File browser Drive */
+/* v7.3.9.068 - File browser Drive */
 .fb-toolbar{
   display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:10px 14px;background:var(--white);border:1.5px solid var(--border);
@@ -370,12 +370,16 @@ body{
   color:var(--gray);font-family:var(--mono);padding:12px 14px 8px;
   border-bottom:1px solid var(--light);
 }
-.fb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;padding:12px}
+.fb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:12px}
 .fb-folder{
   background:linear-gradient(135deg,#FFFBEB,#FFF7E6);
   border:1.5px solid #FCD34D;border-radius:9px;padding:14px;cursor:pointer;
-  transition:.18s;display:flex;align-items:center;gap:10px;
+  transition:.18s;display:grid;grid-template-columns:auto 1fr;
+  grid-template-rows:auto auto;gap:8px 10px;align-items:center;
 }
+.fb-folder-icon{grid-row:1/3;align-self:center}
+.fb-folder-name{grid-column:2;grid-row:1}
+.fb-folder-actions{grid-column:2;grid-row:2;justify-content:flex-start}
 .fb-folder:hover{border-color:#F59E0B;box-shadow:0 3px 10px rgba(245,158,11,.18);transform:translateY(-1px)}
 .fb-folder-icon{
   width:34px;height:30px;flex-shrink:0;
@@ -439,7 +443,7 @@ body{
 .privacy-list{margin:8px 0 0;padding-left:18px}
 .privacy-list li{margin-bottom:3px}
 
-/* v7.3.9.067 - Modali condivisione cartelle */
+/* v7.3.9.068 - Modali condivisione cartelle */
 .modal-backdrop{
   position:fixed;inset:0;background:rgba(15,25,35,.6);backdrop-filter:blur(3px);
   display:none;align-items:center;justify-content:center;z-index:200;
@@ -517,7 +521,7 @@ body{
 .invite-row .ir-actions .decline{background:var(--white);color:var(--gray)}
 .invite-row .ir-actions .decline:hover{border-color:#DC2626;color:#DC2626}
 
-/* v7.3.9.067 - Drag&drop visual feedback */
+/* v7.3.9.068 - Drag&drop visual feedback */
 #filesContainer.drag-over{
   outline:3px dashed var(--blue);outline-offset:-6px;
   background:var(--blue-light);border-radius:11px;
@@ -554,7 +558,7 @@ body{
 <body>
 <div class="app-wrapper">
 
-  <!-- Header (v7.3.9.067 - ridisegnato con logo, hero stats, storage bar) -->
+  <!-- Header (v7.3.9.068 - ridisegnato con logo, hero stats, storage bar) -->
   <div class="app-card">
     <div class="app-header" style="border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:18px">
       <div style="display:flex;align-items:center;gap:18px">
@@ -640,7 +644,7 @@ body{
       <div id="projectsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
     </div>
 
-    <!-- TAB: FILE (file browser Drive - v7.3.9.067) -->
+    <!-- TAB: FILE (file browser Drive - v7.3.9.068) -->
     <div class="tab-content" id="tabFiles">
       <div id="filesContainer">
         <div class="loading"><span class="spinner"></span>Caricamento file...</div>
@@ -698,7 +702,7 @@ body{
         </div>
 
         <div style="margin-top:18px;padding:14px 16px;background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:10px;font-size:11px;color:#065F46;font-family:var(--mono);line-height:1.7">
-          <b>Drive OAuth attivo (v7.3.9.048):</b> Google Drive e\' connettibile. Lo scope richiesto e\' <code style="background:#fff;padding:1px 5px;border-radius:3px">drive.file</code>, che limita Syntesis-ICP ai SOLI file che lui stesso crea nella cartella <code style="background:#fff;padding:1px 5px;border-radius:3px">Syntesis-ICP</code> nel tuo Drive. Gli altri file del Drive non sono mai accessibili.
+          <b>Drive OAuth attivo (v7.3.9.068):</b> Google Drive e\' connettibile. Lo scope richiesto e\' <code style="background:#fff;padding:1px 5px;border-radius:3px">drive.file</code>, che limita Syntesis-ICP ai SOLI file che lui stesso crea nella cartella <code style="background:#fff;padding:1px 5px;border-radius:3px">Syntesis-ICP</code> nel tuo Drive. Gli altri file del Drive non sono mai accessibili.
         </div>
       </div>
     </div>
@@ -708,7 +712,7 @@ body{
       <div id="profileContainer" class="loading"><span class="spinner"></span>Caricamento profilo...</div>
     </div>
 
-    <!-- TAB: CLASSIFICA pubblica (v7.3.9.067) -->
+    <!-- TAB: CLASSIFICA pubblica (v7.3.9.068) -->
     <div class="tab-content" id="tabLeaderboard">
       <div id="lb-section">
         <div style="background:linear-gradient(135deg,#FFFBEB,#FFF7E6);border:1.5px solid #FCD34D;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
@@ -752,7 +756,37 @@ body{
       </div>
     </div>
 
-<script>
+
+
+  <!-- MODAL: NUOVO/MODIFICA CONTATTO (v7.3.9.068) -->
+  <div class="modal-backdrop" id="modalContact">
+    <div class="modal-card">
+      <div class="modal-title" id="modalContactTitle">Nuovo contatto</div>
+      <div class="modal-sub">Aggiungi una persona alla tua rubrica per scambiare file in modo sicuro.</div>
+      <div class="modal-row">
+        <label>Email <span style="color:#EF4444">*</span></label>
+        <input type="email" id="contactEmail" placeholder="email@esempio.it">
+      </div>
+      <div class="modal-row">
+        <label>Nome visualizzato</label>
+        <input type="text" id="contactName" placeholder="Es. Lab Mario Rossi">
+      </div>
+      <div class="modal-row">
+        <label>Ruolo / Funzione</label>
+        <input type="text" id="contactRole" placeholder="Es. Odontotecnico, Clinica">
+      </div>
+      <div class="modal-row">
+        <label>Note (opzionale)</label>
+        <textarea id="contactNotes" rows="3" placeholder="Note personali su questo contatto..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeModal('modalContact')">Annulla</button>
+        <button class="btn-cta" onclick="saveContact()">Salva contatto</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
 // ── Stato ───────────────────────────────────────────────────────────────────
 var TOKEN_KEY = 'syntesis_token';
 var state = {
@@ -865,7 +899,7 @@ async function loadStats(){
   } catch(e){ console.warn('stats', e); }
 }
 
-// ── v7.3.9.067 - Storage consumption ────────────────────────────────────────
+// ── v7.3.9.068 - Storage consumption ────────────────────────────────────────
 async function loadStorage(){
   var el = document.getElementById('storageBar');
   if(!el) return;
@@ -1044,7 +1078,7 @@ function openEdit(id){
     .catch(function(err){ showToast('Errore: ' + err, true); });
 }
 
-function closeModal(){
+function closeEditModal(){
   document.getElementById('modalEdit').classList.remove('show');
   state.editing = null;
 }
@@ -1061,7 +1095,7 @@ async function saveModal(){
     });
     if(!r.ok) throw new Error('HTTP ' + r.status);
     showToast('Salvato.');
-    closeModal();
+    closeEditModal();
     loadAnalyses();
   } catch(e){ showToast('Errore salvataggio: ' + e.message, true); }
 }
@@ -1501,6 +1535,104 @@ async function loadContacts(){
   }
 }
 
+
+async function saveContact(){
+  var emailEl = document.getElementById('contactEmail');
+  var nameEl  = document.getElementById('contactName');
+  var roleEl  = document.getElementById('contactRole');
+  var notesEl = document.getElementById('contactNotes');
+  var email = (emailEl.value || '').trim().toLowerCase();
+  var name  = (nameEl.value || '').trim();
+  var role  = (roleEl.value || '').trim();
+  var notes = (notesEl.value || '').trim();
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    showToast('Inserisci una email valida', true);
+    emailEl.focus();
+    return;
+  }
+  var body = {
+    contact_email: email,
+    display_name: name || null,
+    role: role || null,
+    notes: notes || null,
+  };
+  try {
+    var url, method;
+    if(contactsState.editing){
+      // Edit: PATCH (email rimossa dal body, immutabile)
+      url = '/api/me/contacts/' + contactsState.editing;
+      method = 'PATCH';
+      delete body.contact_email;
+    } else {
+      url = '/api/me/contacts';
+      method = 'POST';
+    }
+    var r = await fetch(url, {
+      method: method,
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+    });
+    if(!r.ok){
+      var err = await r.json().catch(function(){return {detail:'HTTP '+r.status};});
+      throw new Error(err.detail || 'errore');
+    }
+    closeModal('modalContact');
+    showToast(contactsState.editing ? 'Contatto aggiornato' : 'Contatto aggiunto');
+    contactsState.editing = null;
+    if(typeof loadContacts === 'function') loadContacts();
+  } catch(e){
+    showToast('Errore: ' + e.message, true);
+  }
+}
+
+// Helper inline per il modale Condividi cartella (v7.3.9.068)
+async function addContactInline(){
+  var emailEl = document.getElementById('sfNewEmail');
+  var nameEl  = document.getElementById('sfNewName');
+  var email = (emailEl.value || '').trim().toLowerCase();
+  var name  = (nameEl.value || '').trim();
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    showToast('Inserisci una email valida', true);
+    emailEl.focus();
+    return;
+  }
+  var already = (sfState.contacts || []).find(function(c){
+    return (c.contact_email || '').toLowerCase() === email;
+  });
+  if(already){
+    showToast('Contatto gia\' in rubrica, lo seleziono', false);
+    setTimeout(function(){
+      var cb = document.querySelector('#sfContactPicker input[value="' + email + '"]');
+      if(cb){ cb.checked = true; }
+    }, 30);
+    emailEl.value = ''; nameEl.value = '';
+    return;
+  }
+  try {
+    var r = await fetch('/api/me/contacts', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({contact_email: email, display_name: name || null}),
+    });
+    if(!r.ok){
+      var err = await r.json().catch(function(){return {detail:'HTTP '+r.status};});
+      throw new Error(err.detail || 'errore');
+    }
+    var added = await r.json();
+    sfState.contacts = sfState.contacts || [];
+    sfState.contacts.unshift(added);
+    renderContactPicker();
+    setTimeout(function(){
+      var cb = document.querySelector('#sfContactPicker input[value="' + email + '"]');
+      if(cb){ cb.checked = true; }
+    }, 30);
+    emailEl.value = ''; nameEl.value = '';
+    showToast('Contatto aggiunto e selezionato');
+  } catch(e){
+    showToast('Errore: ' + e.message, true);
+  }
+}
+
 function renderContacts(){
   var box = document.getElementById('contactsContainer');
   box.className = '';
@@ -1609,7 +1741,7 @@ async function deleteContact(id){
   } catch(e){ showToast('Errore: ' + e.message, true); }
 }
 
-// ── v7.3.9.067 - Leaderboard pubblica (Supabase) per tab Classifica ────────
+// ── v7.3.9.068 - Leaderboard pubblica (Supabase) per tab Classifica ────────
 var LBdash = (function(){
   var SUPABASE_URL = 'https://gnqnebjuhnxvndrpcdtt.supabase.co';
   var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImducW5lYmp1aG54dm5kcnBjZHR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMTg5ODAsImV4cCI6MjA4ODc5NDk4MH0.ZE_RHhx4KUiwG-_s4pVnRKbvxUZhqEATgNaRowSP6H8';
@@ -1773,7 +1905,7 @@ var LBdash = (function(){
   };
 })();
 
-// ── v7.3.9.067 - File Browser Drive ─────────────────────────────────────────
+// ── v7.3.9.068 - File Browser Drive ─────────────────────────────────────────
 var fbState = {
   currentFolderId: null,    // null = root Syntesis-ICP
   breadcrumb: [],
@@ -1932,7 +2064,7 @@ function renderFiles(data){
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────
-// v7.3.9.067 - Notifiche errore/successo OAuth Drive da query param
+// v7.3.9.068 - Notifiche errore/successo OAuth Drive da query param
 function checkGdriveCallbackParams(){
   try {
     var params = new URLSearchParams(window.location.search);
@@ -1961,7 +2093,7 @@ function checkGdriveCallbackParams(){
   } catch(e){ console.warn('callback params', e); }
 }
 
-// ── v7.3.9.067 - Crea cartella + Condividi cartella ───────────────────────
+// ── v7.3.9.068 - Crea cartella + Condividi cartella ───────────────────────
 var sfState = { folderId: null, folderName: '', contacts: [] };
 
 function openModal(id){
@@ -2095,7 +2227,7 @@ async function submitShareFolder(){
   }
 }
 
-// ── v7.3.9.067 - Upload file in cartella + drag&drop ──────────────────────
+// ── v7.3.9.068 - Upload file in cartella + drag&drop ──────────────────────
 function openUpload(folderId){
   if(!folderId){ showToast('Apri prima una cartella', true); return; }
   // Apre file picker hidden
@@ -2288,12 +2420,12 @@ setInterval(function(){
 // Tasti scorciatoia: Esc chiude i modal
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape'){
-    closeModal();
+    closeEditModal();
     closeProfileModal();
   }
 });
 </script>
-<!-- v7.3.9.067 - Modali condivisione -->
+<!-- v7.3.9.068 - Modali condivisione -->
 <div class="modal-backdrop" id="modalCreateFolder" onclick="if(event.target===this) closeModal('modalCreateFolder')">
   <div class="modal-card">
     <div class="modal-title">Crea nuova cartella</div>
