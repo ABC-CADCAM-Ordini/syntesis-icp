@@ -142,14 +142,18 @@ async def register(req: RegisterRequest):
         raise HTTPException(400, detail="La password deve essere di almeno 8 caratteri.")
 
     hashed, salt = hash_password(req.password)
-    user_id = await create_user(
-        email=req.email,
-        name=req.name,
-        password_hash=hashed,
-        salt=salt,
-        organization=req.organization,
-        license_key=req.license_key
-    )
+    # v7.3.9.040: cattura race condition fra verify_license e create_user
+    try:
+        user_id = await create_user(
+            email=req.email,
+            name=req.name,
+            password_hash=hashed,
+            salt=salt,
+            organization=req.organization,
+            license_key=req.license_key
+        )
+    except ValueError as ve:
+        raise HTTPException(409, detail=str(ve))
 
     token = create_token({
         "user_id": user_id,
