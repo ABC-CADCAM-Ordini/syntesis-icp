@@ -1083,6 +1083,42 @@ async def me_gdrive_file_link(
 
 
 
+
+
+@app.get("/api/me/gdrive/file/{file_id}/content")
+async def me_gdrive_file_content(
+    file_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Proxy del contenuto file da Drive. Streamed bytes con Content-Type
+    inferito. Usato dal frontend per anteprime (immagini, pdf, stl, video)."""
+    from fastapi.responses import Response
+    creds_data = await get_gdrive_credentials(current_user["user_id"])
+    if not creds_data or not creds_data.get("refresh_token_encrypted"):
+        raise HTTPException(409, detail="Google Drive non connesso.")
+    try:
+        # Recupero metadata per content-type + nome
+        meta = await gdrive.get_file_metadata(creds_data, file_id)
+        if not meta:
+            raise HTTPException(404, detail="File non trovato.")
+        # Scarico bytes
+        content = await gdrive.download_file_bytes(creds_data, file_id)
+        if content is None:
+            raise HTTPException(500, detail="Errore download file.")
+        ct = meta.get("mimeType") or "application/octet-stream"
+        name = meta.get("name") or "file"
+        # Inline display nel browser (non download forzato)
+        headers = {
+            "Content-Disposition": f'inline; filename="{name}"',
+            "Cache-Control": "private, max-age=300",
+        }
+        return Response(content=content, media_type=ct, headers=headers)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[gdrive content] file={file_id} error: {e}")
+        raise HTTPException(500, detail=str(e))
+
 # ─────────────────────────────────────────────────────────────────────────────
 # v7.3.9.062 - CARTELLE CONDIVISE (Fase F)
 # Sistema invito + accept tra utenti Synthesis. Cartelle Drive condivise via
