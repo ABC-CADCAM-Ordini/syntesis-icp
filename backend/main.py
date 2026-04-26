@@ -29,7 +29,9 @@ from database import (
     list_user_projects, get_user_project, create_user_project,
     update_user_project, delete_user_project, assign_analysis_to_project,
     set_gdrive_credentials, get_gdrive_credentials, clear_gdrive_credentials,
-    set_project_gdrive_folder
+    set_project_gdrive_folder,
+    list_user_contacts, create_user_contact, update_user_contact,
+    delete_user_contact, reconcile_pending_contacts
 )
 import gdrive  # v7.3.9.048: modulo OAuth + Drive API
 from security_config import validate_security_config
@@ -874,6 +876,100 @@ async def me_project_files(project_id: str,
     if not proj.get("gdrive_folder_id"):
         return {"files": [], "folder_id": None}
 
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.053 - RUBRICA CONTATTI
+# Lista personale di altri utenti Syntesis con cui collaborare per scambio file.
+# Un contatto e' "pending" se l'altra email non e' ancora registrata, "active"
+# se l'altra persona ha gia' un account Syntesis.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ContactCreate(BaseModel):
+    contact_email: str
+    display_name: Optional[str] = None
+    role: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ContactUpdate(BaseModel):
+    display_name: Optional[str] = None
+    role: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@app.get("/api/me/contacts")
+async def me_list_contacts(current_user: dict = Depends(verify_token)):
+    """Lista contatti dell'utente corrente."""
+    items = await list_user_contacts(current_user["user_id"])
+    # Serializzo datetimes
+    for it in items:
+        for k in ("created_at", "updated_at"):
+            v = it.get(k)
+            if v and hasattr(v, "isoformat"):
+                it[k] = v.isoformat()
+    return {"items": items}
+
+
+@app.post("/api/me/contacts")
+async def me_create_contact(req: ContactCreate,
+                              current_user: dict = Depends(verify_token)):
+    """Aggiunge un contatto alla rubrica. Se l'email corrisponde a un utente
+    Syntesis, viene auto-collegato (status=active), altrimenti resta pending."""
+    # Validazione email
+    email = (req.contact_email or "").strip().lower()
+    if not email or "@" not in email or len(email) > 200:
+        raise HTTPException(400, detail="Email non valida.")
+    name = req.display_name.strip() if req.display_name else None
+    if name and len(name) > 200:
+        raise HTTPException(400, detail="Nome troppo lungo (max 200).")
+    role = req.role.strip() if req.role else None
+    if role and len(role) > 100:
+        raise HTTPException(400, detail="Ruolo troppo lungo (max 100).")
+    notes = req.notes.strip() if req.notes else None
+    if notes and len(notes) > 2000:
+        raise HTTPException(400, detail="Note troppo lunghe (max 2000).")
+
+    try:
+        contact = await create_user_contact(
+            owner_user_id=current_user["user_id"],
+            contact_email=email,
+            display_name=name,
+            role=role,
+            notes=notes,
+        )
+    except ValueError as e:
+        raise HTTPException(409, detail=str(e))
+    return contact
+
+
+@app.patch("/api/me/contacts/{contact_id}")
+async def me_update_contact(contact_id: str, req: ContactUpdate,
+                              current_user: dict = Depends(verify_token)):
+    """Aggiorna nome/ruolo/note di un contatto. L'email non e' modificabile."""
+    name = req.display_name.strip() if req.display_name is not None else None
+    if name is not None and len(name) > 200:
+        raise HTTPException(400, detail="Nome troppo lungo.")
+    role = req.role.strip() if req.role is not None else None
+    notes = req.notes.strip() if req.notes is not None else None
+    ok = await update_user_contact(
+        contact_id, current_user["user_id"],
+        display_name=name, role=role, notes=notes
+    )
+    if not ok:
+        raise HTTPException(404, detail="Contatto non trovato o nessun campo da aggiornare.")
+    return {"ok": True}
+
+
+@app.delete("/api/me/contacts/{contact_id}")
+async def me_delete_contact(contact_id: str,
+                              current_user: dict = Depends(verify_token)):
+    """Rimuove un contatto dalla rubrica."""
+    ok = await delete_user_contact(contact_id, current_user["user_id"])
+    if not ok:
+        raise HTTPException(404, detail="Contatto non trovato.")
+    return {"ok": True}
     try:
         refresh_token = gdrive.decrypt_token(creds["refresh_token_encrypted"])
         service = gdrive.get_drive_service(refresh_token)
