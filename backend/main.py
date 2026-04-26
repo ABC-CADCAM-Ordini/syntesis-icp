@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from pathlib import Path
 
+from pydantic import BaseModel
 from auth import router as auth_router, verify_token
 from icp_engine import analyze_stl_pair
 from pdf_gen import generate_pdf
