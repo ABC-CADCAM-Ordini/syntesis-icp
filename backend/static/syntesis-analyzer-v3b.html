@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.048</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.049</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Source Sans 3','Source Sans Pro',sans-serif;--mono:'Source Sans 3','Source Sans Pro',sans-serif}
@@ -321,7 +321,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .mis-tree-slider-row input[type=range]{flex:1;height:12px;accent-color:#0065B3;cursor:pointer;margin:0}
 .mis-tree-val{font-size:11px;color:var(--gray);min-width:30px;text-align:right}
 
-/* Certificato Taratura modal v7.3.9.048 */
+/* Certificato Taratura modal v7.3.9.049 */
 .calmodal-back{position:fixed;inset:0;background:rgba(15,25,35,.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px}
 .calmodal-back.show{display:flex}
 .calmodal{background:#fff;border-radius:14px;max-width:600px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,25,35,.3);font-family:var(--font)}
@@ -345,7 +345,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .calmodal-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
 .calmodal-btn.primary:hover{background:#004F8A}
 
-/* v7.3.9.048 draggable+resizable panels */
+/* v7.3.9.049 draggable+resizable panels */
 .syn-drag-handle {
   cursor: move;
   user-select: none;
@@ -368,7 +368,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .syn-resize-handle:hover { opacity: 1; }
 
 
-/* v7.3.9.048 toolbar icon-only buttons - text-node aware */
+/* v7.3.9.049 toolbar icon-only buttons - text-node aware */
 button.btn.icon-only {
   padding: 6px 9px !important;
   min-width: 34px;
@@ -446,7 +446,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   50% { box-shadow: 0 0 0 6px rgba(0,101,179,0); }
 }
 
-/* v7.3.9.048 tooltip custom istantaneo per pulsanti icon-only e gruppi */
+/* v7.3.9.049 tooltip custom istantaneo per pulsanti icon-only e gruppi */
 [data-tip] {
   position: relative;
 }
@@ -519,7 +519,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   transform: translate(0, -50%);
 }
 
-/* v7.3.9.048 tooltip custom istantaneo */
+/* v7.3.9.049 tooltip custom istantaneo */
 [data-tip] {
   position: relative;
 }
@@ -569,7 +569,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   transition-delay: 0.25s;
 }
 
-/* v7.3.9.048 tooltip custom istantaneo */
+/* v7.3.9.049 tooltip custom istantaneo */
 [data-tip] {
   position: relative;
 }
@@ -619,7 +619,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   transition-delay: 0.25s;
 }
 
-/* v7.3.9.048: Compensazione body.zoom per sidebar overflow */
+/* v7.3.9.049: Compensazione body.zoom per sidebar overflow */
 body[style*="zoom"] .panel,
 body .panel {
   /* L'altezza e' calcolata dal flex container .main; height:100% deve essere
@@ -631,7 +631,7 @@ body .panel {
 .panel::-webkit-scrollbar-thumb { background: rgba(122,144,164,0.4); border-radius: 4px; }
 .panel::-webkit-scrollbar-thumb:hover { background: rgba(122,144,164,0.7); }
 
-/* v7.3.9.048 panel collassabile */
+/* v7.3.9.049 panel collassabile */
 .panel-collapsible-head {
   cursor: pointer;
   display: flex !important;
@@ -674,7 +674,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.048</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.049</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -707,7 +707,15 @@ body .panel {
         Impostazioni
       </div>
       <div class="file-menu-sep"></div>
-      <div class="file-menu-item" onclick="closeFileMenu();window.open('/dashboard','_blank')">
+      <!-- v7.3.9.049: voce auth (login/logout) - testo dinamico -->
+      <div class="file-menu-item" id="fmAuthItem" onclick="closeFileMenu();syntAuthClick()">
+        <svg width="13" height="13" viewBox="0 0 28 28" fill="none">
+          <path d="M11 4 L4 4 L4 24 L11 24 M16 9 L21 14 L16 19 M21 14 L9 14" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span id="fmAuthLabel">Accedi</span>
+        <span class="fm-key" id="fmAuthKey">LOGIN</span>
+      </div>
+      <div class="file-menu-item" id="fmDashboardItem" onclick="closeFileMenu();window.open('/dashboard','_blank')" style="display:none">
         <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="10" r="4" stroke="#0065B3" stroke-width="1.8" fill="none"/><path d="M5 24 C5 18 9 16 14 16 C19 16 23 18 23 24" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
         Area personale
         <span class="fm-key">DASHBOARD</span>
@@ -1276,7 +1284,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '7.3.9.048';
+window.ANALIZZA_BUILD = '7.3.9.049';
 window.ANALIZZA_BUILD_DATE = '2026-04-25';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -1537,7 +1545,7 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   // ALGORITMO: FIT DI CERCHIO A RAGGIO FISSO CAD-aware (client-side)
   // USATO DA: workflow Analizza (default), Sostituire (con opts.radius)
   //
-  // Architettura del progetto - i tre algoritmi di posizionamento (v7.3.9.048):
+  // Architettura del progetto - i tre algoritmi di posizionamento (v7.3.9.049):
   //   - Misurare    -> analyze_stl_pair       (backend Python, weighted ICP)
   //   - Analizza    -> findScanbodyCenter     (questa funzione, fit specializzato)
   //   - Sostituire  -> sostAlignAll           (ICP locale, riusa questa)
@@ -1550,7 +1558,7 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   // tempo di calcolo in millisecondi. Per questa geometria specifica, e'
   // piu' accurato del weighted ICP, che non sfrutta la conoscenza del raggio.
   //
-  // v7.3.9.048: opt-in alternativa server-side via /api/place-mua quando
+  // v7.3.9.049: opt-in alternativa server-side via /api/place-mua quando
   // l'utente seleziona "Algoritmo: server" nelle impostazioni. La routing
   // logic e' in alignAll() che chiama alignAllServer() oppure questa.
   // ═══════════════════════════════════════════════════════════════════════
@@ -1851,7 +1859,7 @@ function extractScanTopFaceNear(scanGeo, clickPos, clickNormal, radiusMm){
 }
 
 function alignAll(){
-  // v7.3.9.048 - DUAL ALGORITHM ROUTING
+  // v7.3.9.049 - DUAL ALGORITHM ROUTING
   // Default 'client' -> findScanbodyCenter (comportamento storico)
   // Opt-in 'server' -> /api/place-mua weighted ICP
   var algoChoice = 'client';
@@ -1940,7 +1948,7 @@ function alignAll(){
   }, 50);
 }
 
-// v7.3.9.048 - alignAll variante SERVER (weighted ICP)
+// v7.3.9.049 - alignAll variante SERVER (weighted ICP)
 function alignAllServer(){
   if(!scanMesh || muaObjects.length === 0){showStatus('Carica scansione + posiziona MUA'); return}
   var anyCut = muaObjects.some(function(m){ return m.scanbodyScanVisible === true; });
@@ -2078,7 +2086,7 @@ function alignAllServer(){
   });
 }
 
-// v7.3.9.048 - Helpers per dual algorithm
+// v7.3.9.049 - Helpers per dual algorithm
 function onAlgoChange(value){
   if(value !== 'client' && value !== 'server') return;
   try { localStorage.setItem('syntesis_mua_algorithm', value); } catch(e){}
@@ -2141,7 +2149,7 @@ function refreshAlgoDiagnostics(){
   box.innerHTML = rows.join('');
 }
 
-// v7.3.9.048 - Inietta tracciamento algorithmUsed nel path client originale
+// v7.3.9.049 - Inietta tracciamento algorithmUsed nel path client originale
 // (chiamata alla fine di alignAll() default per simmetria con alignAllServer)
 function _trackClientAlgo(){
   if(!muaObjects) return;
@@ -2166,7 +2174,7 @@ function calculateAngles(){
   var aligned=muaObjects.filter(function(m){return m.aligned});
   var panelEl = document.getElementById('panelAngleList');
 
-  // v7.3.9.048: nascondi pannello "Analisi angolare (coppie)" quando siamo in
+  // v7.3.9.049: nascondi pannello "Analisi angolare (coppie)" quando siamo in
   // workflow Analizza con piu' gruppi: l'analisi diventa per-gruppo via
   // FRESATURA AVANZATA, le coppie globali non hanno significato clinico.
   var groupsCount = 0;
@@ -2870,7 +2878,7 @@ function exportCase(){
 
   // 2. JSON con i dati del caso
   var triEl = document.getElementById('triScan');
-  // v7.3.9.048: leggo la scelta algoritmo corrente dell'utente
+  // v7.3.9.049: leggo la scelta algoritmo corrente dell'utente
   var algoChoice = 'client';
   try { algoChoice = localStorage.getItem('syntesis_mua_algorithm') || 'client'; } catch(e){}
   var data = {
@@ -2898,7 +2906,7 @@ function exportCase(){
         divergence_deg: (m.divergence !== null && m.divergence !== undefined) ? +m.divergence.toFixed(3) : null,
         rmsd_mm: (m.rmsd !== null && m.rmsd !== undefined) ? +m.rmsd.toFixed(4) : null,
         aligned: !!m.aligned,
-        // v7.3.9.048: tracciabilita' algoritmo dual (vedi MASTER_DOC sez 3.1-3.2)
+        // v7.3.9.049: tracciabilita' algoritmo dual (vedi MASTER_DOC sez 3.1-3.2)
         algorithm: m.algorithmUsed || null,
         algorithm_rmsd_um: (m.algorithmRmsd != null) ? Math.round(m.algorithmRmsd * 1000) : null,
         algorithm_elapsed_ms: m.algorithmElapsedMs || null
@@ -2976,7 +2984,7 @@ function updateWorkflowUI(wf){
 }
 
 
-// ── RESET TOTALE SESSIONE v7.3.9.048 ──────────────────────────
+// ── RESET TOTALE SESSIONE v7.3.9.049 ──────────────────────────
 // Cambio workflow = nuova sessione. Tutti i dati e gli artefatti dell'altro
 // workflow vengono distrutti, non solo nascosti. Non serve "ritrovo dove ho
 // lasciato": ogni workflow parte pulito. Pulizia mentale completa.
@@ -3187,7 +3195,7 @@ function selectWorkflow(wf){
   if(!WORKFLOWS[wf]) return;
   closeWorkflowMenu();
   var prev = currentWorkflow;
-  // v7.3.9.048: cambio workflow = nuova sessione. Reset completo del workflow
+  // v7.3.9.049: cambio workflow = nuova sessione. Reset completo del workflow
   // precedente, con conferma se l'utente ha dati attivi.
   if(prev && prev !== wf){
     if(_hasUnsavedDataInWorkflow(prev)){
@@ -3227,7 +3235,7 @@ function selectWorkflow(wf){
   // Se sto uscendo da Misurare verso un altro workflow, smonto il viewport ICP
   if(prev === 'misurare' && wf !== 'misurare'){
     try { misICP_unmountViewport(); } catch(e){ console.warn('[Misurare] unmount fallito:', e); }
-    // FIX v7.3.9.048: riaccendi artefatti Analizza se torni in analizza/accoppia
+    // FIX v7.3.9.049: riaccendi artefatti Analizza se torni in analizza/accoppia
     if(wf === 'analizza' || wf === 'accoppia'){
       try { _setAnalyzaArtifactsVisible(true); } catch(e){}
     }
@@ -3284,7 +3292,7 @@ function selectWorkflow(wf){
   }
   else if(wf === 'misurare'){
     analysisMode = 'misurare';
-    // FIX v7.3.9.048: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
+    // FIX v7.3.9.049: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
     try { _setAnalyzaArtifactsVisible(false); } catch(e){}
     if(panAng)  panAng.style.display  = 'none';
     if(panAx)   panAx.style.display   = 'none';
@@ -3376,7 +3384,7 @@ var FRES_PROXIMITY_DEG = 2.0;
 var fresState = {
   db: null,                    // { machines, selectedId, lastCustomAxis, lastCustomAxisByGid }
   mode: 'mean',                // 'mean' | 'minimax' | 'custom' (globale)
-  // v7.3.9.048: stato per-gruppo
+  // v7.3.9.049: stato per-gruppo
   axesByGid: {},               // { gid: {meanAxis, minimaxAxis, customAxis, setupAxis} }
   arrowsByGid: {},             // { gid: THREE.Group }
   pickersByGid: {},            // { gid: THREE.Mesh sfera }
@@ -3505,7 +3513,7 @@ function fresComputeMinimaxAxis(axes){
 
 // ===== Costruzione e aggiornamento freccia di setup =====
 
-// ── OVERLAY SCENE per frecce fresatura v7.3.9.048 ─────────────────
+// ── OVERLAY SCENE per frecce fresatura v7.3.9.049 ─────────────────
 // Una seconda scena Three.js dedicata alle frecce per-gruppo. La pipeline
 // render fa: 1) renderer.render(scene, camera); 2) clearDepth();
 // 3) renderer.render(fresOverlayScene, camera). Risultato: le frecce sono
@@ -3516,7 +3524,7 @@ var fresOverlayLights = null;
 function fresInitOverlayScene(){
   if(fresOverlayScene) return;
   fresOverlayScene = new THREE.Scene();
-  // v7.3.9.048: luci DIRECT nella overlay scene, NO camera.add
+  // v7.3.9.049: luci DIRECT nella overlay scene, NO camera.add
   // (il bug v.033/034: camera.add(light) -> luce condivisa con scene principale
   // -> arcata bruciata. Ora le luci vivono nella overlay scene e basta).
   var amb = new THREE.AmbientLight(0xffffff, 0.55);
@@ -3530,14 +3538,14 @@ function fresInitOverlayScene(){
 }
 
 function fresOverlayRender(){
-  // v7.3.9.048: NO-OP. Le frecce sono tornate nella scena principale con
+  // v7.3.9.049: NO-OP. Le frecce sono tornate nella scena principale con
   // depthTest:false + renderOrder alto. fresOverlayScene non viene piu'
   // usata. Funzione mantenuta solo per compatibilita' con animate loop.
   return;
 }
 
 function fresBuildArrow(gid, origin){
-  // v7.3.9.048: arrow nella scena PRINCIPALE con depthTest:false +
+  // v7.3.9.049: arrow nella scena PRINCIPALE con depthTest:false +
   // renderOrder alto. Niente piu' overlay scene (causava TypeError in alcuni
   // refresh). Questo approccio era quello originale di v.029 e funzionava.
   if(fresState.arrowsByGid[gid]){
@@ -3838,7 +3846,7 @@ function fresBuildAllArrows(){
   });
 }
 
-// v7.3.9.048: cleanup di tutte le frecce
+// v7.3.9.049: cleanup di tutte le frecce
 function fresClearAllArrows(){
   Object.keys(fresState.arrowsByGid).forEach(function(k){
     var g = fresState.arrowsByGid[k];
@@ -3850,7 +3858,7 @@ function fresClearAllArrows(){
   fresState.pickerSphere = null;
 }
 
-// v7.3.9.048: ricostruisce frecce per tutti i gruppi presenti
+// v7.3.9.049: ricostruisce frecce per tutti i gruppi presenti
 function fresBuildAllArrows(){
   fresClearAllArrows();
   var aligned = muaObjects.filter(function(m){ return m.aligned; });
@@ -3874,7 +3882,7 @@ function fresBuildAllArrows(){
   });
 }
 function fresUpdateArrow(gid){
-  // v7.3.9.048: freccia parte da `origin + d*liftOff` (stacco dal MUA)
+  // v7.3.9.049: freccia parte da `origin + d*liftOff` (stacco dal MUA)
   var grp = fresState.arrowsByGid[gid];
   if(!grp) return;
   var axes = fresState.axesByGid[gid];
@@ -4262,7 +4270,7 @@ function fresScreenToSphere(x, y){
   return new THREE.Vector3(nx/r, ny/r, 0);
 }
 function fresIsClickOnPicker(x, y){
-  // v7.3.9.048: soglia 80px ULTRA generosa + log diagnostico esteso
+  // v7.3.9.049: soglia 80px ULTRA generosa + log diagnostico esteso
   var pickers = Object.values(fresState.pickersByGid).filter(Boolean);
   if(pickers.length === 0){
     console.log('[fres-pick] no pickers in fresState');
@@ -4325,7 +4333,7 @@ function fresIsClickOnPicker(x, y){
 }
 
 function fresOnMouseDown(e){
-  // v7.3.9.048 super-diagnostic
+  // v7.3.9.049 super-diagnostic
   console.log('[fres-md] click! isOpen=' + fresState.isOpen + 
               ' pickersCount=' + Object.keys(fresState.pickersByGid).length +
               ' button=' + e.button +
@@ -4427,7 +4435,7 @@ function fresAttachMouseHandlers(){
   fresState.pendingMouseHandlers = {
     md: fresOnMouseDown, mm: fresOnMouseMove, mu: fresOnMouseUp
   };
-  // v7.3.9.048: triplo attach in capture phase per intercettare prima
+  // v7.3.9.049: triplo attach in capture phase per intercettare prima
   // di OrbitControls qualsiasi cosa accada
   dom.addEventListener('mousedown', fresOnMouseDown, true);
   window.addEventListener('mousedown', fresOnMouseDown, true);
@@ -5050,7 +5058,7 @@ function misICP_run(){
       var rmsdUm = icpRes.rmsd * 1000;
       var penRmsd = Math.min(50, rmsdUm/10);
       var penAngle = Math.min(30, avgAngle*10);
-      // v7.3.9.048: SCORE PRELIMINARE rapido durante ICP, NON e' il punteggio canonico.
+      // v7.3.9.049: SCORE PRELIMINARE rapido durante ICP, NON e' il punteggio canonico.
       // Il valore canonico viene calcolato da misICP_score() (Syntesis Score v1.0)
       // a fine pipeline e SOSTITUISCE questo. Vedi L5256 per la formula canonica.
       var score = Math.max(0, 100 - penRmsd - penAngle);
@@ -5233,7 +5241,7 @@ function misICP_renderPerCylinder(pairs, bgTrisA, bgTrisB){
     controls.update && controls.update();
   }
 
-  // FIX v7.3.9.048: applico la modalita\' di rendering corrente
+  // FIX v7.3.9.049: applico la modalita\' di rendering corrente
   // alle nuove mesh (recupero da localStorage o envSettings.renderMode)
   try {
     var savedMode = null;
@@ -5522,14 +5530,14 @@ function misICP_calcScore(pairs, cylAxes){
     }
   }
   var eff=Math.sqrt(L6xy*L6xy*0.55 + L6z*L6z*0.30 + L6ax*L6ax*0.15);
-  // v7.3.9.048 SCORE MODEL CANONICO (Syntesis Score v1.0)
+  // v7.3.9.049 SCORE MODEL CANONICO (Syntesis Score v1.0)
   // Sincronizzato con backend/icp_engine.calc_score()
   // Curva iperbole: inflection 110um, steepness 1.5
   var score=100/(1+Math.pow(eff/110,1.5));
   return Math.max(0, Math.min(100, Math.round(score*100)/100));
 }
 function misICP_scoreLabel(s){
-  // v7.3.9.048 SCORE MODEL CANONICO - soglie sincronizzate con backend
+  // v7.3.9.049 SCORE MODEL CANONICO - soglie sincronizzate con backend
   // backend/icp_engine.score_label(): >=85 Eccellente, >=70 Buono, >=50 Sufficiente, >=33 Scarso, <33 Critico
   if(s>=85) return {label:'Eccellente',  col:'#639922', bg:'#EAF3DE', fg:'#3B6D11'};
   if(s>=70) return {label:'Buono',       col:'#D97706', bg:'#FEFCE8', fg:'#854D0E'};
@@ -6070,7 +6078,7 @@ function misICP_buildReportData(){
     icpT: misICP_result.t || [0,0,0],
     nCyl: pdfPairs.length,
     timestamp: new Date(),
-    // v7.3.9.048: tracciabilita' modello voto e algoritmo (Misurare = server weighted ICP)
+    // v7.3.9.049: tracciabilita' modello voto e algoritmo (Misurare = server weighted ICP)
     score_model_version: (misICP_result.score_model_version || 'Syntesis Score v1.0'),
     algorithm: (misICP_result.algorithm || 'server_weighted_icp_v1')
   };
@@ -6127,7 +6135,7 @@ function misICP_pdfFooter(doc, title, pageInfo, darkBg){
  * Disegna la copertina comune (sfondo scuro, anello, badge, info, mappa).
  */
 
-// Helper v7.3.9.048: schiarisce/scurisce un hex color di una percentuale
+// Helper v7.3.9.049: schiarisce/scurisce un hex color di una percentuale
 function misICP_shadeHex(hex, pct){
   hex = hex.replace('#','');
   var r = parseInt(hex.substr(0,2), 16);
@@ -6149,7 +6157,7 @@ function misICP_shadeHex(hex, pct){
 }
 
 function misICP_pdfDrawCover(doc, data, reportTitle){
-  // COVER CLINICO v7.3.9.048: anello smooth con gradient sottile (no doppio glow)
+  // COVER CLINICO v7.3.9.049: anello smooth con gradient sottile (no doppio glow)
   var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
   function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
   function setTxt (hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
@@ -7046,7 +7054,7 @@ function misICP_renderClinicalPDF(data){
   var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.048)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.049)', null, true);
 
   // Pagina 2: Note metodologiche (statica, identica per ogni report)
   doc.addPage();
@@ -7092,7 +7100,7 @@ function misICP_renderClinicalPDF(data){
 // ────────────────────────────────────────────────────────────────────
 
 
-// ── CERTIFICATO DI TARATURA v7.3.9.048 ─────────────────────────────
+// ── CERTIFICATO DI TARATURA v7.3.9.049 ─────────────────────────────
 // Modal di raccolta metadati + helpers di classificazione PASS/VERIFICA/FAIL
 // Soglie industriali standard: PASS \u2264 50\u03bcm, VERIFICA 50-100\u03bcm, FAIL > 100\u03bcm
 // (per angoli: PASS \u2264 0.5\u00b0, VERIFICA 0.5-1.0\u00b0, FAIL > 1.0\u00b0)
@@ -7167,7 +7175,7 @@ function misICP_submitCalibration(){
 
 
 function misICP_renderCalibrationPDF(data, calibMeta){
-  // CERTIFICATO DI TARATURA v7.3.9.048
+  // CERTIFICATO DI TARATURA v7.3.9.049
   // Cover con anello gradient conico + logo Syntesis bianco watermark in pagine interne
   if(!calibMeta){
     calibMeta = { type:'\u2014', maker:'\u2014', model:'\u2014', sn:'\u2014',
@@ -7309,7 +7317,7 @@ function misICP_pdfDrawCalibrationCover(doc, data, calibMeta){
   doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#B0B8C1');
   doc.text('Precision Scanner Report - Taratura', W/2, 46, {align:'center'});
 
-  // Anello smooth - gradient SOTTILE nel colore base (v7.3.9.048)
+  // Anello smooth - gradient SOTTILE nel colore base (v7.3.9.049)
   var scoreRingSrc = (function(){
     var sizePx = 700;
     var c = document.createElement('canvas');
@@ -7465,7 +7473,7 @@ function misICP_pdfDrawCalibrationIdPage(doc, calibMeta, data){
   h = drawInfoBox(ml, y, cw, 'OPERAZIONE', [
     ['Data taratura', calibMeta.dateStr + '  alle  ' + calibMeta.timeStr],
     ['Procedura',     'Allineamento Kabsch + SVD + ICP iterativo'],
-    ['Software',      'Syntesis-ICP - Misurare (Analizza v7.3.9.048)']
+    ['Software',      'Syntesis-ICP - Misurare (Analizza v7.3.9.049)']
   ]); y += h + 6;
   h = drawInfoBox(ml, y, cw, 'FILE DI RIFERIMENTO', [
     ['Master STL',      data.fileAfull || data.fileA || '\u2014'],
@@ -7686,7 +7694,7 @@ function misICP_renderExcel(data){
     ['Scala mappa colorimetrica', data.scaleUm,                       'μm'],
     [],
     ['SOFTWARE'],
-    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.048)'],
+    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.049)'],
     ['Produttore',   'Biaggini Medical Devices S.r.l.'],
     ['Sito',         'https://syntesis-icp.com'],
     [],
@@ -7901,7 +7909,7 @@ function misICP_renderExcel(data){
     ['File B slug filesystem',           slugB],
     ['Data analisi (locale)',            dtStr],
     ['Data analisi (ISO 8601)',          dtIso],
-    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.048)'],
+    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.049)'],
     ['Produttore',                       'Biaggini Medical Devices S.r.l.'],
     ['Sito',                             'https://syntesis-icp.com'],
     ['User-Agent browser',               ua]
@@ -7976,7 +7984,7 @@ function misICP_generateReport(kind){
   if(btn){ btn.classList.add('busy'); btn.innerHTML='<span>Generazione in corso...</span>'; }
   misICP_clearError();
 
-  // FIX v7.3.9.048: per Taratura apri modal di raccolta metadati invece di generare subito
+  // FIX v7.3.9.049: per Taratura apri modal di raccolta metadati invece di generare subito
   if(kind === 'taratura'){
     var btn0 = document.getElementById('misBtnReport');
     if(btn0){ btn0.classList.remove('busy'); btn0.innerHTML = '<span>Scarica report</span><span style="font-size:13px;opacity:0.8">&#9662;</span>'; }
@@ -8096,7 +8104,7 @@ function misICP_updateLabels(){
   var rect = vp.getBoundingClientRect();
   var W = rect.width, H = rect.height;
 
-  // FIX v7.3.9.048: compensa body.style.zoom (vedi updateDivergenceLabels)
+  // FIX v7.3.9.049: compensa body.style.zoom (vedi updateDivergenceLabels)
   var zoomF = (typeof syntesisGetUiZoom === 'function') ? syntesisGetUiZoom() : 1.0;
 
   var svg = document.getElementById('labelLines');
@@ -9579,7 +9587,7 @@ function updateDivergenceLabels(){
     return;
   }
 
-  // FIX v7.3.9.048: compensa body.style.zoom. getBoundingClientRect()
+  // FIX v7.3.9.049: compensa body.style.zoom. getBoundingClientRect()
   // ritorna coordinate post-zoom, ma style.left viene RI-zoomato dal
   // browser. Devo dividere per il zoom prima di applicare le coordinate.
   var zoomF = (typeof syntesisGetUiZoom === 'function') ? syntesisGetUiZoom() : 1.0;
@@ -10089,7 +10097,7 @@ function closeGroupDialog(){
 }
 
 function confirmGroup(){
-  // v7.3.9.048: Quando si crea un nuovo gruppo, i MUA che erano in gid=0
+  // v7.3.9.049: Quando si crea un nuovo gruppo, i MUA che erano in gid=0
   // (gruppo di base "default") vengono SPOSTATI automaticamente in un secondo
   // gruppo complementare, perche' dividere implica due insiemi distinti.
   var selected = [];
@@ -10156,7 +10164,7 @@ function getMuaByGroup(){
 
 // Helper: colore unico per badge gruppo
 
-// Helper v7.3.9.048: colore freccia di setup per gruppo
+// Helper v7.3.9.049: colore freccia di setup per gruppo
 // Distinto da getGroupBadgeColor per coerenza visiva (gid 0 blu primario,
 // non grigio come il badge che e' "senza gruppo")
 function getGroupArrowColor(gid){
@@ -10562,7 +10570,7 @@ function applyRenderModeToScene(){
       if(m.scanbodyScanMesh) applyRenderModeToMesh(m.scanbodyScanMesh);
     });
   }
-  // FIX v7.3.9.048: applico la modalita\' anche alle mesh Misurare
+  // FIX v7.3.9.049: applico la modalita\' anche alle mesh Misurare
   // (arcate riferimento/confronto + scanbody A e B post-ICP)
   if(typeof misICP_bgMeshA !== 'undefined' && misICP_bgMeshA){
     applyRenderModeToMesh(misICP_bgMeshA);
@@ -10907,12 +10915,12 @@ try {
 
 
 
-// ── UI ZOOM v7.3.9.048 ─────────────────────────────────────────────
+// ── UI ZOOM v7.3.9.049 ─────────────────────────────────────────────
 // Scaling globale del testo interfaccia. Salva preferenza in localStorage.
 var SYNTESIS_UI_ZOOM_KEY = 'syntesis_ui_zoom';
 
 
-// Helper v7.3.9.048: ritorna il fattore zoom corrente del body
+// Helper v7.3.9.049: ritorna il fattore zoom corrente del body
 // (per compensare coordinate label che vengono ri-zoomate dal browser)
 function syntesisGetUiZoom(){
   try {
@@ -10923,7 +10931,7 @@ function syntesisGetUiZoom(){
 }
 
 function applyUiZoom(zoom, opts){
-  // v7.3.9.048: opts.silent=true applica senza salvare in localStorage
+  // v7.3.9.049: opts.silent=true applica senza salvare in localStorage
   // (usato da loadUiZoom quando applica il default 130%)
   zoom = parseFloat(zoom);
   if(!zoom || isNaN(zoom)) zoom = 1.30;
@@ -10944,7 +10952,7 @@ function applyUiZoom(zoom, opts){
 }
 
 function loadUiZoom(){
-  // v7.3.9.048: zoom default 1.0. I font base sono stati ingranditi nel CSS,
+  // v7.3.9.049: zoom default 1.0. I font base sono stati ingranditi nel CSS,
   // quindi non serve piu' lo zoom forzato di v044.
   // Reset una-tantum: chi aveva la migrazione automatica v044 attiva con zoom
   // 1.15/1.30/1.45 (cioe' non aveva scelto consapevolmente) viene riportato a
@@ -10978,7 +10986,7 @@ function loadUiZoom(){
 }
 
 function refreshUiZoomButtons(){
-  // v7.3.9.048: 5 bottoni 100/115/130/145/160 (130 = default)
+  // v7.3.9.049: 5 bottoni 100/115/130/145/160 (130 = default)
   var z = 1.30;
   try { z = parseFloat(localStorage.getItem(SYNTESIS_UI_ZOOM_KEY)) || 1.30; } catch(e){}
   var btns = [
@@ -15044,7 +15052,7 @@ window.addEventListener('DOMContentLoaded',init);
     </div>
 
 
-    <!-- === TAB ALGORITMO (v7.3.9.048) === -->
+    <!-- === TAB ALGORITMO (v7.3.9.049) === -->
     <div id="settingsTabAlgo" style="display:none">
       <div style="margin-bottom:14px">
         <label style="display:block;font-family:var(--mono);font-size:12px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Algoritmo posizionamento MUA</label>
@@ -15225,7 +15233,7 @@ window.onSyntesisViewModeChange = function(mode){
   }
 };
 
-// ── DRAGGABLE + RESIZABLE PANELS (v7.3.9.048) ─────────────────────
+// ── DRAGGABLE + RESIZABLE PANELS (v7.3.9.049) ─────────────────────
 // Rende un pannello assoluto trascinabile (handle = elemento con classe
 // .syn-drag-handle dentro il pannello) e ridimensionabile (handle in basso
 // a destra, classe .syn-resize-handle). Stato salvato in localStorage.
@@ -15402,7 +15410,7 @@ window.onSyntesisViewModeChange = function(mode){
 
 
 
-// ── KEYBOARD SHORTCUTS v7.3.9.048 ─────────────────────────────────
+// ── KEYBOARD SHORTCUTS v7.3.9.049 ─────────────────────────────────
 // Spazio chiama Raffina (alignAll) quando ha senso (Analizza con MUA).
 // P chiama startPlacement (Posiziona).
 // Skip se l'utente sta scrivendo in un input/textarea.
@@ -15444,7 +15452,7 @@ window.onSyntesisViewModeChange = function(mode){
   }, false);
 })();
 
-// ── PULSANTE CARICA FILE (toolbar) v7.3.9.048 ─────────────────────
+// ── PULSANTE CARICA FILE (toolbar) v7.3.9.049 ─────────────────────
 // Il pulsante in toolbar inoltra al file picker corretto in base al
 // workflow corrente. Quando un caricamento e' "necessario" (no scan
 // caricata) il pulsante pulsa con classe .attention.
@@ -15499,7 +15507,7 @@ if(typeof window !== 'undefined'){
 }
 
 
-// ── TOOLTIP CUSTOM v7.3.9.048 ─────────────────────────────────
+// ── TOOLTIP CUSTOM v7.3.9.049 ─────────────────────────────────
 // Sposta il `title` dei pulsanti toolbar in `data-tip` per usare i tooltip
 // CSS custom istantanei (niente delay 1.5s del browser, niente fondo giallo).
 // Si applica solo ai bottoni icon-only e ai pulsanti dentro btn-icon-group e
@@ -15534,7 +15542,7 @@ if(typeof window !== 'undefined'){
 })();
 
 
-// TOOLTIP CUSTOM v7.3.9.048: sposta title -> data-tip sui bottoni toolbar
+// TOOLTIP CUSTOM v7.3.9.049: sposta title -> data-tip sui bottoni toolbar
 (function(){
   function migrateTitles(){
     var selectors = [
@@ -15563,7 +15571,7 @@ if(typeof window !== 'undefined'){
 })();
 
 
-// TOOLTIP CUSTOM v7.3.9.048: sposta title -> data-tip sui bottoni toolbar
+// TOOLTIP CUSTOM v7.3.9.049: sposta title -> data-tip sui bottoni toolbar
 (function(){
   function migrateTitles(){
     var selectors = [
@@ -15592,7 +15600,7 @@ if(typeof window !== 'undefined'){
 })();
 
 
-// v7.3.9.048 toggle panel collassabile
+// v7.3.9.049 toggle panel collassabile
 function toggleAngleListPanel(){
   var p = document.getElementById('panelAngleList');
   if(!p) return;
@@ -15602,7 +15610,7 @@ function toggleAngleListPanel(){
 </script>
 
 
-<!-- Modal Certificato Taratura v7.3.9.048 -->
+<!-- Modal Certificato Taratura v7.3.9.049 -->
 <div class="calmodal-back" id="calibrationModal">
   <div class="calmodal">
     <div class="calmodal-h">
@@ -15645,5 +15653,251 @@ function toggleAngleListPanel(){
     </div>
   </div>
 </div>
+
+<!-- v7.3.9.049: Modal Login / Registrazione -->
+<div id="syntAuthOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,25,35,.72);z-index:1000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:14px;max-width:440px;width:100%;box-shadow:0 24px 60px rgba(0,30,80,.5);overflow:hidden;font-family:Arial,sans-serif">
+    <div style="padding:18px 22px;border-bottom:1.5px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:15px;font-weight:800;color:#0F1923">Area personale Syntesis-ICP</div>
+        <div style="font-size:11px;color:#7A90A4;margin-top:2px;font-family:monospace">Login per accedere alle tue analisi e progetti</div>
+      </div>
+      <button onclick="syntAuthClose()" style="background:none;border:none;font-size:24px;color:#7A90A4;cursor:pointer;padding:0;line-height:1">&times;</button>
+    </div>
+    <div style="display:flex;background:#F0F5FA;padding:4px;margin:14px 22px 0;border-radius:9px">
+      <button id="syntAuthTabLogin" onclick="syntAuthSwitchTab('login')" style="flex:1;padding:8px;border:none;background:#fff;color:#0065B3;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,50,100,.1)">Accedi</button>
+      <button id="syntAuthTabRegister" onclick="syntAuthSwitchTab('register')" style="flex:1;padding:8px;border:none;background:transparent;color:#7A90A4;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer">Registrati</button>
+    </div>
+
+    <!-- Login form -->
+    <div id="syntAuthLoginForm" style="padding:18px 22px">
+      <div style="margin-bottom:12px">
+        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Email</label>
+        <input type="email" id="syntAuthLoginEmail" placeholder="email@esempio.it" style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Password</label>
+        <input type="password" id="syntAuthLoginPwd" placeholder="..." style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')syntAuthDoLogin()">
+      </div>
+      <div id="syntAuthLoginErr" style="color:#DC2626;font-size:12px;margin-bottom:8px;font-family:monospace;min-height:14px"></div>
+      <button onclick="syntAuthDoLogin()" id="syntAuthLoginBtn" style="width:100%;padding:11px;background:linear-gradient(135deg,#0077CC,#0050A0);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">Accedi</button>
+    </div>
+
+    <!-- Register form -->
+    <div id="syntAuthRegisterForm" style="padding:18px 22px;display:none">
+      <div style="margin-bottom:10px">
+        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Email *</label>
+        <input type="email" id="syntAuthRegEmail" placeholder="email@esempio.it" style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Nome completo *</label>
+        <input type="text" id="syntAuthRegName" placeholder="Mario Rossi" style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Password * (min 8 caratteri)</label>
+        <input type="password" id="syntAuthRegPwd" style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Organizzazione (opz.)</label>
+        <input type="text" id="syntAuthRegOrg" placeholder="Studio dentistico, laboratorio..." style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Chiave di licenza *</label>
+        <input type="text" id="syntAuthRegLicense" placeholder="SICP-XXXX-XXXX-XXXX" style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none;font-family:monospace">
+      </div>
+      <div id="syntAuthRegErr" style="color:#DC2626;font-size:12px;margin-bottom:8px;font-family:monospace;min-height:14px"></div>
+      <button onclick="syntAuthDoRegister()" id="syntAuthRegBtn" style="width:100%;padding:11px;background:linear-gradient(135deg,#0077CC,#0050A0);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">Crea account</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// v7.3.9.049 - Sistema login/registrazione FastAPI backend
+(function(){
+  var SYNT_TOKEN_KEY = 'syntesis_token';
+  var SYNT_USER_KEY = 'syntesis_user';
+
+  function syntAuthGetToken(){
+    try { return localStorage.getItem(SYNT_TOKEN_KEY) || ''; } catch(e){ return ''; }
+  }
+  function syntAuthGetUser(){
+    try { return JSON.parse(localStorage.getItem(SYNT_USER_KEY) || 'null'); } catch(e){ return null; }
+  }
+  function syntAuthSetToken(token, user){
+    try {
+      localStorage.setItem(SYNT_TOKEN_KEY, token);
+      localStorage.setItem(SYNT_USER_KEY, JSON.stringify(user));
+    } catch(e){}
+  }
+  function syntAuthClearToken(){
+    try {
+      localStorage.removeItem(SYNT_TOKEN_KEY);
+      localStorage.removeItem(SYNT_USER_KEY);
+    } catch(e){}
+  }
+
+  // Refresh stato UI: aggiorna voce menu File
+  window.syntAuthRefreshUI = function(){
+    var token = syntAuthGetToken();
+    var user = syntAuthGetUser();
+    var label = document.getElementById('fmAuthLabel');
+    var key = document.getElementById('fmAuthKey');
+    var dash = document.getElementById('fmDashboardItem');
+    if(!label) return;
+    if(token && user){
+      label.textContent = 'Esci (' + (user.name || user.email || 'utente') + ')';
+      key.textContent = 'LOGOUT';
+      if(dash) dash.style.display = 'flex';
+    } else {
+      label.textContent = 'Accedi';
+      key.textContent = 'LOGIN';
+      if(dash) dash.style.display = 'none';
+    }
+  };
+
+  // Click sul menu Accedi/Esci
+  window.syntAuthClick = function(){
+    var token = syntAuthGetToken();
+    if(token){
+      // Logout
+      if(!confirm('Disconnettersi dall\'area personale?')) return;
+      syntAuthClearToken();
+      window.syntAuthRefreshUI();
+      try { showStatus && showStatus('Disconnesso.'); } catch(e){}
+    } else {
+      // Apri modal login
+      window.syntAuthOpen('login');
+    }
+  };
+
+  window.syntAuthOpen = function(tab){
+    var ov = document.getElementById('syntAuthOverlay');
+    if(!ov) return;
+    ov.style.display = 'flex';
+    syntAuthSwitchTab(tab || 'login');
+    setTimeout(function(){
+      var f = document.getElementById(tab === 'register' ? 'syntAuthRegEmail' : 'syntAuthLoginEmail');
+      if(f) f.focus();
+    }, 60);
+  };
+  window.syntAuthClose = function(){
+    var ov = document.getElementById('syntAuthOverlay');
+    if(ov) ov.style.display = 'none';
+    document.getElementById('syntAuthLoginErr').textContent = '';
+    document.getElementById('syntAuthRegErr').textContent = '';
+  };
+  window.syntAuthSwitchTab = function(tab){
+    var loginForm = document.getElementById('syntAuthLoginForm');
+    var regForm = document.getElementById('syntAuthRegisterForm');
+    var loginTab = document.getElementById('syntAuthTabLogin');
+    var regTab = document.getElementById('syntAuthTabRegister');
+    if(tab === 'register'){
+      loginForm.style.display = 'none';
+      regForm.style.display = 'block';
+      loginTab.style.background = 'transparent';
+      loginTab.style.color = '#7A90A4';
+      loginTab.style.boxShadow = 'none';
+      regTab.style.background = '#fff';
+      regTab.style.color = '#0065B3';
+      regTab.style.boxShadow = '0 1px 4px rgba(0,50,100,.1)';
+    } else {
+      loginForm.style.display = 'block';
+      regForm.style.display = 'none';
+      loginTab.style.background = '#fff';
+      loginTab.style.color = '#0065B3';
+      loginTab.style.boxShadow = '0 1px 4px rgba(0,50,100,.1)';
+      regTab.style.background = 'transparent';
+      regTab.style.color = '#7A90A4';
+      regTab.style.boxShadow = 'none';
+    }
+  };
+
+  window.syntAuthDoLogin = async function(){
+    var email = document.getElementById('syntAuthLoginEmail').value.trim();
+    var pwd = document.getElementById('syntAuthLoginPwd').value;
+    var errEl = document.getElementById('syntAuthLoginErr');
+    var btn = document.getElementById('syntAuthLoginBtn');
+    errEl.textContent = '';
+    if(!email || !pwd){ errEl.textContent = 'Email e password sono richieste.'; return; }
+    btn.disabled = true; btn.textContent = 'Accesso in corso...';
+    try {
+      var r = await fetch('/auth/login', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ email: email, password: pwd })
+      });
+      if(!r.ok){
+        var j = await r.json().catch(function(){ return {detail:'errore HTTP '+r.status}; });
+        errEl.textContent = j.detail || 'Credenziali non valide.';
+        return;
+      }
+      var data = await r.json();
+      syntAuthSetToken(data.access_token, data.user);
+      window.syntAuthRefreshUI();
+      window.syntAuthClose();
+      try { showStatus && showStatus('Connesso come ' + (data.user.name || data.user.email)); } catch(e){}
+    } catch(e){
+      errEl.textContent = 'Errore: ' + e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Accedi';
+    }
+  };
+
+  window.syntAuthDoRegister = async function(){
+    var email = document.getElementById('syntAuthRegEmail').value.trim();
+    var name = document.getElementById('syntAuthRegName').value.trim();
+    var pwd = document.getElementById('syntAuthRegPwd').value;
+    var org = document.getElementById('syntAuthRegOrg').value.trim();
+    var license = document.getElementById('syntAuthRegLicense').value.trim();
+    var errEl = document.getElementById('syntAuthRegErr');
+    var btn = document.getElementById('syntAuthRegBtn');
+    errEl.textContent = '';
+    if(!email || !name || !pwd || !license){
+      errEl.textContent = 'Email, nome, password e licenza sono obbligatori.'; return;
+    }
+    if(pwd.length < 8){
+      errEl.textContent = 'Password troppo corta (minimo 8 caratteri).'; return;
+    }
+    btn.disabled = true; btn.textContent = 'Registrazione...';
+    try {
+      var r = await fetch('/auth/register', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          email: email, name: name, password: pwd,
+          organization: org || null, license_key: license
+        })
+      });
+      if(!r.ok){
+        var j = await r.json().catch(function(){ return {detail:'errore HTTP '+r.status}; });
+        errEl.textContent = j.detail || 'Errore registrazione.';
+        return;
+      }
+      var data = await r.json();
+      syntAuthSetToken(data.access_token, data.user);
+      window.syntAuthRefreshUI();
+      window.syntAuthClose();
+      try { showStatus && showStatus('Account creato! Connesso come ' + data.user.name); } catch(e){}
+    } catch(e){
+      errEl.textContent = 'Errore: ' + e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Crea account';
+    }
+  };
+
+  // Esc per chiudere
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ window.syntAuthClose(); }
+  });
+  // Refresh UI all'avvio
+  document.addEventListener('DOMContentLoaded', function(){
+    window.syntAuthRefreshUI();
+  });
+  // Subito (potrebbe essere caricato dopo DOMContentLoaded)
+  if(document.readyState !== 'loading'){
+    setTimeout(function(){ window.syntAuthRefreshUI && window.syntAuthRefreshUI(); }, 100);
+  }
+})();
+</script>
+
 </body>
 </html>
