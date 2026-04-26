@@ -81,20 +81,34 @@ async def get_user_by_email(email: str) -> Optional[dict]:
 
 async def create_user(email: str, name: str, password_hash: str, salt: str,
                       organization: Optional[str], license_key: str) -> str:
+    """v7.3.9.040: race condition fix.
+    Tenta UPDATE...RETURNING della licenza PRIMA di creare l'utente.
+    Se la licenza e' gia' usata da qualcun altro fra verify_license() e qui,
+    UPDATE ritorna 0 righe e la transazione si annulla con eccezione esplicita.
+    Cosi' due richieste concorrenti non possono entrambe consumare la stessa
+    licenza."""
     import uuid
     user_id = str(uuid.uuid4())
     pool = await get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
+            # 1. Tenta lock atomico della licenza
+            row = await conn.fetchrow("""
+                UPDATE licenses
+                SET used_by = $1, used_at = NOW()
+                WHERE key = $2
+                  AND active = TRUE
+                  AND used_by IS NULL
+                RETURNING key
+            """, user_id, license_key)
+            if not row:
+                # Licenza non disponibile: race detected o licenza disattivata
+                raise ValueError("Licenza non disponibile o gia' utilizzata.")
+            # 2. Solo se la licenza e' stata bloccata, crea l'utente
             await conn.execute("""
                 INSERT INTO users (id, email, name, organization, password_hash, salt, license_key)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
             """, user_id, email, name, organization, password_hash, salt, license_key)
-            # Marca licenza come usata
-            await conn.execute("""
-                UPDATE licenses SET used_by = $1, used_at = NOW()
-                WHERE key = $2 AND used_by IS NULL
-            """, user_id, license_key)
     return user_id
 
 
