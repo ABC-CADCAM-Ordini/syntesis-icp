@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.043</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.044</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Source Sans 3','Source Sans Pro',sans-serif;--mono:'Source Sans 3','Source Sans Pro',sans-serif}
@@ -321,7 +321,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .mis-tree-slider-row input[type=range]{flex:1;height:12px;accent-color:#0065B3;cursor:pointer;margin:0}
 .mis-tree-val{font-size:9px;color:var(--gray);min-width:30px;text-align:right}
 
-/* Certificato Taratura modal v7.3.9.043 */
+/* Certificato Taratura modal v7.3.9.044 */
 .calmodal-back{position:fixed;inset:0;background:rgba(15,25,35,.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px}
 .calmodal-back.show{display:flex}
 .calmodal{background:#fff;border-radius:14px;max-width:600px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,25,35,.3);font-family:var(--font)}
@@ -345,7 +345,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .calmodal-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
 .calmodal-btn.primary:hover{background:#004F8A}
 
-/* v7.3.9.043 draggable+resizable panels */
+/* v7.3.9.044 draggable+resizable panels */
 .syn-drag-handle {
   cursor: move;
   user-select: none;
@@ -368,7 +368,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .syn-resize-handle:hover { opacity: 1; }
 
 
-/* v7.3.9.043 toolbar icon-only buttons - text-node aware */
+/* v7.3.9.044 toolbar icon-only buttons - text-node aware */
 button.btn.icon-only {
   padding: 6px 9px !important;
   min-width: 34px;
@@ -446,7 +446,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   50% { box-shadow: 0 0 0 6px rgba(0,101,179,0); }
 }
 
-/* v7.3.9.043 tooltip custom istantaneo per pulsanti icon-only e gruppi */
+/* v7.3.9.044 tooltip custom istantaneo per pulsanti icon-only e gruppi */
 [data-tip] {
   position: relative;
 }
@@ -519,7 +519,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   transform: translate(0, -50%);
 }
 
-/* v7.3.9.043 tooltip custom istantaneo */
+/* v7.3.9.044 tooltip custom istantaneo */
 [data-tip] {
   position: relative;
 }
@@ -569,7 +569,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   transition-delay: 0.25s;
 }
 
-/* v7.3.9.043 tooltip custom istantaneo */
+/* v7.3.9.044 tooltip custom istantaneo */
 [data-tip] {
   position: relative;
 }
@@ -619,7 +619,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   transition-delay: 0.25s;
 }
 
-/* v7.3.9.043: Compensazione body.zoom per sidebar overflow */
+/* v7.3.9.044: Compensazione body.zoom per sidebar overflow */
 body[style*="zoom"] .panel,
 body .panel {
   /* L'altezza e' calcolata dal flex container .main; height:100% deve essere
@@ -631,7 +631,7 @@ body .panel {
 .panel::-webkit-scrollbar-thumb { background: rgba(122,144,164,0.4); border-radius: 4px; }
 .panel::-webkit-scrollbar-thumb:hover { background: rgba(122,144,164,0.7); }
 
-/* v7.3.9.043 panel collassabile */
+/* v7.3.9.044 panel collassabile */
 .panel-collapsible-head {
   cursor: pointer;
   display: flex !important;
@@ -674,7 +674,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.043</span>
+      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.044</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -1270,7 +1270,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '7.3.9.043';
+window.ANALIZZA_BUILD = '7.3.9.044';
 window.ANALIZZA_BUILD_DATE = '2026-04-25';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -1531,7 +1531,7 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   // ALGORITMO: FIT DI CERCHIO A RAGGIO FISSO CAD-aware (client-side)
   // USATO DA: workflow Analizza (default), Sostituire (con opts.radius)
   //
-  // Architettura del progetto - i tre algoritmi di posizionamento (v7.3.9.043):
+  // Architettura del progetto - i tre algoritmi di posizionamento (v7.3.9.044):
   //   - Misurare    -> analyze_stl_pair       (backend Python, weighted ICP)
   //   - Analizza    -> findScanbodyCenter     (questa funzione, fit specializzato)
   //   - Sostituire  -> sostAlignAll           (ICP locale, riusa questa)
@@ -1544,7 +1544,7 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   // tempo di calcolo in millisecondi. Per questa geometria specifica, e'
   // piu' accurato del weighted ICP, che non sfrutta la conoscenza del raggio.
   //
-  // v7.3.9.043: opt-in alternativa server-side via /api/place-mua quando
+  // v7.3.9.044: opt-in alternativa server-side via /api/place-mua quando
   // l'utente seleziona "Algoritmo: server" nelle impostazioni. La routing
   // logic e' in alignAll() che chiama alignAllServer() oppure questa.
   // ═══════════════════════════════════════════════════════════════════════
@@ -1845,7 +1845,7 @@ function extractScanTopFaceNear(scanGeo, clickPos, clickNormal, radiusMm){
 }
 
 function alignAll(){
-  // v7.3.9.043 - DUAL ALGORITHM ROUTING
+  // v7.3.9.044 - DUAL ALGORITHM ROUTING
   // Default 'client' -> findScanbodyCenter (comportamento storico)
   // Opt-in 'server' -> /api/place-mua weighted ICP
   var algoChoice = 'client';
@@ -1934,7 +1934,7 @@ function alignAll(){
   }, 50);
 }
 
-// v7.3.9.043 - alignAll variante SERVER (weighted ICP)
+// v7.3.9.044 - alignAll variante SERVER (weighted ICP)
 function alignAllServer(){
   if(!scanMesh || muaObjects.length === 0){showStatus('Carica scansione + posiziona MUA'); return}
   var anyCut = muaObjects.some(function(m){ return m.scanbodyScanVisible === true; });
@@ -2072,7 +2072,7 @@ function alignAllServer(){
   });
 }
 
-// v7.3.9.043 - Helpers per dual algorithm
+// v7.3.9.044 - Helpers per dual algorithm
 function onAlgoChange(value){
   if(value !== 'client' && value !== 'server') return;
   try { localStorage.setItem('syntesis_mua_algorithm', value); } catch(e){}
@@ -2135,7 +2135,7 @@ function refreshAlgoDiagnostics(){
   box.innerHTML = rows.join('');
 }
 
-// v7.3.9.043 - Inietta tracciamento algorithmUsed nel path client originale
+// v7.3.9.044 - Inietta tracciamento algorithmUsed nel path client originale
 // (chiamata alla fine di alignAll() default per simmetria con alignAllServer)
 function _trackClientAlgo(){
   if(!muaObjects) return;
@@ -2160,7 +2160,7 @@ function calculateAngles(){
   var aligned=muaObjects.filter(function(m){return m.aligned});
   var panelEl = document.getElementById('panelAngleList');
 
-  // v7.3.9.043: nascondi pannello "Analisi angolare (coppie)" quando siamo in
+  // v7.3.9.044: nascondi pannello "Analisi angolare (coppie)" quando siamo in
   // workflow Analizza con piu' gruppi: l'analisi diventa per-gruppo via
   // FRESATURA AVANZATA, le coppie globali non hanno significato clinico.
   var groupsCount = 0;
@@ -2864,7 +2864,7 @@ function exportCase(){
 
   // 2. JSON con i dati del caso
   var triEl = document.getElementById('triScan');
-  // v7.3.9.043: leggo la scelta algoritmo corrente dell'utente
+  // v7.3.9.044: leggo la scelta algoritmo corrente dell'utente
   var algoChoice = 'client';
   try { algoChoice = localStorage.getItem('syntesis_mua_algorithm') || 'client'; } catch(e){}
   var data = {
@@ -2892,7 +2892,7 @@ function exportCase(){
         divergence_deg: (m.divergence !== null && m.divergence !== undefined) ? +m.divergence.toFixed(3) : null,
         rmsd_mm: (m.rmsd !== null && m.rmsd !== undefined) ? +m.rmsd.toFixed(4) : null,
         aligned: !!m.aligned,
-        // v7.3.9.043: tracciabilita' algoritmo dual (vedi MASTER_DOC sez 3.1-3.2)
+        // v7.3.9.044: tracciabilita' algoritmo dual (vedi MASTER_DOC sez 3.1-3.2)
         algorithm: m.algorithmUsed || null,
         algorithm_rmsd_um: (m.algorithmRmsd != null) ? Math.round(m.algorithmRmsd * 1000) : null,
         algorithm_elapsed_ms: m.algorithmElapsedMs || null
@@ -2970,7 +2970,7 @@ function updateWorkflowUI(wf){
 }
 
 
-// ── RESET TOTALE SESSIONE v7.3.9.043 ──────────────────────────
+// ── RESET TOTALE SESSIONE v7.3.9.044 ──────────────────────────
 // Cambio workflow = nuova sessione. Tutti i dati e gli artefatti dell'altro
 // workflow vengono distrutti, non solo nascosti. Non serve "ritrovo dove ho
 // lasciato": ogni workflow parte pulito. Pulizia mentale completa.
@@ -3181,7 +3181,7 @@ function selectWorkflow(wf){
   if(!WORKFLOWS[wf]) return;
   closeWorkflowMenu();
   var prev = currentWorkflow;
-  // v7.3.9.043: cambio workflow = nuova sessione. Reset completo del workflow
+  // v7.3.9.044: cambio workflow = nuova sessione. Reset completo del workflow
   // precedente, con conferma se l'utente ha dati attivi.
   if(prev && prev !== wf){
     if(_hasUnsavedDataInWorkflow(prev)){
@@ -3221,7 +3221,7 @@ function selectWorkflow(wf){
   // Se sto uscendo da Misurare verso un altro workflow, smonto il viewport ICP
   if(prev === 'misurare' && wf !== 'misurare'){
     try { misICP_unmountViewport(); } catch(e){ console.warn('[Misurare] unmount fallito:', e); }
-    // FIX v7.3.9.043: riaccendi artefatti Analizza se torni in analizza/accoppia
+    // FIX v7.3.9.044: riaccendi artefatti Analizza se torni in analizza/accoppia
     if(wf === 'analizza' || wf === 'accoppia'){
       try { _setAnalyzaArtifactsVisible(true); } catch(e){}
     }
@@ -3278,7 +3278,7 @@ function selectWorkflow(wf){
   }
   else if(wf === 'misurare'){
     analysisMode = 'misurare';
-    // FIX v7.3.9.043: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
+    // FIX v7.3.9.044: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
     try { _setAnalyzaArtifactsVisible(false); } catch(e){}
     if(panAng)  panAng.style.display  = 'none';
     if(panAx)   panAx.style.display   = 'none';
@@ -3370,7 +3370,7 @@ var FRES_PROXIMITY_DEG = 2.0;
 var fresState = {
   db: null,                    // { machines, selectedId, lastCustomAxis, lastCustomAxisByGid }
   mode: 'mean',                // 'mean' | 'minimax' | 'custom' (globale)
-  // v7.3.9.043: stato per-gruppo
+  // v7.3.9.044: stato per-gruppo
   axesByGid: {},               // { gid: {meanAxis, minimaxAxis, customAxis, setupAxis} }
   arrowsByGid: {},             // { gid: THREE.Group }
   pickersByGid: {},            // { gid: THREE.Mesh sfera }
@@ -3499,7 +3499,7 @@ function fresComputeMinimaxAxis(axes){
 
 // ===== Costruzione e aggiornamento freccia di setup =====
 
-// ── OVERLAY SCENE per frecce fresatura v7.3.9.043 ─────────────────
+// ── OVERLAY SCENE per frecce fresatura v7.3.9.044 ─────────────────
 // Una seconda scena Three.js dedicata alle frecce per-gruppo. La pipeline
 // render fa: 1) renderer.render(scene, camera); 2) clearDepth();
 // 3) renderer.render(fresOverlayScene, camera). Risultato: le frecce sono
@@ -3510,7 +3510,7 @@ var fresOverlayLights = null;
 function fresInitOverlayScene(){
   if(fresOverlayScene) return;
   fresOverlayScene = new THREE.Scene();
-  // v7.3.9.043: luci DIRECT nella overlay scene, NO camera.add
+  // v7.3.9.044: luci DIRECT nella overlay scene, NO camera.add
   // (il bug v.033/034: camera.add(light) -> luce condivisa con scene principale
   // -> arcata bruciata. Ora le luci vivono nella overlay scene e basta).
   var amb = new THREE.AmbientLight(0xffffff, 0.55);
@@ -3524,14 +3524,14 @@ function fresInitOverlayScene(){
 }
 
 function fresOverlayRender(){
-  // v7.3.9.043: NO-OP. Le frecce sono tornate nella scena principale con
+  // v7.3.9.044: NO-OP. Le frecce sono tornate nella scena principale con
   // depthTest:false + renderOrder alto. fresOverlayScene non viene piu'
   // usata. Funzione mantenuta solo per compatibilita' con animate loop.
   return;
 }
 
 function fresBuildArrow(gid, origin){
-  // v7.3.9.043: arrow nella scena PRINCIPALE con depthTest:false +
+  // v7.3.9.044: arrow nella scena PRINCIPALE con depthTest:false +
   // renderOrder alto. Niente piu' overlay scene (causava TypeError in alcuni
   // refresh). Questo approccio era quello originale di v.029 e funzionava.
   if(fresState.arrowsByGid[gid]){
@@ -3832,7 +3832,7 @@ function fresBuildAllArrows(){
   });
 }
 
-// v7.3.9.043: cleanup di tutte le frecce
+// v7.3.9.044: cleanup di tutte le frecce
 function fresClearAllArrows(){
   Object.keys(fresState.arrowsByGid).forEach(function(k){
     var g = fresState.arrowsByGid[k];
@@ -3844,7 +3844,7 @@ function fresClearAllArrows(){
   fresState.pickerSphere = null;
 }
 
-// v7.3.9.043: ricostruisce frecce per tutti i gruppi presenti
+// v7.3.9.044: ricostruisce frecce per tutti i gruppi presenti
 function fresBuildAllArrows(){
   fresClearAllArrows();
   var aligned = muaObjects.filter(function(m){ return m.aligned; });
@@ -3868,7 +3868,7 @@ function fresBuildAllArrows(){
   });
 }
 function fresUpdateArrow(gid){
-  // v7.3.9.043: freccia parte da `origin + d*liftOff` (stacco dal MUA)
+  // v7.3.9.044: freccia parte da `origin + d*liftOff` (stacco dal MUA)
   var grp = fresState.arrowsByGid[gid];
   if(!grp) return;
   var axes = fresState.axesByGid[gid];
@@ -4256,7 +4256,7 @@ function fresScreenToSphere(x, y){
   return new THREE.Vector3(nx/r, ny/r, 0);
 }
 function fresIsClickOnPicker(x, y){
-  // v7.3.9.043: soglia 80px ULTRA generosa + log diagnostico esteso
+  // v7.3.9.044: soglia 80px ULTRA generosa + log diagnostico esteso
   var pickers = Object.values(fresState.pickersByGid).filter(Boolean);
   if(pickers.length === 0){
     console.log('[fres-pick] no pickers in fresState');
@@ -4319,7 +4319,7 @@ function fresIsClickOnPicker(x, y){
 }
 
 function fresOnMouseDown(e){
-  // v7.3.9.043 super-diagnostic
+  // v7.3.9.044 super-diagnostic
   console.log('[fres-md] click! isOpen=' + fresState.isOpen + 
               ' pickersCount=' + Object.keys(fresState.pickersByGid).length +
               ' button=' + e.button +
@@ -4421,7 +4421,7 @@ function fresAttachMouseHandlers(){
   fresState.pendingMouseHandlers = {
     md: fresOnMouseDown, mm: fresOnMouseMove, mu: fresOnMouseUp
   };
-  // v7.3.9.043: triplo attach in capture phase per intercettare prima
+  // v7.3.9.044: triplo attach in capture phase per intercettare prima
   // di OrbitControls qualsiasi cosa accada
   dom.addEventListener('mousedown', fresOnMouseDown, true);
   window.addEventListener('mousedown', fresOnMouseDown, true);
@@ -5044,7 +5044,7 @@ function misICP_run(){
       var rmsdUm = icpRes.rmsd * 1000;
       var penRmsd = Math.min(50, rmsdUm/10);
       var penAngle = Math.min(30, avgAngle*10);
-      // v7.3.9.043: SCORE PRELIMINARE rapido durante ICP, NON e' il punteggio canonico.
+      // v7.3.9.044: SCORE PRELIMINARE rapido durante ICP, NON e' il punteggio canonico.
       // Il valore canonico viene calcolato da misICP_score() (Syntesis Score v1.0)
       // a fine pipeline e SOSTITUISCE questo. Vedi L5256 per la formula canonica.
       var score = Math.max(0, 100 - penRmsd - penAngle);
@@ -5227,7 +5227,7 @@ function misICP_renderPerCylinder(pairs, bgTrisA, bgTrisB){
     controls.update && controls.update();
   }
 
-  // FIX v7.3.9.043: applico la modalita\' di rendering corrente
+  // FIX v7.3.9.044: applico la modalita\' di rendering corrente
   // alle nuove mesh (recupero da localStorage o envSettings.renderMode)
   try {
     var savedMode = null;
@@ -5516,14 +5516,14 @@ function misICP_calcScore(pairs, cylAxes){
     }
   }
   var eff=Math.sqrt(L6xy*L6xy*0.55 + L6z*L6z*0.30 + L6ax*L6ax*0.15);
-  // v7.3.9.043 SCORE MODEL CANONICO (Syntesis Score v1.0)
+  // v7.3.9.044 SCORE MODEL CANONICO (Syntesis Score v1.0)
   // Sincronizzato con backend/icp_engine.calc_score()
   // Curva iperbole: inflection 110um, steepness 1.5
   var score=100/(1+Math.pow(eff/110,1.5));
   return Math.max(0, Math.min(100, Math.round(score*100)/100));
 }
 function misICP_scoreLabel(s){
-  // v7.3.9.043 SCORE MODEL CANONICO - soglie sincronizzate con backend
+  // v7.3.9.044 SCORE MODEL CANONICO - soglie sincronizzate con backend
   // backend/icp_engine.score_label(): >=85 Eccellente, >=70 Buono, >=50 Sufficiente, >=33 Scarso, <33 Critico
   if(s>=85) return {label:'Eccellente',  col:'#639922', bg:'#EAF3DE', fg:'#3B6D11'};
   if(s>=70) return {label:'Buono',       col:'#D97706', bg:'#FEFCE8', fg:'#854D0E'};
@@ -6064,7 +6064,7 @@ function misICP_buildReportData(){
     icpT: misICP_result.t || [0,0,0],
     nCyl: pdfPairs.length,
     timestamp: new Date(),
-    // v7.3.9.043: tracciabilita' modello voto e algoritmo (Misurare = server weighted ICP)
+    // v7.3.9.044: tracciabilita' modello voto e algoritmo (Misurare = server weighted ICP)
     score_model_version: (misICP_result.score_model_version || 'Syntesis Score v1.0'),
     algorithm: (misICP_result.algorithm || 'server_weighted_icp_v1')
   };
@@ -6121,7 +6121,7 @@ function misICP_pdfFooter(doc, title, pageInfo, darkBg){
  * Disegna la copertina comune (sfondo scuro, anello, badge, info, mappa).
  */
 
-// Helper v7.3.9.043: schiarisce/scurisce un hex color di una percentuale
+// Helper v7.3.9.044: schiarisce/scurisce un hex color di una percentuale
 function misICP_shadeHex(hex, pct){
   hex = hex.replace('#','');
   var r = parseInt(hex.substr(0,2), 16);
@@ -6143,7 +6143,7 @@ function misICP_shadeHex(hex, pct){
 }
 
 function misICP_pdfDrawCover(doc, data, reportTitle){
-  // COVER CLINICO v7.3.9.043: anello smooth con gradient sottile (no doppio glow)
+  // COVER CLINICO v7.3.9.044: anello smooth con gradient sottile (no doppio glow)
   var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
   function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
   function setTxt (hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
@@ -7040,7 +7040,7 @@ function misICP_renderClinicalPDF(data){
   var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.043)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.044)', null, true);
 
   // Pagina 2: Note metodologiche (statica, identica per ogni report)
   doc.addPage();
@@ -7086,7 +7086,7 @@ function misICP_renderClinicalPDF(data){
 // ────────────────────────────────────────────────────────────────────
 
 
-// ── CERTIFICATO DI TARATURA v7.3.9.043 ─────────────────────────────
+// ── CERTIFICATO DI TARATURA v7.3.9.044 ─────────────────────────────
 // Modal di raccolta metadati + helpers di classificazione PASS/VERIFICA/FAIL
 // Soglie industriali standard: PASS \u2264 50\u03bcm, VERIFICA 50-100\u03bcm, FAIL > 100\u03bcm
 // (per angoli: PASS \u2264 0.5\u00b0, VERIFICA 0.5-1.0\u00b0, FAIL > 1.0\u00b0)
@@ -7161,7 +7161,7 @@ function misICP_submitCalibration(){
 
 
 function misICP_renderCalibrationPDF(data, calibMeta){
-  // CERTIFICATO DI TARATURA v7.3.9.043
+  // CERTIFICATO DI TARATURA v7.3.9.044
   // Cover con anello gradient conico + logo Syntesis bianco watermark in pagine interne
   if(!calibMeta){
     calibMeta = { type:'\u2014', maker:'\u2014', model:'\u2014', sn:'\u2014',
@@ -7303,7 +7303,7 @@ function misICP_pdfDrawCalibrationCover(doc, data, calibMeta){
   doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#B0B8C1');
   doc.text('Precision Scanner Report - Taratura', W/2, 46, {align:'center'});
 
-  // Anello smooth - gradient SOTTILE nel colore base (v7.3.9.043)
+  // Anello smooth - gradient SOTTILE nel colore base (v7.3.9.044)
   var scoreRingSrc = (function(){
     var sizePx = 700;
     var c = document.createElement('canvas');
@@ -7459,7 +7459,7 @@ function misICP_pdfDrawCalibrationIdPage(doc, calibMeta, data){
   h = drawInfoBox(ml, y, cw, 'OPERAZIONE', [
     ['Data taratura', calibMeta.dateStr + '  alle  ' + calibMeta.timeStr],
     ['Procedura',     'Allineamento Kabsch + SVD + ICP iterativo'],
-    ['Software',      'Syntesis-ICP - Misurare (Analizza v7.3.9.043)']
+    ['Software',      'Syntesis-ICP - Misurare (Analizza v7.3.9.044)']
   ]); y += h + 6;
   h = drawInfoBox(ml, y, cw, 'FILE DI RIFERIMENTO', [
     ['Master STL',      data.fileAfull || data.fileA || '\u2014'],
@@ -7680,7 +7680,7 @@ function misICP_renderExcel(data){
     ['Scala mappa colorimetrica', data.scaleUm,                       'μm'],
     [],
     ['SOFTWARE'],
-    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.043)'],
+    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.044)'],
     ['Produttore',   'Biaggini Medical Devices S.r.l.'],
     ['Sito',         'https://syntesis-icp.com'],
     [],
@@ -7895,7 +7895,7 @@ function misICP_renderExcel(data){
     ['File B slug filesystem',           slugB],
     ['Data analisi (locale)',            dtStr],
     ['Data analisi (ISO 8601)',          dtIso],
-    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.043)'],
+    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.044)'],
     ['Produttore',                       'Biaggini Medical Devices S.r.l.'],
     ['Sito',                             'https://syntesis-icp.com'],
     ['User-Agent browser',               ua]
@@ -7970,7 +7970,7 @@ function misICP_generateReport(kind){
   if(btn){ btn.classList.add('busy'); btn.innerHTML='<span>Generazione in corso...</span>'; }
   misICP_clearError();
 
-  // FIX v7.3.9.043: per Taratura apri modal di raccolta metadati invece di generare subito
+  // FIX v7.3.9.044: per Taratura apri modal di raccolta metadati invece di generare subito
   if(kind === 'taratura'){
     var btn0 = document.getElementById('misBtnReport');
     if(btn0){ btn0.classList.remove('busy'); btn0.innerHTML = '<span>Scarica report</span><span style="font-size:11px;opacity:0.8">&#9662;</span>'; }
@@ -8090,7 +8090,7 @@ function misICP_updateLabels(){
   var rect = vp.getBoundingClientRect();
   var W = rect.width, H = rect.height;
 
-  // FIX v7.3.9.043: compensa body.style.zoom (vedi updateDivergenceLabels)
+  // FIX v7.3.9.044: compensa body.style.zoom (vedi updateDivergenceLabels)
   var zoomF = (typeof syntesisGetUiZoom === 'function') ? syntesisGetUiZoom() : 1.0;
 
   var svg = document.getElementById('labelLines');
@@ -9573,7 +9573,7 @@ function updateDivergenceLabels(){
     return;
   }
 
-  // FIX v7.3.9.043: compensa body.style.zoom. getBoundingClientRect()
+  // FIX v7.3.9.044: compensa body.style.zoom. getBoundingClientRect()
   // ritorna coordinate post-zoom, ma style.left viene RI-zoomato dal
   // browser. Devo dividere per il zoom prima di applicare le coordinate.
   var zoomF = (typeof syntesisGetUiZoom === 'function') ? syntesisGetUiZoom() : 1.0;
@@ -10083,7 +10083,7 @@ function closeGroupDialog(){
 }
 
 function confirmGroup(){
-  // v7.3.9.043: Quando si crea un nuovo gruppo, i MUA che erano in gid=0
+  // v7.3.9.044: Quando si crea un nuovo gruppo, i MUA che erano in gid=0
   // (gruppo di base "default") vengono SPOSTATI automaticamente in un secondo
   // gruppo complementare, perche' dividere implica due insiemi distinti.
   var selected = [];
@@ -10150,7 +10150,7 @@ function getMuaByGroup(){
 
 // Helper: colore unico per badge gruppo
 
-// Helper v7.3.9.043: colore freccia di setup per gruppo
+// Helper v7.3.9.044: colore freccia di setup per gruppo
 // Distinto da getGroupBadgeColor per coerenza visiva (gid 0 blu primario,
 // non grigio come il badge che e' "senza gruppo")
 function getGroupArrowColor(gid){
@@ -10556,7 +10556,7 @@ function applyRenderModeToScene(){
       if(m.scanbodyScanMesh) applyRenderModeToMesh(m.scanbodyScanMesh);
     });
   }
-  // FIX v7.3.9.043: applico la modalita\' anche alle mesh Misurare
+  // FIX v7.3.9.044: applico la modalita\' anche alle mesh Misurare
   // (arcate riferimento/confronto + scanbody A e B post-ICP)
   if(typeof misICP_bgMeshA !== 'undefined' && misICP_bgMeshA){
     applyRenderModeToMesh(misICP_bgMeshA);
@@ -10901,12 +10901,12 @@ try {
 
 
 
-// ── UI ZOOM v7.3.9.043 ─────────────────────────────────────────────
+// ── UI ZOOM v7.3.9.044 ─────────────────────────────────────────────
 // Scaling globale del testo interfaccia. Salva preferenza in localStorage.
 var SYNTESIS_UI_ZOOM_KEY = 'syntesis_ui_zoom';
 
 
-// Helper v7.3.9.043: ritorna il fattore zoom corrente del body
+// Helper v7.3.9.044: ritorna il fattore zoom corrente del body
 // (per compensare coordinate label che vengono ri-zoomate dal browser)
 function syntesisGetUiZoom(){
   try {
@@ -10917,10 +10917,10 @@ function syntesisGetUiZoom(){
 }
 
 function applyUiZoom(zoom, opts){
-  // v7.3.9.043: opts.silent=true applica senza salvare in localStorage
-  // (usato da loadUiZoom quando applica il default 115%)
+  // v7.3.9.044: opts.silent=true applica senza salvare in localStorage
+  // (usato da loadUiZoom quando applica il default 130%)
   zoom = parseFloat(zoom);
-  if(!zoom || isNaN(zoom)) zoom = 1.15;
+  if(!zoom || isNaN(zoom)) zoom = 1.30;
   zoom = Math.max(0.7, Math.min(1.5, zoom));
   try {
     document.body.style.zoom = String(zoom);
@@ -10938,33 +10938,53 @@ function applyUiZoom(zoom, opts){
 }
 
 function loadUiZoom(){
-  // v7.3.9.043: default 115% per nuovi utenti.
-  // Se utente ha gia' una preferenza (anche 100%), la rispettiamo.
-  var DEFAULT_UI_ZOOM = 1.15;
+  // v7.3.9.044: default 130% per migliorare leggibilita'.
+  // Migrazione: utenti che avevano i vecchi defaults (0.9, 1.0, 1.15)
+  // vengono aggiornati al nuovo 1.30 (una volta sola via flag _migrated_v044).
+  // Chi ha scelto 1.30 o 1.50 esplicitamente mantiene la sua preferenza.
+  var DEFAULT_UI_ZOOM = 1.30;
+  var MIGRATION_KEY = 'syntesis_ui_zoom_migrated_v044';
   try {
     var raw = localStorage.getItem(SYNTESIS_UI_ZOOM_KEY);
+    var migrated = localStorage.getItem(MIGRATION_KEY);
     if(raw === null || raw === undefined || raw === ''){
       applyUiZoom(DEFAULT_UI_ZOOM, {silent:true});
       return;
     }
     var z = parseFloat(raw);
+    // Migrazione una-tantum: se l'utente aveva uno dei vecchi defaults,
+    // applico il nuovo. Altrimenti rispetto la sua scelta esplicita.
+    if(!migrated && (z === 0.9 || z === 1.0 || z === 1.15)){
+      applyUiZoom(DEFAULT_UI_ZOOM, {silent:false});  // salva la nuova preferenza
+      try { localStorage.setItem(MIGRATION_KEY, '1'); } catch(e){}
+      return;
+    }
     if(z && z >= 0.7 && z <= 1.5){ applyUiZoom(z, {silent:true}); }
     else { applyUiZoom(DEFAULT_UI_ZOOM, {silent:true}); }
+    try { localStorage.setItem(MIGRATION_KEY, '1'); } catch(e){}
   } catch(e){
     try { applyUiZoom(DEFAULT_UI_ZOOM, {silent:true}); } catch(e2){}
   }
 }
 
 function refreshUiZoomButtons(){
-  var current = 1.0;
-  try { current = parseFloat(localStorage.getItem(SYNTESIS_UI_ZOOM_KEY)) || 1.0; } catch(e){}
-  var ids = [['uiZoomBtn90', 0.9], ['uiZoomBtn100', 1.0], ['uiZoomBtn115', 1.15], ['uiZoomBtn130', 1.3]];
-  ids.forEach(function(p){
-    var el = document.getElementById(p[0]); if(!el) return;
-    var active = Math.abs(current - p[1]) < 0.01;
+  // v7.3.9.044: 5 bottoni 100/115/130/145/160 (130 = default)
+  var z = 1.30;
+  try { z = parseFloat(localStorage.getItem(SYNTESIS_UI_ZOOM_KEY)) || 1.30; } catch(e){}
+  var btns = [
+    {id:'uiZoomBtn100', val:1.0},
+    {id:'uiZoomBtn115', val:1.15},
+    {id:'uiZoomBtn130', val:1.3},
+    {id:'uiZoomBtn145', val:1.45},
+    {id:'uiZoomBtn160', val:1.6}
+  ];
+  btns.forEach(function(b){
+    var el = document.getElementById(b.id); if(!el) return;
+    var active = Math.abs(z - b.val) < 0.01;
+    el.style.background = active ? 'var(--blue)' : '#fff';
+    el.style.color = active ? '#fff' : 'var(--dark)';
     el.style.borderColor = active ? 'var(--blue)' : 'var(--border)';
-    el.style.background = active ? '#E6F0FA' : '#fff';
-    el.style.color = active ? 'var(--blue)' : 'var(--dark)';
+    el.style.fontWeight = active ? '800' : '600';
   });
 }
 
@@ -15007,17 +15027,14 @@ window.addEventListener('DOMContentLoaded',init);
       <div style="margin-bottom:14px">
         <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Dimensione testo interfaccia</label>
         <div style="display:flex;gap:8px;align-items:stretch">
-          <button id="uiZoomBtn90" onclick="applyUiZoom(0.9)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:12px">A&#8722;</span><span style="font-size:8px;color:var(--gray);font-weight:500">90%</span></button>
-          <button id="uiZoomBtn100" onclick="applyUiZoom(1.0)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:14px">A</span><span style="font-size:8px;color:var(--gray);font-weight:500">100%</span></button>
-          <button id="uiZoomBtn115" onclick="applyUiZoom(1.15)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:15px">A&#43;</span><span style="font-size:8px;color:var(--gray);font-weight:500">115%</span></button>
-          <button id="uiZoomBtn130" onclick="applyUiZoom(1.3)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:17px">A&#43;&#43;</span><span style="font-size:8px;color:var(--gray);font-weight:500">130%</span></button>
+          <button id="uiZoomBtn100" onclick="applyUiZoom(1.0)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">100%</button><button id="uiZoomBtn115" onclick="applyUiZoom(1.15)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">115%</button><button id="uiZoomBtn130" onclick="applyUiZoom(1.3)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">130%</button><button id="uiZoomBtn145" onclick="applyUiZoom(1.45)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">145%</button><button id="uiZoomBtn160" onclick="applyUiZoom(1.6)" style="flex:1;padding:10px 6px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-family:var(--mono);font-weight:800;color:var(--dark);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px">160%</button>
         </div>
         <div style="margin-top:10px;padding:10px 12px;background:#F7F9FC;border:1px solid #E2E8F0;border-radius:6px;font-family:var(--font);font-size:10px;color:var(--gray);line-height:1.5">La preferenza viene salvata nel browser e applicata a ogni riapertura. Lo zoom influisce su tutto il testo dell'interfaccia, non sulla risoluzione del modello 3D.</div>
       </div>
     </div>
 
 
-    <!-- === TAB ALGORITMO (v7.3.9.043) === -->
+    <!-- === TAB ALGORITMO (v7.3.9.044) === -->
     <div id="settingsTabAlgo" style="display:none">
       <div style="margin-bottom:14px">
         <label style="display:block;font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Algoritmo posizionamento MUA</label>
@@ -15034,7 +15051,7 @@ window.addEventListener('DOMContentLoaded',init);
           <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="algoOptServer">
             <input type="radio" name="algoOpt" value="server" onchange="onAlgoChange(this.value)" style="margin-top:2px">
             <div style="flex:1">
-              <div style="font-family:var(--mono);font-size:11px;font-weight:800;color:var(--dark)">Server (weighted ICP, sperimentale)</div>
+              <div style="font-family:var(--mono);font-size:11px;font-weight:800;color:var(--dark)">Server (weighted ICP)</div>
               <div style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-top:3px;line-height:1.5">
                 Allineamento ICP weighted cap+cylinder eseguito sul server. Algoritmo generalista identico a quello del workflow Misurare. Latenza: 200-500ms per MUA. Richiede connessione internet.
               </div>
@@ -15198,7 +15215,7 @@ window.onSyntesisViewModeChange = function(mode){
   }
 };
 
-// ── DRAGGABLE + RESIZABLE PANELS (v7.3.9.043) ─────────────────────
+// ── DRAGGABLE + RESIZABLE PANELS (v7.3.9.044) ─────────────────────
 // Rende un pannello assoluto trascinabile (handle = elemento con classe
 // .syn-drag-handle dentro il pannello) e ridimensionabile (handle in basso
 // a destra, classe .syn-resize-handle). Stato salvato in localStorage.
@@ -15375,7 +15392,7 @@ window.onSyntesisViewModeChange = function(mode){
 
 
 
-// ── KEYBOARD SHORTCUTS v7.3.9.043 ─────────────────────────────────
+// ── KEYBOARD SHORTCUTS v7.3.9.044 ─────────────────────────────────
 // Spazio chiama Raffina (alignAll) quando ha senso (Analizza con MUA).
 // P chiama startPlacement (Posiziona).
 // Skip se l'utente sta scrivendo in un input/textarea.
@@ -15417,7 +15434,7 @@ window.onSyntesisViewModeChange = function(mode){
   }, false);
 })();
 
-// ── PULSANTE CARICA FILE (toolbar) v7.3.9.043 ─────────────────────
+// ── PULSANTE CARICA FILE (toolbar) v7.3.9.044 ─────────────────────
 // Il pulsante in toolbar inoltra al file picker corretto in base al
 // workflow corrente. Quando un caricamento e' "necessario" (no scan
 // caricata) il pulsante pulsa con classe .attention.
@@ -15472,7 +15489,7 @@ if(typeof window !== 'undefined'){
 }
 
 
-// ── TOOLTIP CUSTOM v7.3.9.043 ─────────────────────────────────
+// ── TOOLTIP CUSTOM v7.3.9.044 ─────────────────────────────────
 // Sposta il `title` dei pulsanti toolbar in `data-tip` per usare i tooltip
 // CSS custom istantanei (niente delay 1.5s del browser, niente fondo giallo).
 // Si applica solo ai bottoni icon-only e ai pulsanti dentro btn-icon-group e
@@ -15507,7 +15524,7 @@ if(typeof window !== 'undefined'){
 })();
 
 
-// TOOLTIP CUSTOM v7.3.9.043: sposta title -> data-tip sui bottoni toolbar
+// TOOLTIP CUSTOM v7.3.9.044: sposta title -> data-tip sui bottoni toolbar
 (function(){
   function migrateTitles(){
     var selectors = [
@@ -15536,7 +15553,7 @@ if(typeof window !== 'undefined'){
 })();
 
 
-// TOOLTIP CUSTOM v7.3.9.043: sposta title -> data-tip sui bottoni toolbar
+// TOOLTIP CUSTOM v7.3.9.044: sposta title -> data-tip sui bottoni toolbar
 (function(){
   function migrateTitles(){
     var selectors = [
@@ -15565,7 +15582,7 @@ if(typeof window !== 'undefined'){
 })();
 
 
-// v7.3.9.043 toggle panel collassabile
+// v7.3.9.044 toggle panel collassabile
 function toggleAngleListPanel(){
   var p = document.getElementById('panelAngleList');
   if(!p) return;
@@ -15575,7 +15592,7 @@ function toggleAngleListPanel(){
 </script>
 
 
-<!-- Modal Certificato Taratura v7.3.9.043 -->
+<!-- Modal Certificato Taratura v7.3.9.044 -->
 <div class="calmodal-back" id="calibrationModal">
   <div class="calmodal">
     <div class="calmodal-h">
