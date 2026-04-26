@@ -137,6 +137,25 @@ async def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_contacts_owner ON contacts(owner_user_id);
         CREATE INDEX IF NOT EXISTS idx_contacts_target ON contacts(contact_user_id) WHERE contact_user_id IS NOT NULL;
+
+        -- v7.3.9.054 - Tracking consumo storage mensile
+        -- Ogni evento di upload registra bytes utilizzati. Il consumo
+        -- mensile e' la somma dei bytes nel periodo (UTC, day-of-month).
+        CREATE TABLE IF NOT EXISTS usage_log (
+            id              BIGSERIAL PRIMARY KEY,
+            user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            event_type      TEXT NOT NULL,        -- 'upload', 'analysis', 'share', etc.
+            bytes_delta     BIGINT NOT NULL,      -- positivo per upload, negativo per delete
+            ref_type        TEXT,                 -- 'analysis', 'project_file', 'shared_file'
+            ref_id          TEXT,                 -- riferimento all'oggetto
+            metadata        JSONB,                -- info extra (filename, mime, etc.)
+            created_at      TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_usage_user_time ON usage_log(user_id, created_at DESC);
+
+        -- v7.3.9.054 - Piano di abbonamento per utente
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'free';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_renewed_at TIMESTAMPTZ DEFAULT NOW();
         """)
 
 
@@ -600,6 +619,95 @@ async def set_project_gdrive_folder(project_id: str, user_id: str,
 
 
 
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# v7.3.9.054 - Tracking consumo storage mensile
+# Free plan: 1 GB/mese (1024 MB = 1073741824 bytes)
+# Periodo: dal 1\xb0 del mese corrente alla mezzanotte del 1\xb0 successivo (UTC)
+# ──────────────────────────────────────────────────────────────────────────────
+
+PLAN_LIMITS = {
+    "free":    1 * 1024 * 1024 * 1024,        # 1 GB
+    "pro":     50 * 1024 * 1024 * 1024,       # 50 GB
+    "studio":  500 * 1024 * 1024 * 1024,      # 500 GB
+}
+
+
+async def log_usage(user_id: str, event_type: str, bytes_delta: int,
+                      ref_type: Optional[str] = None,
+                      ref_id: Optional[str] = None,
+                      metadata: Optional[dict] = None) -> None:
+    """Registra un evento di uso storage. bytes_delta puo' essere negativo
+    in caso di delete (libera spazio nel mese)."""
+    pool = await get_pool()
+    import json as _json
+    md_json = _json.dumps(metadata) if metadata else None
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO usage_log (user_id, event_type, bytes_delta, ref_type, ref_id, metadata)
+            VALUES ($1, $2, $3, $4, $5, $6)
+        """, user_id, event_type, bytes_delta, ref_type, ref_id, md_json)
+
+
+async def get_user_storage_status(user_id: str) -> dict:
+    """Ritorna dict con consumo del mese corrente, limite del piano,
+    percentuale, periodo (start/end UTC), e plan."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # Primo del mese successivo
+    if period_start.month == 12:
+        period_end = period_start.replace(year=period_start.year+1, month=1)
+    else:
+        period_end = period_start.replace(month=period_start.month+1)
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        # Plan dell'utente
+        plan_row = await conn.fetchrow("SELECT plan FROM users WHERE id = $1", user_id)
+        plan = (plan_row["plan"] if plan_row and plan_row.get("plan") else "free")
+        limit_bytes = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
+
+        # Somma bytes_delta nel periodo
+        used_row = await conn.fetchrow("""
+            SELECT COALESCE(SUM(bytes_delta), 0) AS used
+            FROM usage_log
+            WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
+        """, user_id, period_start, period_end)
+        used_bytes = max(0, int(used_row["used"]))
+
+        # Storico ultimi 6 mesi (per grafico futuro)
+        history = await conn.fetch("""
+            SELECT date_trunc('month', created_at) AS month,
+                   COALESCE(SUM(bytes_delta), 0) AS bytes
+            FROM usage_log
+            WHERE user_id = $1 AND created_at >= $2
+            GROUP BY 1
+            ORDER BY 1 DESC
+            LIMIT 6
+        """, user_id, period_start.replace(month=1) if period_start.month <= 6
+                       else period_start.replace(month=period_start.month-5))
+
+    pct = round(100.0 * used_bytes / limit_bytes, 2) if limit_bytes else 0
+    return {
+        "plan": plan,
+        "limit_bytes": limit_bytes,
+        "used_bytes": used_bytes,
+        "free_bytes": max(0, limit_bytes - used_bytes),
+        "percent": pct,
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
+        "history": [{"month": h["month"].isoformat(), "bytes": int(h["bytes"])} for h in history],
+    }
+
+
+async def can_upload_bytes(user_id: str, n_bytes: int) -> tuple[bool, dict]:
+    """Verifica se l'utente puo' caricare n_bytes senza superare il limite mensile.
+    Ritorna (ok, status_dict)."""
+    status = await get_user_storage_status(user_id)
+    ok = (status["used_bytes"] + n_bytes) <= status["limit_bytes"]
+    return ok, status
 
 
 # ──────────────────────────────────────────────────────────────────────────────
