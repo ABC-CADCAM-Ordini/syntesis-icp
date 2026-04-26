@@ -162,6 +162,13 @@ async def register(req: RegisterRequest):
         "role": "user",
         "org": req.organization or ""
     })
+    # v7.3.9.053: riconcilia eventuali contatti pending che hanno questa email
+    try:
+        from database import reconcile_pending_contacts
+        await reconcile_pending_contacts(user_id, req.email)
+    except Exception:
+        pass  # non bloccare la registrazione se la riconciliazione fallisce
+
     return {
         "access_token": token,
         "user": {
