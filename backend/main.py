@@ -41,6 +41,7 @@ from database import (
     reconcile_pending_shared_invites
 )
 import gdrive  # v7.3.9.048: modulo OAuth + Drive API
+import email_service  # v7.3.9.065 - email transazionali Resend
 from security_config import validate_security_config
 from rate_limit import limiter, ANALYZE_PUBLIC_LIMIT
 
@@ -1141,6 +1142,10 @@ async def me_create_shared_folder(
     )
     invited = []
     skipped = []
+    emails_sent = 0
+    base_url = os.getenv("PUBLIC_BASE_URL", "https://syntesis-icp-production.up.railway.app")
+    owner_name = current_user.get("name") or current_user.get("email", "")
+    owner_email = current_user.get("email", "")
     for email in body.member_emails:
         email = (email or "").lower().strip()
         if not email or email == current_user.get("email", "").lower():
@@ -1152,9 +1157,37 @@ async def me_create_shared_folder(
         )
         if m.get("error"):
             skipped.append({"email": email, "reason": m["error"]})
-        else:
-            invited.append(m)
-    return {"shared_folder": sf, "invited": invited, "skipped": skipped}
+            continue
+        invited.append(m)
+        # Email transazionale (silently fail se Resend non configurato)
+        try:
+            if m.get("member_user_id"):
+                # Utente gia' registrato -> link al dashboard
+                ok_email = email_service.send_share_invite_to_existing_user(
+                    to_email=email,
+                    to_name=None,  # nome utente non in scope qui, prendiamo dalla email
+                    owner_name=owner_name,
+                    owner_email=owner_email,
+                    folder_name=body.folder_name,
+                    description=body.description,
+                    accept_url=f"{base_url}/dashboard?tab=files",
+                )
+            else:
+                # Utente non registrato -> link a registrazione
+                ok_email = email_service.send_share_invite_to_unregistered(
+                    to_email=email,
+                    owner_name=owner_name,
+                    owner_email=owner_email,
+                    folder_name=body.folder_name,
+                    description=body.description,
+                    register_url=f"{base_url}/analizzare?invite={sf['id']}",
+                )
+            if ok_email:
+                emails_sent += 1
+        except Exception as e:
+            logger.warning(f"[shared-folder] email send fail to={email}: {e}")
+    return {"shared_folder": sf, "invited": invited, "skipped": skipped,
+            "emails_sent": emails_sent, "emails_configured": email_service.is_configured()}
 
 
 @app.get("/api/me/shared-folders")
