@@ -11,25 +11,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.061 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
-html{background:#000;margin:0;padding:0}
+/* v7.3.9.061 - Cornice nera sobria, una sola, niente animazione */
+html{background:#0F1923;margin:0;padding:0}
 body{
-  margin:25px !important;
-  width:calc(100vw - 50px) !important;
-  height:calc(100vh - 50px) !important;
-  border:4px solid transparent !important;
+  margin:18px !important;
+  width:calc(100vw - 36px) !important;
+  height:calc(100vh - 36px) !important;
   border-radius:14px !important;
-  background-image:
-    linear-gradient(var(--pearl,#F0F5FA),var(--pearl,#F0F5FA)),
-    conic-gradient(from var(--synt-sa,0deg),#FF8C42,#FF4D8D,#FFD166,#C84BFF,#FF6B35,#FF9FC8,#FF8C42) !important;
-  background-origin:padding-box,border-box !important;
-  background-clip:padding-box,border-box !important;
+  background:var(--pearl,#F0F5FA) !important;
   box-sizing:border-box !important;
-  overflow-y:auto !important;overflow-x:hidden !important;
-  animation:syntSpin 4s linear infinite;
-  box-shadow:0 0 22px rgba(255,140,66,.42),0 0 52px rgba(200,75,255,.20);
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  box-shadow:0 4px 24px rgba(0,0,0,.4) !important;
 }
-@property --synt-sa{syntax:'<angle>';initial-value:0deg;inherits:false}
-@keyframes syntSpin{to{--synt-sa:360deg}}
 /* v7.3.9.061 - Scrollbar custom dentro la cornice */
 body::-webkit-scrollbar{width:10px}
 body::-webkit-scrollbar-track{background:transparent}
