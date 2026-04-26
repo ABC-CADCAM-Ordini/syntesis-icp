@@ -9,9 +9,7 @@
 <title>Syntesis-ICP - Analizzare v7.3.9.049</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* v7.3.9.051 - Cornice colorata: approccio body con border + background-clip
-   Bordo nero 25px attorno + cornice gradient animata sui 4 lati,
-   contenuto interno coperto dal body bg (var(--pearl) o bianco). */
+/* v7.3.9.052 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
 body{
   margin:25px !important;
@@ -25,6 +23,7 @@ body{
   background-origin:padding-box,border-box !important;
   background-clip:padding-box,border-box !important;
   box-sizing:border-box !important;
+  overflow:hidden !important;
   animation:syntSpin 4s linear infinite;
   box-shadow:0 0 22px rgba(255,140,66,.42),0 0 52px rgba(200,75,255,.20);
 }
