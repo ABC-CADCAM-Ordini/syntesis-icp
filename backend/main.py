@@ -27,8 +27,11 @@ from database import (
     list_user_analyses, count_user_analyses, update_analysis_meta,
     delete_user_analysis, get_user_profile, update_user_profile,
     list_user_projects, get_user_project, create_user_project,
-    update_user_project, delete_user_project, assign_analysis_to_project
+    update_user_project, delete_user_project, assign_analysis_to_project,
+    set_gdrive_credentials, get_gdrive_credentials, clear_gdrive_credentials,
+    set_project_gdrive_folder
 )
+import gdrive  # v7.3.9.048: modulo OAuth + Drive API
 from security_config import validate_security_config
 from rate_limit import limiter, ANALYZE_PUBLIC_LIMIT
 
@@ -745,3 +748,136 @@ async def me_assign_analysis(analysis_id: str, req: AnalysisAssignToProject,
     if not ok:
         raise HTTPException(404, detail="Analisi o progetto non trovato.")
     return {"ok": True, "project_id": req.project_id}
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.048 - GOOGLE DRIVE OAUTH
+# Connessione cloud personale dell'utente. Privacy-first: scope drive.file
+# limita Syntesis-ICP ai SOLI file che lui stesso crea, mai il resto del Drive.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/me/gdrive/status")
+async def me_gdrive_status(current_user: dict = Depends(verify_token)):
+    """Stato connessione Drive per l'utente corrente."""
+    if not gdrive.is_configured():
+        return {"configured": False, "connected": False,
+                "message": "OAuth non configurato lato server"}
+    creds = await get_gdrive_credentials(current_user["user_id"])
+    if not creds:
+        return {"configured": True, "connected": False}
+    return {
+        "configured": True,
+        "connected": True,
+        "email": creds["email"],
+        "connected_at": creds["connected_at"].isoformat() if creds["connected_at"] else None,
+    }
+
+
+@app.get("/auth/gdrive/connect")
+async def gdrive_connect_start(token: str):
+    """Inizia OAuth: ritorna URL Google. Il frontend chiama questo endpoint
+    passando il JWT come query param (perche' verra' aperto in window.location
+    o popup, non come fetch con header)."""
+    if not gdrive.is_configured():
+        raise HTTPException(503, detail="OAuth non configurato sul server.")
+    # Verifico il JWT manualmente (l'endpoint accetta token come query param)
+    try:
+        import jwt as pyjwt
+        payload = pyjwt.decode(token, os.getenv("JWT_SECRET", ""), algorithms=["HS256"])
+        user_id = payload.get("user_id") or payload.get("sub")
+        if not user_id:
+            raise HTTPException(401, detail="Token JWT non valido.")
+    except Exception as e:
+        raise HTTPException(401, detail=f"Token JWT non valido: {e}")
+    auth_url = gdrive.get_authorization_url(user_id)
+    return RedirectResponse(url=auth_url, status_code=302)
+
+
+@app.get("/auth/gdrive/callback")
+async def gdrive_callback(code: str = "", state: str = "", error: str = ""):
+    """Callback OAuth da Google. Verifica state, scambia code per token,
+    cifra il refresh_token, salva nel DB. Poi redirect a /dashboard."""
+    if error:
+        return RedirectResponse(
+            url=f"/dashboard?tab=cloud&error={error}", status_code=302)
+    if not code or not state:
+        raise HTTPException(400, detail="Parametri OAuth mancanti.")
+    user_id = gdrive.verify_state_token(state)
+    if not user_id:
+        raise HTTPException(400, detail="State token non valido o scaduto.")
+    try:
+        tokens = gdrive.exchange_code_for_tokens(code)
+    except Exception as e:
+        return RedirectResponse(
+            url=f"/dashboard?tab=cloud&error={str(e)[:200]}", status_code=302)
+    encrypted = gdrive.encrypt_token(tokens["refresh_token"])
+    ok = await set_gdrive_credentials(
+        user_id=user_id,
+        email=tokens.get("email", ""),
+        refresh_token_encrypted=encrypted,
+    )
+    if not ok:
+        return RedirectResponse(
+            url="/dashboard?tab=cloud&error=save_failed", status_code=302)
+    return RedirectResponse(
+        url="/dashboard?tab=cloud&connected=1", status_code=302)
+
+
+@app.post("/auth/gdrive/disconnect")
+async def gdrive_disconnect(current_user: dict = Depends(verify_token)):
+    """Rimuove le credenziali Drive dal nostro DB.
+    L'utente puo' anche revocare manualmente da
+    https://myaccount.google.com/permissions per togliere il consent Google."""
+    await clear_gdrive_credentials(current_user["user_id"])
+    return {"ok": True}
+
+
+@app.post("/api/me/projects/{project_id}/sync-folder")
+async def me_project_sync_folder(project_id: str,
+                                    current_user: dict = Depends(verify_token)):
+    """Crea (o recupera) la folder Drive associata al progetto.
+    Idempotente: se gia' esiste, ritorna l'ID esistente."""
+    creds = await get_gdrive_credentials(current_user["user_id"])
+    if not creds:
+        raise HTTPException(400, detail="Drive non connesso.")
+    proj = await get_user_project(project_id, current_user["user_id"])
+    if not proj:
+        raise HTTPException(404, detail="Progetto non trovato.")
+    # Se gia' esiste un folder_id valido, lo restituisco senza ricreare
+    if proj.get("gdrive_folder_id"):
+        return {"folder_id": proj["gdrive_folder_id"], "created": False}
+    # Crea folder
+    try:
+        refresh_token = gdrive.decrypt_token(creds["refresh_token_encrypted"])
+        service = gdrive.get_drive_service(refresh_token)
+        folder_id = gdrive.get_or_create_project_folder(
+            service, proj["name"], project_id
+        )
+        await set_project_gdrive_folder(project_id, current_user["user_id"], folder_id)
+        return {"folder_id": folder_id, "created": True}
+    except Exception as e:
+        logger.error(f"sync-folder failed: {e}")
+        raise HTTPException(502, detail=f"Drive API error: {str(e)[:200]}")
+
+
+@app.get("/api/me/projects/{project_id}/files")
+async def me_project_files(project_id: str,
+                              current_user: dict = Depends(verify_token)):
+    """Lista file caricati su Drive per questo progetto."""
+    creds = await get_gdrive_credentials(current_user["user_id"])
+    if not creds:
+        raise HTTPException(400, detail="Drive non connesso.")
+    proj = await get_user_project(project_id, current_user["user_id"])
+    if not proj:
+        raise HTTPException(404, detail="Progetto non trovato.")
+    if not proj.get("gdrive_folder_id"):
+        return {"files": [], "folder_id": None}
+    try:
+        refresh_token = gdrive.decrypt_token(creds["refresh_token_encrypted"])
+        service = gdrive.get_drive_service(refresh_token)
+        files = gdrive.list_folder(service, proj["gdrive_folder_id"])
+        return {"files": files, "folder_id": proj["gdrive_folder_id"]}
+    except Exception as e:
+        logger.error(f"list files failed: {e}")
+        raise HTTPException(502, detail=f"Drive API error: {str(e)[:200]}")
