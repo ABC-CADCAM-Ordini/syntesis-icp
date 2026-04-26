@@ -50,7 +50,7 @@ from googleapiclient.errors import HttpError
 logger = logging.getLogger(__name__)
 
 # ── Configurazione ────────────────────────────────────────────────────────────
-SCOPES = ['https://www.googleapis.com/auth/drive.file', 'openid', 'email']
+SCOPES = ['https://www.googleapis.com/auth/drive.file', 'openid', 'https://www.googleapis.com/auth/userinfo.email']
 GDRIVE_ROOT_FOLDER_NAME = 'Syntesis-ICP'
 STATE_TOKEN_EXP_SECONDS = 15 * 60  # 15 minuti per completare OAuth
 
