@@ -138,6 +138,14 @@ async def statistiche_page():
         return FileResponse(str(_st), headers=_NO_STORE_HEADERS)
     return JSONResponse({"error": "Statistiche not found"}, status_code=404)
 
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard_page():
+    """v7.3.9.046: backend utente - area personale (mie analisi, profilo)."""
+    _dh = _STATIC_DIR / "syntesis-dashboard-v1.html"
+    if _dh.exists():
+        return FileResponse(str(_dh), headers=_NO_STORE_HEADERS)
+    return JSONResponse({"error": "Dashboard not found"}, status_code=404)
+
 @app.post("/api/analyze")
 async def analyze(
     file_a: UploadFile = File(..., description="STL riferimento"),
