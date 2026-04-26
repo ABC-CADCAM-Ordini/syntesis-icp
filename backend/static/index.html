@@ -14,7 +14,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
-/* v7.3.9.052 - Splash: bordo nero 25px attorno alla cornice siri (no doppio frame) */
+/* v7.3.9.080 - Splash: bordo nero 25px attorno alla cornice siri (no doppio frame) */
 html{background:#000;margin:0;padding:0}
 body{background:#000 !important;padding:25px !important;min-height:100vh;box-sizing:border-box;background-image:none !important}
 
@@ -217,6 +217,116 @@ body{background:#000 !important;padding:25px !important;min-height:100vh;box-siz
 </script>
 
 <script defer src="/static/js/pdf-gen.js?v=20260420_1945"></script>
+
+
+<script>
+// v7.3.9.080 - Auto-load file da Drive via query string
+// Quando si arriva qui da Dashboard tramite link "Apri in Synthesis Analizza",
+// l'URL contiene ?file_id=... e auto-carichiamo nel slot specificato (default A).
+(function(){
+  var params = new URLSearchParams(window.location.search);
+  var fileId = params.get('file_id');
+  var fileName = params.get('file_name') || 'file.stl';
+  var slot = (params.get('slot') || 'A').toUpperCase();
+  if(!fileId) return;
+  if(slot !== 'A' && slot !== 'B') slot = 'A';
+
+  // Mostra un piccolo banner "caricamento da Drive..."
+  function showBanner(msg, isError){
+    var b = document.getElementById('drive-loader-banner');
+    if(!b){
+      b = document.createElement('div');
+      b.id = 'drive-loader-banner';
+      b.style.cssText = 'position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:99999;'
+        + 'padding:11px 20px;border-radius:10px;font-family:var(--font),sans-serif;font-size:13px;'
+        + 'font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.15);transition:.25s;color:#fff';
+      document.body.appendChild(b);
+    }
+    b.style.background = isError ? '#DC2626' : '#0F1923';
+    b.textContent = msg;
+    if(isError){ setTimeout(function(){ b.remove(); }, 5000); }
+  }
+
+  function clearUrlParams(){
+    // Pulisco i query params per non riprovare al refresh
+    history.replaceState({}, '', window.location.pathname);
+  }
+
+  function dispatchFile(file){
+    // Tre tentativi in cascata
+    if(typeof window.pickFile === 'function'){
+      window.pickFile({target:{files:[file]}}, slot);
+      return true;
+    }
+    if(typeof pickFile === 'function'){
+      pickFile({target:{files:[file]}}, slot);
+      return true;
+    }
+    // Fallback: simulo drag&drop
+    if(typeof dzDrop === 'function'){
+      dzDrop({preventDefault:function(){}, dataTransfer:{files:[file]}}, slot);
+      return true;
+    }
+    return false;
+  }
+
+  function tryDispatch(file, attempt){
+    if(dispatchFile(file)){
+      showBanner('File caricato nel slot ' + slot);
+      setTimeout(function(){
+        var b = document.getElementById('drive-loader-banner');
+        if(b) b.remove();
+      }, 1800);
+      return;
+    }
+    if(attempt < 20){
+      setTimeout(function(){ tryDispatch(file, attempt+1); }, 200);
+    } else {
+      showBanner('Impossibile caricare il file: app non pronta', true);
+    }
+  }
+
+  async function loadFromDrive(){
+    var jwt = localStorage.getItem('syntesis_token');
+    if(!jwt){
+      showBanner('Per caricare dal cloud, accedi prima al tuo account', true);
+      return;
+    }
+    showBanner('Caricamento file da Drive...');
+    try {
+      // 1. Ottiengo access token Drive (~200 bytes dal nostro server)
+      var rt = await fetch('/api/me/gdrive/access-token', {
+        headers: {'Authorization': 'Bearer ' + jwt}
+      });
+      if(!rt.ok) throw new Error('access-token HTTP ' + rt.status);
+      var tk = await rt.json();
+      // 2. Scarico file direttamente da Google Drive (no proxy server)
+      var driveUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId)
+        + '?alt=media&supportsAllDrives=true';
+      var rd = await fetch(driveUrl, {
+        headers: {'Authorization': 'Bearer ' + tk.access_token}
+      });
+      if(!rd.ok) throw new Error('Drive HTTP ' + rd.status);
+      var blob = await rd.blob();
+      // 3. Trasformo in File object con il nome originale
+      var file = new File([blob], fileName, {type: 'model/stl'});
+      // 4. Pulisco URL e dispatch
+      clearUrlParams();
+      tryDispatch(file, 0);
+    } catch(e){
+      console.error('[drive auto-load]', e);
+      showBanner('Errore: ' + (e.message || 'sconosciuto'), true);
+    }
+  }
+
+  // Aspetto che il DOM e gli script esterni siano caricati
+  if(document.readyState === 'complete'){
+    setTimeout(loadFromDrive, 50);
+  } else {
+    window.addEventListener('load', function(){ setTimeout(loadFromDrive, 50); });
+  }
+})();
+</script>
 
 </body>
 </html>
