@@ -9410,8 +9410,8 @@ try {
 var SYNTESIS_UI_ZOOM_KEY = 'syntesis_ui_zoom';
 
 function applyUiZoom(zoom, opts){
-  // v7.3.9.023: opts.silent=true per applicare senza salvare in localStorage
-  // (usato da loadUiZoom quando applica il default)
+  // v7.3.9.023: opts.silent=true applica senza salvare in localStorage
+  // (usato da loadUiZoom quando applica il default 115%)
   zoom = parseFloat(zoom);
   if(!zoom || isNaN(zoom)) zoom = 1.15;
   zoom = Math.max(0.7, Math.min(1.5, zoom));
@@ -9431,13 +9431,12 @@ function applyUiZoom(zoom, opts){
 }
 
 function loadUiZoom(){
-  // v7.3.9.023: default 115% se utente non ha mai impostato la preferenza.
-  // Se ha gia' una preferenza valida in localStorage (anche 100%), rispettiamo la sua scelta.
+  // v7.3.9.023: default 115% per nuovi utenti.
+  // Se utente ha gia' una preferenza (anche 100%), la rispettiamo.
   var DEFAULT_UI_ZOOM = 1.15;
   try {
     var raw = localStorage.getItem(SYNTESIS_UI_ZOOM_KEY);
     if(raw === null || raw === undefined || raw === ''){
-      // nessuna preferenza: applica default in modo silent
       applyUiZoom(DEFAULT_UI_ZOOM, {silent:true});
       return;
     }
