@@ -183,6 +183,8 @@ async def analyze(
         logger.error(f"Errore analisi ICP: {e}", exc_info=True)
         raise HTTPException(500, detail="Errore interno durante l'analisi.")
 
+    # v7.3.9.043: marca esplicitamente l'algoritmo usato (Misurare = sempre server)
+    result["algorithm"] = "server_weighted_icp_v1"
     analysis_id = str(uuid.uuid4())
     await log_analysis(
         analysis_id=analysis_id,
