@@ -568,6 +568,56 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   transform: translateX(-50%) translateY(0);
   transition-delay: 0.25s;
 }
+
+/* v7.3.9.030 tooltip custom istantaneo */
+[data-tip] {
+  position: relative;
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  background: #0F1923;
+  color: #fff;
+  padding: 5px 9px;
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease 0.15s, transform 0.18s ease 0.15s, visibility 0s linear 0.27s;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+}
+[data-tip]::before {
+  content: "";
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  border: 5px solid transparent;
+  border-bottom-color: #0F1923;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease 0.15s, transform 0.18s ease 0.15s, visibility 0s linear 0.27s;
+  z-index: 10000;
+}
+[data-tip]:hover::after,
+[data-tip]:hover::before,
+[data-tip]:focus-visible::after,
+[data-tip]:focus-visible::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+  transition-delay: 0.25s;
+}
 </style>
 </head>
 <body>
@@ -14618,6 +14668,35 @@ if(typeof window !== 'undefined'){
     migrateTitles();
   }
   // Re-run dopo qualche secondo per pulsanti aggiunti dinamicamente
+  setTimeout(migrateTitles, 800);
+  setTimeout(migrateTitles, 2500);
+})();
+
+
+// TOOLTIP CUSTOM v7.3.9.030: sposta title -> data-tip sui bottoni toolbar
+(function(){
+  function migrateTitles(){
+    var selectors = [
+      'button.btn.icon-only[title]',
+      '.btn-icon-group > button[title]',
+      'button.btn-load-file[title]'
+    ];
+    var elements = document.querySelectorAll(selectors.join(','));
+    elements.forEach(function(el){
+      if(el.dataset.tipMigrated === '1') return;
+      var t = el.getAttribute('title');
+      if(t){
+        el.setAttribute('data-tip', t);
+        el.removeAttribute('title');
+        el.dataset.tipMigrated = '1';
+      }
+    });
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', migrateTitles);
+  } else {
+    migrateTitles();
+  }
   setTimeout(migrateTitles, 800);
   setTimeout(migrateTitles, 2500);
 })();
