@@ -10,7 +10,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<style>
+<style>/* v7.3.9.044: zoom default 1.30 per leggibilita' (cross-browser) */
+body{zoom:1.30}
+@-moz-document url-prefix(){
+  body{transform:scale(1.30);transform-origin:0 0;width:76.92%;height:76.92%}
+}
+
 :root{
   --blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;
   --border:#D6E4F0;--white:#FFFFFF;
