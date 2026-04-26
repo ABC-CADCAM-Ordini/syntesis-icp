@@ -1901,6 +1901,7 @@ function alignAll(){
     if(typeof calcMeanAxis === 'function') calcMeanAxis();
     updateMuaPanel();
     try { updateGroupSplines(); } catch(e){}
+    _trackClientAlgo();
     showStatus('Posizionamento rifinito (analitico).');
     // Auto-apertura cut view (solo se non gia' aperta)
     if(muaObjects.length > 0 && document.getElementById('cutViewOverlay').style.display !== 'flex'){
