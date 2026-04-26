@@ -1832,6 +1832,7 @@ function renderFiles(data){
     '<div class="fb-toolbar">' +
       '<div class="fb-breadcrumb">' + crumb + '</div>' +
       '<div class="fb-actions">' +
+        '<button onclick="openCreateFolder(\'' + (fbState.currentFolderId || '') + '\')" style="background:var(--blue);color:#fff;border-color:var(--blue);font-weight:800">+ Cartella</button>' +
         '<button onclick="loadFiles(\'' + (fbState.currentFolderId || '') + '\')">&#x21bb; Aggiorna</button>' +
         '<a href="' + driveUrl + '" target="_blank" rel="noopener">Apri in Drive &rarr;</a>' +
       '</div>' +
