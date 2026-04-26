@@ -510,6 +510,70 @@ async def assign_analysis_to_project(analysis_id: str, user_id: str,
         return result.endswith(" 1")
 
 
+
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# v7.3.9.048 - Google Drive credentials (refresh_token cifrato)
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def set_gdrive_credentials(user_id: str, email: str,
+                                    refresh_token_encrypted: str) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE users
+            SET gdrive_email = $1,
+                gdrive_refresh_token_enc = $2,
+                gdrive_connected_at = NOW()
+            WHERE id = $3
+        """, email, refresh_token_encrypted, user_id)
+        return result.endswith(" 1")
+
+
+async def get_gdrive_credentials(user_id: str) -> Optional[dict]:
+    """Ritorna { email, refresh_token_encrypted, connected_at } se l'utente
+    ha connesso Drive, None altrimenti."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT gdrive_email, gdrive_refresh_token_enc, gdrive_connected_at
+            FROM users WHERE id = $1
+        """, user_id)
+        if not row or not row['gdrive_refresh_token_enc']:
+            return None
+        return {
+            'email': row['gdrive_email'],
+            'refresh_token_encrypted': row['gdrive_refresh_token_enc'],
+            'connected_at': row['gdrive_connected_at'],
+        }
+
+
+async def clear_gdrive_credentials(user_id: str) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE users
+            SET gdrive_email = NULL,
+                gdrive_refresh_token_enc = NULL,
+                gdrive_connected_at = NULL
+            WHERE id = $1
+        """, user_id)
+        return result.endswith(" 1")
+
+
+async def set_project_gdrive_folder(project_id: str, user_id: str,
+                                       folder_id: str) -> bool:
+    """Salva l'ID della folder Drive associata a un progetto."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE projects SET gdrive_folder_id = $1, updated_at = NOW()
+            WHERE id = $2 AND user_id = $3
+        """, folder_id, project_id, user_id)
+        return result.endswith(" 1")
+
+
 # ── Utility admin: crea licenze (da usare via script) ─────────────────────────
 async def create_licenses(keys: list[str]):
     """Inserisce nuove licenze nel database."""
