@@ -2,10 +2,15 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
+<!-- Syntesis-ICP - Dashboard utente
+     Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
+     v7.3.9.048 - Backend utente: mie analisi, profilo, classifica -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Area personale v7.3.9.054</title>
+<title>Syntesis-ICP - Area personale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* v7.3.9.052 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
+/* v7.3.9.054 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
 body{
   margin:25px !important;
@@ -26,455 +31,511 @@ body{
 @property --synt-sa{syntax:'<angle>';initial-value:0deg;inherits:false}
 @keyframes syntSpin{to{--synt-sa:360deg}}
 
+
 :root{
-  --blue:#0065B3;--blue-mid:#0077CC;--blue-dark:#0050A0;
-  --blue-light:#E8F4FF;--blue-glow:rgba(0,101,179,.16);
-  --dark:#0F1923;--mid:#3D5166;--gray:#7A90A4;
-  --pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;
-  --green:#0D9E6E;--green-light:#DCFCE7;
-  --gold:#F59E0B;--gold-light:#FEF3C7;
-  --red:#DC2626;--red-light:#FEE2E2;
-  --pink:#FF4D8D;--orange:#FF8C42;--purple:#C84BFF;
+  --blue:#0065B3; --blue-mid:#0077CC; --blue-light:#E8F4FF;
+  --dark:#0F1923; --mid:#3D5166; --gray:#7A90A4;
+  --pearl:#F0F5FA; --light:#F7F9FC; --border:#D6E4F0;
+  --white:#FFFFFF; --green:#0D9E6E; --red:#DC2626; --gold:#F59E0B;
   --radius:14px;
-  --font:'Source Sans 3','Source Sans Pro',-apple-system,sans-serif;
-  --mono:'JetBrains Mono','SF Mono',Menlo,monospace;
+  --font:'Source Sans 3','Source Sans Pro',sans-serif;
+  --mono:'Source Sans 3','Source Sans Pro',sans-serif;
 }
-*{box-sizing:border-box}
-.scroll-area{
-  position:absolute;
-  inset:0;
-  overflow-y:auto;
-  background:var(--pearl);
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{
   font-family:var(--font);
-  color:var(--dark);
+  background:#E2EBF5;
+  background-image:radial-gradient(ellipse at 15% 0%,rgba(0,101,179,.08) 0%,transparent 55%),
+                   radial-gradient(ellipse at 85% 100%,rgba(0,101,179,.05) 0%,transparent 50%);
+  min-height:100vh;color:var(--dark);
+  font-feature-settings:"tnum";font-variant-numeric:tabular-nums;
+  padding:28px 16px 48px;
 }
-.scroll-area::-webkit-scrollbar{width:10px}
-.scroll-area::-webkit-scrollbar-track{background:transparent}
-.scroll-area::-webkit-scrollbar-thumb{background:rgba(122,144,164,.35);border-radius:5px}
-.scroll-area::-webkit-scrollbar-thumb:hover{background:rgba(122,144,164,.6)}
+.app-wrapper{width:100%;max-width:1100px;margin:0 auto}
 
-/* HERO */
-.hero{
-  background:linear-gradient(135deg,#FFFFFF 0%,#F7F9FC 100%);
-  border-bottom:1px solid var(--border);
-  padding:34px 48px 28px;
-  position:relative;
-  overflow:hidden;
+/* Header coerente con altre pagine */
+.app-card{
+  background:var(--white);border-radius:var(--radius);
+  box-shadow:0 8px 40px rgba(0,50,100,.12),0 2px 8px rgba(0,50,100,.07);
+  margin-bottom:18px;overflow:hidden;
 }
-.hero::before{
-  content:'';position:absolute;top:-80px;right:-100px;width:400px;height:400px;
-  background:radial-gradient(circle,rgba(0,101,179,.08) 0%,transparent 70%);
-  pointer-events:none;
+.app-header{
+  padding:18px 24px;border-bottom:3px solid var(--blue);
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
 }
-.hero-row{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
-.hero-brand{display:flex;align-items:center;gap:18px}
-.hero-logo{height:48px;width:auto;flex-shrink:0}
-.hero-text{display:flex;flex-direction:column}
-.hero-greet{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--blue);margin-bottom:4px;font-family:var(--mono)}
-.hero-name{font-size:24px;font-weight:800;color:var(--dark);line-height:1.2}
-.hero-org{font-size:13px;color:var(--gray);font-family:var(--mono);margin-top:2px}
+.app-title{font-size:18px;font-weight:800;color:var(--dark);letter-spacing:-.01em}
+.app-sub{font-size:11px;font-weight:600;color:var(--gray);margin-top:2px}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn-outline{
+  padding:8px 14px;background:var(--white);border:1.5px solid var(--border);
+  border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;
+  color:var(--dark);transition:.15s;font-family:var(--font);
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+.btn-cta{
+  padding:8px 14px;background:linear-gradient(135deg,#0077CC,#0050A0);color:#fff;
+  border:none;border-radius:9px;font-size:12px;font-weight:800;cursor:pointer;
+  transition:.2s;font-family:var(--font);box-shadow:0 4px 12px rgba(0,100,180,.2);
+}
+.btn-cta:hover{opacity:.92;transform:translateY(-1px)}
+.btn-danger{
+  padding:6px 12px;background:#FFF5F5;border:1.5px solid #FCA5A5;
+  border-radius:7px;color:var(--red);font-size:11px;font-weight:700;cursor:pointer;
+  font-family:var(--font);
+}
+.btn-danger:hover{background:#FEE2E2}
 
-.hero-actions{display:flex;gap:10px;align-items:center}
-.hero-actions .btn-outline,.hero-actions .btn-cta{font-size:12px;padding:9px 16px}
-
-/* HERO STATS - 3 numeri grandi */
-.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:24px}
-.stat-card{
-  background:var(--white);border:1px solid var(--border);border-radius:11px;
-  padding:18px 20px;position:relative;overflow:hidden;transition:.18s;
-}
-.stat-card:hover{border-color:var(--blue);box-shadow:0 4px 16px rgba(0,82,163,.08);transform:translateY(-1px)}
-.stat-card .stat-num{font-family:var(--mono);font-size:38px;font-weight:800;line-height:1;color:var(--dark);letter-spacing:-.02em}
-.stat-card .stat-label{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin-top:6px}
-.stat-card .stat-icon{
-  position:absolute;top:14px;right:14px;width:32px;height:32px;
-  border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:14px;
-}
-.stat-card.c-blue .stat-icon{background:var(--blue-light);color:var(--blue)}
-.stat-card.c-green .stat-icon{background:var(--green-light);color:var(--green)}
-.stat-card.c-pink .stat-icon{background:#FFE4EC;color:var(--pink)}
-
-/* STORAGE BAR */
-.storage-section{
-  margin-top:18px;padding:18px 22px;
-  background:var(--white);border:1px solid var(--border);border-radius:11px;
-  position:relative;overflow:hidden;
-}
-.storage-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px}
-.storage-title{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:800;color:var(--dark);font-family:var(--mono)}
-.storage-ico{
-  display:inline-block;width:18px;height:18px;border-radius:5px;
-  background:linear-gradient(135deg,var(--blue),var(--blue-mid));
-  position:relative;flex-shrink:0;
-}
-.storage-ico::after{content:'';position:absolute;inset:3px;border:2px solid #fff;border-radius:2px;border-top:none;border-left:none}
-.storage-plan{
-  font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;
-  padding:3px 8px;border-radius:10px;background:var(--blue);color:#fff;margin-left:2px;
-}
-.storage-figures{font-family:var(--mono);font-size:13px;color:var(--mid)}
-.storage-used{font-weight:800;color:var(--dark)}
-.storage-limit{color:var(--gray)}
-.storage-pct{font-size:11px;color:var(--gray);margin-left:4px}
-.storage-track{height:10px;background:var(--blue-light);border-radius:5px;overflow:hidden;position:relative}
-.storage-fill{height:100%;background:var(--green);border-radius:5px;transition:width .6s ease}
-.storage-foot{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:11px;color:var(--gray);font-family:var(--mono)}
-.storage-foot a{color:var(--blue);font-weight:700;text-decoration:none}
-.storage-foot a:hover{text-decoration:underline}
-.storage-ok{color:var(--green);font-weight:700}
-
-/* CONTAINER */
-.container{padding:24px 48px 48px;max-width:1280px;margin:0 auto}
-
-/* TABS */
+/* Tabs */
 .tabs{
-  display:flex;gap:4px;border-bottom:1.5px solid var(--border);margin-bottom:22px;
-  position:sticky;top:0;background:var(--pearl);z-index:5;padding-top:16px;
+  display:flex;gap:4px;background:var(--pearl);border-radius:10px;
+  padding:4px;margin:16px 24px 0;
 }
 .tab{
-  padding:11px 18px;font-size:13px;font-weight:700;color:var(--gray);
-  background:transparent;border:none;cursor:pointer;border-bottom:2.5px solid transparent;
-  transition:.18s;font-family:var(--font);position:relative;
+  padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;
+  cursor:pointer;color:var(--gray);border:none;background:transparent;
+  transition:.15s;font-family:var(--font);flex:1;text-align:center;
 }
-.tab:hover{color:var(--blue)}
-.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
-.tab-content{display:none;animation:fadeIn .28s ease}
+.tab.active{background:var(--white);color:var(--blue);box-shadow:0 1px 5px rgba(0,50,100,.12)}
+
+.tab-content{padding:22px 24px 28px;display:none}
 .tab-content.active{display:block}
-@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 
-/* List toolbar */
-.list-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-.list-toolbar input,.list-toolbar select{
-  padding:8px 12px;border:1px solid var(--border);border-radius:7px;
-  font-family:var(--font);font-size:13px;background:var(--white);outline:none;
+/* Stats cards */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+@media(max-width:720px){.stats-row{grid-template-columns:repeat(2,1fr)}}
+.stat-card{
+  background:var(--light);border:1.5px solid var(--border);border-radius:10px;
+  padding:14px 16px;
 }
-.list-toolbar input:focus,.list-toolbar select:focus{border-color:var(--blue)}
+.stat-label{font-size:10px;font-weight:800;color:var(--gray);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.stat-value{font-size:24px;font-weight:800;color:var(--dark);line-height:1}
+.stat-sub{font-size:11px;color:var(--gray);margin-top:4px}
 
-/* BUTTONS */
-.btn-cta{
-  background:linear-gradient(135deg,var(--blue-mid),var(--blue-dark));
-  color:#fff;border:none;border-radius:7px;padding:9px 16px;font-size:12px;
-  font-weight:800;cursor:pointer;font-family:var(--font);
-  box-shadow:0 1px 3px rgba(0,80,160,.25);transition:.18s;
+/* Lista analisi */
+.list-toolbar{
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap;
 }
-.btn-cta:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,80,160,.35)}
-.btn-outline{
-  background:#fff;color:var(--blue);border:1.5px solid var(--blue);
-  border-radius:7px;padding:9px 16px;font-size:12px;font-weight:800;
-  cursor:pointer;font-family:var(--font);transition:.18s;
+.filter-group{display:flex;gap:6px;align-items:center}
+.filter-btn{
+  padding:6px 14px;border:1.5px solid var(--border);border-radius:18px;
+  font-size:11px;font-weight:700;cursor:pointer;background:var(--white);
+  color:var(--gray);transition:.15s;font-family:var(--font);
 }
-.btn-outline:hover{background:var(--blue-light)}
-.btn-soft{
-  background:var(--blue-light);color:var(--blue);border:none;
-  border-radius:7px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;
-}
-.btn-soft:hover{background:#D6EAFA}
+.filter-btn.active{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
 
-/* CARD generica (analisi, progetti) */
-.card-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
-.item-card{
-  background:var(--white);border:1.5px solid var(--border);border-radius:11px;
-  padding:16px 18px;transition:.2s;display:flex;flex-direction:column;cursor:pointer;
-  position:relative;overflow:hidden;
+.analysis-table{
+  width:100%;border-collapse:collapse;font-family:var(--font);
+  border:1.5px solid var(--border);border-radius:10px;overflow:hidden;
+  background:var(--white);
 }
-.item-card::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:3px;
-  background:linear-gradient(90deg,var(--blue),var(--blue-mid));opacity:0;transition:.2s;
+.analysis-table thead{background:var(--light)}
+.analysis-table th{
+  text-align:left;padding:11px 14px;font-size:10px;font-weight:800;
+  color:var(--gray);text-transform:uppercase;letter-spacing:.06em;
+  border-bottom:1.5px solid var(--border);
 }
-.item-card:hover{border-color:var(--blue);box-shadow:0 6px 20px rgba(0,80,160,.10);transform:translateY(-2px)}
-.item-card:hover::before{opacity:1}
-.item-card .ic-title{font-size:15px;font-weight:800;color:var(--dark);margin-bottom:4px}
-.item-card .ic-meta{font-size:11px;color:var(--gray);font-family:var(--mono)}
-.item-card .ic-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px}
-.item-card .ic-actions{display:flex;gap:6px;margin-top:auto;padding-top:12px;border-top:1px dashed var(--border);flex-wrap:wrap}
-.item-card .ic-actions button{
-  font-size:10.5px;padding:5px 10px;border:1px solid var(--border);background:#fff;
-  border-radius:5px;cursor:pointer;color:var(--mid);font-family:var(--font);font-weight:700;
+.analysis-table th.right{text-align:right}
+.analysis-table td{
+  padding:11px 14px;font-size:13px;border-bottom:1px solid var(--light);
+  color:var(--dark);vertical-align:middle;
 }
-.item-card .ic-actions button:hover{border-color:var(--blue);color:var(--blue)}
-.item-card .ic-actions .danger{border-color:#FCA5A5;color:var(--red)}
-.item-card .ic-actions .danger:hover{background:var(--red-light)}
+.analysis-table td.right{text-align:right}
+.analysis-table tr:last-child td{border-bottom:none}
+.analysis-table tr:hover td{background:var(--light)}
+.cell-name{font-weight:700;cursor:pointer}
+.cell-name:hover{color:var(--blue);text-decoration:underline}
+.cell-meta{font-size:11px;color:var(--gray);font-family:var(--mono);margin-top:2px}
+.score-badge{
+  display:inline-block;padding:3px 10px;border-radius:14px;font-size:12px;
+  font-weight:800;font-family:var(--mono);
+}
+.score-eccellente{background:#EAF3DE;color:#3B6D11}
+.score-buono{background:#FEF3C7;color:#854D0E}
+.score-sufficiente{background:#FFEDD5;color:#9A3412}
+.score-scarso{background:#FEE2E2;color:#991B1B}
+.score-critico{background:#F3E0F7;color:#6B21A8}
+.row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.row-actions button{
+  padding:5px 10px;border:1px solid var(--border);background:var(--white);
+  border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;
+  font-family:var(--font);color:var(--mid);transition:.15s;
+}
+.row-actions button:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+.row-actions .danger{color:var(--red);border-color:#FCA5A5}
+.row-actions .danger:hover{background:#FEE2E2;color:var(--red)}
 
-/* SCORE BADGE per analisi */
-.score-badge{display:inline-block;padding:3px 9px;border-radius:11px;font-family:var(--mono);font-size:11px;font-weight:800}
-.score-ottimo{background:#D5F4D8;color:#1F7A2A}
-.score-buono{background:#DBE9FF;color:#1E4FA8}
-.score-suff{background:#FEF3C7;color:#92400E}
-.score-scarso{background:#FFE4DC;color:#B53A12}
-.score-crit{background:#FEE2E2;color:#991B1B}
+.empty-state{
+  text-align:center;padding:48px 24px;color:var(--gray);
+  font-family:var(--mono);font-size:13px;line-height:1.7;
+}
+.empty-state .ico{font-size:42px;margin-bottom:12px;opacity:.4}
 
-/* PROJECT CARD specifica */
-.project-card .pc-color{width:6px;height:24px;border-radius:3px;margin-right:8px;display:inline-block;vertical-align:middle;background:var(--blue)}
-.project-card .pc-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px;margin-top:8px;font-family:var(--mono);font-size:11px}
-.project-card .pc-meta div{padding:6px 8px;background:var(--light);border-radius:5px}
-.project-card .pc-meta b{color:var(--dark);font-weight:800}
+.pagination{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--gray);
+}
 
-/* CONTACT CARD */
-.contact-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+/* Modal */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(15,25,35,.7);z-index:200;
+  display:none;align-items:center;justify-content:center;padding:18px;
+}
+.modal-overlay.show{display:flex}
+.modal{
+  background:var(--white);border-radius:14px;padding:22px;
+  max-width:480px;width:100%;box-shadow:0 24px 60px rgba(0,30,80,.5);
+}
+.modal-title{font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px}
+.modal-sub{font-size:12px;color:var(--gray);font-family:var(--mono);margin-bottom:16px;line-height:1.5}
+.modal-field{margin-bottom:12px}
+.modal-field label{display:block;font-size:10px;font-weight:800;color:var(--gray);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.modal-field input,.modal-field textarea{
+  width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;
+  font-family:var(--font);font-size:13px;color:var(--dark);background:var(--white);
+  outline:none;transition:.15s;
+}
+.modal-field input:focus,.modal-field textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,119,204,.1)}
+.modal-field textarea{min-height:90px;resize:vertical}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+
+/* Profilo */
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:720px){.profile-grid{grid-template-columns:1fr}}
+.profile-card{
+  background:var(--light);border:1.5px solid var(--border);
+  border-radius:10px;padding:18px;
+}
+.profile-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #E2E8F0;font-size:13px}
+.profile-row:last-child{border-bottom:none}
+.profile-row .lbl{color:var(--gray);font-weight:600}
+.profile-row .val{color:var(--dark);font-weight:700;font-family:var(--mono)}
+.profile-section-title{font-size:11px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--dark);color:#fff;font-size:12px;font-weight:700;
+  padding:10px 22px;border-radius:22px;opacity:0;pointer-events:none;
+  transition:.3s;z-index:999;white-space:nowrap;max-width:90vw;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{background:var(--red)}
+
+/* Loading */
+.spinner{
+  display:inline-block;width:14px;height:14px;
+  border:2px solid rgba(0,0,0,.1);border-top-color:var(--blue);
+  border-radius:50%;animation:spin .7s linear infinite;
+  vertical-align:middle;margin-right:6px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading{padding:32px;text-align:center;color:var(--gray);font-family:var(--mono);font-size:12px}
+
+/* Project cards */
+.project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:16px}
+.project-card{
+  background:var(--white);border:1.5px solid var(--border);border-radius:12px;
+  padding:16px;cursor:pointer;transition:.18s;position:relative;
+}
+.project-card:hover{border-color:var(--blue);box-shadow:0 4px 16px rgba(0,82,163,.12);transform:translateY(-2px)}
+.project-card .pc-bar{position:absolute;top:0;left:0;right:0;height:4px;border-radius:12px 12px 0 0}
+.project-card .pc-name{font-size:14px;font-weight:800;color:var(--dark);margin-top:8px;margin-bottom:4px}
+.project-card .pc-patient{font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:10px}
+.project-card .pc-stats{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--gray);font-family:var(--mono);margin-top:12px;padding-top:10px;border-top:1px solid var(--light)}
+.project-card .pc-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.project-card .pc-actions button{font-size:10px;padding:5px 10px}
+.color-swatch:hover{transform:scale(1.1)}
+
+/* Contact list */
+.contact-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-bottom:14px}
 .contact-card{
-  background:var(--white);border:1.5px solid var(--border);border-radius:11px;
+  background:var(--white);border:1.5px solid var(--border);border-radius:10px;
   padding:14px 16px;transition:.18s;display:flex;flex-direction:column;
 }
 .contact-card:hover{border-color:var(--blue);box-shadow:0 3px 12px rgba(0,82,163,.08)}
 .contact-card.pending{border-style:dashed;background:#FFFBEB}
-.cc-name{font-size:14px;font-weight:800;color:var(--dark);margin-bottom:2px;display:flex;align-items:center;gap:6px}
-.cc-status{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;letter-spacing:.05em;text-transform:uppercase}
-.cc-status.active{background:var(--green-light);color:#065F46}
-.cc-status.pending{background:var(--gold-light);color:#92400E}
-.cc-email{font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:6px}
-.cc-role{font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
-.cc-notes{font-size:11px;color:var(--mid);font-style:italic;margin-bottom:8px;line-height:1.5}
-.cc-meta{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--gray);font-family:var(--mono);margin-top:auto;padding-top:8px;border-top:1px solid var(--light)}
-.cc-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
-.cc-actions button{font-size:10px;padding:4px 9px;border:1px solid var(--border);background:#fff;border-radius:5px;cursor:pointer;color:var(--mid);font-family:var(--font);font-weight:700}
-.cc-actions button:hover{border-color:var(--blue);color:var(--blue)}
-.cc-actions .danger{border-color:#FCA5A5;color:var(--red)}
-.cc-actions .danger:hover{background:var(--red-light)}
-.cc-drive-icon{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green)}
+.contact-card .cc-name{font-size:14px;font-weight:800;color:var(--dark);margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.contact-card .cc-status{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;letter-spacing:.05em;text-transform:uppercase}
+.contact-card .cc-status.active{background:#DCFCE7;color:#065F46}
+.contact-card .cc-status.pending{background:#FEF3C7;color:#92400E}
+.contact-card .cc-email{font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:6px}
+.contact-card .cc-role{font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.contact-card .cc-notes{font-size:11px;color:var(--mid);font-style:italic;margin-bottom:8px;line-height:1.5}
+.contact-card .cc-meta{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--gray);font-family:var(--mono);margin-top:auto;padding-top:8px;border-top:1px solid var(--light)}
+.contact-card .cc-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.contact-card .cc-actions button{font-size:10px;padding:4px 9px;border:1px solid var(--border);background:var(--white);border-radius:5px;cursor:pointer;color:var(--mid);font-family:var(--font);font-weight:700}
+.contact-card .cc-actions button:hover{border-color:var(--blue);color:var(--blue)}
+.contact-card .cc-actions .danger{border-color:#FCA5A5;color:var(--red)}
+.contact-card .cc-actions .danger:hover{background:#FEE2E2}
+.cc-drive-icon{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green);margin-right:4px;vertical-align:middle}
 
-/* CLOUD section */
-.cloud-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.cloud-card{background:var(--white);border:1.5px solid var(--border);border-radius:11px;padding:22px}
-.cloud-card h3{margin:0 0 4px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--blue);font-family:var(--mono)}
-.cloud-status{font-size:13px;color:var(--mid);margin-bottom:16px}
-.cloud-status.connected{color:var(--green);font-weight:700}
-.cloud-info-box{
-  background:var(--blue-light);border:1.5px solid #BAE0FF;border-radius:9px;
-  padding:14px 16px;margin-bottom:16px;font-size:12px;color:#065B8A;
-  font-family:var(--mono);line-height:1.6;display:flex;gap:14px;align-items:flex-start;
+/* v7.3.9.054 - Hero stats card */
+.hs-card{
+  background:var(--white);border:1px solid var(--border);border-radius:10px;
+  padding:16px 18px;position:relative;overflow:hidden;transition:.18s;
 }
-.cloud-info-box .ico{font-size:24px;color:var(--blue);flex-shrink:0;line-height:1}
-
-/* PROFILO section */
-.profile-card{background:var(--white);border:1.5px solid var(--border);border-radius:11px;padding:24px;max-width:560px}
-.profile-row{margin-bottom:18px}
-.profile-label{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin-bottom:5px;font-family:var(--mono)}
-.profile-val{font-size:15px;color:var(--dark);font-weight:600}
-
-/* Empty state */
-.empty-state{
-  text-align:center;padding:60px 20px;color:var(--gray);font-family:var(--mono);font-size:13px;
-  background:var(--white);border:2px dashed var(--border);border-radius:11px;
+.hs-card:hover{border-color:var(--blue);box-shadow:0 3px 12px rgba(0,82,163,.08);transform:translateY(-1px)}
+.hs-card .hs-num{
+  font-family:var(--mono);font-size:32px;font-weight:800;line-height:1;
+  letter-spacing:-.02em;color:var(--dark);
 }
-.empty-state .ico{font-size:32px;display:block;margin-bottom:10px;opacity:.5}
-
-/* Loading */
-.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--gray);font-family:var(--mono)}
-.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite;margin-right:8px}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* Toast */
-.toast{position:fixed;bottom:48px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:12px 20px;border-radius:9px;font-size:13px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.3);font-family:var(--mono);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
-.toast.error{background:var(--red)}
-
-/* Modal */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,25,35,.6);z-index:1000;align-items:center;justify-content:center;padding:20px}
-.modal-overlay.show{display:flex}
-.modal{background:#fff;border-radius:13px;padding:26px;max-width:520px;width:100%;box-shadow:0 24px 60px rgba(0,30,80,.5);max-height:90vh;overflow-y:auto}
-.modal-title{font-size:18px;font-weight:800;color:var(--dark);margin-bottom:5px}
-.modal-sub{font-size:12px;color:var(--gray);margin-bottom:18px;font-family:var(--mono)}
-.modal-field{margin-bottom:14px}
-.modal-field label{display:block;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin-bottom:5px;font-family:var(--mono)}
-.modal-field input,.modal-field textarea,.modal-field select{
-  width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:7px;
-  font-family:var(--font);font-size:13px;outline:none;background:#fff;
+.hs-card .hs-lbl{
+  font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--gray);margin-top:5px;font-family:var(--mono);
 }
-.modal-field input:focus,.modal-field textarea:focus,.modal-field select:focus{border-color:var(--blue)}
-.modal-field textarea{resize:vertical;min-height:70px}
-.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+.hs-blue{border-top:3px solid var(--blue)}
+.hs-green{border-top:3px solid var(--green)}
+.hs-pink{border-top:3px solid #FF4D8D}
 
-/* Login required */
-.login-gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:40px;text-align:center}
-.login-gate .ico{font-size:48px;margin-bottom:14px;opacity:.4}
-.login-gate h2{font-size:22px;color:var(--dark);margin:0 0 8px;font-weight:800}
-.login-gate p{font-size:13px;color:var(--gray);font-family:var(--mono);max-width:420px;margin:0 0 20px;line-height:1.6}
-
-/* LEADERBOARD */
-.lb-table{width:100%;border-collapse:collapse;background:var(--white);border-radius:9px;overflow:hidden;box-shadow:0 1px 4px rgba(0,30,80,.04)}
-.lb-table th{background:var(--light);text-align:left;padding:9px 14px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);font-family:var(--mono);font-weight:800}
-.lb-table td{padding:11px 14px;border-bottom:1px solid var(--light);font-size:13px}
-.lb-table tr:last-child td{border-bottom:none}
-.lb-rank{font-family:var(--mono);font-weight:800;font-size:14px;color:var(--blue)}
-
-/* Footer */
-.footer{padding:20px 48px;text-align:center;font-size:11px;color:var(--gray);font-family:var(--mono);border-top:1px solid var(--border);background:var(--white)}
-
-@media(max-width:680px){
-  .hero{padding:24px}
-  .container{padding:18px 22px 30px}
-  .hero-stats{grid-template-columns:1fr 1fr 1fr;gap:8px}
-  .stat-card{padding:14px}
-  .stat-card .stat-num{font-size:30px}
-  .cloud-grid{grid-template-columns:1fr}
-  .hero-actions{width:100%}
+/* Storage bar */
+.storage-section{
+  padding:16px 18px;background:var(--white);border:1px solid var(--border);
+  border-radius:10px;
 }
+.storage-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px}
+.storage-title{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:800;color:var(--dark);font-family:var(--mono)}
+.storage-ico{
+  display:inline-block;width:18px;height:18px;border-radius:5px;
+  background:linear-gradient(135deg,var(--blue),var(--blue-mid));position:relative;flex-shrink:0;
+}
+.storage-ico::after{content:'';position:absolute;inset:3px;border:2px solid #fff;border-radius:2px;border-top:none;border-left:none}
+.storage-plan{
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;
+  padding:2px 7px;border-radius:9px;background:var(--blue);color:#fff;
+}
+.storage-figures{font-family:var(--mono);font-size:12px;color:var(--mid)}
+.storage-used{font-weight:800;color:var(--dark)}
+.storage-limit{color:var(--gray)}
+.storage-pct{font-size:11px;color:var(--gray);margin-left:4px}
+.storage-track{height:9px;background:var(--blue-light);border-radius:5px;overflow:hidden}
+.storage-fill{height:100%;background:var(--green);border-radius:5px;transition:width .6s ease}
+.storage-foot{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:10.5px;color:var(--gray);font-family:var(--mono)}
+.storage-foot a{color:var(--blue);font-weight:700;text-decoration:none}
+.storage-foot a:hover{text-decoration:underline}
+.storage-ok{color:var(--green);font-weight:700}
+
+/* Login required state */
+.auth-required{
+  background:linear-gradient(135deg,var(--blue-light),#F0F9FF);
+  border:1.5px solid #BAE0FF;border-radius:var(--radius);
+  padding:28px;text-align:center;margin:24px 0;
+}
+.auth-required .ico{font-size:42px;margin-bottom:10px;opacity:.6}
+.auth-required .title{font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px}
+.auth-required .desc{font-size:12px;color:var(--gray);font-family:var(--mono);line-height:1.7;margin-bottom:14px}
 </style>
 </head>
 <body>
-<div class="scroll-area">
+<div class="app-wrapper">
 
-<!-- ========== HERO ========== -->
-<section class="hero">
-  <div class="hero-row">
-    <div class="hero-brand">
-      <img class="hero-logo" src="/static/synthesis-logo.png" alt="Synthesis">
-      <div class="hero-text">
-        <div class="hero-greet" id="heroGreet">Bentornato</div>
-        <div class="hero-name" id="heroName">&mdash;</div>
-        <div class="hero-org" id="heroOrg"></div>
+  <!-- Header (v7.3.9.054 - ridisegnato con logo, hero stats, storage bar) -->
+  <div class="app-card">
+    <div class="app-header" style="border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:18px">
+        <img src="/static/synthesis-logo.png" alt="Synthesis" style="height:42px;width:auto;flex-shrink:0">
+        <div>
+          <div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--blue);margin-bottom:3px;font-family:var(--mono)">Area personale</div>
+          <div class="app-title" style="font-size:22px">Le tue analisi, il tuo cloud</div>
+          <div class="app-sub">Tutto al posto giusto, sempre tuo</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-outline" onclick="location.href='/analizzare'">Vai all'analisi</button>
+        <button class="btn-outline" id="btnLogout" onclick="doLogout()">Esci</button>
       </div>
     </div>
-    <div class="hero-actions">
-      <button class="btn-outline" onclick="window.location='/analizzare'">Vai all'analisi</button>
-      <button class="btn-cta" onclick="logout()">Esci</button>
+
+    <!-- Hero stats: 3 numeri grandi (visibili solo se loggato) -->
+    <div id="heroStats" hidden style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">
+      <div class="hs-card hs-blue">
+        <div class="hs-num" id="hsAnalyses">&mdash;</div>
+        <div class="hs-lbl">Le tue analisi</div>
+      </div>
+      <div class="hs-card hs-green">
+        <div class="hs-num" id="hsProjects">&mdash;</div>
+        <div class="hs-lbl">Progetti attivi</div>
+      </div>
+      <div class="hs-card hs-pink">
+        <div class="hs-num" id="hsContacts">&mdash;</div>
+        <div class="hs-lbl">Contatti rubrica</div>
+      </div>
+    </div>
+
+    <!-- Storage bar (consumo mensile 1GB free) -->
+    <div id="storageBar" hidden style="margin-bottom:18px"></div>
+
+    <!-- Auth gate -->
+    <div id="authGate" class="auth-required" hidden>
+      <div class="ico">&#x1F510;</div>
+      <div class="title">Accesso richiesto</div>
+      <div class="desc">Per visualizzare le tue analisi devi essere autenticato.<br>Apri il modulo Analizza e accedi prima di tornare qui.</div>
+      <button class="btn-cta" onclick="location.href='/analizzare'">Vai al login</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="tabsNav" hidden>
+      <button class="tab active" data-tab="analyses" onclick="switchTab('analyses')">Le mie analisi</button>
+      <button class="tab" data-tab="projects" onclick="switchTab('projects')">I miei progetti</button>
+      <button class="tab" data-tab="contacts" onclick="switchTab('contacts')">Contatti</button>
+      <button class="tab" data-tab="cloud" onclick="switchTab('cloud')">Cloud</button>
+      <button class="tab" data-tab="profile" onclick="switchTab('profile')">Profilo</button>
+      <button class="tab" data-tab="leaderboard" onclick="switchTab('leaderboard')">Classifica</button>
+    </div>
+
+    <!-- TAB: ANALISI -->
+    <div class="tab-content active" id="tabAnalyses" hidden>
+      <div class="stats-row" id="statsRow"></div>
+
+      <div class="list-toolbar">
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="active" onclick="switchFilter('active')">Attive</button>
+          <button class="filter-btn" data-filter="archived" onclick="switchFilter('archived')">Archiviate</button>
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="totalCount">&mdash;</div>
+      </div>
+
+      <div id="analysesContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
+      <div class="pagination" id="pagination" hidden></div>
+    </div>
+
+    <!-- TAB: PROGETTI -->
+    <div class="tab-content" id="tabProjects">
+      <div class="list-toolbar">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-cta" onclick="openProjectCreate()">+ Nuovo progetto</button>
+          <div class="filter-group" style="margin-left:8px">
+            <button class="filter-btn active" data-pfilter="active" onclick="switchProjectFilter('active')">Attivi</button>
+            <button class="filter-btn" data-pfilter="archived" onclick="switchProjectFilter('archived')">Archiviati</button>
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="projectsCount">&mdash;</div>
+      </div>
+      <div id="projectsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
+    </div>
+
+    <!-- TAB: CONTATTI -->
+    <div class="tab-content" id="tabContacts">
+      <div class="list-toolbar">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-cta" onclick="openContactCreate()">+ Nuovo contatto</button>
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="contactsCount">&mdash;</div>
+      </div>
+      <div style="background:var(--blue-light);border:1.5px solid #BAE0FF;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:12px;color:#065B8A;font-family:var(--mono);line-height:1.6">
+        <b>Rubrica per scambio file.</b> Aggiungi gli utenti Syntesis con cui collabori (cliniche, laboratori). Se l\'email non e\' ancora registrata su Syntesis, il contatto resta in attesa: appena la persona si registra con quella email, viene attivato automaticamente.
+      </div>
+      <div id="contactsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
+    </div>
+
+    <!-- TAB: CLOUD -->
+    <div class="tab-content" id="tabCloud">
+      <div id="cloudContainer">
+        <div style="background:linear-gradient(135deg,var(--blue-light),#F0F9FF);border:1.5px solid #BAE0FF;border-radius:12px;padding:22px;margin-bottom:18px">
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <div style="width:48px;height:48px;background:var(--white);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <path d="M22 17a4 4 0 0 0-4-4h-1a6 6 0 0 0-11.7 1A4 4 0 0 0 7 22h11a4 4 0 0 0 4-5z" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">I tuoi file restano tuoi</div>
+              <div style="font-size:12px;color:var(--gray);font-family:var(--mono);line-height:1.7">
+                Collegando un cloud personale (Google Drive o Dropbox), i file STL, JSON e PDF delle tue analisi vengono salvati nel <b>tuo</b> cloud, non sui nostri server. Puoi scollegare in qualsiasi momento.<br>
+                Organizzazione: una cartella radice <code style="background:#fff;padding:1px 5px;border-radius:3px">Syntesis-ICP</code> nel tuo Drive, con una sottocartella per ogni progetto.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-grid">
+          <div class="profile-card">
+            <div class="profile-section-title">Google Drive</div>
+            <div id="gdriveStatus" style="font-size:13px;color:var(--gray);font-family:var(--mono);margin-bottom:14px">
+              <span class="spinner"></span>Verifica stato...
+            </div>
+            <div id="gdriveActions"></div>
+          </div>
+          <div class="profile-card">
+            <div class="profile-section-title">Dropbox</div>
+            <div id="dropboxStatus" style="font-size:13px;color:var(--gray);font-family:var(--mono);margin-bottom:14px">
+              <span class="spinner"></span>Verifica stato...
+            </div>
+            <div id="dropboxActions"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;padding:14px 16px;background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:10px;font-size:11px;color:#065F46;font-family:var(--mono);line-height:1.7">
+          <b>Drive OAuth attivo (v7.3.9.048):</b> Google Drive e\' connettibile. Lo scope richiesto e\' <code style="background:#fff;padding:1px 5px;border-radius:3px">drive.file</code>, che limita Syntesis-ICP ai SOLI file che lui stesso crea nella cartella <code style="background:#fff;padding:1px 5px;border-radius:3px">Syntesis-ICP</code> nel tuo Drive. Gli altri file del Drive non sono mai accessibili.
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: PROFILO -->
+    <div class="tab-content" id="tabProfile">
+      <div id="profileContainer" class="loading"><span class="spinner"></span>Caricamento profilo...</div>
+    </div>
+
+    <!-- TAB: CLASSIFICA -->
+    <div class="tab-content" id="tabLeaderboard">
+      <div id="leaderboardContainer" class="loading"><span class="spinner"></span>Caricamento classifica...</div>
     </div>
   </div>
 
-  <!-- Hero Stats -->
-  <div class="hero-stats">
-    <div class="stat-card c-blue">
-      <div class="stat-num" id="heroStatA">0</div>
-      <div class="stat-label">Le tue analisi</div>
-      <div class="stat-icon">&#9745;</div>
-    </div>
-    <div class="stat-card c-green">
-      <div class="stat-num" id="heroStatP">0</div>
-      <div class="stat-label">Progetti attivi</div>
-      <div class="stat-icon">&#128193;</div>
-    </div>
-    <div class="stat-card c-pink">
-      <div class="stat-num" id="heroStatC">0</div>
-      <div class="stat-label">Contatti</div>
-      <div class="stat-icon">&#9993;</div>
-    </div>
-  </div>
-
-  <!-- Storage Bar -->
-  <div class="storage-section" id="storageBar">
-    <div class="loading"><span class="spinner"></span>Caricamento spazio...</div>
-  </div>
-</section>
-
-<!-- ========== TABS + CONTAINER ========== -->
-<div class="container">
-  <div class="tabs">
-    <button class="tab active" data-tab="analyses" onclick="switchTab('analyses')">Le mie analisi</button>
-    <button class="tab" data-tab="projects" onclick="switchTab('projects')">I miei progetti</button>
-    <button class="tab" data-tab="contacts" onclick="switchTab('contacts')">Contatti</button>
-    <button class="tab" data-tab="cloud" onclick="switchTab('cloud')">Cloud</button>
-    <button class="tab" data-tab="profile" onclick="switchTab('profile')">Profilo</button>
-    <button class="tab" data-tab="leaderboard" onclick="switchTab('leaderboard')">Classifica</button>
-  </div>
-
-  <!-- TAB: ANALISI -->
-  <div class="tab-content active" id="tabAnalyses">
-    <div class="list-toolbar">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="text" id="searchAnalyses" placeholder="Cerca per nome..." style="width:220px" oninput="filterAnalyses()">
-        <select id="filterProject" onchange="loadAnalyses()">
-          <option value="">Tutti i progetti</option>
-        </select>
-      </div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="analysesCount">&mdash;</div>
-    </div>
-    <div id="analysesContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
-  </div>
-
-  <!-- TAB: PROGETTI -->
-  <div class="tab-content" id="tabProjects">
-    <div class="list-toolbar">
-      <div><button class="btn-cta" onclick="openProjectCreate()">+ Nuovo progetto</button></div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="projectsCount">&mdash;</div>
-    </div>
-    <div id="projectsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
-  </div>
-
-  <!-- TAB: CONTATTI -->
-  <div class="tab-content" id="tabContacts">
-    <div class="list-toolbar">
-      <div><button class="btn-cta" onclick="openContactCreate()">+ Nuovo contatto</button></div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="contactsCount">&mdash;</div>
-    </div>
-    <div class="cloud-info-box">
-      <span class="ico">&#9993;</span>
-      <div><b>Rubrica per scambio file.</b> Aggiungi gli utenti Syntesis con cui collabori (cliniche, laboratori). Se l'email non e' ancora registrata, il contatto resta in attesa: appena la persona si registra con quella email, viene attivato automaticamente.</div>
-    </div>
-    <div id="contactsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
-  </div>
-
-  <!-- TAB: CLOUD -->
-  <div class="tab-content" id="tabCloud">
-    <div class="cloud-info-box">
-      <span class="ico">&#9729;</span>
-      <div><b>I tuoi file restano tuoi.</b> Collegando un cloud personale (Google Drive o Dropbox), i file STL, JSON e PDF delle tue analisi vengono salvati nel <b>tuo</b> cloud, non sui nostri server. Puoi scollegare in qualsiasi momento. Organizzazione: una cartella radice <code>Syntesis-ICP</code> nel tuo Drive, con una sottocartella per ogni progetto.</div>
-    </div>
-    <div class="cloud-grid">
-      <div class="cloud-card">
-        <h3>Google Drive</h3>
-        <div class="cloud-status" id="gdriveStatus">Verifica in corso...</div>
-        <div id="gdriveAction"></div>
-      </div>
-      <div class="cloud-card">
-        <h3>Dropbox</h3>
-        <div class="cloud-status">Non connesso</div>
-        <button class="btn-outline" disabled style="opacity:.5;cursor:not-allowed">Connetti Dropbox</button>
-        <div style="font-size:11px;color:var(--gray);font-family:var(--mono);margin-top:10px">Disponibile in una prossima fase.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB: PROFILO -->
-  <div class="tab-content" id="tabProfile">
-    <div class="profile-card">
-      <div class="profile-row">
-        <div class="profile-label">Email</div>
-        <div class="profile-val" id="pfEmail">&mdash;</div>
-      </div>
-      <div class="profile-row">
-        <div class="profile-label">Nome completo</div>
-        <div class="profile-val" id="pfName">&mdash;</div>
-      </div>
-      <div class="profile-row">
-        <div class="profile-label">Organizzazione</div>
-        <div class="profile-val" id="pfOrg">&mdash;</div>
-      </div>
-      <div class="profile-row">
-        <div class="profile-label">Ruolo</div>
-        <div class="profile-val" id="pfRole">&mdash;</div>
-      </div>
-      <div class="profile-row">
-        <div class="profile-label">Membro da</div>
-        <div class="profile-val" id="pfSince">&mdash;</div>
-      </div>
-      <div style="margin-top:18px"><button class="btn-outline" onclick="openProfileEdit()">Modifica profilo</button></div>
-    </div>
-  </div>
-
-  <!-- TAB: CLASSIFICA -->
-  <div class="tab-content" id="tabLeaderboard">
-    <div class="cloud-info-box">
-      <span class="ico">&#x1F3C6;</span>
-      <div>Le tue posizioni nelle classifiche pubbliche di precisione. Solo i risultati che hai scelto di pubblicare appaiono qui.</div>
-    </div>
-    <div id="leaderboardContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
+  <div style="text-align:center;font-size:10px;color:var(--gray);font-weight:600;letter-spacing:.04em;margin-top:14px">
+    Syntesis-ICP &middot; Area personale &middot; v7.3.9.048
   </div>
 </div>
 
-<!-- Footer -->
-<div class="footer">Syntesis-ICP &middot; Area personale &middot; v7.3.9.054</div>
+<!-- Modal rinomina/modifica -->
+<div class="modal-overlay" id="modalEdit">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Modifica analisi</div>
+    <div class="modal-sub">I file STL originali non vengono memorizzati. Puoi solo cambiare nome e note.</div>
+    <div class="modal-field">
+      <label>Nome dell'analisi</label>
+      <input type="text" id="modalName" maxlength="200" placeholder="Es. Caso Rossi - 12 marzo">
+    </div>
+    <div class="modal-field">
+      <label>Note (opzionale)</label>
+      <textarea id="modalNotes" maxlength="5000" placeholder="Annotazioni cliniche, ID paziente, dettagli..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeModal()">Annulla</button>
+      <button class="btn-cta" onclick="saveModal()">Salva</button>
+    </div>
+  </div>
+</div>
 
-<!-- ========== MODALS ========== -->
-<!-- Modal nuovo/modifica progetto -->
+<!-- Modal nuovo progetto / modifica progetto -->
 <div class="modal-overlay" id="modalProject">
   <div class="modal">
     <div class="modal-title" id="modalProjectTitle">Nuovo progetto</div>
-    <div class="modal-sub">Organizza le tue analisi per paziente o caso clinico.</div>
-    <div class="modal-field"><label>Nome *</label><input type="text" id="projName" maxlength="100" placeholder="Es. Caso Rossi 2026-01"></div>
-    <div class="modal-field"><label>Descrizione</label><textarea id="projDesc" maxlength="500"></textarea></div>
-    <div class="modal-field"><label>Riferimento paziente</label><input type="text" id="projPatient" maxlength="100" placeholder="Iniziali, codice, identificativo"></div>
-    <div class="modal-field"><label>Colore</label><input type="color" id="projColor" value="#0065B3" style="height:40px;padding:4px"></div>
+    <div class="modal-sub">Un progetto raggruppa analisi e file correlati. Es. un caso clinico o un paziente.</div>
+    <div class="modal-field">
+      <label>Nome progetto *</label>
+      <input type="text" id="projectName" maxlength="200" placeholder="Es. Caso Rossi - quadrante 1">
+    </div>
+    <div class="modal-field">
+      <label>Riferimento paziente (opzionale)</label>
+      <input type="text" id="projectPatient" maxlength="200" placeholder="ID paziente, codice anonimo, etc.">
+    </div>
+    <div class="modal-field">
+      <label>Descrizione (opzionale)</label>
+      <textarea id="projectDescription" maxlength="2000" placeholder="Note sul caso, decorso, vincoli..."></textarea>
+    </div>
+    <div class="modal-field">
+      <label>Colore identificativo</label>
+      <div style="display:flex;gap:6px">
+        <span class="color-swatch" data-c="#0065B3" style="width:28px;height:28px;background:#0065B3;border-radius:6px;cursor:pointer;border:2.5px solid var(--blue)"></span>
+        <span class="color-swatch" data-c="#0D9E6E" style="width:28px;height:28px;background:#0D9E6E;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+        <span class="color-swatch" data-c="#F59E0B" style="width:28px;height:28px;background:#F59E0B;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+        <span class="color-swatch" data-c="#DC2626" style="width:28px;height:28px;background:#DC2626;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+        <span class="color-swatch" data-c="#7C3AED" style="width:28px;height:28px;background:#7C3AED;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+        <span class="color-swatch" data-c="#0E7490" style="width:28px;height:28px;background:#0E7490;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeProjectModal()">Annulla</button>
       <button class="btn-cta" onclick="saveProjectModal()">Salva</button>
@@ -487,10 +548,22 @@ body{
   <div class="modal">
     <div class="modal-title" id="modalContactTitle">Nuovo contatto</div>
     <div class="modal-sub">Aggiungi un altro utente Syntesis con cui scambiare file e progetti.</div>
-    <div class="modal-field"><label>Email del contatto *</label><input type="email" id="contactEmail" maxlength="200" placeholder="email@esempio.it"></div>
-    <div class="modal-field"><label>Etichetta</label><input type="text" id="contactName" maxlength="200" placeholder="Es. Studio Rossi, Lab Bianchi..."></div>
-    <div class="modal-field"><label>Ruolo (opzionale)</label><input type="text" id="contactRole" maxlength="100" placeholder="Es. Clinica, Laboratorio, Collega..."></div>
-    <div class="modal-field"><label>Note (opzionale)</label><textarea id="contactNotes" maxlength="2000"></textarea></div>
+    <div class="modal-field">
+      <label>Email del contatto *</label>
+      <input type="email" id="contactEmail" maxlength="200" placeholder="email@esempio.it">
+    </div>
+    <div class="modal-field">
+      <label>Etichetta</label>
+      <input type="text" id="contactName" maxlength="200" placeholder="Es. Studio Rossi, Lab Bianchi...">
+    </div>
+    <div class="modal-field">
+      <label>Ruolo (opzionale)</label>
+      <input type="text" id="contactRole" maxlength="100" placeholder="Es. Clinica, Laboratorio, Collega...">
+    </div>
+    <div class="modal-field">
+      <label>Note (opzionale)</label>
+      <textarea id="contactNotes" maxlength="2000" placeholder="Annotazioni libere..."></textarea>
+    </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeContactModal()">Annulla</button>
       <button class="btn-cta" onclick="saveContactModal()">Salva</button>
@@ -498,53 +571,30 @@ body{
   </div>
 </div>
 
-<!-- Modal modifica profilo -->
+<!-- Modal profilo -->
 <div class="modal-overlay" id="modalProfile">
   <div class="modal">
     <div class="modal-title">Modifica profilo</div>
-    <div class="modal-sub">Aggiorna i tuoi dati. L'email non e' modificabile.</div>
-    <div class="modal-field"><label>Nome completo</label><input type="text" id="pfNameEdit" maxlength="100"></div>
-    <div class="modal-field"><label>Organizzazione</label><input type="text" id="pfOrgEdit" maxlength="100"></div>
-    <div class="modal-actions">
-      <button class="btn-outline" onclick="closeProfileEdit()">Annulla</button>
-      <button class="btn-cta" onclick="saveProfileEdit()">Salva</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal modifica analisi -->
-<div class="modal-overlay" id="modalAnalysis">
-  <div class="modal">
-    <div class="modal-title">Modifica analisi</div>
-    <div class="modal-sub">Personalizza i metadati. Il file STL e i risultati restano invariati.</div>
-    <div class="modal-field"><label>Nome</label><input type="text" id="anName" maxlength="200"></div>
+    <div class="modal-sub">Email e licenza non sono modificabili.</div>
     <div class="modal-field">
-      <label>Progetto</label>
-      <select id="anProject"><option value="">Nessun progetto</option></select>
+      <label>Nome</label>
+      <input type="text" id="modalProfileName" maxlength="200">
     </div>
-    <div class="modal-field"><label>Note</label><textarea id="anNotes" maxlength="2000"></textarea></div>
+    <div class="modal-field">
+      <label>Organizzazione</label>
+      <input type="text" id="modalProfileOrg" maxlength="200" placeholder="Studio dentistico, laboratorio...">
+    </div>
     <div class="modal-actions">
-      <button class="btn-outline" onclick="closeAnalysisModal()">Annulla</button>
-      <button class="btn-cta" onclick="saveAnalysisModal()">Salva</button>
+      <button class="btn-outline" onclick="closeProfileModal()">Annulla</button>
+      <button class="btn-cta" onclick="saveProfileModal()">Salva</button>
     </div>
   </div>
 </div>
 
 <!-- Toast -->
-<div class="toast" id="toast"></div>
-
-<!-- Login gate (se non autenticato) -->
-<div class="login-gate" id="loginGate" style="display:none">
-  <span class="ico">&#x1F512;</span>
-  <h2>Accesso richiesto</h2>
-  <p>Per accedere all'area personale, devi essere autenticato. Apri il modulo Analizzare e clicca "Accedi" dal menu File.</p>
-  <button class="btn-cta" onclick="window.location='/analizzare'">Vai all'analizzatore</button>
-</div>
-
-</div><!-- /scroll-area -->
+<div id="toast" class="toast"></div>
 
 <script>
-
 // ── Stato ───────────────────────────────────────────────────────────────────
 var TOKEN_KEY = 'syntesis_token';
 var state = {
@@ -654,6 +704,80 @@ async function loadStats(){
       '<div class="stat-card"><div class="stat-label">Miglior voto</div><div class="stat-value">' + best + '</div><div class="stat-sub">storico</div></div>' +
       '<div class="stat-card"><div class="stat-label">Archiviate</div><div class="stat-value">' + (stats.n_archived || 0) + '</div><div class="stat-sub">non visibili</div></div>';
   } catch(e){ console.warn('stats', e); }
+}
+
+// ── v7.3.9.054 - Storage consumption ────────────────────────────────────────
+async function loadStorage(){
+  var el = document.getElementById('storageBar');
+  if(!el) return;
+  el.hidden = false;
+  try {
+    var r = await fetch('/api/me/storage', { headers: authHeaders() });
+    if(r.status === 401){ checkAuth(); return; }
+    if(!r.ok) return;
+    var s = await r.json();
+    renderStorageBar(s);
+  } catch(e){ console.error('storage', e); }
+}
+
+function renderStorageBar(s){
+  var el = document.getElementById('storageBar');
+  if(!el) return;
+  var pct = Math.min(100, s.percent || 0);
+  var color = pct < 50 ? 'var(--green)' : pct < 80 ? 'var(--gold)' : 'var(--red)';
+  var planLabel = { free: 'Free', pro: 'Pro', studio: 'Studio' }[s.plan] || s.plan;
+  el.innerHTML = '<div class="storage-section">' +
+    '<div class="storage-head">' +
+      '<div class="storage-title">' +
+        '<span class="storage-ico"></span>' +
+        '<span>Spazio mensile</span>' +
+        '<span class="storage-plan">' + planLabel + '</span>' +
+      '</div>' +
+      '<div class="storage-figures">' +
+        '<span class="storage-used">' + fmtBytes(s.used_bytes) + '</span>' +
+        ' / <span class="storage-limit">' + fmtBytes(s.limit_bytes) + '</span>' +
+        ' <span class="storage-pct">(' + pct.toFixed(1) + '%)</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="storage-track">' +
+      '<div class="storage-fill" style="width:' + pct + '%;background:' + color + '"></div>' +
+    '</div>' +
+    '<div class="storage-foot">' +
+      '<span>Si rinnova il 1\xb0 del prossimo mese</span>' +
+      (s.plan === 'free' ?
+        '<a href="#" onclick="alert(\'Piani a pagamento in arrivo. Verrai avvisato.\');return false">Passa a Pro &rarr;</a>'
+        : '<span class="storage-ok">Piano attivo</span>') +
+    '</div>' +
+  '</div>';
+}
+
+function fmtBytes(b){
+  if(b < 1024) return b + ' B';
+  if(b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+  if(b < 1024*1024*1024) return (b/1024/1024).toFixed(1) + ' MB';
+  return (b/1024/1024/1024).toFixed(2) + ' GB';
+}
+
+async function loadHeroStats(){
+  var box = document.getElementById('heroStats');
+  if(!box) return;
+  box.hidden = false;
+  try {
+    var [a, p, c] = await Promise.all([
+      fetch('/api/me/profile', { headers: authHeaders() }).then(r => r.ok ? r.json() : null),
+      fetch('/api/me/projects', { headers: authHeaders() }).then(r => r.ok ? r.json() : null),
+      fetch('/api/me/contacts', { headers: authHeaders() }).then(r => r.ok ? r.json() : null),
+    ]);
+    var na = a && a.stats ? (a.stats.n_total || 0) : 0;
+    var np = p && p.items ? p.items.length : 0;
+    var nc = c && c.items ? c.items.length : 0;
+    var elA = document.getElementById('hsAnalyses');
+    var elP = document.getElementById('hsProjects');
+    var elC = document.getElementById('hsContacts');
+    if(elA) elA.textContent = na;
+    if(elP) elP.textContent = np;
+    if(elC) elC.textContent = nc;
+  } catch(e){ console.error('hero stats', e); }
 }
 
 // ── Lista analisi ───────────────────────────────────────────────────────────
@@ -1326,97 +1450,22 @@ async function deleteContact(id){
   } catch(e){ showToast('Errore: ' + e.message, true); }
 }
 
-
-
-// ── v7.3.9.054 - Storage consumption ────────────────────────────────────────
-async function loadStorage(){
-  try {
-    var r = await fetch('/api/me/storage', { headers: authHeaders() });
-    if(r.status === 401){ checkAuth(); return; }
-    if(!r.ok) return;
-    var s = await r.json();
-    renderStorageBar(s);
-  } catch(e){
-    console.error('storage load error', e);
-  }
-}
-
-function renderStorageBar(s){
-  var el = document.getElementById('storageBar');
-  if(!el) return;
-  var pct = Math.min(100, s.percent || 0);
-  var color = pct < 50 ? 'var(--green)' : pct < 80 ? 'var(--gold)' : 'var(--red)';
-  var usedMb = (s.used_bytes / 1024 / 1024).toFixed(1);
-  var limitMb = (s.limit_bytes / 1024 / 1024).toFixed(0);
-  var usedHuman = formatBytes(s.used_bytes);
-  var limitHuman = formatBytes(s.limit_bytes);
-  var planLabel = { free: 'Gratuito', pro: 'Pro', studio: 'Studio' }[s.plan] || s.plan;
-  el.innerHTML =
-    '<div class="storage-head">' +
-      '<div class="storage-title">' +
-        '<span class="storage-ico"></span>' +
-        '<span>Spazio mensile</span>' +
-        '<span class="storage-plan">' + planLabel + '</span>' +
-      '</div>' +
-      '<div class="storage-figures">' +
-        '<span class="storage-used">' + usedHuman + '</span>' +
-        ' / <span class="storage-limit">' + limitHuman + '</span>' +
-        ' <span class="storage-pct">(' + pct.toFixed(1) + '%)</span>' +
-      '</div>' +
-    '</div>' +
-    '<div class="storage-track">' +
-      '<div class="storage-fill" style="width:' + pct + '%;background:' + color + '"></div>' +
-    '</div>' +
-    '<div class="storage-foot">' +
-      '<span>Si rinnova il 1° del prossimo mese</span>' +
-      (s.plan === 'free' ?
-        '<a href="#" onclick="alert(\'Piani a pagamento in arrivo. Verrai avvisato.\');return false">Passa a Pro &rarr;</a>'
-        : '<span class="storage-ok">Piano attivo</span>') +
-    '</div>';
-}
-
-function formatBytes(b){
-  if(b < 1024) return b + ' B';
-  if(b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
-  if(b < 1024*1024*1024) return (b/1024/1024).toFixed(1) + ' MB';
-  return (b/1024/1024/1024).toFixed(2) + ' GB';
-}
-
-// Hero stats: aggiorna numeri analisi/progetti/contatti
-async function loadHeroStats(){
-  try {
-    var [a, p, c] = await Promise.all([
-      fetch('/api/me/analyses?limit=1', { headers: authHeaders() }).then(r => r.ok ? r.json() : null),
-      fetch('/api/me/projects', { headers: authHeaders() }).then(r => r.ok ? r.json() : null),
-      fetch('/api/me/contacts', { headers: authHeaders() }).then(r => r.ok ? r.json() : null),
-    ]);
-    var na = a && a.total ? a.total : (a && a.items ? a.items.length : 0);
-    var np = p && p.items ? p.items.length : 0;
-    var nc = c && c.items ? c.items.length : 0;
-    var elA = document.getElementById('heroStatA');
-    var elP = document.getElementById('heroStatP');
-    var elC = document.getElementById('heroStatC');
-    if(elA) elA.textContent = na;
-    if(elP) elP.textContent = np;
-    if(elC) elC.textContent = nc;
-  } catch(e){ console.error('hero stats', e); }
-}
-
-// Estendo la init per caricare anche storage e hero
-var _origInit = window.initDashboard;
-window.initDashboard = async function(){
-  if(_origInit) await _origInit();
-  loadStorage();
-  loadHeroStats();
-};
-
 // ── Init ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function(){
   if(checkAuth()){
     loadStats();
+    loadStorage();
+    loadHeroStats();
     loadAnalyses();
   }
 });
+
+// Refresh hero stats dopo create/delete che cambiano i contatori
+setInterval(function(){
+  if(document.visibilityState === 'visible' && document.getElementById('heroStats') && !document.getElementById('heroStats').hidden){
+    loadHeroStats();
+  }
+}, 30000);
 
 // Tasti scorciatoia: Esc chiude i modal
 document.addEventListener('keydown', function(e){
@@ -1425,7 +1474,6 @@ document.addEventListener('keydown', function(e){
     closeProfileModal();
   }
 });
-
 </script>
 </body>
 </html>
