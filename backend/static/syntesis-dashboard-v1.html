@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* v7.3.9.052 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
+/* v7.3.9.053 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
 body{
   margin:25px !important;
@@ -248,6 +248,29 @@ body{
 .project-card .pc-actions button{font-size:10px;padding:5px 10px}
 .color-swatch:hover{transform:scale(1.1)}
 
+/* Contact list */
+.contact-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-bottom:14px}
+.contact-card{
+  background:var(--white);border:1.5px solid var(--border);border-radius:10px;
+  padding:14px 16px;transition:.18s;display:flex;flex-direction:column;
+}
+.contact-card:hover{border-color:var(--blue);box-shadow:0 3px 12px rgba(0,82,163,.08)}
+.contact-card.pending{border-style:dashed;background:#FFFBEB}
+.contact-card .cc-name{font-size:14px;font-weight:800;color:var(--dark);margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.contact-card .cc-status{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;letter-spacing:.05em;text-transform:uppercase}
+.contact-card .cc-status.active{background:#DCFCE7;color:#065F46}
+.contact-card .cc-status.pending{background:#FEF3C7;color:#92400E}
+.contact-card .cc-email{font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:6px}
+.contact-card .cc-role{font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.contact-card .cc-notes{font-size:11px;color:var(--mid);font-style:italic;margin-bottom:8px;line-height:1.5}
+.contact-card .cc-meta{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--gray);font-family:var(--mono);margin-top:auto;padding-top:8px;border-top:1px solid var(--light)}
+.contact-card .cc-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.contact-card .cc-actions button{font-size:10px;padding:4px 9px;border:1px solid var(--border);background:var(--white);border-radius:5px;cursor:pointer;color:var(--mid);font-family:var(--font);font-weight:700}
+.contact-card .cc-actions button:hover{border-color:var(--blue);color:var(--blue)}
+.contact-card .cc-actions .danger{border-color:#FCA5A5;color:var(--red)}
+.contact-card .cc-actions .danger:hover{background:#FEE2E2}
+.cc-drive-icon{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green);margin-right:4px;vertical-align:middle}
+
 /* Login required state */
 .auth-required{
   background:linear-gradient(135deg,var(--blue-light),#F0F9FF);
@@ -287,6 +310,7 @@ body{
     <div class="tabs" id="tabsNav" hidden>
       <button class="tab active" data-tab="analyses" onclick="switchTab('analyses')">Le mie analisi</button>
       <button class="tab" data-tab="projects" onclick="switchTab('projects')">I miei progetti</button>
+      <button class="tab" data-tab="contacts" onclick="switchTab('contacts')">Contatti</button>
       <button class="tab" data-tab="cloud" onclick="switchTab('cloud')">Cloud</button>
       <button class="tab" data-tab="profile" onclick="switchTab('profile')">Profilo</button>
       <button class="tab" data-tab="leaderboard" onclick="switchTab('leaderboard')">Classifica</button>
@@ -321,6 +345,20 @@ body{
         <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="projectsCount">&mdash;</div>
       </div>
       <div id="projectsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
+    </div>
+
+    <!-- TAB: CONTATTI -->
+    <div class="tab-content" id="tabContacts">
+      <div class="list-toolbar">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-cta" onclick="openContactCreate()">+ Nuovo contatto</button>
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="contactsCount">&mdash;</div>
+      </div>
+      <div style="background:var(--blue-light);border:1.5px solid #BAE0FF;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:12px;color:#065B8A;font-family:var(--mono);line-height:1.6">
+        <b>Rubrica per scambio file.</b> Aggiungi gli utenti Syntesis con cui collabori (cliniche, laboratori). Se l\'email non e\' ancora registrata su Syntesis, il contatto resta in attesa: appena la persona si registra con quella email, viene attivato automaticamente.
+      </div>
+      <div id="contactsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
     </div>
 
     <!-- TAB: CLOUD -->
@@ -437,6 +475,34 @@ body{
   </div>
 </div>
 
+<!-- Modal nuovo/modifica contatto -->
+<div class="modal-overlay" id="modalContact">
+  <div class="modal">
+    <div class="modal-title" id="modalContactTitle">Nuovo contatto</div>
+    <div class="modal-sub">Aggiungi un altro utente Syntesis con cui scambiare file e progetti.</div>
+    <div class="modal-field">
+      <label>Email del contatto *</label>
+      <input type="email" id="contactEmail" maxlength="200" placeholder="email@esempio.it">
+    </div>
+    <div class="modal-field">
+      <label>Etichetta</label>
+      <input type="text" id="contactName" maxlength="200" placeholder="Es. Studio Rossi, Lab Bianchi...">
+    </div>
+    <div class="modal-field">
+      <label>Ruolo (opzionale)</label>
+      <input type="text" id="contactRole" maxlength="100" placeholder="Es. Clinica, Laboratorio, Collega...">
+    </div>
+    <div class="modal-field">
+      <label>Note (opzionale)</label>
+      <textarea id="contactNotes" maxlength="2000" placeholder="Annotazioni libere..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeContactModal()">Annulla</button>
+      <button class="btn-cta" onclick="saveContactModal()">Salva</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal profilo -->
 <div class="modal-overlay" id="modalProfile">
   <div class="modal">
@@ -540,6 +606,7 @@ function switchTab(name){
   });
   if(name === 'analyses'){ loadAnalyses(); loadStats(); }
   else if(name === 'projects'){ loadProjects(); }
+  else if(name === 'contacts'){ loadContacts(); }
   else if(name === 'cloud'){ loadCloudStatus(); }
   else if(name === 'profile'){ loadProfile(); }
   else if(name === 'leaderboard'){ loadLeaderboard(); }
@@ -1112,6 +1179,134 @@ async function disconnectGdrive(){
   } catch(e){}
 })();
 
+
+// ── Contatti (rubrica) ──────────────────────────────────────────────────────
+var contactsState = { editing: null, items: [] };
+
+async function loadContacts(){
+  var box = document.getElementById('contactsContainer');
+  box.className = 'loading';
+  box.innerHTML = '<span class="spinner"></span>Caricamento...';
+  try {
+    var r = await fetch('/api/me/contacts', { headers: authHeaders() });
+    if(r.status === 401){ checkAuth(); return; }
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    contactsState.items = data.items || [];
+    renderContacts();
+  } catch(e){
+    box.className = 'empty-state';
+    box.innerHTML = '<div class="ico">&#9888;</div>Errore caricamento: ' + e.message;
+  }
+}
+
+function renderContacts(){
+  var box = document.getElementById('contactsContainer');
+  box.className = '';
+  document.getElementById('contactsCount').textContent = contactsState.items.length + ' contatti';
+  if(contactsState.items.length === 0){
+    box.className = 'empty-state';
+    box.innerHTML = '<div class="ico">&#x1F465;</div>Nessun contatto ancora. Aggiungi le persone con cui scambi file (cliniche, laboratori, colleghi).';
+    return;
+  }
+  var html = '<div class="contact-list">';
+  contactsState.items.forEach(function(c){
+    var isActive = c.status === 'active';
+    var displayName = c.display_name || c.contact_real_name || c.contact_email.split('@')[0];
+    var realName = c.contact_real_name && c.display_name && c.contact_real_name !== c.display_name
+                    ? ' &middot; ' + escapeHtml(c.contact_real_name) : '';
+    html += '<div class="contact-card' + (isActive ? '' : ' pending') + '" data-id="' + c.id + '">' +
+      '<div class="cc-name">' +
+        (c.contact_drive_connected ? '<span class="cc-drive-icon" title="Drive connesso"></span>' : '') +
+        escapeHtml(displayName) +
+        '<span class="cc-status ' + c.status + '">' + (isActive ? 'Attivo' : 'In attesa') + '</span>' +
+      '</div>' +
+      '<div class="cc-email">' + escapeHtml(c.contact_email) + realName + '</div>' +
+      (c.role ? '<div class="cc-role">' + escapeHtml(c.role) + '</div>' : '') +
+      (c.contact_organization ? '<div style="font-size:11px;color:var(--gray);margin-bottom:6px">' + escapeHtml(c.contact_organization) + '</div>' : '') +
+      (c.notes ? '<div class="cc-notes">' + escapeHtml(c.notes) + '</div>' : '') +
+      '<div class="cc-actions">' +
+        '<button onclick="openContactEdit(\'' + c.id + '\')">Modifica</button>' +
+        '<button class="danger" onclick="deleteContact(\'' + c.id + '\')">Elimina</button>' +
+      '</div>' +
+      '<div class="cc-meta"><span>Aggiunto il ' + fmtDate(c.created_at) + '</span></div>' +
+    '</div>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+function openContactCreate(){
+  contactsState.editing = null;
+  document.getElementById('modalContactTitle').textContent = 'Nuovo contatto';
+  document.getElementById('contactEmail').value = '';
+  document.getElementById('contactEmail').disabled = false;
+  document.getElementById('contactName').value = '';
+  document.getElementById('contactRole').value = '';
+  document.getElementById('contactNotes').value = '';
+  document.getElementById('modalContact').classList.add('show');
+  setTimeout(function(){ document.getElementById('contactEmail').focus(); }, 50);
+}
+
+function openContactEdit(id){
+  var c = contactsState.items.find(function(x){ return x.id === id; });
+  if(!c) return;
+  contactsState.editing = id;
+  document.getElementById('modalContactTitle').textContent = 'Modifica contatto';
+  document.getElementById('contactEmail').value = c.contact_email;
+  document.getElementById('contactEmail').disabled = true;  // email non modificabile
+  document.getElementById('contactName').value = c.display_name || '';
+  document.getElementById('contactRole').value = c.role || '';
+  document.getElementById('contactNotes').value = c.notes || '';
+  document.getElementById('modalContact').classList.add('show');
+}
+
+function closeContactModal(){
+  document.getElementById('modalContact').classList.remove('show');
+  contactsState.editing = null;
+}
+
+async function saveContactModal(){
+  var email = document.getElementById('contactEmail').value.trim();
+  var name = document.getElementById('contactName').value.trim();
+  var role = document.getElementById('contactRole').value.trim();
+  var notes = document.getElementById('contactNotes').value.trim();
+  if(!contactsState.editing && (!email || email.indexOf('@') < 0)){
+    showToast('Email non valida.', true); return;
+  }
+  try {
+    var url, method, body;
+    if(contactsState.editing){
+      url = '/api/me/contacts/' + contactsState.editing;
+      method = 'PATCH';
+      body = { display_name: name || null, role: role || null, notes: notes || null };
+    } else {
+      url = '/api/me/contacts';
+      method = 'POST';
+      body = { contact_email: email, display_name: name || null, role: role || null, notes: notes || null };
+    }
+    var r = await fetch(url, { method: method, headers: authHeaders(), body: JSON.stringify(body) });
+    if(!r.ok){
+      var err = await r.json().catch(function(){ return {detail:'errore'}; });
+      throw new Error(err.detail || ('HTTP ' + r.status));
+    }
+    showToast(contactsState.editing ? 'Contatto aggiornato.' : 'Contatto aggiunto.');
+    closeContactModal();
+    loadContacts();
+  } catch(e){ showToast('Errore: ' + e.message, true); }
+}
+
+async function deleteContact(id){
+  var c = contactsState.items.find(function(x){ return x.id === id; });
+  var label = c ? (c.display_name || c.contact_email) : 'questo contatto';
+  if(!confirm('Eliminare ' + label + ' dalla rubrica?')) return;
+  try {
+    var r = await fetch('/api/me/contacts/' + id, { method: 'DELETE', headers: authHeaders() });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Contatto eliminato.');
+    loadContacts();
+  } catch(e){ showToast('Errore: ' + e.message, true); }
+}
 
 // ── Init ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function(){
