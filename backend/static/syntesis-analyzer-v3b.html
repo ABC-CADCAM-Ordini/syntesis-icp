@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.031</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.032</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Source Sans 3','Source Sans Pro',sans-serif;--mono:'Source Sans 3','Source Sans Pro',sans-serif}
@@ -321,7 +321,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .mis-tree-slider-row input[type=range]{flex:1;height:12px;accent-color:#0065B3;cursor:pointer;margin:0}
 .mis-tree-val{font-size:9px;color:var(--gray);min-width:30px;text-align:right}
 
-/* Certificato Taratura modal v7.3.9.031 */
+/* Certificato Taratura modal v7.3.9.032 */
 .calmodal-back{position:fixed;inset:0;background:rgba(15,25,35,.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px}
 .calmodal-back.show{display:flex}
 .calmodal{background:#fff;border-radius:14px;max-width:600px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,25,35,.3);font-family:var(--font)}
@@ -345,7 +345,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .calmodal-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
 .calmodal-btn.primary:hover{background:#004F8A}
 
-/* v7.3.9.031 draggable+resizable panels */
+/* v7.3.9.032 draggable+resizable panels */
 .syn-drag-handle {
   cursor: move;
   user-select: none;
@@ -368,7 +368,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .syn-resize-handle:hover { opacity: 1; }
 
 
-/* v7.3.9.031 toolbar icon-only buttons - text-node aware */
+/* v7.3.9.032 toolbar icon-only buttons - text-node aware */
 button.btn.icon-only {
   padding: 6px 9px !important;
   min-width: 34px;
@@ -446,7 +446,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   50% { box-shadow: 0 0 0 6px rgba(0,101,179,0); }
 }
 
-/* v7.3.9.031 tooltip custom istantaneo per pulsanti icon-only e gruppi */
+/* v7.3.9.032 tooltip custom istantaneo per pulsanti icon-only e gruppi */
 [data-tip] {
   position: relative;
 }
@@ -519,7 +519,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   transform: translate(0, -50%);
 }
 
-/* v7.3.9.031 tooltip custom istantaneo */
+/* v7.3.9.032 tooltip custom istantaneo */
 [data-tip] {
   position: relative;
 }
@@ -569,7 +569,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   transition-delay: 0.25s;
 }
 
-/* v7.3.9.031 tooltip custom istantaneo */
+/* v7.3.9.032 tooltip custom istantaneo */
 [data-tip] {
   position: relative;
 }
@@ -619,7 +619,7 @@ button.btn.icon-only > :not(svg):not(.dropdown-arrow) {
   transition-delay: 0.25s;
 }
 
-/* v7.3.9.031: Compensazione body.zoom per sidebar overflow */
+/* v7.3.9.032: Compensazione body.zoom per sidebar overflow */
 body[style*="zoom"] .panel,
 body .panel {
   /* L'altezza e' calcolata dal flex container .main; height:100% deve essere
@@ -638,7 +638,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.031</span>
+      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.032</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -1229,7 +1229,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '7.3.9.031';
+window.ANALIZZA_BUILD = '7.3.9.032';
 window.ANALIZZA_BUILD_DATE = '2026-04-25';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -1867,7 +1867,7 @@ function calculateAngles(){
   var aligned=muaObjects.filter(function(m){return m.aligned});
   var panelEl = document.getElementById('panelAngleList');
 
-  // v7.3.9.031: nascondi pannello "Analisi angolare (coppie)" quando siamo in
+  // v7.3.9.032: nascondi pannello "Analisi angolare (coppie)" quando siamo in
   // workflow Analizza con piu' gruppi: l'analisi diventa per-gruppo via
   // FRESATURA AVANZATA, le coppie globali non hanno significato clinico.
   var groupsCount = 0;
@@ -2668,10 +2668,238 @@ function updateWorkflowUI(wf){
   }
 }
 
+
+// ── RESET TOTALE SESSIONE v7.3.9.032 ──────────────────────────
+// Cambio workflow = nuova sessione. Tutti i dati e gli artefatti dell'altro
+// workflow vengono distrutti, non solo nascosti. Non serve "ritrovo dove ho
+// lasciato": ogni workflow parte pulito. Pulizia mentale completa.
+
+function _hardResetAnalizza(){
+  // Distrugge MUA, scansione, label, spline, fresState, gruppi
+  try {
+    if(typeof muaObjects !== 'undefined' && muaObjects.length > 0){
+      muaObjects.forEach(function(m){
+        if(m.group){ scene.remove(m.group); }
+        if(m.axisLine){ scene.remove(m.axisLine); }
+        if(m.scanbodyScanMesh){ scene.remove(m.scanbodyScanMesh); }
+        if(m.scanbodyColoredMesh){ scene.remove(m.scanbodyColoredMesh); }
+        if(m.undercutMesh){ scene.remove(m.undercutMesh); }
+        if(m.labelEl && m.labelEl.parentNode){ m.labelEl.parentNode.removeChild(m.labelEl); }
+      });
+      muaObjects.length = 0;
+    }
+    if(typeof muaCounter !== 'undefined') muaCounter = 0;
+    if(typeof meanAxisLine !== 'undefined' && meanAxisLine){ scene.remove(meanAxisLine); meanAxisLine = null; }
+    if(typeof clearDivergenceCones === 'function') clearDivergenceCones();
+    if(typeof clearGroupSplines === 'function') clearGroupSplines();
+    // fresatura state + frecce 3D
+    if(typeof fresClearAllArrows === 'function') fresClearAllArrows();
+    if(typeof fresState !== 'undefined' && fresState){
+      fresState.axesByGid = {};
+      fresState.activeGroupId = null;
+      fresState.dragging = false;
+      fresState.isOpen = false;
+      fresState.meanAxis = fresState.minimaxAxis = fresState.customAxis = fresState.setupAxis = null;
+    }
+    // Scansione
+    if(typeof scanMesh !== 'undefined' && scanMesh){
+      scene.remove(scanMesh);
+      if(scanMesh.geometry) scanMesh.geometry.dispose();
+      if(scanMesh.material) scanMesh.material.dispose();
+      scanMesh = null;
+    }
+    if(typeof scanOriginalGeo !== 'undefined' && scanOriginalGeo){
+      scanOriginalGeo.dispose();
+      scanOriginalGeo = null;
+    }
+    // Label SVG
+    var svgL = document.getElementById('labelLines');
+    if(svgL){ while(svgL.firstChild) svgL.removeChild(svgL.firstChild); }
+    // UI Analizza
+    var slot = document.getElementById('slotScan');
+    if(slot){
+      slot.classList.remove('loaded');
+      slot.innerHTML = '<div class="fplaceholder">Clicca o trascina .stl</div>';
+    }
+    var empty = document.getElementById('emptyState');
+    if(empty) empty.classList.remove('hidden');
+    var triEl = document.getElementById('triScan'); if(triEl) triEl.textContent = '0';
+    var muaCountEl = document.getElementById('muaCount'); if(muaCountEl) muaCountEl.textContent = '0';
+    var maxDivEl = document.getElementById('maxDiv'); if(maxDivEl) maxDivEl.textContent = '--';
+    var avgDivEl = document.getElementById('avgDiv'); if(avgDivEl) avgDivEl.textContent = '--';
+    var angleListEl = document.getElementById('angleList');
+    if(angleListEl) angleListEl.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--gray)">Posiziona almeno 2 MUA</div>';
+    var axisInfoEl = document.getElementById('axisInfo');
+    if(axisInfoEl) axisInfoEl.innerHTML = '<span style="font-family:var(--mono);font-size:9px;color:var(--gray)">Dopo accoppiamento ICP</span>';
+    var fresContainer = document.getElementById('fresGroupsContainer');
+    if(fresContainer) fresContainer.innerHTML = '';
+    // Reset input file
+    var input = document.getElementById('inputScan'); if(input) input.value = '';
+    // Cut view
+    if(typeof closeCutView === 'function'){
+      var cv = document.getElementById('cutViewOverlay');
+      if(cv && cv.style.display === 'flex') closeCutView();
+    }
+    if(typeof rebuildTree === 'function'){ try { rebuildTree(); } catch(e){} }
+    if(typeof updateRaffinaButtonState === 'function') updateRaffinaButtonState();
+  } catch(err){ console.warn('[Reset Analizza]', err); }
+}
+
+function _hardResetMisurare(){
+  try {
+    if(typeof misICP_unmountViewport === 'function') misICP_unmountViewport();
+    // Distruggo i geom
+    if(typeof misICP_meshA !== 'undefined' && misICP_meshA){
+      if(misICP_meshA.geometry) misICP_meshA.geometry.dispose();
+      if(misICP_meshA.material) misICP_meshA.material.dispose();
+      misICP_meshA = null;
+    }
+    if(typeof misICP_meshB !== 'undefined' && misICP_meshB){
+      if(misICP_meshB.geometry) misICP_meshB.geometry.dispose();
+      if(misICP_meshB.material) misICP_meshB.material.dispose();
+      misICP_meshB = null;
+    }
+    if(typeof misICP_bgMeshA !== 'undefined' && misICP_bgMeshA){
+      scene.remove(misICP_bgMeshA);
+      if(misICP_bgMeshA.geometry) misICP_bgMeshA.geometry.dispose();
+      if(misICP_bgMeshA.material) misICP_bgMeshA.material.dispose();
+      misICP_bgMeshA = null;
+    }
+    if(typeof misICP_bgMeshB !== 'undefined' && misICP_bgMeshB){
+      scene.remove(misICP_bgMeshB);
+      if(misICP_bgMeshB.geometry) misICP_bgMeshB.geometry.dispose();
+      if(misICP_bgMeshB.material) misICP_bgMeshB.material.dispose();
+      misICP_bgMeshB = null;
+    }
+    if(typeof misICP_meshesA !== 'undefined' && Array.isArray(misICP_meshesA)){
+      misICP_meshesA.forEach(function(m){ if(m){
+        scene.remove(m);
+        if(m.geometry) m.geometry.dispose();
+        if(m.material) m.material.dispose();
+      }});
+      misICP_meshesA.length = 0;
+    }
+    if(typeof misICP_meshesB !== 'undefined' && Array.isArray(misICP_meshesB)){
+      misICP_meshesB.forEach(function(m){ if(m){
+        scene.remove(m);
+        if(m.geometry) m.geometry.dispose();
+        if(m.material) m.material.dispose();
+      }});
+      misICP_meshesB.length = 0;
+    }
+    if(typeof misICP_geomA !== 'undefined') misICP_geomA = null;
+    if(typeof misICP_geomB !== 'undefined') misICP_geomB = null;
+    if(typeof misICP_result !== 'undefined') misICP_result = null;
+    // Label DOM
+    if(typeof misICP_labels !== 'undefined' && Array.isArray(misICP_labels)){
+      misICP_labels.forEach(function(el){ if(el && el.parentNode) el.parentNode.removeChild(el); });
+      misICP_labels.length = 0;
+    }
+    // UI dropzone
+    ['A','B'].forEach(function(suf){
+      var dz = document.getElementById('misDz' + suf);
+      var hint = document.getElementById('misDz' + suf + 'Hint');
+      var meta = document.getElementById('misDz' + suf + 'Meta');
+      if(dz) dz.classList.remove('loaded');
+      if(hint) hint.textContent = 'trascina .stl qui oppure clicca';
+      if(meta) meta.textContent = '';
+      var inp = document.getElementById('misInput' + suf);
+      if(inp) inp.value = '';
+    });
+    var btnRun = document.getElementById('misBtnRun');
+    if(btnRun){ btnRun.disabled = true; }
+    // Stage
+    var stage = document.getElementById('misurareStage');
+    if(stage) stage.classList.remove('hidden');
+  } catch(err){ console.warn('[Reset Misurare]', err); }
+}
+
+function _hardResetSostituire(){
+  try {
+    if(typeof sostMesh !== 'undefined' && sostMesh){
+      scene.remove(sostMesh);
+      if(sostMesh.geometry) sostMesh.geometry.dispose();
+      if(sostMesh.material) sostMesh.material.dispose();
+      sostMesh = null;
+    }
+    if(typeof sostOriginalGeo !== 'undefined' && sostOriginalGeo){
+      sostOriginalGeo.dispose();
+      sostOriginalGeo = null;
+    }
+    if(typeof sostPlaced !== 'undefined' && Array.isArray(sostPlaced)){
+      sostPlaced.forEach(function(p){
+        if(p && p.group){ scene.remove(p.group); }
+      });
+      sostPlaced.length = 0;
+    }
+    if(typeof sostCounter !== 'undefined') sostCounter = 0;
+    if(typeof sostPlacementMode !== 'undefined') sostPlacementMode = false;
+    if(typeof sostStl !== 'undefined') sostStl = null;
+    if(typeof sostCustomStlBuffer !== 'undefined') sostCustomStlBuffer = null;
+    // UI
+    var slotS = document.getElementById('sostSlotScan');
+    var phS = document.getElementById('sostScanPlaceholder');
+    if(slotS) slotS.classList.remove('loaded');
+    if(phS) phS.textContent = 'Clicca o trascina .stl';
+    var inpS = document.getElementById('sostInputScan'); if(inpS) inpS.value = '';
+    var inpC = document.getElementById('sostInputCustom'); if(inpC) inpC.value = '';
+    var customName = document.getElementById('sostCustomName');
+    if(customName){ customName.style.display = 'none'; customName.textContent = ''; }
+    var placedList = document.getElementById('sostPlacedList');
+    if(placedList) placedList.style.display = 'none';
+    var placedItems = document.getElementById('sostPlacedItems');
+    if(placedItems) placedItems.innerHTML = '';
+    var btnRefine = document.getElementById('sostBtnRefine');
+    if(btnRefine){ btnRefine.disabled = true; btnRefine.style.opacity = '0.5'; }
+    var btnExport = document.getElementById('sostBtnExport');
+    if(btnExport) btnExport.style.display = 'none';
+    var sostStatus = document.getElementById('sostStatus');
+    if(sostStatus){ sostStatus.style.display = 'none'; sostStatus.textContent = ''; }
+  } catch(err){ console.warn('[Reset Sostituire]', err); }
+}
+
+// Helper: chiede conferma se ci sono dati non salvati nel workflow corrente
+function _hasUnsavedDataInWorkflow(wf){
+  if(wf === 'analizza' || wf === 'accoppia'){
+    var hasScan = (typeof scanMesh !== 'undefined' && scanMesh);
+    var hasMua = (typeof muaObjects !== 'undefined' && muaObjects.length > 0);
+    return !!(hasScan || hasMua);
+  }
+  if(wf === 'misurare'){
+    return !!(typeof misICP_geomA !== 'undefined' && misICP_geomA) ||
+           !!(typeof misICP_geomB !== 'undefined' && misICP_geomB);
+  }
+  if(wf === 'sostituire'){
+    return !!(typeof sostMesh !== 'undefined' && sostMesh) ||
+           (typeof sostPlaced !== 'undefined' && sostPlaced && sostPlaced.length > 0);
+  }
+  return false;
+}
+
 function selectWorkflow(wf){
   if(!WORKFLOWS[wf]) return;
   closeWorkflowMenu();
   var prev = currentWorkflow;
+  // v7.3.9.032: cambio workflow = nuova sessione. Reset completo del workflow
+  // precedente, con conferma se l'utente ha dati attivi.
+  if(prev && prev !== wf){
+    if(_hasUnsavedDataInWorkflow(prev)){
+      var prevName = (WORKFLOWS[prev] && WORKFLOWS[prev].name) ? WORKFLOWS[prev].name : prev;
+      if(!confirm('Cambiare workflow comporta una nuova sessione di lavoro.\nTutti i dati di "' + prevName + '" andranno persi.\n\nProseguire?')){
+        return;
+      }
+    }
+    // Hard reset del workflow precedente
+    if(prev === 'analizza' || prev === 'accoppia'){
+      try { _hardResetAnalizza(); } catch(e){ console.warn('reset analizza:', e); }
+    }
+    if(prev === 'misurare'){
+      try { _hardResetMisurare(); } catch(e){ console.warn('reset misurare:', e); }
+    }
+    if(prev === 'sostituire'){
+      try { _hardResetSostituire(); } catch(e){ console.warn('reset sostituire:', e); }
+    }
+  }
   currentWorkflow = wf;
   updateWorkflowUI(wf);
 
@@ -2692,7 +2920,7 @@ function selectWorkflow(wf){
   // Se sto uscendo da Misurare verso un altro workflow, smonto il viewport ICP
   if(prev === 'misurare' && wf !== 'misurare'){
     try { misICP_unmountViewport(); } catch(e){ console.warn('[Misurare] unmount fallito:', e); }
-    // FIX v7.3.9.031: riaccendi artefatti Analizza se torni in analizza/accoppia
+    // FIX v7.3.9.032: riaccendi artefatti Analizza se torni in analizza/accoppia
     if(wf === 'analizza' || wf === 'accoppia'){
       try { _setAnalyzaArtifactsVisible(true); } catch(e){}
     }
@@ -2749,7 +2977,7 @@ function selectWorkflow(wf){
   }
   else if(wf === 'misurare'){
     analysisMode = 'misurare';
-    // FIX v7.3.9.031: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
+    // FIX v7.3.9.032: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
     try { _setAnalyzaArtifactsVisible(false); } catch(e){}
     if(panAng)  panAng.style.display  = 'none';
     if(panAx)   panAx.style.display   = 'none';
@@ -2841,7 +3069,7 @@ var FRES_PROXIMITY_DEG = 2.0;
 var fresState = {
   db: null,                    // { machines, selectedId, lastCustomAxis, lastCustomAxisByGid }
   mode: 'mean',                // 'mean' | 'minimax' | 'custom' (globale)
-  // v7.3.9.031: stato per-gruppo
+  // v7.3.9.032: stato per-gruppo
   axesByGid: {},               // { gid: {meanAxis, minimaxAxis, customAxis, setupAxis} }
   arrowsByGid: {},             // { gid: THREE.Group }
   pickersByGid: {},            // { gid: THREE.Mesh sfera }
@@ -2970,7 +3198,7 @@ function fresComputeMinimaxAxis(axes){
 
 // ===== Costruzione e aggiornamento freccia di setup =====
 function fresBuildArrow(gid, origin){
-  // v7.3.9.031: freccia COMPATTA. Sempre in primo piano (depthTest:false +
+  // v7.3.9.032: freccia COMPATTA. Sempre in primo piano (depthTest:false +
   // renderOrder alto). Parte poco sopra il centroide MUA per non confondersi
   // con la geometria scanbody.
   if(fresState.arrowsByGid[gid]){
@@ -3192,7 +3420,7 @@ function fresBuildAllArrows(){
   });
 }
 
-// v7.3.9.031: cleanup di tutte le frecce
+// v7.3.9.032: cleanup di tutte le frecce
 function fresClearAllArrows(){
   Object.keys(fresState.arrowsByGid).forEach(function(k){
     var g = fresState.arrowsByGid[k];
@@ -3204,7 +3432,7 @@ function fresClearAllArrows(){
   fresState.pickerSphere = null;
 }
 
-// v7.3.9.031: ricostruisce frecce per tutti i gruppi presenti
+// v7.3.9.032: ricostruisce frecce per tutti i gruppi presenti
 function fresBuildAllArrows(){
   fresClearAllArrows();
   var aligned = muaObjects.filter(function(m){ return m.aligned; });
@@ -3228,7 +3456,7 @@ function fresBuildAllArrows(){
   });
 }
 function fresUpdateArrow(gid){
-  // v7.3.9.031: freccia parte da `origin + d*liftOff` (stacco dal MUA)
+  // v7.3.9.032: freccia parte da `origin + d*liftOff` (stacco dal MUA)
   var grp = fresState.arrowsByGid[gid];
   if(!grp) return;
   var axes = fresState.axesByGid[gid];
@@ -3616,7 +3844,7 @@ function fresScreenToSphere(x, y){
   return new THREE.Vector3(nx/r, ny/r, 0);
 }
 function fresIsClickOnPicker(x, y){
-  // v7.3.9.031: raycast standard + fallback proximity per drag piu' permissivo
+  // v7.3.9.032: raycast standard + fallback proximity per drag piu' permissivo
   var pickers = Object.values(fresState.pickersByGid).filter(Boolean);
   if(pickers.length === 0) return null;
   var rect = renderer.domElement.getBoundingClientRect();
@@ -3660,7 +3888,7 @@ function fresIsClickOnPicker(x, y){
 function fresOnMouseDown(e){
   if(!fresState.isOpen) return;
   if(e.button !== 0) return;
-  // v7.3.9.031: testo SEMPRE se il click e' su una picker sphere.
+  // v7.3.9.032: testo SEMPRE se il click e' su una picker sphere.
   // Se l'utente non e' in modalita' custom ma clicca la sfera, capisco
   // l'intento e attivo custom automaticamente.
   var gid = fresIsClickOnPicker(e.clientX, e.clientY);
@@ -4545,7 +4773,7 @@ function misICP_renderPerCylinder(pairs, bgTrisA, bgTrisB){
     controls.update && controls.update();
   }
 
-  // FIX v7.3.9.031: applico la modalita\' di rendering corrente
+  // FIX v7.3.9.032: applico la modalita\' di rendering corrente
   // alle nuove mesh (recupero da localStorage o envSettings.renderMode)
   try {
     var savedMode = null;
@@ -5431,7 +5659,7 @@ function misICP_pdfFooter(doc, title, pageInfo, darkBg){
  * Disegna la copertina comune (sfondo scuro, anello, badge, info, mappa).
  */
 
-// Helper v7.3.9.031: schiarisce/scurisce un hex color di una percentuale
+// Helper v7.3.9.032: schiarisce/scurisce un hex color di una percentuale
 function misICP_shadeHex(hex, pct){
   hex = hex.replace('#','');
   var r = parseInt(hex.substr(0,2), 16);
@@ -5453,7 +5681,7 @@ function misICP_shadeHex(hex, pct){
 }
 
 function misICP_pdfDrawCover(doc, data, reportTitle){
-  // COVER CLINICO v7.3.9.031: anello smooth con gradient sottile (no doppio glow)
+  // COVER CLINICO v7.3.9.032: anello smooth con gradient sottile (no doppio glow)
   var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
   function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
   function setTxt (hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
@@ -6350,7 +6578,7 @@ function misICP_renderClinicalPDF(data){
   var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.031)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.032)', null, true);
 
   // Pagina 2: Note metodologiche (statica, identica per ogni report)
   doc.addPage();
@@ -6396,7 +6624,7 @@ function misICP_renderClinicalPDF(data){
 // ────────────────────────────────────────────────────────────────────
 
 
-// ── CERTIFICATO DI TARATURA v7.3.9.031 ─────────────────────────────
+// ── CERTIFICATO DI TARATURA v7.3.9.032 ─────────────────────────────
 // Modal di raccolta metadati + helpers di classificazione PASS/VERIFICA/FAIL
 // Soglie industriali standard: PASS \u2264 50\u03bcm, VERIFICA 50-100\u03bcm, FAIL > 100\u03bcm
 // (per angoli: PASS \u2264 0.5\u00b0, VERIFICA 0.5-1.0\u00b0, FAIL > 1.0\u00b0)
@@ -6471,7 +6699,7 @@ function misICP_submitCalibration(){
 
 
 function misICP_renderCalibrationPDF(data, calibMeta){
-  // CERTIFICATO DI TARATURA v7.3.9.031
+  // CERTIFICATO DI TARATURA v7.3.9.032
   // Cover con anello gradient conico + logo Syntesis bianco watermark in pagine interne
   if(!calibMeta){
     calibMeta = { type:'\u2014', maker:'\u2014', model:'\u2014', sn:'\u2014',
@@ -6613,7 +6841,7 @@ function misICP_pdfDrawCalibrationCover(doc, data, calibMeta){
   doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#B0B8C1');
   doc.text('Precision Scanner Report - Taratura', W/2, 46, {align:'center'});
 
-  // Anello smooth - gradient SOTTILE nel colore base (v7.3.9.031)
+  // Anello smooth - gradient SOTTILE nel colore base (v7.3.9.032)
   var scoreRingSrc = (function(){
     var sizePx = 700;
     var c = document.createElement('canvas');
@@ -6769,7 +6997,7 @@ function misICP_pdfDrawCalibrationIdPage(doc, calibMeta, data){
   h = drawInfoBox(ml, y, cw, 'OPERAZIONE', [
     ['Data taratura', calibMeta.dateStr + '  alle  ' + calibMeta.timeStr],
     ['Procedura',     'Allineamento Kabsch + SVD + ICP iterativo'],
-    ['Software',      'Syntesis-ICP - Misurare (Analizza v7.3.9.031)']
+    ['Software',      'Syntesis-ICP - Misurare (Analizza v7.3.9.032)']
   ]); y += h + 6;
   h = drawInfoBox(ml, y, cw, 'FILE DI RIFERIMENTO', [
     ['Master STL',      data.fileAfull || data.fileA || '\u2014'],
@@ -6990,7 +7218,7 @@ function misICP_renderExcel(data){
     ['Scala mappa colorimetrica', data.scaleUm,                       'μm'],
     [],
     ['SOFTWARE'],
-    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.031)'],
+    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.032)'],
     ['Produttore',   'Biaggini Medical Devices S.r.l.'],
     ['Sito',         'https://syntesis-icp.com'],
     [],
@@ -7205,7 +7433,7 @@ function misICP_renderExcel(data){
     ['File B slug filesystem',           slugB],
     ['Data analisi (locale)',            dtStr],
     ['Data analisi (ISO 8601)',          dtIso],
-    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.031)'],
+    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.032)'],
     ['Produttore',                       'Biaggini Medical Devices S.r.l.'],
     ['Sito',                             'https://syntesis-icp.com'],
     ['User-Agent browser',               ua]
@@ -7280,7 +7508,7 @@ function misICP_generateReport(kind){
   if(btn){ btn.classList.add('busy'); btn.innerHTML='<span>Generazione in corso...</span>'; }
   misICP_clearError();
 
-  // FIX v7.3.9.031: per Taratura apri modal di raccolta metadati invece di generare subito
+  // FIX v7.3.9.032: per Taratura apri modal di raccolta metadati invece di generare subito
   if(kind === 'taratura'){
     var btn0 = document.getElementById('misBtnReport');
     if(btn0){ btn0.classList.remove('busy'); btn0.innerHTML = '<span>Scarica report</span><span style="font-size:11px;opacity:0.8">&#9662;</span>'; }
@@ -7400,7 +7628,7 @@ function misICP_updateLabels(){
   var rect = vp.getBoundingClientRect();
   var W = rect.width, H = rect.height;
 
-  // FIX v7.3.9.031: compensa body.style.zoom (vedi updateDivergenceLabels)
+  // FIX v7.3.9.032: compensa body.style.zoom (vedi updateDivergenceLabels)
   var zoomF = (typeof syntesisGetUiZoom === 'function') ? syntesisGetUiZoom() : 1.0;
 
   var svg = document.getElementById('labelLines');
@@ -8883,7 +9111,7 @@ function updateDivergenceLabels(){
     return;
   }
 
-  // FIX v7.3.9.031: compensa body.style.zoom. getBoundingClientRect()
+  // FIX v7.3.9.032: compensa body.style.zoom. getBoundingClientRect()
   // ritorna coordinate post-zoom, ma style.left viene RI-zoomato dal
   // browser. Devo dividere per il zoom prima di applicare le coordinate.
   var zoomF = (typeof syntesisGetUiZoom === 'function') ? syntesisGetUiZoom() : 1.0;
@@ -9393,7 +9621,7 @@ function closeGroupDialog(){
 }
 
 function confirmGroup(){
-  // v7.3.9.031: Quando si crea un nuovo gruppo, i MUA che erano in gid=0
+  // v7.3.9.032: Quando si crea un nuovo gruppo, i MUA che erano in gid=0
   // (gruppo di base "default") vengono SPOSTATI automaticamente in un secondo
   // gruppo complementare, perche' dividere implica due insiemi distinti.
   var selected = [];
@@ -9460,7 +9688,7 @@ function getMuaByGroup(){
 
 // Helper: colore unico per badge gruppo
 
-// Helper v7.3.9.031: colore freccia di setup per gruppo
+// Helper v7.3.9.032: colore freccia di setup per gruppo
 // Distinto da getGroupBadgeColor per coerenza visiva (gid 0 blu primario,
 // non grigio come il badge che e' "senza gruppo")
 function getGroupArrowColor(gid){
@@ -9866,7 +10094,7 @@ function applyRenderModeToScene(){
       if(m.scanbodyScanMesh) applyRenderModeToMesh(m.scanbodyScanMesh);
     });
   }
-  // FIX v7.3.9.031: applico la modalita\' anche alle mesh Misurare
+  // FIX v7.3.9.032: applico la modalita\' anche alle mesh Misurare
   // (arcate riferimento/confronto + scanbody A e B post-ICP)
   if(typeof misICP_bgMeshA !== 'undefined' && misICP_bgMeshA){
     applyRenderModeToMesh(misICP_bgMeshA);
@@ -10201,12 +10429,12 @@ try {
 
 
 
-// ── UI ZOOM v7.3.9.031 ─────────────────────────────────────────────
+// ── UI ZOOM v7.3.9.032 ─────────────────────────────────────────────
 // Scaling globale del testo interfaccia. Salva preferenza in localStorage.
 var SYNTESIS_UI_ZOOM_KEY = 'syntesis_ui_zoom';
 
 
-// Helper v7.3.9.031: ritorna il fattore zoom corrente del body
+// Helper v7.3.9.032: ritorna il fattore zoom corrente del body
 // (per compensare coordinate label che vengono ri-zoomate dal browser)
 function syntesisGetUiZoom(){
   try {
@@ -10217,7 +10445,7 @@ function syntesisGetUiZoom(){
 }
 
 function applyUiZoom(zoom, opts){
-  // v7.3.9.031: opts.silent=true applica senza salvare in localStorage
+  // v7.3.9.032: opts.silent=true applica senza salvare in localStorage
   // (usato da loadUiZoom quando applica il default 115%)
   zoom = parseFloat(zoom);
   if(!zoom || isNaN(zoom)) zoom = 1.15;
@@ -10238,7 +10466,7 @@ function applyUiZoom(zoom, opts){
 }
 
 function loadUiZoom(){
-  // v7.3.9.031: default 115% per nuovi utenti.
+  // v7.3.9.032: default 115% per nuovi utenti.
   // Se utente ha gia' una preferenza (anche 100%), la rispettiamo.
   var DEFAULT_UI_ZOOM = 1.15;
   try {
@@ -14456,7 +14684,7 @@ window.onSyntesisViewModeChange = function(mode){
   }
 };
 
-// ── DRAGGABLE + RESIZABLE PANELS (v7.3.9.031) ─────────────────────
+// ── DRAGGABLE + RESIZABLE PANELS (v7.3.9.032) ─────────────────────
 // Rende un pannello assoluto trascinabile (handle = elemento con classe
 // .syn-drag-handle dentro il pannello) e ridimensionabile (handle in basso
 // a destra, classe .syn-resize-handle). Stato salvato in localStorage.
@@ -14633,7 +14861,7 @@ window.onSyntesisViewModeChange = function(mode){
 
 
 
-// ── KEYBOARD SHORTCUTS v7.3.9.031 ─────────────────────────────────
+// ── KEYBOARD SHORTCUTS v7.3.9.032 ─────────────────────────────────
 // Spazio chiama Raffina (alignAll) quando ha senso (Analizza con MUA).
 // P chiama startPlacement (Posiziona).
 // Skip se l'utente sta scrivendo in un input/textarea.
@@ -14675,7 +14903,7 @@ window.onSyntesisViewModeChange = function(mode){
   }, false);
 })();
 
-// ── PULSANTE CARICA FILE (toolbar) v7.3.9.031 ─────────────────────
+// ── PULSANTE CARICA FILE (toolbar) v7.3.9.032 ─────────────────────
 // Il pulsante in toolbar inoltra al file picker corretto in base al
 // workflow corrente. Quando un caricamento e' "necessario" (no scan
 // caricata) il pulsante pulsa con classe .attention.
@@ -14730,7 +14958,7 @@ if(typeof window !== 'undefined'){
 }
 
 
-// ── TOOLTIP CUSTOM v7.3.9.031 ─────────────────────────────────
+// ── TOOLTIP CUSTOM v7.3.9.032 ─────────────────────────────────
 // Sposta il `title` dei pulsanti toolbar in `data-tip` per usare i tooltip
 // CSS custom istantanei (niente delay 1.5s del browser, niente fondo giallo).
 // Si applica solo ai bottoni icon-only e ai pulsanti dentro btn-icon-group e
@@ -14765,7 +14993,7 @@ if(typeof window !== 'undefined'){
 })();
 
 
-// TOOLTIP CUSTOM v7.3.9.031: sposta title -> data-tip sui bottoni toolbar
+// TOOLTIP CUSTOM v7.3.9.032: sposta title -> data-tip sui bottoni toolbar
 (function(){
   function migrateTitles(){
     var selectors = [
@@ -14794,7 +15022,7 @@ if(typeof window !== 'undefined'){
 })();
 
 
-// TOOLTIP CUSTOM v7.3.9.031: sposta title -> data-tip sui bottoni toolbar
+// TOOLTIP CUSTOM v7.3.9.032: sposta title -> data-tip sui bottoni toolbar
 (function(){
   function migrateTitles(){
     var selectors = [
@@ -14825,7 +15053,7 @@ if(typeof window !== 'undefined'){
 </script>
 
 
-<!-- Modal Certificato Taratura v7.3.9.031 -->
+<!-- Modal Certificato Taratura v7.3.9.032 -->
 <div class="calmodal-back" id="calibrationModal">
   <div class="calmodal">
     <div class="calmodal-h">
