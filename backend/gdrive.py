@@ -401,3 +401,100 @@ def get_drive_web_url(folder_id: Optional[str] = None) -> str:
     if folder_id:
         return f"https://drive.google.com/drive/folders/{folder_id}"
     return "https://drive.google.com/drive/my-drive"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.062 - Funzioni per cartelle condivise
+# ─────────────────────────────────────────────────────────────────────────────
+
+def create_folder_in(refresh_token: str, name: str, parent_id: Optional[str] = None) -> dict:
+    """Crea una cartella nel Drive dell'utente. Se parent_id e' None, la crea
+    dentro Syntesis-ICP (root). Ritorna {id, name}."""
+    service = get_drive_service(refresh_token)
+    if parent_id is None:
+        parent_id = find_or_create_folder(service, GDRIVE_ROOT_FOLDER_NAME, parent_id=None)
+    folder_id = find_or_create_folder(service, name, parent_id=parent_id)
+    return {"id": folder_id, "name": name, "parent_id": parent_id}
+
+
+def download_file_bytes(refresh_token: str, file_id: str) -> tuple[bytes, str, str]:
+    """Scarica i bytes di un file da Drive. Ritorna (data, name, mime_type).
+    Per replica server-mediata: il file passa per la RAM del server, non viene salvato su disco."""
+    service = get_drive_service(refresh_token)
+    meta = service.files().get(fileId=file_id, fields="id,name,mimeType,size").execute()
+    name = meta.get("name", "file")
+    mime_type = meta.get("mimeType", "application/octet-stream")
+    # Streaming download
+    from googleapiclient.http import MediaIoBaseDownload
+    import io
+    request = service.files().get_media(fileId=file_id)
+    buf = io.BytesIO()
+    downloader = MediaIoBaseDownload(buf, request, chunksize=2*1024*1024)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+    return buf.getvalue(), name, mime_type
+
+
+def list_files_recursive(refresh_token: str, folder_id: str, max_files: int = 200) -> list[dict]:
+    """Lista TUTTI i file (no folders) dentro una cartella, ricorsivamente.
+    Usato dall'accept per replicare i file esistenti nel Drive del nuovo membro.
+    Ritorna list di {id, name, mime_type, size, parent_id, relative_path}."""
+    service = get_drive_service(refresh_token)
+    results = []
+    # BFS: queue di (folder_id, relative_path)
+    queue = [(folder_id, "")]
+    visited_folders = set()
+    while queue and len(results) < max_files:
+        current_folder, rel = queue.pop(0)
+        if current_folder in visited_folders:
+            continue
+        visited_folders.add(current_folder)
+        page_token = None
+        while True:
+            resp = service.files().list(
+                q=f"'{current_folder}' in parents and trashed = false",
+                fields="nextPageToken, files(id,name,mimeType,size,parents)",
+                pageSize=100,
+                pageToken=page_token,
+            ).execute()
+            for f in resp.get("files", []):
+                if f.get("mimeType") == "application/vnd.google-apps.folder":
+                    sub_rel = (rel + "/" + f["name"]) if rel else f["name"]
+                    queue.append((f["id"], sub_rel))
+                else:
+                    results.append({
+                        "id":          f.get("id"),
+                        "name":        f.get("name"),
+                        "mime_type":   f.get("mimeType"),
+                        "size":        int(f.get("size", 0)) if f.get("size") else 0,
+                        "parent_id":   current_folder,
+                        "relative_path": rel,
+                    })
+                    if len(results) >= max_files:
+                        return results
+            page_token = resp.get("nextPageToken")
+            if not page_token:
+                break
+    return results
+
+
+def upload_file_to_folder(refresh_token: str, folder_id: str, filename: str,
+                            data: bytes, mime_type: str = "application/octet-stream") -> dict:
+    """Wrapper di upload_bytes che usa direttamente il refresh_token."""
+    service = get_drive_service(refresh_token)
+    file_id = upload_bytes(service, folder_id, filename, data, mime_type)
+    return {"id": file_id, "name": filename}
+
+
+def ensure_subfolder_path(refresh_token: str, root_folder_id: str, relative_path: str) -> str:
+    """Naviga il percorso relativo (es. "subA/subB"), creando le cartelle mancanti.
+    Ritorna l'ID della cartella terminale. Usato per replica preservando struttura."""
+    if not relative_path or relative_path == "":
+        return root_folder_id
+    service = get_drive_service(refresh_token)
+    parent = root_folder_id
+    parts = [p for p in relative_path.split("/") if p]
+    for part in parts:
+        parent = find_or_create_folder(service, part, parent_id=parent)
+    return parent
