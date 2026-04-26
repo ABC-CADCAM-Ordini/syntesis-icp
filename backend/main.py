@@ -874,34 +874,6 @@ async def me_project_files(project_id: str,
     if not proj.get("gdrive_folder_id"):
         return {"files": [], "folder_id": None}
 
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# v7.3.9.049 - ADMIN UTILITY (TEMPORANEO)
-# Endpoint protetto per generare licenze. Rimuovere dopo seed iniziale.
-# Auth: header X-Admin-Secret deve essere uguale a JWT_SECRET.
-# ─────────────────────────────────────────────────────────────────────────────
-
-@app.post("/admin/seed-licenses")
-async def admin_seed_licenses(
-    n: int = 5,
-    x_admin_secret: Optional[str] = Header(None, alias="X-Admin-Secret"),
-):
-    """Genera N licenze SICP-XXXX-XXXX-XXXX e le inserisce nel DB.
-    Ritorna le chiavi (mostrate UNA SOLA VOLTA).
-    Protetto da X-Admin-Secret == JWT_SECRET.
-    Da rimuovere dopo seed iniziale (v7.3.9.049)."""
-    expected = os.getenv("JWT_SECRET", "")
-    if not expected or x_admin_secret != expected:
-        raise HTTPException(403, detail="Forbidden")
-    if n < 1 or n > 50:
-        raise HTTPException(400, detail="n deve essere fra 1 e 50.")
-
-    import uuid
-    from database import create_licenses
-    keys = [f"SICP-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}-{uuid.uuid4().hex[:4].upper()}" for _ in range(n)]
-    await create_licenses(keys)
-    return {"ok": True, "n": n, "keys": keys}
     try:
         refresh_token = gdrive.decrypt_token(creds["refresh_token_encrypted"])
         service = gdrive.get_drive_service(refresh_token)
