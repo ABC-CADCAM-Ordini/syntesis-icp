@@ -13,7 +13,7 @@ import math
 from datetime import datetime
 from typing import Optional
 
-VERSION = "7.3.9.039"
+VERSION = "7.3.9.040"
 SCORE_MODEL_VERSION = "Syntesis Score v1.0"
 
 
@@ -313,19 +313,22 @@ def _generate_reportlab(record: dict) -> bytes:
     # Modalita' template -> non valutabile metrologicamente
     is_template_mode = analysis_mode == "template"
 
+    # v7.3.9.040: soglie ALLINEATE a icp_engine.score_label() (modello canonico)
+    # Sorgente unica: backend/icp_engine.py - score_label()
+    # Range: >=85 Eccellente, >=70 Buono, >=50 Sufficiente, >=33 Scarso, <33 Critico
     if is_template_mode:
         score_col = GRAY
         score_lbl = LS["notEvaluable"]
-    elif score >= 90:
-        score_col, score_lbl = GREEN, LS["excellent"]
-    elif score >= 75:
-        score_col, score_lbl = HexColor("#639922"), LS["good"]
-    elif score >= 55:
-        score_col, score_lbl = GOLD, LS["acceptable"]
-    elif score >= 35:
-        score_col, score_lbl = HexColor("#F97316"), LS["risky"]
+    elif score >= 85:
+        score_col, score_lbl = HexColor("#639922"), LS["excellent"]
+    elif score >= 70:
+        score_col, score_lbl = AMBER, LS["good"]
+    elif score >= 50:
+        score_col, score_lbl = HexColor("#F97316"), LS["acceptable"]
+    elif score >= 33:
+        score_col, score_lbl = RED, LS["risky"]
     else:
-        score_col, score_lbl = RED, LS["critical"]
+        score_col, score_lbl = HexColor("#A855F7"), LS["critical"]
 
     story = []
 
