@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <!-- Syntesis-ICP - Dashboard utente
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
-     v7.3.9.074 - Backend utente: mie analisi, profilo, classifica -->
+     v7.3.9.075 - Backend utente: mie analisi, profilo, classifica -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Syntesis-ICP - Area personale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* v7.3.9.074 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
-/* v7.3.9.074 - Cornice nera sobria, una sola, niente animazione */
+/* v7.3.9.075 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
+/* v7.3.9.075 - Cornice nera sobria, una sola, niente animazione */
 html{background:#0F1923;margin:0;padding:0}
 body{
   margin:18px !important;
@@ -24,7 +24,7 @@ body{
   overflow-x:hidden !important;
   box-shadow:0 4px 24px rgba(0,0,0,.4) !important;
 }
-/* v7.3.9.074 - Scrollbar custom dentro la cornice */
+/* v7.3.9.075 - Scrollbar custom dentro la cornice */
 body::-webkit-scrollbar{width:10px}
 body::-webkit-scrollbar-track{background:transparent}
 body::-webkit-scrollbar-thumb{background:rgba(122,144,164,.35);border-radius:5px}
@@ -271,7 +271,7 @@ body{
 .contact-card .cc-actions .danger:hover{background:#FEE2E2}
 .cc-drive-icon{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green);margin-right:4px;vertical-align:middle}
 
-/* v7.3.9.074 - Hero stats card */
+/* v7.3.9.075 - Hero stats card */
 .hs-card{
   background:var(--white);border:1px solid var(--border);border-radius:10px;
   padding:16px 18px;position:relative;overflow:hidden;transition:.18s;
@@ -316,7 +316,7 @@ body{
 .storage-foot a:hover{text-decoration:underline}
 .storage-ok{color:var(--green);font-weight:700}
 
-/* v7.3.9.074 - Leaderboard pubblica (uguale al modulo principale) */
+/* v7.3.9.075 - Leaderboard pubblica (uguale al modulo principale) */
 .lb-filter-row{display:flex;gap:6px;align-items:flex-start;flex-wrap:nowrap;margin-bottom:8px}
 .lb-filter-label{font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;padding-top:7px;min-width:60px;font-family:var(--font)}
 .lb-filters{display:flex;gap:5px;flex-wrap:wrap;flex:1}
@@ -342,7 +342,7 @@ body{
 .lb-score-bar{height:4px;border-radius:2px;margin-top:3px}
 .lb-empty{padding:40px;text-align:center;color:var(--gray);font-family:var(--mono);font-size:13px}
 
-/* v7.3.9.074 - File browser Drive */
+/* v7.3.9.075 - File browser Drive */
 .fb-toolbar{
   display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:10px 14px;background:var(--white);border:1.5px solid var(--border);
@@ -443,7 +443,7 @@ body{
 .privacy-list{margin:8px 0 0;padding-left:18px}
 .privacy-list li{margin-bottom:3px}
 
-/* v7.3.9.074 - Modali condivisione cartelle */
+/* v7.3.9.075 - Modali condivisione cartelle */
 .modal-backdrop{
   position:fixed;inset:0;background:rgba(15,25,35,.6);backdrop-filter:blur(3px);
   display:none;align-items:center;justify-content:center;z-index:200;
@@ -521,7 +521,7 @@ body{
 .invite-row .ir-actions .decline{background:var(--white);color:var(--gray)}
 .invite-row .ir-actions .decline:hover{border-color:#DC2626;color:#DC2626}
 
-/* v7.3.9.074 - Drag&drop visual feedback */
+/* v7.3.9.075 - Drag&drop visual feedback */
 #filesContainer.drag-over{
   outline:3px dashed var(--blue);outline-offset:-6px;
   background:var(--blue-light);border-radius:11px;
@@ -554,7 +554,7 @@ body{
 .auth-required .title{font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px}
 .auth-required .desc{font-size:12px;color:var(--gray);font-family:var(--mono);line-height:1.7;margin-bottom:14px}
 
-/* Toast notifiche (v7.3.9.074) */
+/* Toast notifiche (v7.3.9.075) */
 .toast{
   position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);
   background:#0F1923;color:#fff;padding:12px 20px;border-radius:8px;
@@ -569,13 +569,71 @@ body{
 .toast.error{
   background:#dc2626;
 }
+
+/* Split-pane file browser (v7.3.9.075) */
+.fb-split{
+  display:grid;grid-template-columns:360px 1fr;gap:14px;
+  margin-top:10px;height:600px;
+}
+.fb-list-pane{
+  background:#fff;border:1.5px solid var(--border);border-radius:10px;
+  overflow-y:auto;
+}
+.fb-file-row{
+  padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;
+  border-bottom:1px solid #f1f5f9;transition:.12s;
+}
+.fb-file-row:hover{background:#f8fafc}
+.fb-file-row.selected{background:#dbeafe;border-left:3px solid var(--blue);padding-left:9px}
+.fb-file-row .fb-file-icon{width:32px;height:32px;font-size:10px;flex-shrink:0}
+.fb-file-info{flex:1;min-width:0}
+.fb-file-row-name{
+  font-size:12.5px;font-weight:700;color:var(--dark);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.fb-file-row-meta{
+  font-family:var(--mono);font-size:10px;color:var(--gray);margin-top:2px;
+}
+.fb-file-row-dl{
+  background:transparent;border:1px solid var(--border);border-radius:5px;
+  width:28px;height:28px;cursor:pointer;color:var(--gray);font-size:14px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:.12s;font-family:inherit;
+}
+.fb-file-row-dl:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.fb-preview-pane{
+  background:#fff;border:1.5px solid var(--border);border-radius:10px;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.fb-preview-header{
+  padding:12px 14px;border-bottom:1.5px solid var(--border);
+  display:flex;align-items:center;gap:10px;flex-shrink:0;
+}
+.fb-preview-body{
+  flex:1;overflow:auto;background:#f8fafc;
+  display:flex;align-items:center;justify-content:center;
+  padding:14px;
+}
+.fb-preview-body img{max-width:100%;max-height:100%;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.fb-preview-body iframe{width:100%;height:100%;border:none;border-radius:6px;background:#fff}
+.fb-preview-body video, .fb-preview-body audio{max-width:100%;max-height:100%}
+.fb-preview-body pre{background:#0F1923;color:#e2e8f0;padding:14px;border-radius:6px;overflow:auto;width:100%;height:100%;font-size:11px;font-family:var(--mono);white-space:pre-wrap;word-break:break-all;margin:0}
+.fb-preview-empty{text-align:center;color:var(--gray)}
+.fb-file-icon.img{background:#10b981}
+
+/* Responsive: su mobile stack verticale */
+@media (max-width:780px){
+  .fb-split{grid-template-columns:1fr;height:auto}
+  .fb-list-pane{max-height:300px}
+  .fb-preview-pane{min-height:400px}
+}
 </style>
 </head>
 <body>
   <div id="toast" class="toast"></div>
 <div class="app-wrapper">
 
-  <!-- Header (v7.3.9.074 - ridisegnato con logo, hero stats, storage bar) -->
+  <!-- Header (v7.3.9.075 - ridisegnato con logo, hero stats, storage bar) -->
   <div class="app-card">
     <div class="app-header" style="border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:18px">
       <div style="display:flex;align-items:center;gap:18px">
@@ -661,7 +719,7 @@ body{
       <div id="projectsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
     </div>
 
-    <!-- TAB: FILE (file browser Drive - v7.3.9.074) -->
+    <!-- TAB: FILE (file browser Drive - v7.3.9.075) -->
     <div class="tab-content" id="tabFiles">
       <div id="filesContainer">
         <div class="loading"><span class="spinner"></span>Caricamento file...</div>
@@ -719,7 +777,7 @@ body{
         </div>
 
         <div style="margin-top:18px;padding:14px 16px;background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:10px;font-size:11px;color:#065F46;font-family:var(--mono);line-height:1.7">
-          <b>Drive OAuth attivo (v7.3.9.074):</b> Google Drive e\' connettibile. Lo scope richiesto e\' <code style="background:#fff;padding:1px 5px;border-radius:3px">drive.file</code>, che limita Syntesis-ICP ai SOLI file che lui stesso crea nella cartella <code style="background:#fff;padding:1px 5px;border-radius:3px">Syntesis-ICP</code> nel tuo Drive. Gli altri file del Drive non sono mai accessibili.
+          <b>Drive OAuth attivo (v7.3.9.075):</b> Google Drive e\' connettibile. Lo scope richiesto e\' <code style="background:#fff;padding:1px 5px;border-radius:3px">drive.file</code>, che limita Syntesis-ICP ai SOLI file che lui stesso crea nella cartella <code style="background:#fff;padding:1px 5px;border-radius:3px">Syntesis-ICP</code> nel tuo Drive. Gli altri file del Drive non sono mai accessibili.
         </div>
       </div>
     </div>
@@ -729,7 +787,7 @@ body{
       <div id="profileContainer" class="loading"><span class="spinner"></span>Caricamento profilo...</div>
     </div>
 
-    <!-- TAB: CLASSIFICA pubblica (v7.3.9.074) -->
+    <!-- TAB: CLASSIFICA pubblica (v7.3.9.075) -->
     <div class="tab-content" id="tabLeaderboard">
       <div id="lb-section">
         <div style="background:linear-gradient(135deg,#FFFBEB,#FFF7E6);border:1.5px solid #FCD34D;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
@@ -776,12 +834,12 @@ body{
 
 
   
-  <!-- FOOTER VERSIONE (v7.3.9.074) -->
+  <!-- FOOTER VERSIONE (v7.3.9.075) -->
   <div style="text-align:center;padding:20px 16px 24px 16px;font-family:var(--mono);font-size:10px;color:var(--gray);letter-spacing:.05em">
-    Synthesis ICP &middot; v7.3.9.074 &middot; Biaggini Medical Devices S.r.l.
+    Synthesis ICP &middot; v7.3.9.075 &middot; Biaggini Medical Devices S.r.l.
   </div>
 
-  <!-- MODAL: ANTEPRIMA FILE (v7.3.9.074) -->
+  <!-- MODAL: ANTEPRIMA FILE (v7.3.9.075) -->
   <div class="modal-backdrop" id="modalPreview">
     <div style="background:#fff;border-radius:14px;width:90vw;max-width:1100px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden">
       <div style="padding:14px 18px;border-bottom:1.5px solid var(--border);display:flex;align-items:center;gap:14px">
@@ -798,7 +856,7 @@ body{
     </div>
   </div>
 
-  <!-- MODAL: NUOVO/MODIFICA CONTATTO (v7.3.9.074) -->
+  <!-- MODAL: NUOVO/MODIFICA CONTATTO (v7.3.9.075) -->
   <div class="modal-backdrop" id="modalContact">
     <div class="modal-card">
       <div class="modal-title" id="modalContactTitle">Nuovo contatto</div>
@@ -945,7 +1003,7 @@ async function loadStats(){
   } catch(e){ console.warn('stats', e); }
 }
 
-// ── v7.3.9.074 - Storage consumption ────────────────────────────────────────
+// ── v7.3.9.075 - Storage consumption ────────────────────────────────────────
 async function loadStorage(){
   var el = document.getElementById('storageBar');
   if(!el) return;
@@ -1631,7 +1689,7 @@ async function saveContact(){
   }
 }
 
-// Helper inline per il modale Condividi cartella (v7.3.9.074)
+// Helper inline per il modale Condividi cartella (v7.3.9.075)
 async function addContactInline(){
   var emailEl = document.getElementById('sfNewEmail');
   var nameEl  = document.getElementById('sfNewName');
@@ -1787,7 +1845,7 @@ async function deleteContact(id){
   } catch(e){ showToast('Errore: ' + e.message, true); }
 }
 
-// ── v7.3.9.074 - Leaderboard pubblica (Supabase) per tab Classifica ────────
+// ── v7.3.9.075 - Leaderboard pubblica (Supabase) per tab Classifica ────────
 var LBdash = (function(){
   var SUPABASE_URL = 'https://gnqnebjuhnxvndrpcdtt.supabase.co';
   var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImducW5lYmp1aG54dm5kcnBjZHR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMTg5ODAsImV4cCI6MjA4ODc5NDk4MH0.ZE_RHhx4KUiwG-_s4pVnRKbvxUZhqEATgNaRowSP6H8';
@@ -1951,7 +2009,7 @@ var LBdash = (function(){
   };
 })();
 
-// ── v7.3.9.074 - File Browser Drive ─────────────────────────────────────────
+// ── v7.3.9.075 - File Browser Drive ─────────────────────────────────────────
 var fbState = {
   currentFolderId: null,    // null = root Syntesis-ICP
   breadcrumb: [],
@@ -2064,14 +2122,13 @@ function renderFiles(data){
       html += '</div>';
     }
 
-    // Files
+    // Files - SPLIT PANE: lista a sinistra, anteprima a destra (v7.3.9.075)
     if(data.files && data.files.length){
       html += '<div class="fb-section-title">File (' + data.files.length + ')</div>';
-      html += '<table class="fb-files-table">' +
-        '<thead><tr>' +
-          '<th>Nome</th><th>Dimensione</th><th>Modificato</th><th></th>' +
-        '</tr></thead><tbody>';
-      data.files.forEach(function(f){
+      html += '<div class="fb-split">';
+      // Pane sinistro: lista compatta
+      html += '<div class="fb-list-pane" id="fbListPane">';
+      data.files.forEach(function(f, idx){
         var ext = '';
         var dot = f.name.lastIndexOf('.');
         if(dot > 0) ext = f.name.substring(dot+1).toLowerCase();
@@ -2079,30 +2136,45 @@ function renderFiles(data){
         if(ext === 'stl') iconCls = 'stl';
         else if(ext === 'pdf') iconCls = 'pdf';
         else if(ext === 'json') iconCls = 'json';
+        else if(['jpg','jpeg','png','gif','webp'].indexOf(ext) >= 0) iconCls = 'img';
         var size = f.size ? fmtBytes(f.size) : '-';
         var modDate = '';
         if(f.modified_time){
           try { modDate = new Date(f.modified_time).toLocaleDateString('it-IT',
-            {day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(_){}
+            {day:'2-digit',month:'short',year:'2-digit'}); } catch(_){}
         }
         var fSafeName = escapeHtml(f.name).replace(/'/g, '&#39;');
         var fMime = (f.mime_type || '').replace(/'/g, '');
         var fSize = f.size || 0;
         html +=
-          '<tr>' +
-            '<td><div class="fb-file-name" style="cursor:pointer" onclick="openPreview(\'' + f.id + '\',\'' + fSafeName + '\',\'' + fMime + '\',' + fSize + ')">' +
-              '<div class="fb-file-icon ' + iconCls + '">' + (ext.substring(0,3).toUpperCase() || '?') + '</div>' +
-              escapeHtml(f.name) +
-            '</div></td>' +
-            '<td><span class="fb-file-meta">' + size + '</span></td>' +
-            '<td><span class="fb-file-meta">' + modDate + '</span></td>' +
-            '<td class="fb-file-actions">' +
-              '<a href="javascript:void(0)" onclick="openPreview(\'' + f.id + '\',\'' + fSafeName + '\',\'' + fMime + '\',' + fSize + ')">Apri</a>' +
-              '<a href="javascript:void(0)" onclick="downloadFileById(\'' + f.id + '\',\'' + fSafeName + '\')">Scarica</a>' +
-            '</td>' +
-          '</tr>';
+          '<div class="fb-file-row" data-fid="' + f.id + '" onclick="selectFileForPreview(\'' + f.id + '\',\'' + fSafeName + '\',\'' + fMime + '\',' + fSize + ')">' +
+            '<div class="fb-file-icon ' + iconCls + '">' + (ext.substring(0,3).toUpperCase() || '?') + '</div>' +
+            '<div class="fb-file-info">' +
+              '<div class="fb-file-row-name">' + escapeHtml(f.name) + '</div>' +
+              '<div class="fb-file-row-meta">' + size + (modDate ? ' . ' + modDate : '') + '</div>' +
+            '</div>' +
+            '<button class="fb-file-row-dl" onclick="event.stopPropagation();downloadFileById(\'' + f.id + '\',\'' + fSafeName + '\')" title="Scarica">&#x2193;</button>' +
+          '</div>';
       });
-      html += '</tbody></table>';
+      html += '</div>';
+      // Pane destro: anteprima
+      html += '<div class="fb-preview-pane" id="fbPreviewPane">' +
+        '<div class="fb-preview-header" id="fbPreviewHeader" style="display:none">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div id="fbPreviewName" style="font-weight:800;font-size:13px;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">--</div>' +
+            '<div id="fbPreviewMeta" style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-top:2px">--</div>' +
+          '</div>' +
+          '<button onclick="fbPreviewExpand()" title="Apri a schermo intero" style="padding:6px 10px;background:#f1f5f9;color:var(--dark);border:1.5px solid var(--border);border-radius:5px;cursor:pointer;font-size:11px;font-family:var(--font);font-weight:700">&#x2922; Espandi</button>' +
+          '<button onclick="fbPreviewDownload()" style="padding:6px 10px;background:var(--blue);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-family:var(--font);font-weight:700">&#x2193; Scarica</button>' +
+        '</div>' +
+        '<div class="fb-preview-body" id="fbPreviewBody">' +
+          '<div class="fb-preview-empty">' +
+            '<span style="font-size:48px;opacity:.3">&#x1F441;</span>' +
+            '<div style="margin-top:12px;color:var(--gray);font-family:var(--mono);font-size:11px">Seleziona un file per vedere l\'anteprima</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+      html += '</div>'; // .fb-split
     }
   }
   html += '</div>';
@@ -2111,7 +2183,7 @@ function renderFiles(data){
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────
-// v7.3.9.074 - Notifiche errore/successo OAuth Drive da query param
+// v7.3.9.075 - Notifiche errore/successo OAuth Drive da query param
 function checkGdriveCallbackParams(){
   try {
     var params = new URLSearchParams(window.location.search);
@@ -2140,7 +2212,7 @@ function checkGdriveCallbackParams(){
   } catch(e){ console.warn('callback params', e); }
 }
 
-// ── v7.3.9.074 - Crea cartella + Condividi cartella ───────────────────────
+// ── v7.3.9.075 - Crea cartella + Condividi cartella ───────────────────────
 var sfState = { folderId: null, folderName: '', contacts: [] };
 
 function openModal(id){
@@ -2274,7 +2346,7 @@ async function submitShareFolder(){
   }
 }
 
-// ── v7.3.9.074 - Upload file in cartella + drag&drop ──────────────────────
+// ── v7.3.9.075 - Upload file in cartella + drag&drop ──────────────────────
 function openUpload(folderId){
   console.log('[openUpload] called with folderId=', folderId);
   if(!folderId){ showToast('Apri prima una cartella', true); console.warn('[openUpload] no folderId'); return; }
@@ -2478,7 +2550,7 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 
 
-// ── v7.3.9.074 - Anteprima file ──────────────────────────────────────────
+// ── v7.3.9.075 - Anteprima file ──────────────────────────────────────────
 var prevState = { fileId: null, fileName: null, mimeType: null, blobUrl: null };
 
 async function openPreview(fileId, fileName, fileMime, fileSize){
@@ -2709,6 +2781,94 @@ function cleanupPreview(closeAll){
   }
 }
 
+
+// ── v7.3.9.075 - Split-pane preview ──────────────────────────────────────
+var fbPreviewState = { fileId: null, fileName: null, fileMime: null, fileSize: 0, blobUrl: null };
+
+async function selectFileForPreview(fileId, fileName, fileMime, fileSize){
+  // Highlight nella lista
+  var rows = document.querySelectorAll('.fb-file-row');
+  rows.forEach(function(r){ r.classList.remove('selected'); });
+  var row = document.querySelector('.fb-file-row[data-fid="' + fileId + '"]');
+  if(row) row.classList.add('selected');
+  // Cleanup precedente blob URL
+  if(fbPreviewState.blobUrl){
+    try { URL.revokeObjectURL(fbPreviewState.blobUrl); } catch(_){}
+    fbPreviewState.blobUrl = null;
+  }
+  fbPreviewState.fileId = fileId;
+  fbPreviewState.fileName = fileName;
+  fbPreviewState.fileMime = fileMime;
+  fbPreviewState.fileSize = fileSize;
+  // Mostra header
+  document.getElementById('fbPreviewHeader').style.display = 'flex';
+  document.getElementById('fbPreviewName').textContent = fileName;
+  document.getElementById('fbPreviewMeta').textContent = (fileMime || 'sconosciuto') + ' . ' + (fileSize ? fmtBytes(fileSize) : '?');
+  var body = document.getElementById('fbPreviewBody');
+  body.innerHTML = '<div style="color:var(--gray);font-family:var(--mono);font-size:11px">Caricamento...</div>';
+  try {
+    var r = await fetch('/api/me/gdrive/file/' + encodeURIComponent(fileId) + '/content', {
+      headers: { 'Authorization': 'Bearer ' + getToken() }
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var blob = await r.blob();
+    fbPreviewState.blobUrl = URL.createObjectURL(blob);
+    var actualMime = blob.type || fileMime || '';
+    var ext = (fileName || '').split('.').pop().toLowerCase();
+    renderPreviewInto(body, fbPreviewState.blobUrl, actualMime, ext, fileName, blob);
+  } catch(e){
+    body.innerHTML = '<div style="text-align:center;color:#dc2626;font-family:var(--mono);font-size:11px;padding:30px">Errore: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+// renderPreviewInto: come renderPreview ma su un container specifico
+function renderPreviewInto(body, blobUrl, mime, ext, name, blob){
+  if(mime.indexOf('image/') === 0 || ['jpg','jpeg','png','gif','webp','svg','bmp','avif'].indexOf(ext) >= 0){
+    body.innerHTML = '<img src="' + blobUrl + '">';
+    return;
+  }
+  if(mime === 'application/pdf' || ext === 'pdf'){
+    body.innerHTML = '<iframe src="' + blobUrl + '"></iframe>';
+    return;
+  }
+  if(mime.indexOf('video/') === 0 || ['mp4','webm','mov','m4v','ogv'].indexOf(ext) >= 0){
+    body.innerHTML = '<video src="' + blobUrl + '" controls></video>';
+    return;
+  }
+  if(mime.indexOf('audio/') === 0 || ['mp3','wav','ogg','m4a','flac'].indexOf(ext) >= 0){
+    body.innerHTML = '<audio src="' + blobUrl + '" controls style="width:80%"></audio>';
+    return;
+  }
+  if(ext === 'stl'){
+    renderSTL(blob, body);
+    return;
+  }
+  if(mime.indexOf('text/') === 0 || ['txt','md','json','csv','xml','log','js','css','html','py'].indexOf(ext) >= 0){
+    blob.text().then(function(txt){
+      body.innerHTML = '<pre>' + escapeHtml(txt.substring(0, 100000)) + (txt.length > 100000 ? '\n\n... [troncato]' : '') + '</pre>';
+    });
+    return;
+  }
+  body.innerHTML =
+    '<div style="text-align:center;padding:30px">' +
+      '<div style="font-size:48px;margin-bottom:14px">&#x1F4C4;</div>' +
+      '<div style="font-weight:700;color:var(--dark);font-size:13px;margin-bottom:6px">' + escapeHtml(name) + '</div>' +
+      '<div style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:14px">Anteprima non disponibile</div>' +
+      '<button onclick="fbPreviewDownload()" style="padding:9px 16px;background:var(--blue);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-family:var(--font);font-size:12px">&#x2193; Scarica</button>' +
+    '</div>';
+}
+
+async function fbPreviewDownload(){
+  if(!fbPreviewState.fileId) return;
+  await downloadFileById(fbPreviewState.fileId, fbPreviewState.fileName);
+}
+
+function fbPreviewExpand(){
+  if(!fbPreviewState.fileId) return;
+  // Apre la modale fullscreen (esistente)
+  openPreview(fbPreviewState.fileId, fbPreviewState.fileName, fbPreviewState.fileMime, fbPreviewState.fileSize);
+}
+
 // Refresh hero stats dopo create/delete che cambiano i contatori
 setInterval(function(){
   if(document.visibilityState === 'visible' && document.getElementById('heroStats') && !document.getElementById('heroStats').hidden){
@@ -2724,7 +2884,7 @@ document.addEventListener('keydown', function(e){
   }
 });
 </script>
-<!-- v7.3.9.074 - Modali condivisione -->
+<!-- v7.3.9.075 - Modali condivisione -->
 <div class="modal-backdrop" id="modalCreateFolder" onclick="if(event.target===this) closeModal('modalCreateFolder')">
   <div class="modal-card">
     <div class="modal-title">Crea nuova cartella</div>
