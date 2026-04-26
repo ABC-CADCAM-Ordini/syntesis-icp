@@ -290,12 +290,12 @@ def delete_drive_file(service, file_id: str) -> bool:
 # Funzioni di navigazione delle cartelle e file (browse + breadcrumb).
 # ─────────────────────────────────────────────────────────────────────────────
 
-def browse_folder(creds, folder_id: Optional[str] = None) -> dict:
+def browse_folder(refresh_token: str, folder_id: Optional[str] = None) -> dict:
     """Lista contenuti di una cartella Drive (subfolders + files con dettagli).
     Se folder_id e' None, usa la root Syntesis-ICP (la crea se non esiste).
     Ritorna dict con folder_id, folder_name, parent_id, items[].
     items[] separa subfolders e files per facilitare il rendering."""
-    service = _build_service(creds)
+    service = get_drive_service(refresh_token)
 
     if folder_id is None:
         folder_id = find_or_create_folder(service, GDRIVE_ROOT_FOLDER_NAME, parent_id=None)
@@ -367,12 +367,12 @@ def browse_folder(creds, folder_id: Optional[str] = None) -> dict:
     }
 
 
-def get_folder_breadcrumb(creds, folder_id: str) -> list[dict]:
+def get_folder_breadcrumb(refresh_token: str, folder_id: str) -> list[dict]:
     """Ritorna la catena di cartelle da root Syntesis-ICP fino a folder_id incluso.
     Lista di {id, name}, ordinata dalla root al target.
     Si ferma quando trova il folder con nome GDRIVE_ROOT_FOLDER_NAME (la nostra root)
     oppure quando non riesce a salire oltre (cartella fuori dallo scope drive.file)."""
-    service = _build_service(creds)
+    service = get_drive_service(refresh_token)
     chain = []
     visited = set()
     current_id = folder_id
