@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* v7.3.9.054 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
+/* v7.3.9.055 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
 body{
   margin:25px !important;
@@ -271,7 +271,7 @@ body{
 .contact-card .cc-actions .danger:hover{background:#FEE2E2}
 .cc-drive-icon{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green);margin-right:4px;vertical-align:middle}
 
-/* v7.3.9.054 - Hero stats card */
+/* v7.3.9.055 - Hero stats card */
 .hs-card{
   background:var(--white);border:1px solid var(--border);border-radius:10px;
   padding:16px 18px;position:relative;overflow:hidden;transition:.18s;
@@ -316,6 +316,51 @@ body{
 .storage-foot a:hover{text-decoration:underline}
 .storage-ok{color:var(--green);font-weight:700}
 
+/* v7.3.9.055 - Leaderboard pubblica (uguale al modulo principale) */
+.lb-filter-row{display:flex;gap:6px;align-items:flex-start;flex-wrap:nowrap;margin-bottom:8px}
+.lb-filter-label{font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;padding-top:7px;min-width:60px;font-family:var(--font)}
+.lb-filters{display:flex;gap:5px;flex-wrap:wrap;flex:1}
+.lb-filter-btn{padding:5px 14px;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;background:var(--white);color:var(--gray);transition:.15s;font-family:var(--font)}
+.lb-filter-btn:hover{border-color:var(--blue);color:var(--blue)}
+.lb-filter-btn.active{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+.lb-table-wrap{border:1.5px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,50,100,.06);margin-top:14px}
+.lb-header{display:grid;grid-template-columns:44px 1fr 100px 70px 90px;background:var(--light);padding:9px 15px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gray)}
+.lb-row{display:grid;grid-template-columns:44px 1fr 100px 70px 90px;padding:11px 15px;border-top:1px solid var(--light);align-items:center;transition:background .1s}
+.lb-row:hover{background:var(--pearl)}
+.lb-row.top1{background:linear-gradient(90deg,#FFFBEB,var(--white))}
+.lb-row.top2{background:linear-gradient(90deg,var(--pearl),var(--white))}
+.lb-row.top3{background:linear-gradient(90deg,#FFF7F0,var(--white))}
+.lb-rank{font-size:14px;font-weight:900;color:var(--gray);font-family:var(--mono)}
+.lb-rank.r1{color:#F59E0B}
+.lb-rank.r2{color:#94A3B8}
+.lb-rank.r3{color:#C2764E}
+.lb-loc{font-size:13px;font-weight:700;color:var(--dark)}
+.lb-loc-sub{font-size:11px;color:var(--gray);font-family:var(--mono)}
+.lb-type{font-size:11px;color:var(--gray);font-weight:600;background:var(--light);padding:2px 9px;border-radius:20px;display:inline-block;white-space:nowrap}
+.lb-date{font-size:11px;color:var(--gray);font-family:var(--mono)}
+.lb-score{font-size:16px;font-weight:900;font-family:var(--mono)}
+.lb-score-bar{height:4px;border-radius:2px;margin-top:3px}
+.lb-empty{padding:40px;text-align:center;color:var(--gray);font-family:var(--mono);font-size:13px}
+
+/* Privacy banner per Drive */
+.privacy-banner{
+  background:linear-gradient(135deg,#F0F9FF,#E0F2FE);
+  border:1.5px solid #7DD3FC;border-radius:10px;
+  padding:16px 18px;margin-bottom:16px;display:flex;gap:14px;align-items:flex-start;
+}
+.privacy-banner .pb-ico{
+  flex-shrink:0;width:36px;height:36px;border-radius:50%;
+  background:#0EA5E9;color:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:800;
+}
+.privacy-banner .pb-content{flex:1}
+.privacy-banner .pb-title{font-size:13px;font-weight:800;color:#075985;margin-bottom:4px}
+.privacy-banner .pb-text{font-size:12px;color:#0C4A6E;font-family:var(--mono);line-height:1.7}
+.privacy-banner .pb-text b{color:#075985}
+.privacy-banner .pb-text code{background:rgba(255,255,255,.7);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px}
+.privacy-list{margin:8px 0 0;padding-left:18px}
+.privacy-list li{margin-bottom:3px}
+
 /* Login required state */
 .auth-required{
   background:linear-gradient(135deg,var(--blue-light),#F0F9FF);
@@ -330,7 +375,7 @@ body{
 <body>
 <div class="app-wrapper">
 
-  <!-- Header (v7.3.9.054 - ridisegnato con logo, hero stats, storage bar) -->
+  <!-- Header (v7.3.9.055 - ridisegnato con logo, hero stats, storage bar) -->
   <div class="app-card">
     <div class="app-header" style="border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:18px">
       <div style="display:flex;align-items:center;gap:18px">
@@ -432,21 +477,20 @@ body{
     <!-- TAB: CLOUD -->
     <div class="tab-content" id="tabCloud">
       <div id="cloudContainer">
-        <div style="background:linear-gradient(135deg,var(--blue-light),#F0F9FF);border:1.5px solid #BAE0FF;border-radius:12px;padding:22px;margin-bottom:18px">
-          <div style="display:flex;gap:14px;align-items:flex-start">
-            <div style="width:48px;height:48px;background:var(--white);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <path d="M22 17a4 4 0 0 0-4-4h-1a6 6 0 0 0-11.7 1A4 4 0 0 0 7 22h11a4 4 0 0 0 4-5z" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <div style="flex:1">
-              <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">I tuoi file restano tuoi</div>
-              <div style="font-size:12px;color:var(--gray);font-family:var(--mono);line-height:1.7">
-                Collegando un cloud personale (Google Drive o Dropbox), i file STL, JSON e PDF delle tue analisi vengono salvati nel <b>tuo</b> cloud, non sui nostri server. Puoi scollegare in qualsiasi momento.<br>
-                Organizzazione: una cartella radice <code style="background:#fff;padding:1px 5px;border-radius:3px">Syntesis-ICP</code> nel tuo Drive, con una sottocartella per ogni progetto.
-              </div>
+        <div class="privacy-banner">
+          <div class="pb-ico">&#x1F512;</div>
+          <div class="pb-content">
+            <div class="pb-title">Synthesis vede SOLO la cartella Syntesis-ICP del tuo Drive</div>
+            <div class="pb-text">
+              Quando colleghi Google Drive, Synthesis usa il permesso <code>drive.file</code>: pu&ograve; vedere e modificare <b>solamente i file che lui stesso crea</b> dentro la cartella radice <code>Syntesis-ICP</code>.
+              <ul class="privacy-list">
+                <li>Il resto del tuo Drive (foto, documenti, altri progetti) rimane <b>completamente privato</b>: Synthesis non lo vede, non lo legge, non lo tocca.</li>
+                <li>Puoi scollegare il Drive in qualsiasi momento dal pulsante "Disconnetti".</li>
+                <li>Eliminando la cartella <code>Syntesis-ICP</code> da Drive, rimuovi tutti i tuoi file dal sistema.</li>
+              </ul>
             </div>
           </div>
+        </div>
         </div>
 
         <div class="profile-grid">
@@ -477,122 +521,49 @@ body{
       <div id="profileContainer" class="loading"><span class="spinner"></span>Caricamento profilo...</div>
     </div>
 
-    <!-- TAB: CLASSIFICA -->
+    <!-- TAB: CLASSIFICA pubblica (v7.3.9.055) -->
     <div class="tab-content" id="tabLeaderboard">
-      <div id="leaderboardContainer" class="loading"><span class="spinner"></span>Caricamento classifica...</div>
-    </div>
-  </div>
+      <div id="lb-section">
+        <div style="background:linear-gradient(135deg,#FFFBEB,#FFF7E6);border:1.5px solid #FCD34D;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
+          <div style="font-size:24px;flex-shrink:0">&#127942;</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:800;color:#78350F;margin-bottom:3px">Classifica globale di precisione</div>
+            <div style="font-size:11px;color:#92400E;font-family:var(--mono);line-height:1.6">Posizioni di laboratori, cliniche e universit&agrave; che hanno scelto di pubblicare il loro voto. Filtra per nazione, provincia, citt&agrave; e tipo di struttura. Solo dati anonimi (nessun nome di paziente, nessun file).</div>
+          </div>
+        </div>
 
-  <div style="text-align:center;font-size:10px;color:var(--gray);font-weight:600;letter-spacing:.04em;margin-top:14px">
-    Syntesis-ICP &middot; Area personale &middot; v7.3.9.048
-  </div>
-</div>
+        <div class="lb-filter-row">
+          <span class="lb-filter-label">Tipo</span>
+          <div class="lb-filters" id="lb-filter-tipo">
+            <button class="lb-filter-btn active" data-ftype="tipo" data-fval="all" onclick="LBdash.filterBy('tipo','all',this)">Tutti</button>
+            <button class="lb-filter-btn" data-ftype="tipo" data-fval="laboratorio" onclick="LBdash.filterBy('tipo','laboratorio',this)">Laboratorio</button>
+            <button class="lb-filter-btn" data-ftype="tipo" data-fval="clinica" onclick="LBdash.filterBy('tipo','clinica',this)">Clinica</button>
+            <button class="lb-filter-btn" data-ftype="tipo" data-fval="universita" onclick="LBdash.filterBy('tipo','universita',this)">Universit&agrave;</button>
+            <button class="lb-filter-btn" data-ftype="tipo" data-fval="altro" onclick="LBdash.filterBy('tipo','altro',this)">Altro</button>
+          </div>
+        </div>
+        <div class="lb-filter-row" id="lb-row-nazione">
+          <span class="lb-filter-label">Nazione</span>
+          <div class="lb-filters" id="lb-filter-nazione"></div>
+        </div>
+        <div class="lb-filter-row" id="lb-row-provincia" hidden style="display:none">
+          <span class="lb-filter-label">Provincia</span>
+          <div class="lb-filters" id="lb-filter-provincia"></div>
+        </div>
+        <div class="lb-filter-row" id="lb-row-citta" hidden style="display:none">
+          <span class="lb-filter-label">Citt&agrave;</span>
+          <div class="lb-filters" id="lb-filter-citta"></div>
+        </div>
 
-<!-- Modal rinomina/modifica -->
-<div class="modal-overlay" id="modalEdit">
-  <div class="modal">
-    <div class="modal-title" id="modalTitle">Modifica analisi</div>
-    <div class="modal-sub">I file STL originali non vengono memorizzati. Puoi solo cambiare nome e note.</div>
-    <div class="modal-field">
-      <label>Nome dell'analisi</label>
-      <input type="text" id="modalName" maxlength="200" placeholder="Es. Caso Rossi - 12 marzo">
-    </div>
-    <div class="modal-field">
-      <label>Note (opzionale)</label>
-      <textarea id="modalNotes" maxlength="5000" placeholder="Annotazioni cliniche, ID paziente, dettagli..."></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-outline" onclick="closeModal()">Annulla</button>
-      <button class="btn-cta" onclick="saveModal()">Salva</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal nuovo progetto / modifica progetto -->
-<div class="modal-overlay" id="modalProject">
-  <div class="modal">
-    <div class="modal-title" id="modalProjectTitle">Nuovo progetto</div>
-    <div class="modal-sub">Un progetto raggruppa analisi e file correlati. Es. un caso clinico o un paziente.</div>
-    <div class="modal-field">
-      <label>Nome progetto *</label>
-      <input type="text" id="projectName" maxlength="200" placeholder="Es. Caso Rossi - quadrante 1">
-    </div>
-    <div class="modal-field">
-      <label>Riferimento paziente (opzionale)</label>
-      <input type="text" id="projectPatient" maxlength="200" placeholder="ID paziente, codice anonimo, etc.">
-    </div>
-    <div class="modal-field">
-      <label>Descrizione (opzionale)</label>
-      <textarea id="projectDescription" maxlength="2000" placeholder="Note sul caso, decorso, vincoli..."></textarea>
-    </div>
-    <div class="modal-field">
-      <label>Colore identificativo</label>
-      <div style="display:flex;gap:6px">
-        <span class="color-swatch" data-c="#0065B3" style="width:28px;height:28px;background:#0065B3;border-radius:6px;cursor:pointer;border:2.5px solid var(--blue)"></span>
-        <span class="color-swatch" data-c="#0D9E6E" style="width:28px;height:28px;background:#0D9E6E;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
-        <span class="color-swatch" data-c="#F59E0B" style="width:28px;height:28px;background:#F59E0B;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
-        <span class="color-swatch" data-c="#DC2626" style="width:28px;height:28px;background:#DC2626;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
-        <span class="color-swatch" data-c="#7C3AED" style="width:28px;height:28px;background:#7C3AED;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
-        <span class="color-swatch" data-c="#0E7490" style="width:28px;height:28px;background:#0E7490;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+        <div class="lb-table-wrap">
+          <div class="lb-header">
+            <span>#</span><span>Posizione</span><span>Tipo</span><span>Data</span>
+            <span style="text-align:right">Voto</span>
+          </div>
+          <div id="lb-body"><div class="lb-empty"><span class="spinner"></span> Caricamento classifica...</div></div>
+        </div>
       </div>
     </div>
-    <div class="modal-actions">
-      <button class="btn-outline" onclick="closeProjectModal()">Annulla</button>
-      <button class="btn-cta" onclick="saveProjectModal()">Salva</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal nuovo/modifica contatto -->
-<div class="modal-overlay" id="modalContact">
-  <div class="modal">
-    <div class="modal-title" id="modalContactTitle">Nuovo contatto</div>
-    <div class="modal-sub">Aggiungi un altro utente Syntesis con cui scambiare file e progetti.</div>
-    <div class="modal-field">
-      <label>Email del contatto *</label>
-      <input type="email" id="contactEmail" maxlength="200" placeholder="email@esempio.it">
-    </div>
-    <div class="modal-field">
-      <label>Etichetta</label>
-      <input type="text" id="contactName" maxlength="200" placeholder="Es. Studio Rossi, Lab Bianchi...">
-    </div>
-    <div class="modal-field">
-      <label>Ruolo (opzionale)</label>
-      <input type="text" id="contactRole" maxlength="100" placeholder="Es. Clinica, Laboratorio, Collega...">
-    </div>
-    <div class="modal-field">
-      <label>Note (opzionale)</label>
-      <textarea id="contactNotes" maxlength="2000" placeholder="Annotazioni libere..."></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-outline" onclick="closeContactModal()">Annulla</button>
-      <button class="btn-cta" onclick="saveContactModal()">Salva</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal profilo -->
-<div class="modal-overlay" id="modalProfile">
-  <div class="modal">
-    <div class="modal-title">Modifica profilo</div>
-    <div class="modal-sub">Email e licenza non sono modificabili.</div>
-    <div class="modal-field">
-      <label>Nome</label>
-      <input type="text" id="modalProfileName" maxlength="200">
-    </div>
-    <div class="modal-field">
-      <label>Organizzazione</label>
-      <input type="text" id="modalProfileOrg" maxlength="200" placeholder="Studio dentistico, laboratorio...">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-outline" onclick="closeProfileModal()">Annulla</button>
-      <button class="btn-cta" onclick="saveProfileModal()">Salva</button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast -->
-<div id="toast" class="toast"></div>
 
 <script>
 // ── Stato ───────────────────────────────────────────────────────────────────
@@ -677,7 +648,7 @@ function switchTab(name){
   else if(name === 'contacts'){ loadContacts(); }
   else if(name === 'cloud'){ loadCloudStatus(); }
   else if(name === 'profile'){ loadProfile(); }
-  else if(name === 'leaderboard'){ loadLeaderboard(); }
+  else if(name === 'leaderboard'){ if(window.LBdash) LBdash.load(); }
 }
 
 function switchFilter(f){
@@ -706,7 +677,7 @@ async function loadStats(){
   } catch(e){ console.warn('stats', e); }
 }
 
-// ── v7.3.9.054 - Storage consumption ────────────────────────────────────────
+// ── v7.3.9.055 - Storage consumption ────────────────────────────────────────
 async function loadStorage(){
   var el = document.getElementById('storageBar');
   if(!el) return;
@@ -1449,6 +1420,170 @@ async function deleteContact(id){
     loadContacts();
   } catch(e){ showToast('Errore: ' + e.message, true); }
 }
+
+// ── v7.3.9.055 - Leaderboard pubblica (Supabase) per tab Classifica ────────
+var LBdash = (function(){
+  var SUPABASE_URL = 'https://gnqnebjuhnxvndrpcdtt.supabase.co';
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImducW5lYmp1aG54dm5kcnBjZHR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMTg5ODAsImV4cCI6MjA4ODc5NDk4MH0.ZE_RHhx4KUiwG-_s4pVnRKbvxUZhqEATgNaRowSP6H8';
+  var SUPABASE_TABLE = 'precision_scores';
+
+  var _data = [], _active = {tipo:'all',nazione:'all',provincia:'all',citta:'all'}, _loaded = false;
+  var FLAGS = {
+    'Italia':'\u{1F1EE}\u{1F1F9}','Italy':'\u{1F1EE}\u{1F1F9}',
+    'Germania':'\u{1F1E9}\u{1F1EA}','Germany':'\u{1F1E9}\u{1F1EA}',
+    'Spagna':'\u{1F1EA}\u{1F1F8}','Spain':'\u{1F1EA}\u{1F1F8}',
+    'Francia':'\u{1F1EB}\u{1F1F7}','France':'\u{1F1EB}\u{1F1F7}',
+    'Svizzera':'\u{1F1E8}\u{1F1ED}','Switzerland':'\u{1F1E8}\u{1F1ED}',
+    'Austria':'\u{1F1E6}\u{1F1F9}','Portugal':'\u{1F1F5}\u{1F1F9}','Portogallo':'\u{1F1F5}\u{1F1F9}',
+    'USA':'\u{1F1FA}\u{1F1F8}','United States':'\u{1F1FA}\u{1F1F8}',
+    'Brasile':'\u{1F1E7}\u{1F1F7}','Brazil':'\u{1F1E7}\u{1F1F7}',
+    'Nederland':'\u{1F1F3}\u{1F1F1}','Netherlands':'\u{1F1F3}\u{1F1F1}',
+    'Belgium':'\u{1F1E7}\u{1F1EA}','Belgio':'\u{1F1E7}\u{1F1EA}',
+    'Poland':'\u{1F1F5}\u{1F1F1}','Polonia':'\u{1F1F5}\u{1F1F1}'
+  };
+  function flag(c){ return FLAGS[c] || '\u{1F30D}'; }
+  function scCol(s){
+    if(s>=90) return '#639922';
+    if(s>=75) return '#D97706';
+    if(s>=55) return '#F97316';
+    if(s>=35) return '#EF4444';
+    return '#A855F7';
+  }
+  function tl(t){
+    return ({laboratorio:'Laboratorio',clinica:'Clinica',universita:'Universit\xe0',altro:'Altro'})[t] || (t || '');
+  }
+
+  function setRowEnabled(id, v){
+    var r = document.getElementById(id);
+    if(!r) return;
+    if(v){ r.removeAttribute('hidden'); r.style.removeProperty('display'); }
+    else { r.setAttribute('hidden',''); r.style.setProperty('display','none','important'); }
+  }
+
+  function buildPills(cid, ftype, vals, allLbl, active){
+    var w = document.getElementById(cid);
+    if(!w) return;
+    while(w.firstChild) w.removeChild(w.firstChild);
+    function makeBtn(label, val){
+      var b = document.createElement('button');
+      b.className = 'lb-filter-btn' + (active===val ? ' active' : '');
+      b.setAttribute('data-ftype', ftype);
+      b.setAttribute('data-fval', val);
+      b.addEventListener('click', function(){ LBdash.filterBy(ftype, val, b); });
+      b.innerHTML = label;
+      w.appendChild(b);
+    }
+    makeBtn(allLbl, 'all');
+    var s = vals.slice().sort(function(a,b){ return a.localeCompare(b,'it'); });
+    s.forEach(function(v){
+      var lbl = ftype==='nazione' ? (flag(v)+' '+v) : v;
+      makeBtn(lbl, v);
+    });
+  }
+
+  function rebuildFilters(){
+    var naz = {};
+    _data.forEach(function(e){ if(e.country) naz[e.country] = 1; });
+    buildPills('lb-filter-nazione','nazione',Object.keys(naz),'Tutte',_active.nazione);
+
+    setRowEnabled('lb-row-provincia', false);
+    setRowEnabled('lb-row-citta', false);
+
+    if(_active.nazione !== 'all'){
+      var prov = {};
+      _data.forEach(function(e){
+        if(e.country===_active.nazione && e.province) prov[e.province] = 1;
+      });
+      buildPills('lb-filter-provincia','provincia',Object.keys(prov),'Tutte',_active.provincia);
+      setRowEnabled('lb-row-provincia', true);
+
+      if(_active.provincia !== 'all'){
+        var cit = {};
+        _data.forEach(function(e){
+          if(e.country===_active.nazione && e.province===_active.provincia && e.city) cit[e.city] = 1;
+        });
+        buildPills('lb-filter-citta','citta',Object.keys(cit),'Tutte',_active.citta);
+        setRowEnabled('lb-row-citta', true);
+      }
+    }
+  }
+
+  function renderTable(){
+    var f = _data.filter(function(e){
+      if(_active.tipo!=='all' && e.tipo!==_active.tipo) return false;
+      if(_active.nazione!=='all' && e.country!==_active.nazione) return false;
+      if(_active.provincia!=='all' && e.province!==_active.provincia) return false;
+      if(_active.citta!=='all' && e.city!==_active.citta) return false;
+      return true;
+    }).sort(function(a,b){ return parseFloat(b.score) - parseFloat(a.score); });
+
+    var body = document.getElementById('lb-body');
+    if(!body) return;
+    if(!f.length){
+      body.innerHTML = '<div class="lb-empty">Nessun risultato per i filtri selezionati.</div>';
+      return;
+    }
+    var h = '';
+    f.forEach(function(e, i){
+      var sc = parseFloat(e.score), col = scCol(sc);
+      var em = i===0 ? '\u{1F947}' : i===1 ? '\u{1F948}' : i===2 ? '\u{1F949}' : (i+1);
+      var cls = i<3 ? 'top'+(i+1) : '';
+      var dt = '';
+      try { dt = new Date(e.created_at).toLocaleDateString('it-IT',{day:'2-digit',month:'short',year:'2-digit'}); } catch(_){}
+      h += '<div class="lb-row' + (cls?' '+cls:'') + '">' +
+        '<span class="lb-rank' + (i<3?' r'+(i+1):'') + '">' + em + '</span>' +
+        '<div>' +
+          '<div class="lb-loc">' + flag(e.country) + ' ' + (e.city||'') + (e.province?' ('+e.province+')':'') + '</div>' +
+          '<div class="lb-loc-sub">' + (e.country||'') + (e.cylinders?(' \xb7 '+e.cylinders+' cil.'):'') + '</div>' +
+        '</div>' +
+        '<span class="lb-type">' + tl(e.tipo) + '</span>' +
+        '<span class="lb-date">' + dt + '</span>' +
+        '<div style="text-align:right">' +
+          '<div class="lb-score" style="color:' + col + '">' + sc.toFixed(0) + '</div>' +
+          '<div class="lb-score-bar" style="background:' + col + ';width:' + sc + '%"></div>' +
+        '</div>' +
+      '</div>';
+    });
+    body.innerHTML = h;
+  }
+
+  return {
+    load: async function(){
+      if(_loaded) return;
+      var body = document.getElementById('lb-body');
+      try {
+        var r = await fetch(SUPABASE_URL+'/rest/v1/'+SUPABASE_TABLE+'?select=*&order=score.desc&limit=500',{
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_KEY,
+            'Content-Type': 'application/json'
+          }
+        });
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        _data = await r.json();
+        _loaded = true;
+        rebuildFilters();
+        renderTable();
+      } catch(e){
+        if(body) body.innerHTML = '<div class="lb-empty">Impossibile caricare la classifica: ' + e.message + '</div>';
+      }
+    },
+    filterBy: function(ftype, val, btn){
+      _active[ftype] = val;
+      // Reset cascading
+      if(ftype === 'nazione'){ _active.provincia = 'all'; _active.citta = 'all'; }
+      if(ftype === 'provincia'){ _active.citta = 'all'; }
+      // Toggle UI
+      if(btn){
+        var siblings = btn.parentNode.querySelectorAll('.lb-filter-btn');
+        for(var i=0;i<siblings.length;i++) siblings[i].classList.remove('active');
+        btn.classList.add('active');
+      }
+      rebuildFilters();
+      renderTable();
+    }
+  };
+})();
 
 // ── Init ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function(){
