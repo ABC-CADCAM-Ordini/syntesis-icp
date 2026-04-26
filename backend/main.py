@@ -984,6 +984,60 @@ async def me_storage(current_user: dict = Depends(verify_token)):
     """Ritorna stato consumo mensile dell'utente: plan, used, limit, %, periodo."""
     status = await get_user_storage_status(current_user["user_id"])
     return status
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.056 - File browser Drive (Fase E1)
+# Permette di navigare i contenuti della cartella Syntesis-ICP del Drive utente
+# direttamente dall'area personale, senza dover aprire drive.google.com.
+# Usa lo scope drive.file: vediamo solo cio' che l'app stessa ha creato.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/me/gdrive/browse")
+async def me_gdrive_browse(
+    folder_id: Optional[str] = None,
+    current_user: dict = Depends(verify_token)
+):
+    """Lista contenuti di una cartella Drive dell'utente.
+    Se folder_id e' omesso, ritorna la root Syntesis-ICP."""
+    creds_data = await get_gdrive_credentials(current_user["user_id"])
+    if not creds_data or not creds_data.get("refresh_token"):
+        raise HTTPException(409, detail="Google Drive non connesso. Vai su Cloud per collegarlo.")
+    try:
+        result = browse_folder(creds_data, folder_id=folder_id)
+        # Aggiungo breadcrumb se siamo dentro una sottocartella
+        if folder_id:
+            try:
+                breadcrumb = get_folder_breadcrumb(creds_data, folder_id)
+            except Exception:
+                breadcrumb = []
+        else:
+            breadcrumb = [{"id": result["folder_id"], "name": result["folder_name"]}]
+        result["breadcrumb"] = breadcrumb
+        result["drive_web_url"] = get_drive_web_url(result["folder_id"])
+        return result
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    except Exception as e:
+        logger.exception("browse Drive fallito")
+        raise HTTPException(500, detail=f"Errore Drive: {e}")
+
+
+@app.get("/api/me/gdrive/file/{file_id}/link")
+async def me_gdrive_file_link(
+    file_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Ritorna il link diretto al file su Drive (per visualizzazione/download via Drive)."""
+    creds_data = await get_gdrive_credentials(current_user["user_id"])
+    if not creds_data or not creds_data.get("refresh_token"):
+        raise HTTPException(409, detail="Google Drive non connesso.")
+    return {
+        "file_id": file_id,
+        "web_view_link": f"https://drive.google.com/file/d/{file_id}/view",
+        "download_link": f"https://drive.google.com/uc?export=download&id={file_id}",
+    }
     try:
         refresh_token = gdrive.decrypt_token(creds["refresh_token_encrypted"])
         service = gdrive.get_drive_service(refresh_token)
