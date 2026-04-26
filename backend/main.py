@@ -1032,14 +1032,19 @@ async def me_gdrive_browse(
     """Lista contenuti di una cartella Drive dell'utente.
     Se folder_id e' omesso, ritorna la root Syntesis-ICP."""
     creds_data = await get_gdrive_credentials(current_user["user_id"])
-    if not creds_data or not creds_data.get("refresh_token"):
+    if not creds_data or not creds_data.get("refresh_token_encrypted"):
         raise HTTPException(409, detail="Google Drive non connesso. Vai su Cloud per collegarlo.")
     try:
-        result = gdrive.browse_folder(creds_data, folder_id=folder_id)
+        refresh_token = gdrive.decrypt_token(creds_data["refresh_token_encrypted"])
+    except Exception as e:
+        logger.exception("decrypt refresh_token fallito")
+        raise HTTPException(500, detail="Token Drive corrotto. Disconnetti e riconnetti.")
+    try:
+        result = gdrive.browse_folder(refresh_token, folder_id=folder_id)
         # Aggiungo breadcrumb se siamo dentro una sottocartella
         if folder_id:
             try:
-                breadcrumb = gdrive.get_folder_breadcrumb(creds_data, folder_id)
+                breadcrumb = gdrive.get_folder_breadcrumb(refresh_token, folder_id)
             except Exception:
                 breadcrumb = []
         else:
@@ -1061,7 +1066,7 @@ async def me_gdrive_file_link(
 ):
     """Ritorna il link diretto al file su Drive (per visualizzazione/download via Drive)."""
     creds_data = await get_gdrive_credentials(current_user["user_id"])
-    if not creds_data or not creds_data.get("refresh_token"):
+    if not creds_data or not creds_data.get("refresh_token_encrypted"):
         raise HTTPException(409, detail="Google Drive non connesso.")
     return {
         "file_id": file_id,
