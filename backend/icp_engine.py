@@ -1553,6 +1553,9 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     return {
         "score": score,
         "score_label": sl["label"],
+        # v7.3.9.039 - PATCH G: versioning score + warnings nel result
+        "score_model_version": "Syntesis Score v1.0",
+        "warnings": _warnings,
         "score_col": sl["col"],
         "icp_rmsd": float(icp["rmsd"]),
         "icp_angle": float(icp["angle"]),
