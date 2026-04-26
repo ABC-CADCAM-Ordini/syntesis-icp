@@ -282,3 +282,122 @@ def delete_drive_file(service, file_id: str) -> bool:
     except HttpError as e:
         logger.error(f'delete drive file failed: {e}')
         return False
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.056 - File browser Drive
+# Funzioni di navigazione delle cartelle e file (browse + breadcrumb).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def browse_folder(creds, folder_id: Optional[str] = None) -> dict:
+    """Lista contenuti di una cartella Drive (subfolders + files con dettagli).
+    Se folder_id e' None, usa la root Syntesis-ICP (la crea se non esiste).
+    Ritorna dict con folder_id, folder_name, parent_id, items[].
+    items[] separa subfolders e files per facilitare il rendering."""
+    service = _build_service(creds)
+
+    if folder_id is None:
+        folder_id = find_or_create_folder(service, GDRIVE_ROOT_FOLDER_NAME, parent_id=None)
+        folder_name = GDRIVE_ROOT_FOLDER_NAME
+        parent_id = None
+    else:
+        # Verifica che folder_id sia accessibile (creato dall'app, scope drive.file)
+        try:
+            meta = service.files().get(
+                fileId=folder_id,
+                fields="id,name,mimeType,parents",
+                supportsAllDrives=False
+            ).execute()
+            if meta.get("mimeType") != "application/vnd.google-apps.folder":
+                raise ValueError("L'ID indicato non e' una cartella.")
+            folder_name = meta.get("name", "")
+            parents = meta.get("parents", [])
+            parent_id = parents[0] if parents else None
+        except Exception as e:
+            raise ValueError(f"Cartella non accessibile: {e}")
+
+    # Lista contenuti (solo non eliminati)
+    query = f"'{folder_id}' in parents and trashed = false"
+    page_token = None
+    subfolders = []
+    files = []
+    MAX = 1000
+    fetched = 0
+    while True:
+        resp = service.files().list(
+            q=query,
+            fields="nextPageToken, files(id,name,mimeType,size,modifiedTime,createdTime,webViewLink,iconLink,thumbnailLink)",
+            pageSize=200,
+            pageToken=page_token,
+            orderBy="folder,name"
+        ).execute()
+        for f in resp.get("files", []):
+            entry = {
+                "id":            f.get("id"),
+                "name":          f.get("name"),
+                "mimeType":      f.get("mimeType"),
+                "size":          int(f.get("size", 0)) if f.get("size") else None,
+                "modified_time": f.get("modifiedTime"),
+                "created_time":  f.get("createdTime"),
+                "web_view_link": f.get("webViewLink"),
+                "icon_link":     f.get("iconLink"),
+                "thumbnail":     f.get("thumbnailLink"),
+            }
+            if f.get("mimeType") == "application/vnd.google-apps.folder":
+                subfolders.append(entry)
+            else:
+                files.append(entry)
+            fetched += 1
+            if fetched >= MAX:
+                break
+        page_token = resp.get("nextPageToken")
+        if not page_token or fetched >= MAX:
+            break
+
+    return {
+        "folder_id":    folder_id,
+        "folder_name":  folder_name,
+        "parent_id":    parent_id,
+        "subfolders":   subfolders,
+        "files":        files,
+        "n_subfolders": len(subfolders),
+        "n_files":      len(files),
+        "truncated":    fetched >= MAX,
+    }
+
+
+def get_folder_breadcrumb(creds, folder_id: str) -> list[dict]:
+    """Ritorna la catena di cartelle da root Syntesis-ICP fino a folder_id incluso.
+    Lista di {id, name}, ordinata dalla root al target.
+    Si ferma quando trova il folder con nome GDRIVE_ROOT_FOLDER_NAME (la nostra root)
+    oppure quando non riesce a salire oltre (cartella fuori dallo scope drive.file)."""
+    service = _build_service(creds)
+    chain = []
+    visited = set()
+    current_id = folder_id
+    MAX_HOPS = 20
+    hops = 0
+    while current_id and hops < MAX_HOPS and current_id not in visited:
+        visited.add(current_id)
+        try:
+            meta = service.files().get(
+                fileId=current_id,
+                fields="id,name,parents,mimeType"
+            ).execute()
+        except Exception:
+            break
+        chain.insert(0, {"id": meta.get("id"), "name": meta.get("name")})
+        if meta.get("name") == GDRIVE_ROOT_FOLDER_NAME:
+            break
+        parents = meta.get("parents", [])
+        current_id = parents[0] if parents else None
+        hops += 1
+    return chain
+
+
+def get_drive_web_url(folder_id: Optional[str] = None) -> str:
+    """Ritorna URL drive.google.com per aprire una cartella nel browser."""
+    if folder_id:
+        return f"https://drive.google.com/drive/folders/{folder_id}"
+    return "https://drive.google.com/drive/my-drive"
