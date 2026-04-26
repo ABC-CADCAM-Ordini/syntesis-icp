@@ -80,6 +80,38 @@ async def init_db():
 
         CREATE INDEX IF NOT EXISTS idx_analyses_user ON analyses(user_id);
         CREATE INDEX IF NOT EXISTS idx_lb_score ON leaderboard(score DESC);
+
+        -- v7.3.9.047: progetti (contenitori di analisi e file)
+        CREATE TABLE IF NOT EXISTS projects (
+            id                  TEXT PRIMARY KEY,
+            user_id             TEXT REFERENCES users(id) ON DELETE CASCADE,
+            name                TEXT NOT NULL,
+            description         TEXT,
+            patient_ref         TEXT,           -- riferimento paziente (libero, anonimizzabile)
+            color               TEXT DEFAULT '#0065B3',
+            archived            BOOLEAN DEFAULT FALSE,
+            -- Storage cloud (popolati quando l'utente connette il provider e crea il progetto)
+            gdrive_folder_id    TEXT,
+            dropbox_folder_id   TEXT,
+            -- Audit
+            created_at          TIMESTAMPTZ DEFAULT NOW(),
+            updated_at          TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
+        CREATE INDEX IF NOT EXISTS idx_projects_archived ON projects(user_id, archived);
+
+        -- v7.3.9.047: associo analisi a progetto (nullable, retrocompat)
+        ALTER TABLE analyses ADD COLUMN IF NOT EXISTS project_id TEXT REFERENCES projects(id) ON DELETE SET NULL;
+        CREATE INDEX IF NOT EXISTS idx_analyses_project ON analyses(project_id);
+
+        -- v7.3.9.047: cloud connection per utente (nullable, opt-in)
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS gdrive_email TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS gdrive_refresh_token_enc TEXT;  -- cifrato
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS gdrive_connected_at TIMESTAMPTZ;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS dropbox_email TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS dropbox_refresh_token_enc TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS dropbox_connected_at TIMESTAMPTZ;
         """)
 
 
@@ -334,6 +366,147 @@ async def update_user_profile(user_id: str, name: Optional[str] = None,
         params.append(user_id)
         sql = f"UPDATE users SET {', '.join(sets)} WHERE id = ${len(params)}"
         result = await conn.execute(sql, *params)
+        return result.endswith(" 1")
+
+
+
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# v7.3.9.047 - Backend utente: progetti
+# Un progetto e' un contenitore logico per analisi e file (cloud).
+# Per ora la cartella cloud e' opzionale (gdrive_folder_id puo' essere NULL).
+# Quando l'utente connettera' Drive, verra' creata la cartella alla creazione progetto.
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def list_user_projects(user_id: str, archived: bool = False) -> list[dict]:
+    """Lista progetti dell'utente con conteggio analisi associate."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT p.id, p.name, p.description, p.patient_ref, p.color,
+                   p.archived, p.created_at, p.updated_at,
+                   p.gdrive_folder_id, p.dropbox_folder_id,
+                   COUNT(a.id) FILTER (WHERE COALESCE(a.archived, FALSE) = FALSE) AS n_analyses,
+                   MAX(a.created_at) AS last_analysis_at
+            FROM projects p
+            LEFT JOIN analyses a ON a.project_id = p.id
+            WHERE p.user_id = $1 AND COALESCE(p.archived, FALSE) = $2
+            GROUP BY p.id
+            ORDER BY COALESCE(p.updated_at, p.created_at) DESC
+        """, user_id, archived)
+        return [dict(r) for r in rows]
+
+
+async def get_user_project(project_id: str, user_id: str) -> Optional[dict]:
+    """Dettaglio progetto + lista analisi associate."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT * FROM projects WHERE id = $1 AND user_id = $2
+        """, project_id, user_id)
+        if not row:
+            return None
+        proj = dict(row)
+        # Analisi del progetto
+        analyses = await conn.fetch("""
+            SELECT id, filename_a, filename_b, display_name,
+                   score, rmsd, created_at, archived
+            FROM analyses
+            WHERE project_id = $1 AND user_id = $2
+            ORDER BY created_at DESC
+        """, project_id, user_id)
+        proj["analyses"] = [dict(a) for a in analyses]
+        return proj
+
+
+async def create_user_project(user_id: str, name: str,
+                                description: Optional[str] = None,
+                                patient_ref: Optional[str] = None,
+                                color: Optional[str] = None) -> str:
+    """Crea un progetto per l'utente. Le folder cloud verranno create
+    al primo upload se l'utente ha connesso Drive/Dropbox."""
+    import uuid
+    project_id = str(uuid.uuid4())
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO projects (id, user_id, name, description, patient_ref, color)
+            VALUES ($1, $2, $3, $4, $5, COALESCE($6, '#0065B3'))
+        """, project_id, user_id, name, description, patient_ref, color)
+    return project_id
+
+
+async def update_user_project(project_id: str, user_id: str,
+                                name: Optional[str] = None,
+                                description: Optional[str] = None,
+                                patient_ref: Optional[str] = None,
+                                color: Optional[str] = None,
+                                archived: Optional[bool] = None) -> bool:
+    if all(v is None for v in [name, description, patient_ref, color, archived]):
+        return False
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        sets = ["updated_at = NOW()"]
+        params = []
+        if name is not None:
+            sets.append(f"name = ${len(params)+1}"); params.append(name)
+        if description is not None:
+            sets.append(f"description = ${len(params)+1}"); params.append(description)
+        if patient_ref is not None:
+            sets.append(f"patient_ref = ${len(params)+1}"); params.append(patient_ref)
+        if color is not None:
+            sets.append(f"color = ${len(params)+1}"); params.append(color)
+        if archived is not None:
+            sets.append(f"archived = ${len(params)+1}"); params.append(archived)
+        params.append(project_id)
+        params.append(user_id)
+        sql = f"""UPDATE projects SET {", ".join(sets)}
+                  WHERE id = ${len(params)-1} AND user_id = ${len(params)}"""
+        result = await conn.execute(sql, *params)
+        return result.endswith(" 1")
+
+
+async def delete_user_project(project_id: str, user_id: str,
+                                cascade_analyses: bool = False) -> bool:
+    """Elimina un progetto. Se cascade_analyses=True elimina anche le analisi
+    associate. Altrimenti le analisi restano ma con project_id=NULL (ON DELETE SET NULL)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            if cascade_analyses:
+                # Rimuovi anche le entry leaderboard delle analisi associate
+                await conn.execute("""
+                    DELETE FROM leaderboard WHERE analysis_id IN (
+                        SELECT id FROM analyses WHERE project_id = $1 AND user_id = $2
+                    )
+                """, project_id, user_id)
+                await conn.execute("""
+                    DELETE FROM analyses WHERE project_id = $1 AND user_id = $2
+                """, project_id, user_id)
+            # Il delete del progetto setta project_id=NULL nelle analisi (ON DELETE SET NULL)
+            result = await conn.execute("""
+                DELETE FROM projects WHERE id = $1 AND user_id = $2
+            """, project_id, user_id)
+            return result.endswith(" 1")
+
+
+async def assign_analysis_to_project(analysis_id: str, user_id: str,
+                                        project_id: Optional[str]) -> bool:
+    """Associa o disassocia (project_id=None) un'analisi a un progetto.
+    Se project_id e' fornito, verifica che il progetto appartenga all'utente."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if project_id:
+            # Verifica ownership del progetto
+            owner = await conn.fetchval(
+                "SELECT user_id FROM projects WHERE id = $1", project_id)
+            if owner != user_id:
+                return False
+        result = await conn.execute("""
+            UPDATE analyses SET project_id = $1, updated_at = NOW()
+            WHERE id = $2 AND user_id = $3
+        """, project_id, analysis_id, user_id)
         return result.endswith(" 1")
 
 
