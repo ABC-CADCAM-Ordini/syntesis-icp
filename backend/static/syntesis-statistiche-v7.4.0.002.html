@@ -11,32 +11,28 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-/* v7.3.9.050 - Cornice colorata stile splash (siri-gradient) + bordo nero 25px */
+/* v7.3.9.051 - Cornice colorata: approccio body con border + background-clip
+   Bordo nero 25px attorno + cornice gradient animata sui 4 lati,
+   contenuto interno coperto dal body bg (var(--pearl) o bianco). */
 html{background:#000;margin:0;padding:0}
 body{
   margin:25px !important;
   width:calc(100vw - 50px) !important;
   height:calc(100vh - 50px) !important;
+  border:4px solid transparent !important;
   border-radius:14px !important;
-  position:relative;
-  z-index:1;
-}
-body::before{
-  content:'';
-  position:fixed;
-  inset:21px;
-  border-radius:18px;
-  background:
-    linear-gradient(transparent,transparent) padding-box,
-    conic-gradient(from var(--synt-sa,0deg),#FF8C42,#FF4D8D,#FFD166,#C84BFF,#FF6B35,#FF9FC8,#FF8C42) border-box;
-  border:4px solid transparent;
-  pointer-events:none;
-  z-index:10000;
+  background-image:
+    linear-gradient(var(--pearl,#F0F5FA),var(--pearl,#F0F5FA)),
+    conic-gradient(from var(--synt-sa,0deg),#FF8C42,#FF4D8D,#FFD166,#C84BFF,#FF6B35,#FF9FC8,#FF8C42) !important;
+  background-origin:padding-box,border-box !important;
+  background-clip:padding-box,border-box !important;
+  box-sizing:border-box !important;
   animation:syntSpin 4s linear infinite;
   box-shadow:0 0 22px rgba(255,140,66,.42),0 0 52px rgba(200,75,255,.20);
 }
 @property --synt-sa{syntax:'<angle>';initial-value:0deg;inherits:false}
 @keyframes syntSpin{to{--synt-sa:360deg}}
+
 
 :root{
   --blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;
