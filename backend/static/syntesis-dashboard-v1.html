@@ -680,9 +680,10 @@ async function loadLeaderboard(){
   box.className = 'loading';
   box.innerHTML = '<span class="spinner"></span>Caricamento classifica...';
   try {
-    var r = await fetch('/api/leaderboard?limit=50');
+    var r = await fetch('/api/leaderboard?limit=50', { headers: authHeaders() });
     if(!r.ok) throw new Error('HTTP ' + r.status);
-    var rows = await r.json();
+    var data = await r.json();
+    var rows = data.rows || data || [];
     box.className = '';
     if(!rows || rows.length === 0){
       box.className = 'empty-state';
