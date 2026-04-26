@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <!-- Syntesis-ICP - Dashboard utente
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
-     v7.3.9.046 - Backend utente: mie analisi, profilo, classifica -->
+     v7.3.9.047 - Backend utente: mie analisi, profilo, classifica -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Syntesis-ICP - Area personale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -211,6 +211,21 @@ body{
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading{padding:32px;text-align:center;color:var(--gray);font-family:var(--mono);font-size:12px}
 
+/* Project cards */
+.project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:16px}
+.project-card{
+  background:var(--white);border:1.5px solid var(--border);border-radius:12px;
+  padding:16px;cursor:pointer;transition:.18s;position:relative;
+}
+.project-card:hover{border-color:var(--blue);box-shadow:0 4px 16px rgba(0,82,163,.12);transform:translateY(-2px)}
+.project-card .pc-bar{position:absolute;top:0;left:0;right:0;height:4px;border-radius:12px 12px 0 0}
+.project-card .pc-name{font-size:14px;font-weight:800;color:var(--dark);margin-top:8px;margin-bottom:4px}
+.project-card .pc-patient{font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:10px}
+.project-card .pc-stats{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--gray);font-family:var(--mono);margin-top:12px;padding-top:10px;border-top:1px solid var(--light)}
+.project-card .pc-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.project-card .pc-actions button{font-size:10px;padding:5px 10px}
+.color-swatch:hover{transform:scale(1.1)}
+
 /* Login required state */
 .auth-required{
   background:linear-gradient(135deg,var(--blue-light),#F0F9FF);
@@ -249,6 +264,8 @@ body{
     <!-- Tabs -->
     <div class="tabs" id="tabsNav" hidden>
       <button class="tab active" data-tab="analyses" onclick="switchTab('analyses')">Le mie analisi</button>
+      <button class="tab" data-tab="projects" onclick="switchTab('projects')">I miei progetti</button>
+      <button class="tab" data-tab="cloud" onclick="switchTab('cloud')">Cloud</button>
       <button class="tab" data-tab="profile" onclick="switchTab('profile')">Profilo</button>
       <button class="tab" data-tab="leaderboard" onclick="switchTab('leaderboard')">Classifica</button>
     </div>
@@ -269,6 +286,64 @@ body{
       <div class="pagination" id="pagination" hidden></div>
     </div>
 
+    <!-- TAB: PROGETTI -->
+    <div class="tab-content" id="tabProjects">
+      <div class="list-toolbar">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-cta" onclick="openProjectCreate()">+ Nuovo progetto</button>
+          <div class="filter-group" style="margin-left:8px">
+            <button class="filter-btn active" data-pfilter="active" onclick="switchProjectFilter('active')">Attivi</button>
+            <button class="filter-btn" data-pfilter="archived" onclick="switchProjectFilter('archived')">Archiviati</button>
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="projectsCount">&mdash;</div>
+      </div>
+      <div id="projectsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
+    </div>
+
+    <!-- TAB: CLOUD -->
+    <div class="tab-content" id="tabCloud">
+      <div id="cloudContainer">
+        <div style="background:linear-gradient(135deg,var(--blue-light),#F0F9FF);border:1.5px solid #BAE0FF;border-radius:12px;padding:22px;margin-bottom:18px">
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <div style="width:48px;height:48px;background:var(--white);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <path d="M22 17a4 4 0 0 0-4-4h-1a6 6 0 0 0-11.7 1A4 4 0 0 0 7 22h11a4 4 0 0 0 4-5z" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">I tuoi file restano tuoi</div>
+              <div style="font-size:12px;color:var(--gray);font-family:var(--mono);line-height:1.7">
+                Collegando un cloud personale (Google Drive o Dropbox), i file STL, JSON e PDF delle tue analisi vengono salvati nel <b>tuo</b> cloud, non sui nostri server. Puoi scollegare in qualsiasi momento.<br>
+                Organizzazione: una cartella radice <code style="background:#fff;padding:1px 5px;border-radius:3px">Syntesis-ICP</code> nel tuo Drive, con una sottocartella per ogni progetto.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-grid">
+          <div class="profile-card">
+            <div class="profile-section-title">Google Drive</div>
+            <div id="gdriveStatus" style="font-size:13px;color:var(--gray);font-family:var(--mono);margin-bottom:14px">
+              <span class="spinner"></span>Verifica stato...
+            </div>
+            <div id="gdriveActions"></div>
+          </div>
+          <div class="profile-card">
+            <div class="profile-section-title">Dropbox</div>
+            <div id="dropboxStatus" style="font-size:13px;color:var(--gray);font-family:var(--mono);margin-bottom:14px">
+              <span class="spinner"></span>Verifica stato...
+            </div>
+            <div id="dropboxActions"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;padding:14px 16px;background:#FFF7E6;border:1.5px solid #FCD34D;border-radius:10px;font-size:11px;color:#92400E;font-family:var(--mono);line-height:1.7">
+          <b>Stato implementazione (v7.3.9.047):</b> la struttura backend e l'interfaccia sono pronte. La connessione OAuth ai provider richiede setup di credenziali su Google Cloud / Dropbox Developer Console che viene fatto separatamente. Quando le credenziali saranno configurate, i bottoni "Connetti" diventeranno funzionali.
+        </div>
+      </div>
+    </div>
+
     <!-- TAB: PROFILO -->
     <div class="tab-content" id="tabProfile">
       <div id="profileContainer" class="loading"><span class="spinner"></span>Caricamento profilo...</div>
@@ -281,7 +356,7 @@ body{
   </div>
 
   <div style="text-align:center;font-size:10px;color:var(--gray);font-weight:600;letter-spacing:.04em;margin-top:14px">
-    Syntesis-ICP &middot; Area personale &middot; v7.3.9.046
+    Syntesis-ICP &middot; Area personale &middot; v7.3.9.047
   </div>
 </div>
 
@@ -301,6 +376,41 @@ body{
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeModal()">Annulla</button>
       <button class="btn-cta" onclick="saveModal()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal nuovo progetto / modifica progetto -->
+<div class="modal-overlay" id="modalProject">
+  <div class="modal">
+    <div class="modal-title" id="modalProjectTitle">Nuovo progetto</div>
+    <div class="modal-sub">Un progetto raggruppa analisi e file correlati. Es. un caso clinico o un paziente.</div>
+    <div class="modal-field">
+      <label>Nome progetto *</label>
+      <input type="text" id="projectName" maxlength="200" placeholder="Es. Caso Rossi - quadrante 1">
+    </div>
+    <div class="modal-field">
+      <label>Riferimento paziente (opzionale)</label>
+      <input type="text" id="projectPatient" maxlength="200" placeholder="ID paziente, codice anonimo, etc.">
+    </div>
+    <div class="modal-field">
+      <label>Descrizione (opzionale)</label>
+      <textarea id="projectDescription" maxlength="2000" placeholder="Note sul caso, decorso, vincoli..."></textarea>
+    </div>
+    <div class="modal-field">
+      <label>Colore identificativo</label>
+      <div style="display:flex;gap:6px">
+        <span class="color-swatch" data-c="#0065B3" style="width:28px;height:28px;background:#0065B3;border-radius:6px;cursor:pointer;border:2.5px solid var(--blue)"></span>
+        <span class="color-swatch" data-c="#0D9E6E" style="width:28px;height:28px;background:#0D9E6E;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+        <span class="color-swatch" data-c="#F59E0B" style="width:28px;height:28px;background:#F59E0B;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+        <span class="color-swatch" data-c="#DC2626" style="width:28px;height:28px;background:#DC2626;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+        <span class="color-swatch" data-c="#7C3AED" style="width:28px;height:28px;background:#7C3AED;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+        <span class="color-swatch" data-c="#0E7490" style="width:28px;height:28px;background:#0E7490;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeProjectModal()">Annulla</button>
+      <button class="btn-cta" onclick="saveProjectModal()">Salva</button>
     </div>
   </div>
 </div>
@@ -407,6 +517,8 @@ function switchTab(name){
     c.classList.toggle('active', c.id === 'tab' + name.charAt(0).toUpperCase() + name.slice(1));
   });
   if(name === 'analyses'){ loadAnalyses(); loadStats(); }
+  else if(name === 'projects'){ loadProjects(); }
+  else if(name === 'cloud'){ loadCloudStatus(); }
   else if(name === 'profile'){ loadProfile(); }
   else if(name === 'leaderboard'){ loadLeaderboard(); }
 }
@@ -710,6 +822,193 @@ async function loadLeaderboard(){
     box.className = 'empty-state';
     box.innerHTML = '<div class="ico">&#9888;</div>Errore caricamento: ' + e.message;
   }
+}
+
+// ── Progetti ────────────────────────────────────────────────────────────────
+var projectsState = { filter: 'active', editing: null, items: [] };
+
+async function loadProjects(){
+  var box = document.getElementById('projectsContainer');
+  box.className = 'loading';
+  box.innerHTML = '<span class="spinner"></span>Caricamento...';
+  try {
+    var url = '/api/me/projects?archived=' + (projectsState.filter === 'archived' ? 'true' : 'false');
+    var r = await fetch(url, { headers: authHeaders() });
+    if(r.status === 401){ checkAuth(); return; }
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    projectsState.items = data.items || [];
+    renderProjects();
+  } catch(e){
+    box.className = 'empty-state';
+    box.innerHTML = '<div class="ico">&#9888;</div>Errore caricamento: ' + e.message;
+  }
+}
+
+function renderProjects(){
+  var box = document.getElementById('projectsContainer');
+  box.className = '';
+  document.getElementById('projectsCount').textContent = projectsState.items.length + ' totali';
+  if(projectsState.items.length === 0){
+    box.className = 'empty-state';
+    box.innerHTML = '<div class="ico">&#x1F4C1;</div>' +
+      (projectsState.filter === 'archived'
+        ? 'Nessun progetto archiviato.'
+        : 'Nessun progetto. Crea il primo con il bottone "Nuovo progetto" qui sopra.');
+    return;
+  }
+  var html = '<div class="project-grid">';
+  projectsState.items.forEach(function(p){
+    var color = p.color || '#0065B3';
+    html += '<div class="project-card" onclick="openProjectDetail(\'' + p.id + '\')">' +
+      '<div class="pc-bar" style="background:' + color + '"></div>' +
+      '<div class="pc-name">' + escapeHtml(p.name) + '</div>' +
+      (p.patient_ref ? '<div class="pc-patient">Paz: ' + escapeHtml(p.patient_ref) + '</div>' : '') +
+      (p.description ? '<div style="font-size:11px;color:var(--gray);line-height:1.5;margin-bottom:8px">' + escapeHtml(p.description.slice(0,100)) + (p.description.length > 100 ? '...' : '') + '</div>' : '') +
+      '<div class="pc-stats">' +
+        '<span><b style="color:' + color + '">' + (p.n_analyses || 0) + '</b> analisi</span>' +
+        '<span>' + fmtDate(p.last_analysis_at || p.updated_at) + '</span>' +
+      '</div>' +
+      '<div class="pc-actions" onclick="event.stopPropagation()">' +
+        '<button onclick="openProjectEdit(\'' + p.id + '\')">Modifica</button>' +
+        (projectsState.filter === 'archived'
+          ? '<button onclick="setProjectArchived(\'' + p.id + '\', false)">Ripristina</button>'
+          : '<button onclick="setProjectArchived(\'' + p.id + '\', true)">Archivia</button>') +
+        '<button class="danger" onclick="deleteProject(\'' + p.id + '\')">Elimina</button>' +
+      '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+function switchProjectFilter(f){
+  projectsState.filter = f;
+  document.querySelectorAll('[data-pfilter]').forEach(function(b){
+    b.classList.toggle('active', b.dataset.pfilter === f);
+  });
+  loadProjects();
+}
+
+function openProjectCreate(){
+  projectsState.editing = null;
+  document.getElementById('modalProjectTitle').textContent = 'Nuovo progetto';
+  document.getElementById('projectName').value = '';
+  document.getElementById('projectPatient').value = '';
+  document.getElementById('projectDescription').value = '';
+  selectProjectColor('#0065B3');
+  document.getElementById('modalProject').classList.add('show');
+  setTimeout(function(){ document.getElementById('projectName').focus(); }, 50);
+}
+
+function openProjectEdit(id){
+  var p = projectsState.items.find(function(x){ return x.id === id; });
+  if(!p) return;
+  projectsState.editing = id;
+  document.getElementById('modalProjectTitle').textContent = 'Modifica progetto';
+  document.getElementById('projectName').value = p.name || '';
+  document.getElementById('projectPatient').value = p.patient_ref || '';
+  document.getElementById('projectDescription').value = p.description || '';
+  selectProjectColor(p.color || '#0065B3');
+  document.getElementById('modalProject').classList.add('show');
+}
+
+function selectProjectColor(c){
+  document.querySelectorAll('.color-swatch').forEach(function(s){
+    var on = s.dataset.c === c;
+    s.style.border = on ? '2.5px solid var(--blue)' : '1.5px solid var(--border)';
+  });
+  projectsState.selectedColor = c;
+}
+
+function closeProjectModal(){
+  document.getElementById('modalProject').classList.remove('show');
+  projectsState.editing = null;
+}
+
+async function saveProjectModal(){
+  var name = document.getElementById('projectName').value.trim();
+  if(name.length < 1){ showToast('Il nome del progetto e\' obbligatorio.', true); return; }
+  var body = {
+    name: name,
+    description: document.getElementById('projectDescription').value.trim() || null,
+    patient_ref: document.getElementById('projectPatient').value.trim() || null,
+    color: projectsState.selectedColor || '#0065B3'
+  };
+  try {
+    var url, method;
+    if(projectsState.editing){
+      url = '/api/me/projects/' + projectsState.editing;
+      method = 'PATCH';
+    } else {
+      url = '/api/me/projects';
+      method = 'POST';
+    }
+    var r = await fetch(url, { method: method, headers: authHeaders(), body: JSON.stringify(body) });
+    if(!r.ok){
+      var err = await r.json().catch(function(){ return { detail: 'errore' }; });
+      throw new Error(err.detail || ('HTTP ' + r.status));
+    }
+    showToast(projectsState.editing ? 'Progetto aggiornato.' : 'Progetto creato.');
+    closeProjectModal();
+    loadProjects();
+  } catch(e){ showToast('Errore: ' + e.message, true); }
+}
+
+async function setProjectArchived(id, val){
+  try {
+    var r = await fetch('/api/me/projects/' + id, {
+      method: 'PATCH', headers: authHeaders(),
+      body: JSON.stringify({ archived: val })
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    showToast(val ? 'Progetto archiviato.' : 'Progetto ripristinato.');
+    loadProjects();
+  } catch(e){ showToast('Errore: ' + e.message, true); }
+}
+
+async function deleteProject(id){
+  var p = projectsState.items.find(function(x){ return x.id === id; });
+  var nAn = p ? (p.n_analyses || 0) : 0;
+  var msg = 'Eliminare il progetto?';
+  if(nAn > 0) msg += '\nLe ' + nAn + ' analisi associate verranno mantenute (senza progetto).';
+  if(!confirm(msg)) return;
+  try {
+    var r = await fetch('/api/me/projects/' + id + '?cascade=false', {
+      method: 'DELETE', headers: authHeaders()
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Progetto eliminato.');
+    loadProjects();
+  } catch(e){ showToast('Errore: ' + e.message, true); }
+}
+
+function openProjectDetail(id){
+  // Per ora apre la modal di modifica. Sviluppo futuro: pagina dedicata con files.
+  openProjectEdit(id);
+}
+
+// Click su colore swatch nella modal
+document.addEventListener('click', function(e){
+  var sw = e.target.closest('.color-swatch');
+  if(sw){ selectProjectColor(sw.dataset.c); }
+});
+
+// ── Cloud (placeholder Fase B/C) ────────────────────────────────────────────
+async function loadCloudStatus(){
+  // Placeholder: mostra stato disconnesso. Quando sara' implementato l'OAuth,
+  // questa funzione chiamera' /api/me/gdrive/status e /api/me/dropbox/status
+  document.getElementById('gdriveStatus').innerHTML =
+    '<span style="color:var(--gray)">Non connesso</span>';
+  document.getElementById('gdriveActions').innerHTML =
+    '<button class="btn-cta" disabled style="opacity:.5;cursor:not-allowed" title="Disponibile dopo configurazione OAuth">Connetti Google Drive</button>' +
+    '<div style="font-size:10px;color:var(--gray);margin-top:8px;font-family:var(--mono)">Disponibile dopo Fase B (setup credenziali Google Cloud)</div>';
+
+  document.getElementById('dropboxStatus').innerHTML =
+    '<span style="color:var(--gray)">Non connesso</span>';
+  document.getElementById('dropboxActions').innerHTML =
+    '<button class="btn-cta" disabled style="opacity:.5;cursor:not-allowed" title="Disponibile dopo configurazione OAuth">Connetti Dropbox</button>' +
+    '<div style="font-size:10px;color:var(--gray);margin-top:8px;font-family:var(--mono)">Disponibile dopo Fase D</div>';
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────
