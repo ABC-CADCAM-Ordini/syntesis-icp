@@ -185,6 +185,7 @@ class SocialLoginRequest(BaseModel):
     token: str             # ID token (Google/Apple) o access token (Facebook)
     name: Optional[str] = ""
     email: Optional[str] = ""
+    license_key: Optional[str] = ""  # v7.3.9.041: richiesta solo per primo accesso (registrazione)
 
 
 async def _verify_google_token(token: str) -> dict:
@@ -303,7 +304,11 @@ async def _verify_facebook_token(access_token: str, name: str, email: str) -> di
 
 @router.post("/social", response_model=TokenResponse)
 async def social_login(req: SocialLoginRequest):
-    """Login/registrazione tramite provider social. Nessuna licenza richiesta."""
+    """v7.3.9.041: Login social.
+    - Utente gia' registrato: login normale (la licenza era stata fornita al primo accesso).
+    - Utente nuovo: richiede license_key valida e non ancora usata.
+    Niente piu' bypass licenza tramite social provider.
+    """
     import uuid as _uuid
 
     # Verifica token con il provider
@@ -328,7 +333,7 @@ async def social_login(req: SocialLoginRequest):
     existing = await _get_user(email)
 
     if existing:
-        # Login
+        # Login: utente gia' registrato, la licenza era stata verificata al primo accesso.
         if not existing["active"]:
             raise HTTPException(403, detail="Account disabilitato.")
         user_id = existing["id"]
@@ -336,18 +341,42 @@ async def social_login(req: SocialLoginRequest):
         user_role = existing["role"]
         user_org = existing.get("organization", "")
     else:
-        # Registrazione automatica senza licenza (social)
+        # v7.3.9.041: REGISTRAZIONE social: licenza obbligatoria.
+        license_key = (req.license_key or "").strip()
+        if not license_key:
+            raise HTTPException(
+                403,
+                detail="Per la prima registrazione e\' richiesta una chiave di licenza valida."
+            )
+        # Atomic UPDATE...RETURNING per evitare race condition (vedi v7.3.9.040)
         user_id = str(_uuid.uuid4())
         user_name = name
         user_role = "user"
         user_org = ""
         pool = await get_pool()
         async with pool.acquire() as conn:
-            await conn.execute("""
-                INSERT INTO users (id, email, name, password_hash, salt, role, active, license_key)
-                VALUES ($1, $2, $3, $4, $5, $6, TRUE, NULL)
-                ON CONFLICT (email) DO NOTHING
-            """, user_id, email, user_name, f"social_{provider}", f"social_{provider}")
+            async with conn.transaction():
+                # 1. Lock atomico licenza
+                lic_row = await conn.fetchrow("""
+                    UPDATE licenses
+                    SET used_by = $1, used_at = NOW()
+                    WHERE key = $2
+                      AND active = TRUE
+                      AND used_by IS NULL
+                    RETURNING key
+                """, user_id, license_key)
+                if not lic_row:
+                    raise HTTPException(
+                        403,
+                        detail="Chiave di licenza non valida, gia\' utilizzata o disattivata."
+                    )
+                # 2. Crea l'utente
+                await conn.execute("""
+                    INSERT INTO users (id, email, name, password_hash, salt, role, active, license_key)
+                    VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7)
+                    ON CONFLICT (email) DO NOTHING
+                """, user_id, email, user_name, f"social_{provider}", f"social_{provider}",
+                    user_role, license_key)
         # Rileggi per assicurarsi che sia stato inserito
         existing2 = await _get_user(email)
         if existing2:
