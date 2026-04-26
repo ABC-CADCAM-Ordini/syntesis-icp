@@ -1022,9 +1022,34 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
                      name_a: str = "A.stl", name_b: str = "B.stl",
                      landmarks: dict = None) -> dict:
     """
-    Analisi ICP completa di due file STL.
-    landmarks: {"a":[{x,y,z}x3], "b":[{x,y,z}x3]} per pre-allineamento manuale.
-    Se fornito, bypassa il robust_pre_align automatico.
+    Algoritmo: WEIGHTED ICP cap+cylinder (server-side).
+
+    USATO DA: workflow Misurare (confronto fra DUE STL completi).
+
+    Architettura del progetto - i tre algoritmi di posizionamento (v7.3.9.042):
+      - Misurare    -> analyze_stl_pair       (questa funzione, server)
+      - Analizza    -> findScanbodyCenter     (frontend JS, client)
+      - Sostituire  -> sostAlignAll           (frontend JS, client)
+    Vedi MASTER_DOC.md sezione 3.1 per il razionale di questa separazione.
+
+    Pipeline:
+      1. Parse STL binario (parse_stl_with_normals)
+      2. Find components + cluster matching (Hungarian su matrice piena)
+      3. Robust ICP weighted cap+cylinder (Tukey-like outlier rejection,
+         peso 5x sui triangoli del cap rispetto al body)
+      4. Mesh ICP refinement (point-to-point con threshold 1.00, accetta
+         solo se migliora)
+      5. Calcolo deviazioni per coppia + score Syntesis Score v1.0
+         (formula iperbole inflection 110um steepness 1.5)
+
+    Costanti chiave:
+      - max_tris=2500    Limite OOM Railway
+      - SR_FLIP_X=180°   Convenzione Z invertita SR (cap a Zmin)
+      - Cap weight = 5x  Pesatura ICP
+
+    Output: dict con 'pairs', 'cyl_axes', 'icp_rmsd', 'score',
+            'score_label', 'detected_profile', 'analysis_mode',
+            'score_model_version', 'warnings'.
     """
     _warnings: list = []  # v7.3.9.039: warnings accumulati durante la pipeline
     tris_a = parse_stl(data_a)
