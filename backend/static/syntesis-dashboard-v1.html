@@ -1098,7 +1098,7 @@ function changePage(delta){
   loadAnalyses();
 }
 
-function escapeHtml(s){
+async function escapeHtml(s){
   if(!s) return '';
   return String(s).replace(/[&<>"']/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
@@ -2679,7 +2679,7 @@ async function downloadFileById(fileId, fileName){
   }
 }
 
-function downloadPreviewFile(){
+async function downloadPreviewFile(){
   if(!prevState.fileId) return;
   try {
     var r = await fetch('/api/me/gdrive/file/' + encodeURIComponent(prevState.fileId) + '/content', {
