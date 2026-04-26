@@ -166,6 +166,11 @@ async def register(req: RegisterRequest):
     try:
         from database import reconcile_pending_contacts
         await reconcile_pending_contacts(user_id, req.email)
+        try:
+            from database import reconcile_pending_shared_invites
+            await reconcile_pending_shared_invites(user_id=new_user_id, user_email=email)
+        except Exception as e:
+            logger.warning(f"reconcile_pending_shared_invites fail: {e}")
     except Exception:
         pass  # non bloccare la registrazione se la riconciliazione fallisce
 
