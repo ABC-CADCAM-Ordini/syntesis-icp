@@ -8,22 +8,55 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Syntesis-ICP - Area personale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.078 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 /* v7.3.9.078 - Cornice nera sobria, una sola, niente animazione */
 html{background:#0F1923;margin:0;padding:0}
 body{
-  margin:18px !important;
-  width:calc(100vw - 36px) !important;
-  height:calc(100vh - 36px) !important;
-  border-radius:14px !important;
-  background:var(--pearl,#F0F5FA) !important;
-  box-sizing:border-box !important;
-  overflow-y:auto !important;
-  overflow-x:hidden !important;
-  box-shadow:0 4px 24px rgba(0,0,0,.4) !important;
+  font-family:var(--font);
+  background:#E2EBF5;
+  background-image:
+    radial-gradient(ellipse at 15% 0%,rgba(0,101,179,.08) 0%,transparent 55%),
+    radial-gradient(ellipse at 85% 100%,rgba(0,101,179,.05) 0%,transparent 50%);
+  min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;
+  padding:28px 16px 48px;
+  color:var(--dark);
+  margin:0;
 }
+.app-wrapper{
+  width:100%;
+  max-width:1280px;
+}
+.siri-wrapper{
+  position:relative;width:100%;border-radius:var(--radius);padding:3.5px;background:transparent;transition:background .6s;
+}
+.siri-wrapper.online{
+  background:conic-gradient(from var(--sa,0deg),#FF8C42,#FF4D8D,#FFD166,#C84BFF,#FF6B35,#FF9FC8,#FF8C42);
+  animation:siriSpin 4s linear infinite;
+  box-shadow:0 0 22px rgba(255,140,66,.42),0 0 52px rgba(200,75,255,.20);
+}
+@property --sa{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes siriSpin{to{--sa:360deg}}
+.siri-inner{
+  position:relative;background:var(--white);
+  border-radius:calc(var(--radius) - 2px);overflow:hidden;z-index:1;
+}
+.status-badge{
+  position:absolute;top:-11px;right:18px;
+  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;
+  padding:3px 10px;border-radius:20px;z-index:10;
+  pointer-events:none;font-family:var(--font);
+}
+.status-badge.online{
+  background:#051A0A;color:#4ADE80;
+  border:1px solid rgba(74,222,128,.4);
+  box-shadow:0 0 10px rgba(74,222,128,.32);
+}
+.app-footer{text-align:center;padding:14px 0 8px}
+.brand-sub-footer{font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;font-family:var(--font)}
+.footer-legal{font-size:10px;color:var(--gray);font-weight:600;letter-spacing:.04em;font-family:var(--font)}
 /* v7.3.9.078 - Scrollbar custom dentro la cornice */
 body::-webkit-scrollbar{width:10px}
 body::-webkit-scrollbar-track{background:transparent}
@@ -38,8 +71,8 @@ body{scrollbar-width:thin;scrollbar-color:rgba(122,144,164,.35) transparent}
   --pearl:#F0F5FA; --light:#F7F9FC; --border:#D6E4F0;
   --white:#FFFFFF; --green:#0D9E6E; --red:#DC2626; --gold:#F59E0B;
   --radius:14px;
-  --font:'Source Sans 3','Source Sans Pro',sans-serif;
-  --mono:'Source Sans 3','Source Sans Pro',sans-serif;
+  --font:'Plus Jakarta Sans',sans-serif;
+  --mono:'DM Mono',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none!important}
