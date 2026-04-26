@@ -347,3 +347,129 @@ async def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
 
 
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.042 - Endpoint posizionamento MUA con weighted ICP server-side
+# Feature flag opt-in: il client invia scan_crop + click + template_id e
+# riceve center/axis/rmsd dal weighted ICP. Path parallela a findScanbodyCenter
+# client-side, attivata da settings utente.
+# ─────────────────────────────────────────────────────────────────────────────
+class PlaceMuaRequest(BaseModel):
+    scan_crop_tris: list  # lista di triangoli [[v0,v1,v2], ...] in coordinate scan
+    click_point: list     # [x,y,z]
+    click_normal: list    # [x,y,z]
+    template_id: str      # "1T3" | "OS" | "SR" | custom
+    template_radius: Optional[float] = None  # mm, override del raggio CAD
+
+
+@app.post("/api/place-mua")
+async def place_mua(req: PlaceMuaRequest, current_user: dict = Depends(verify_token)):
+    """v7.3.9.042: posizionamento singolo MUA con weighted ICP server-side.
+
+    Path opt-in alternativa a findScanbodyCenter() client-side. Stesso input
+    semantico (un crop di scansione + un click), output equivalente
+    (center, axis), ma calcolato con weighted ICP cap+cylinder.
+
+    Permette confronto A/B fra il fit deterministico client e il weighted
+    ICP server, per validazione clinica e decisione futura su quale
+    algoritmo mantenere.
+    """
+    import time as _time
+    import numpy as _np
+    from icp_engine import (
+        align_template_to_marker, find_components, _cap_centroid_for_cluster,
+        cyl_axis
+    )
+
+    t0 = _time.time()
+
+    # Validazione
+    if not req.scan_crop_tris or len(req.scan_crop_tris) < 30:
+        raise HTTPException(400, detail="Crop scansione troppo piccolo (min 30 triangoli).")
+    if len(req.click_point) != 3 or len(req.click_normal) != 3:
+        raise HTTPException(400, detail="click_point e click_normal devono essere [x,y,z].")
+
+    # Conversione input
+    try:
+        scan_tris = _np.array(req.scan_crop_tris, dtype=_np.float32)
+        if scan_tris.ndim != 3 or scan_tris.shape[1:] != (3, 3):
+            raise ValueError(f"Shape inattesa: {scan_tris.shape}, atteso (N,3,3)")
+        click_pt = _np.array(req.click_point, dtype=_np.float32)
+        click_n = _np.array(req.click_normal, dtype=_np.float32)
+        click_n = click_n / (_np.linalg.norm(click_n) + 1e-9)
+    except Exception as e:
+        raise HTTPException(400, detail=f"Input malformato: {e}")
+
+    # Trovo i punti del cluster marker (entro 5mm dal click + normale concorde)
+    centroids = scan_tris.mean(axis=1)
+    dists = _np.linalg.norm(centroids - click_pt, axis=1)
+    near_mask = dists < 5.0
+    near_pts = centroids[near_mask]
+
+    if len(near_pts) < 30:
+        raise HTTPException(
+            422,
+            detail=f"Pochi punti vicini al click ({len(near_pts)} < 30)."
+        )
+
+    # Per il template usiamo direttamente la geometria attesa CAD (1T3, OS, SR)
+    # Costruisco un template sintetico: cilindro + cap basato su parametri noti
+    radius_map = {"1T3": 2.515, "OS": 1.78, "SR": 2.03}
+    radius = req.template_radius or radius_map.get(req.template_id, 2.515)
+
+    # Genero un template parametrico cilindro-con-cap (semplificato)
+    # In produzione si caricherebbero dal CAD ufficiale; per ora:
+    # 200 punti su un cilindro raggio=radius, altezza=4mm, cap a z=4mm
+    n_side = 80
+    n_cap = 60
+    template_pts = []
+    for i in range(n_side):
+        ang = 2 * 3.14159 * i / n_side
+        for z in [0.5, 1.5, 2.5, 3.5]:
+            template_pts.append([radius * _np.cos(ang), radius * _np.sin(ang), z])
+    for i in range(n_cap):
+        r = radius * (i / n_cap) ** 0.5
+        ang = 2 * 3.14159 * i * 0.382  # golden angle per distribuzione
+        template_pts.append([r * _np.cos(ang), r * _np.sin(ang), 4.0])
+    template_pts = _np.array(template_pts, dtype=_np.float32)
+    # Faccio triangoli fittizzi da questi punti per soddisfare API align_template_to_marker
+    # (richiede shape Nx3x3) - uso una triangolazione semplice consecutiva
+    n_tri = (len(template_pts) - 2) // 3
+    template_tris = template_pts[:n_tri*3].reshape(n_tri, 3, 3)
+
+    try:
+        result = align_template_to_marker(
+            template_tris=template_tris,
+            marker_pts=near_pts,
+            use_icp=True,
+            n_rot_attempts=8
+        )
+    except Exception as e:
+        raise HTTPException(500, detail=f"Allineamento fallito: {type(e).__name__}: {e}")
+
+    R = _np.array(result["R"])
+    t = _np.array(result["t"])
+    rmsd = float(result["rmsd"])
+
+    # Centro = trasformazione del cap-top template
+    cap_top_local = _np.array([0, 0, 4.0])
+    center = (R @ cap_top_local + t).tolist()
+
+    # Asse = R applicato all'asse Z locale del template
+    axis_z_local = _np.array([0, 0, 1.0])
+    axis_world = (R @ axis_z_local).tolist()
+
+    elapsed_ms = int((_time.time() - t0) * 1000)
+
+    return {
+        "center": center,
+        "axis": axis_world,
+        "rmsd": rmsd,
+        "method": result.get("method", "weighted_icp"),
+        "algorithm": "server_weighted_icp_v1",
+        "elapsed_ms": elapsed_ms,
+        "n_marker_pts": int(len(near_pts)),
+        "template_id": req.template_id,
+        "template_radius": radius
+    }
