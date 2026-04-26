@@ -2446,6 +2446,15 @@ document.addEventListener('keydown', function(e){
     <div class="modal-title">Condividi cartella</div>
     <div class="modal-sub" id="sfSub">Seleziona uno o piu\' contatti dalla rubrica. Ogni contatto ricevera\' un invito che dovra\' accettare per accedere ai file.</div>
     <div class="modal-row">
+        <label>Aggiungi un nuovo contatto</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <input type="email" id="sfNewEmail" placeholder="email@esempio.it" style="flex:1 1 200px;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font)">
+          <input type="text" id="sfNewName" placeholder="Nome (opzionale)" style="flex:1 1 140px;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font)">
+          <button onclick="addContactInline()" style="padding:9px 14px;background:#0D9E6E;color:#fff;border:1.5px solid #0D9E6E;border-radius:8px;font-weight:800;font-size:12px;cursor:pointer;font-family:var(--font);white-space:nowrap">+ Aggiungi</button>
+        </div>
+        <div style="font-size:10px;color:var(--gray);font-family:var(--mono);margin-top:4px">Salvato in rubrica e selezionato automaticamente.</div>
+      </div>
+      <div class="modal-row">
       <label>Contatti dalla rubrica</label>
       <div class="contact-picker" id="sfContactPicker">
         <div class="cp-empty">Caricamento...</div>
