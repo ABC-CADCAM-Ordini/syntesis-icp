@@ -6063,7 +6063,10 @@ function misICP_buildReportData(){
     icpR: misICP_result.R || [[1,0,0],[0,1,0],[0,0,1]],
     icpT: misICP_result.t || [0,0,0],
     nCyl: pdfPairs.length,
-    timestamp: new Date()
+    timestamp: new Date(),
+    // v7.3.9.043: tracciabilita' modello voto e algoritmo (Misurare = server weighted ICP)
+    score_model_version: (misICP_result.score_model_version || 'Syntesis Score v1.0'),
+    algorithm: (misICP_result.algorithm || 'server_weighted_icp_v1')
   };
 }
 
