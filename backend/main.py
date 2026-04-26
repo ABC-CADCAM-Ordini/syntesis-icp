@@ -1125,6 +1125,34 @@ class CreateFolderBody(BaseModel):
     name: str
     parent_id: Optional[str] = None  # None = dentro Syntesis-ICP root
 
+
+
+@app.get("/api/me/gdrive/access-token")
+async def me_gdrive_access_token(
+    current_user: dict = Depends(verify_token)
+):
+    """Ritorna un access_token Drive short-lived per uso lato browser.
+    Permette al frontend di scaricare file direttamente da Drive,
+    bypassando il nostro server. v7.3.9.079 - ottimizzazione bandwidth."""
+    creds_data = await get_gdrive_credentials(current_user["user_id"])
+    if not creds_data or not creds_data.get("refresh_token_encrypted"):
+        raise HTTPException(409, detail="Google Drive non connesso.")
+    try:
+        refresh_token = gdrive.decrypt_token(creds_data["refresh_token_encrypted"])
+    except Exception:
+        logger.exception("decrypt refresh_token fallito (access-token endpoint)")
+        raise HTTPException(500, detail="Token Drive corrotto. Disconnetti e riconnetti.")
+    try:
+        access_token, expires_in = gdrive.get_access_token(refresh_token)
+        return {
+            "access_token": access_token,
+            "expires_in": expires_in,
+            "token_type": "Bearer"
+        }
+    except Exception as e:
+        logger.error(f"[access-token] error: {e}")
+        raise HTTPException(500, detail=f"Errore generazione token: {str(e)[:200]}")
+
 @app.post("/api/me/folders")
 async def me_create_folder(
     body: CreateFolderBody,
