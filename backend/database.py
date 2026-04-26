@@ -109,22 +109,44 @@ async def verify_license(key: str) -> bool:
 
 
 async def log_analysis(analysis_id: str, user_id: str, filename_a: str,
-                        filename_b: str, score: int, rmsd: float):
+                        filename_b: str, score: int, rmsd: float,
+                        result_json: Optional[dict] = None):
+    """v7.3.9.039: persistenza completa di result come JSONB.
+    Permette al PDF server-side di accedere a pairs/cyl_axes/profile/warnings."""
+    import json as _json
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute("""
-            INSERT INTO analyses (id, user_id, filename_a, filename_b, score, rmsd)
-            VALUES ($1, $2, $3, $4, $5, $6)
-        """, analysis_id, user_id, filename_a, filename_b, score, rmsd)
+            INSERT INTO analyses (id, user_id, filename_a, filename_b, score, rmsd, result_json)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        """, analysis_id, user_id, filename_a, filename_b, score, rmsd,
+            _json.dumps(result_json) if result_json else None)
 
 
 async def get_analysis(analysis_id: str, user_id: str) -> Optional[dict]:
+    """v7.3.9.039: fonde result_json con i campi base.
+    Il PDF server-side ora trova pairs/cyl_axes/warnings dentro il record."""
+    import json as _json
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT * FROM analyses WHERE id = $1 AND user_id = $2",
             analysis_id, user_id)
-        return dict(row) if row else None
+        if not row:
+            return None
+        record = dict(row)
+        # Fondi result_json (se presente) con i campi top-level.
+        # I campi base (id, score, rmsd, filenames, created_at) hanno priorita'.
+        rj = record.pop("result_json", None)
+        if rj:
+            try:
+                payload = _json.loads(rj) if isinstance(rj, str) else dict(rj)
+                merged = dict(payload)
+                merged.update(record)
+                return merged
+            except Exception:
+                pass
+        return record
 
 
 async def save_result(analysis_id: str, operator_name: str, location: str,
