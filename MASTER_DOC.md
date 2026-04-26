@@ -9,7 +9,7 @@
 ---
 
 # SYNTESIS-ICP — DOCUMENTO MAESTRO DI PROGETTO
-## Versione v7.2.0.012 — Ultimo aggiornamento: 2026-04-13
+## Versione v7.3.9.042 - Ultimo aggiornamento: 2026-04-26
 
 ---
 
@@ -79,6 +79,78 @@ lievemente diverse, il protesista può fare una protesi che non si adatta.
 - PostgreSQL per classifica e analytics
 - JWT per autenticazione
 - Resend API per email (notifiche classifica)
+
+### 3.1 I tre algoritmi di posizionamento (architettura intenzionale)
+
+Il sistema include tre workflow distinti, ognuno con il proprio algoritmo di
+allineamento. Questa NON e' duplicazione di codice: e' una scelta architetturale
+intenzionale. Ogni algoritmo e' specializzato per il suo caso d'uso.
+
+| Workflow    | Dove gira | Algoritmo                       | Caso d'uso                       |
+|-------------|-----------|----------------------------------|----------------------------------|
+| Misurare    | Server    | Weighted ICP cap+cylinder        | Confronto fra DUE STL completi   |
+| Analizza    | Client    | Fit di cerchio a raggio CAD-fisso| Posizionamento singolo MUA       |
+| Sostituire  | Client    | ICP locale cap+body              | Allineamento template MUA-on-scan|
+
+**Misurare (server-side `analyze_stl_pair` in `icp_engine.py`)**
+Algoritmo: weighted ICP con cap pesato 5x rispetto al body. Robust con outlier
+rejection Tukey-like. Generalista, lavora su qualsiasi geometria scanbody.
+Lavora su due STL completi (riferimento + paziente), ne fa l'analisi globale e
+restituisce score di precisione, deviazioni per coppia, divergenze angolari.
+Tempo: 3-15 secondi a seconda del numero di coppie. Latenza accettabile per un
+report una-tantum.
+
+**Analizza (client-side `findScanbodyCenter` in `syntesis-analyzer-v3b.html`)**
+Algoritmo: fit di cerchio a raggio fisso CAD-aware. Conoscendo il raggio nominale
+dello scanbody (1T3=2.515mm, OS=1.78mm, SR=2.03mm), il problema diventa un fit
+con un solo parametro libero (centro). Risolvibile per minimi quadrati con
+errore tipico < 15µm sotto rumore di scansione. Specializzato, deterministico,
+non iterativo. Tempo: pochi millisecondi per click. **Per questa geometria, il
+fit specializzato e' piu' accurato del weighted ICP generalista**, perche' il
+weighted ICP non sfrutta la conoscenza del raggio.
+
+**Sostituire (client-side `sostAlignAll` in `syntesis-analyzer-v3b.html`)**
+Algoritmo: ICP locale point-to-point con peso cap+body. Riusa
+`findScanbodyCenter(opts.radius)` come inizializzazione, poi raffina con ICP
+deterministico. Specializzato per allineare un template di scanbody alla
+scansione locale dopo che il template e' stato spostato. Sostanzialmente un
+weighted ICP semplificato ma client-side.
+
+### 3.2 Dual-algorithm in Analizza (v7.3.9.042)
+
+A partire da v7.3.9.042 il workflow Analizza supporta opzionalmente l'uso del
+weighted ICP server-side come ALTERNATIVA al fit deterministico client-side.
+Default invariato (client). Il toggle e' nelle impostazioni utente, tab
+"Algoritmo".
+
+Architettura:
+```
+[Browser]
+  alignAll() routing
+    if localStorage.syntesis_mua_algorithm == 'server':
+        ──POST /api/place-mua──> [Railway Backend]
+              {scan_crop, click, template_id}    align_template_to_marker()
+        <──── {center, axis, rmsd, algorithm}─── (riusa weighted ICP di Misurare)
+    else:
+        findScanbodyCenter()  // path storica, default
+```
+
+Lo scopo NON e' migrare al server-side. E' raccogliere dati comparativi su
+casi reali per decidere se uno dei due algoritmi e' sistematicamente migliore,
+o se vanno tenuti entrambi per casi diversi. La diagnostica e' visibile
+nella stessa tab "Algoritmo" del dialog impostazioni.
+
+Vincoli del path server-side:
+- Richiede login (token JWT) - flusso protetto da auth
+- Latenza tipica 200-500ms per MUA (vs millisecondi del client)
+- Comporta upload del crop di scansione (6mm di raggio dal click)
+- Fallback automatico al client se: token mancante, crop troppo piccolo (<30 tris),
+  errore di rete, errore server
+
+I due percorsi salvano in `mua.algorithmUsed`, `mua.algorithmRmsd`,
+`mua.algorithmElapsedMs` per ogni MUA, permettendo confronto diretto nella
+diagnostica e analisi statistica futura.
+
 
 ---
 
