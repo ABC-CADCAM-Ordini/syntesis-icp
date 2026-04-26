@@ -9,3 +9,9 @@ scipy==1.14.1
 PyJWT[crypto]==2.10.1
 slowapi==0.1.9
 scikit-learn==1.5.2
+
+# v7.3.9.048 - Google Drive OAuth + Drive API
+google-auth==2.36.0
+google-auth-oauthlib==1.2.1
+google-api-python-client==2.151.0
+cryptography==43.0.3
