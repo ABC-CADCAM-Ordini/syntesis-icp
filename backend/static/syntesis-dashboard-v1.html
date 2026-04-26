@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <!-- Syntesis-ICP - Dashboard utente
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
-     v7.3.9.047 - Backend utente: mie analisi, profilo, classifica -->
+     v7.3.9.048 - Backend utente: mie analisi, profilo, classifica -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Syntesis-ICP - Area personale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -338,8 +338,8 @@ body{
           </div>
         </div>
 
-        <div style="margin-top:18px;padding:14px 16px;background:#FFF7E6;border:1.5px solid #FCD34D;border-radius:10px;font-size:11px;color:#92400E;font-family:var(--mono);line-height:1.7">
-          <b>Stato implementazione (v7.3.9.047):</b> la struttura backend e l'interfaccia sono pronte. La connessione OAuth ai provider richiede setup di credenziali su Google Cloud / Dropbox Developer Console che viene fatto separatamente. Quando le credenziali saranno configurate, i bottoni "Connetti" diventeranno funzionali.
+        <div style="margin-top:18px;padding:14px 16px;background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:10px;font-size:11px;color:#065F46;font-family:var(--mono);line-height:1.7">
+          <b>Drive OAuth attivo (v7.3.9.048):</b> Google Drive e\' connettibile. Lo scope richiesto e\' <code style="background:#fff;padding:1px 5px;border-radius:3px">drive.file</code>, che limita Syntesis-ICP ai SOLI file che lui stesso crea nella cartella <code style="background:#fff;padding:1px 5px;border-radius:3px">Syntesis-ICP</code> nel tuo Drive. Gli altri file del Drive non sono mai accessibili.
         </div>
       </div>
     </div>
@@ -356,7 +356,7 @@ body{
   </div>
 
   <div style="text-align:center;font-size:10px;color:var(--gray);font-weight:600;letter-spacing:.04em;margin-top:14px">
-    Syntesis-ICP &middot; Area personale &middot; v7.3.9.047
+    Syntesis-ICP &middot; Area personale &middot; v7.3.9.048
   </div>
 </div>
 
@@ -994,22 +994,102 @@ document.addEventListener('click', function(e){
   if(sw){ selectProjectColor(sw.dataset.c); }
 });
 
-// ── Cloud (placeholder Fase B/C) ────────────────────────────────────────────
+// ── Cloud (Fase C - Drive OAuth funzionante) ────────────────────────────────
 async function loadCloudStatus(){
-  // Placeholder: mostra stato disconnesso. Quando sara' implementato l'OAuth,
-  // questa funzione chiamera' /api/me/gdrive/status e /api/me/dropbox/status
-  document.getElementById('gdriveStatus').innerHTML =
-    '<span style="color:var(--gray)">Non connesso</span>';
-  document.getElementById('gdriveActions').innerHTML =
-    '<button class="btn-cta" disabled style="opacity:.5;cursor:not-allowed" title="Disponibile dopo configurazione OAuth">Connetti Google Drive</button>' +
-    '<div style="font-size:10px;color:var(--gray);margin-top:8px;font-family:var(--mono)">Disponibile dopo Fase B (setup credenziali Google Cloud)</div>';
+  // Stato Google Drive
+  try {
+    var r = await fetch('/api/me/gdrive/status', { headers: authHeaders() });
+    if(r.status === 401){ checkAuth(); return; }
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    renderGdriveStatus(data);
+  } catch(e){
+    document.getElementById('gdriveStatus').innerHTML =
+      '<span style="color:var(--red)">Errore: ' + e.message + '</span>';
+    document.getElementById('gdriveActions').innerHTML = '';
+  }
 
+  // Dropbox: ancora placeholder
   document.getElementById('dropboxStatus').innerHTML =
     '<span style="color:var(--gray)">Non connesso</span>';
   document.getElementById('dropboxActions').innerHTML =
-    '<button class="btn-cta" disabled style="opacity:.5;cursor:not-allowed" title="Disponibile dopo configurazione OAuth">Connetti Dropbox</button>' +
-    '<div style="font-size:10px;color:var(--gray);margin-top:8px;font-family:var(--mono)">Disponibile dopo Fase D</div>';
+    '<button class="btn-cta" disabled style="opacity:.5;cursor:not-allowed" title="In arrivo nella Fase D">Connetti Dropbox</button>' +
+    '<div style="font-size:10px;color:var(--gray);margin-top:8px;font-family:var(--mono)">Disponibile nella Fase D (dopo Drive)</div>';
 }
+
+function renderGdriveStatus(data){
+  var statusEl = document.getElementById('gdriveStatus');
+  var actionsEl = document.getElementById('gdriveActions');
+  if(!data.configured){
+    statusEl.innerHTML = '<span style="color:var(--red)">Server non configurato</span>';
+    actionsEl.innerHTML = '<div style="font-size:11px;color:var(--gray);font-family:var(--mono)">Le env vars OAuth mancano sul backend.</div>';
+    return;
+  }
+  if(!data.connected){
+    statusEl.innerHTML = '<span style="color:var(--gray)">Non connesso</span>';
+    actionsEl.innerHTML =
+      '<button class="btn-cta" onclick="connectGdrive()">Connetti Google Drive</button>' +
+      '<div style="font-size:10px;color:var(--gray);margin-top:8px;font-family:var(--mono);line-height:1.5">' +
+      'Verrai rediretto a Google per autorizzare. Syntesis-ICP otterra\' accesso solo ai file che lui stesso crea (mai al resto del tuo Drive).' +
+      '</div>';
+  } else {
+    var connectedAt = data.connected_at ? fmtDate(data.connected_at) : '—';
+    statusEl.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<span style="display:inline-block;width:10px;height:10px;background:var(--green);border-radius:50%"></span>' +
+        '<span style="color:var(--green);font-weight:700">Connesso</span>' +
+        '<span style="color:var(--dark);font-weight:600">' + escapeHtml(data.email || '—') + '</span>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--gray);font-family:var(--mono);margin-top:6px">Connesso il ' + connectedAt + '</div>';
+    actionsEl.innerHTML =
+      '<button class="btn-outline" onclick="disconnectGdrive()">Disconnetti</button>' +
+      '<div style="font-size:10px;color:var(--gray);margin-top:8px;font-family:var(--mono);line-height:1.5">' +
+      'Per revocare completamente l\'accesso anche da Google, vai su <a href="https://myaccount.google.com/permissions" target="_blank" style="color:var(--blue)">myaccount.google.com/permissions</a>.' +
+      '</div>';
+  }
+}
+
+function connectGdrive(){
+  // L'endpoint OAuth richiede il JWT come query param perche' fa redirect.
+  var token = getToken();
+  if(!token){ showToast('Devi essere autenticato.', true); return; }
+  // Apriamo nella stessa finestra: dopo OAuth Google torna con redirect su /dashboard
+  window.location.href = '/auth/gdrive/connect?token=' + encodeURIComponent(token);
+}
+
+async function disconnectGdrive(){
+  if(!confirm('Disconnettere Google Drive?\nLe analisi e i progetti restano nel sistema, ma non verranno piu\' caricati su Drive.')) return;
+  try {
+    var r = await fetch('/auth/gdrive/disconnect', {
+      method: 'POST', headers: authHeaders()
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Drive disconnesso.');
+    loadCloudStatus();
+  } catch(e){ showToast('Errore: ' + e.message, true); }
+}
+
+// Mostro toast se torno da OAuth (query param connected=1 o error=...)
+(function(){
+  try {
+    var u = new URL(location.href);
+    if(u.searchParams.get('connected') === '1'){
+      setTimeout(function(){ showToast('Google Drive collegato!'); }, 600);
+      // Auto-switch alla tab Cloud
+      setTimeout(function(){ switchTab('cloud'); }, 800);
+      // Pulisci URL
+      history.replaceState({}, '', '/dashboard');
+    } else if(u.searchParams.get('error')){
+      setTimeout(function(){ showToast('Errore OAuth: ' + u.searchParams.get('error'), true); }, 600);
+      setTimeout(function(){ switchTab('cloud'); }, 800);
+      history.replaceState({}, '', '/dashboard');
+    } else if(u.searchParams.get('tab')){
+      var t = u.searchParams.get('tab');
+      setTimeout(function(){ switchTab(t); }, 200);
+    }
+  } catch(e){}
+})();
+
 
 // ── Init ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function(){
