@@ -159,6 +159,47 @@ async def init_db():
         """)
 
 
+
+        # v7.3.9.062 - Cartelle condivise (sistema invito + accept)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS shared_folders (
+                id                      TEXT PRIMARY KEY,
+                owner_user_id           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                folder_name             TEXT NOT NULL,
+                description             TEXT,
+                owner_drive_folder_id   TEXT NOT NULL,
+                created_at              TIMESTAMPTZ DEFAULT NOW(),
+                updated_at              TIMESTAMPTZ DEFAULT NOW()
+            );
+        """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS shared_folder_members (
+                id                       TEXT PRIMARY KEY,
+                shared_folder_id         TEXT NOT NULL REFERENCES shared_folders(id) ON DELETE CASCADE,
+                member_user_id           TEXT REFERENCES users(id) ON DELETE SET NULL,
+                member_email             TEXT NOT NULL,
+                member_drive_folder_id   TEXT,
+                status                   TEXT NOT NULL DEFAULT 'pending',
+                invited_by               TEXT NOT NULL REFERENCES users(id),
+                invited_at               TIMESTAMPTZ DEFAULT NOW(),
+                responded_at             TIMESTAMPTZ,
+                UNIQUE (shared_folder_id, member_email)
+            );
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sfm_email_pending
+                ON shared_folder_members(member_email)
+                WHERE status='pending';
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sfm_user_active
+                ON shared_folder_members(member_user_id)
+                WHERE status='active';
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sf_owner
+                ON shared_folders(owner_user_id);
+        """)
 async def get_user_by_email(email: str) -> Optional[dict]:
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -837,3 +878,257 @@ async def create_licenses(keys: list[str]):
             await conn.execute(
                 "INSERT INTO licenses (key) VALUES ($1) ON CONFLICT DO NOTHING", key)
     print(f"✓ {len(keys)} licenze inserite.")
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.062 - CARTELLE CONDIVISE
+# ─────────────────────────────────────────────────────────────────────────────
+
+import secrets
+
+def _gen_id() -> str:
+    """Genera un ID compatto sicuro per shared_folders."""
+    return secrets.token_urlsafe(12)
+
+
+async def create_shared_folder(
+    owner_user_id: str,
+    folder_name: str,
+    owner_drive_folder_id: str,
+    description: Optional[str] = None,
+) -> dict:
+    """Crea un record shared_folders. La cartella su Drive deve gia' essere creata."""
+    pool = await get_pool()
+    sf_id = _gen_id()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO shared_folders
+                (id, owner_user_id, folder_name, description, owner_drive_folder_id)
+            VALUES ($1, $2, $3, $4, $5)
+        """, sf_id, owner_user_id, folder_name, description, owner_drive_folder_id)
+    return {
+        "id": sf_id,
+        "owner_user_id": owner_user_id,
+        "folder_name": folder_name,
+        "owner_drive_folder_id": owner_drive_folder_id,
+    }
+
+
+async def add_shared_folder_member(
+    shared_folder_id: str,
+    member_email: str,
+    invited_by_user_id: str,
+) -> dict:
+    """Aggiunge un membro a una cartella condivisa. Se l'email corrisponde
+    a un utente registrato, ne valorizza l'user_id. Status=pending fino all'accept."""
+    member_email = member_email.lower().strip()
+    pool = await get_pool()
+    member_id = _gen_id()
+    async with pool.acquire() as conn:
+        # Cerco se l'email e' di un utente gia' registrato
+        existing_user = await conn.fetchrow(
+            "SELECT id FROM users WHERE LOWER(email) = $1 AND active = TRUE",
+            member_email
+        )
+        member_user_id = existing_user["id"] if existing_user else None
+
+        try:
+            await conn.execute("""
+                INSERT INTO shared_folder_members
+                    (id, shared_folder_id, member_user_id, member_email, status, invited_by)
+                VALUES ($1, $2, $3, $4, 'pending', $5)
+            """, member_id, shared_folder_id, member_user_id, member_email, invited_by_user_id)
+        except Exception as e:
+            # Probabilmente UNIQUE violation (gia' invitato)
+            return {"id": None, "error": "already_invited"}
+    return {
+        "id": member_id,
+        "member_email": member_email,
+        "member_user_id": member_user_id,
+        "status": "pending",
+    }
+
+
+async def get_shared_folder(shared_folder_id: str) -> Optional[dict]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT id, owner_user_id, folder_name, description,
+                   owner_drive_folder_id, created_at, updated_at
+            FROM shared_folders WHERE id = $1
+        """, shared_folder_id)
+    return dict(row) if row else None
+
+
+async def list_owned_shared_folders(owner_user_id: str) -> list[dict]:
+    """Cartelle che ho condiviso io con altri."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT sf.id, sf.folder_name, sf.description, sf.owner_drive_folder_id,
+                   sf.created_at,
+                   (SELECT COUNT(*) FROM shared_folder_members
+                    WHERE shared_folder_id = sf.id AND status = 'active') AS n_active,
+                   (SELECT COUNT(*) FROM shared_folder_members
+                    WHERE shared_folder_id = sf.id AND status = 'pending') AS n_pending
+            FROM shared_folders sf
+            WHERE sf.owner_user_id = $1
+            ORDER BY sf.created_at DESC
+        """, owner_user_id)
+    return [dict(r) for r in rows]
+
+
+async def list_member_shared_folders(member_user_id: str) -> list[dict]:
+    """Cartelle condivise CON me, dove ho gia' accettato (status=active)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT sfm.id AS membership_id,
+                   sfm.member_drive_folder_id,
+                   sf.id AS shared_folder_id,
+                   sf.folder_name, sf.description,
+                   sf.owner_user_id,
+                   u.email AS owner_email, u.name AS owner_name,
+                   sfm.responded_at AS accepted_at
+            FROM shared_folder_members sfm
+            JOIN shared_folders sf ON sf.id = sfm.shared_folder_id
+            JOIN users u ON u.id = sf.owner_user_id
+            WHERE sfm.member_user_id = $1 AND sfm.status = 'active'
+            ORDER BY sfm.responded_at DESC
+        """, member_user_id)
+    return [dict(r) for r in rows]
+
+
+async def list_pending_invites_for_user(member_user_id: str, member_email: str) -> list[dict]:
+    """Inviti pending per questo utente (matched per user_id O per email)."""
+    pool = await get_pool()
+    member_email = member_email.lower().strip()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT sfm.id AS membership_id,
+                   sf.id AS shared_folder_id,
+                   sf.folder_name, sf.description,
+                   sf.owner_user_id,
+                   u.email AS owner_email, u.name AS owner_name,
+                   sfm.invited_at
+            FROM shared_folder_members sfm
+            JOIN shared_folders sf ON sf.id = sfm.shared_folder_id
+            JOIN users u ON u.id = sf.owner_user_id
+            WHERE sfm.status = 'pending'
+              AND (sfm.member_user_id = $1 OR LOWER(sfm.member_email) = $2)
+            ORDER BY sfm.invited_at DESC
+        """, member_user_id, member_email)
+    return [dict(r) for r in rows]
+
+
+async def get_membership(membership_id: str) -> Optional[dict]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT id, shared_folder_id, member_user_id, member_email,
+                   member_drive_folder_id, status, invited_by, invited_at, responded_at
+            FROM shared_folder_members WHERE id = $1
+        """, membership_id)
+    return dict(row) if row else None
+
+
+async def accept_shared_invite(
+    membership_id: str,
+    accepting_user_id: str,
+    user_email: str,
+    member_drive_folder_id: str,
+) -> bool:
+    """L'utente accetta l'invito. Aggiorna status=active, valorizza user_id e
+    member_drive_folder_id (il mirror creato nel suo Drive)."""
+    user_email = user_email.lower().strip()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE shared_folder_members
+            SET status = 'active',
+                member_user_id = $1,
+                member_drive_folder_id = $2,
+                responded_at = NOW()
+            WHERE id = $3
+              AND status = 'pending'
+              AND (member_user_id = $1 OR LOWER(member_email) = $4)
+        """, accepting_user_id, member_drive_folder_id, membership_id, user_email)
+    return result.endswith(" 1")
+
+
+async def decline_shared_invite(
+    membership_id: str,
+    declining_user_id: str,
+    user_email: str,
+) -> bool:
+    user_email = user_email.lower().strip()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE shared_folder_members
+            SET status = 'declined',
+                member_user_id = COALESCE(member_user_id, $1),
+                responded_at = NOW()
+            WHERE id = $2
+              AND status = 'pending'
+              AND (member_user_id = $1 OR LOWER(member_email) = $3)
+        """, declining_user_id, membership_id, user_email)
+    return result.endswith(" 1")
+
+
+async def list_active_members_of_folder(shared_folder_id: str) -> list[dict]:
+    """Ritorna i membri attivi di una cartella condivisa, con i loro drive_folder_id.
+    Serve per la replica file."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT id AS membership_id, member_user_id, member_email,
+                   member_drive_folder_id
+            FROM shared_folder_members
+            WHERE shared_folder_id = $1 AND status = 'active'
+              AND member_drive_folder_id IS NOT NULL
+        """, shared_folder_id)
+    return [dict(r) for r in rows]
+
+
+async def get_shared_folder_by_drive_id(drive_folder_id: str, user_id: str) -> Optional[dict]:
+    """Data una drive_folder_id, ritorna la shared_folder se l'utente ne fa parte
+    (come owner o come membro attivo). Serve per sapere se un upload va replicato."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        # Sono owner?
+        row = await conn.fetchrow("""
+            SELECT id, owner_user_id, folder_name, owner_drive_folder_id, 'owner' AS role
+            FROM shared_folders
+            WHERE owner_drive_folder_id = $1 AND owner_user_id = $2
+        """, drive_folder_id, user_id)
+        if row:
+            return dict(row)
+        # Sono membro?
+        row = await conn.fetchrow("""
+            SELECT sf.id, sf.owner_user_id, sf.folder_name, sf.owner_drive_folder_id, 'member' AS role
+            FROM shared_folders sf
+            JOIN shared_folder_members sfm ON sfm.shared_folder_id = sf.id
+            WHERE sfm.member_drive_folder_id = $1
+              AND sfm.member_user_id = $2
+              AND sfm.status = 'active'
+        """, drive_folder_id, user_id)
+        return dict(row) if row else None
+
+
+async def reconcile_pending_shared_invites(user_id: str, user_email: str) -> int:
+    """Quando un utente si registra, collega gli inviti pending alla sua user_id.
+    Ritorna il numero di inviti aggiornati."""
+    user_email = user_email.lower().strip()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE shared_folder_members
+            SET member_user_id = $1
+            WHERE LOWER(member_email) = $2
+              AND member_user_id IS NULL
+              AND status = 'pending'
+        """, user_id, user_email)
+    return int(result.split()[-1]) if result else 0
+
