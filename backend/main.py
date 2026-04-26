@@ -3,7 +3,7 @@ Syntesis-ICP — Backend API
 Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
 """
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -32,7 +32,13 @@ from database import (
     set_project_gdrive_folder,
     list_user_contacts, create_user_contact, update_user_contact,
     delete_user_contact, reconcile_pending_contacts,
-    get_user_storage_status, log_usage, can_upload_bytes, PLAN_LIMITS
+    get_user_storage_status, log_usage, can_upload_bytes, PLAN_LIMITS,
+    create_shared_folder, add_shared_folder_member,
+    get_shared_folder, list_owned_shared_folders, list_member_shared_folders,
+    list_pending_invites_for_user, get_membership,
+    accept_shared_invite, decline_shared_invite,
+    list_active_members_of_folder, get_shared_folder_by_drive_id,
+    reconcile_pending_shared_invites
 )
 import gdrive  # v7.3.9.048: modulo OAuth + Drive API
 from security_config import validate_security_config
@@ -1073,6 +1079,300 @@ async def me_gdrive_file_link(
         "web_view_link": f"https://drive.google.com/file/d/{file_id}/view",
         "download_link": f"https://drive.google.com/uc?export=download&id={file_id}",
     }
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.062 - CARTELLE CONDIVISE (Fase F)
+# Sistema invito + accept tra utenti Synthesis. Cartelle Drive condivise via
+# replica server-mediata (no Google Drive sharing nativo: scope drive.file
+# permette accesso solo ai file creati da noi, non condivisione classica).
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CreateFolderBody(BaseModel):
+    name: str
+    parent_id: Optional[str] = None  # None = dentro Syntesis-ICP root
+
+@app.post("/api/me/folders")
+async def me_create_folder(
+    body: CreateFolderBody,
+    current_user: dict = Depends(verify_token),
+):
+    """Crea una nuova cartella nel Drive dell'utente (dentro Syntesis-ICP o sub)."""
+    creds_data = await get_gdrive_credentials(current_user["user_id"])
+    if not creds_data or not creds_data.get("refresh_token_encrypted"):
+        raise HTTPException(409, detail="Google Drive non connesso.")
+    name = (body.name or "").strip()
+    if not name or len(name) > 120:
+        raise HTTPException(400, detail="Nome cartella non valido (1-120 char).")
+    try:
+        refresh_token = gdrive.decrypt_token(creds_data["refresh_token_encrypted"])
+        result = gdrive.create_folder_in(refresh_token, name, body.parent_id)
+        return result
+    except Exception as e:
+        logger.exception("create_folder fallito")
+        raise HTTPException(500, detail=f"Errore Drive: {e}")
+
+
+class CreateSharedFolderBody(BaseModel):
+    folder_drive_id: str
+    folder_name: str
+    description: Optional[str] = None
+    member_emails: list[str]
+
+@app.post("/api/me/shared-folders")
+async def me_create_shared_folder(
+    body: CreateSharedFolderBody,
+    current_user: dict = Depends(verify_token),
+):
+    """Registra una condivisione: la cartella esiste gia' su Drive (creata
+    in precedenza con /api/me/folders), questa chiamata invita i membri."""
+    creds_data = await get_gdrive_credentials(current_user["user_id"])
+    if not creds_data or not creds_data.get("refresh_token_encrypted"):
+        raise HTTPException(409, detail="Google Drive non connesso.")
+    if not body.member_emails:
+        raise HTTPException(400, detail="Nessun destinatario specificato.")
+
+    sf = await create_shared_folder(
+        owner_user_id=current_user["user_id"],
+        folder_name=body.folder_name,
+        owner_drive_folder_id=body.folder_drive_id,
+        description=body.description,
+    )
+    invited = []
+    skipped = []
+    for email in body.member_emails:
+        email = (email or "").lower().strip()
+        if not email or email == current_user.get("email", "").lower():
+            continue
+        m = await add_shared_folder_member(
+            shared_folder_id=sf["id"],
+            member_email=email,
+            invited_by_user_id=current_user["user_id"],
+        )
+        if m.get("error"):
+            skipped.append({"email": email, "reason": m["error"]})
+        else:
+            invited.append(m)
+    return {"shared_folder": sf, "invited": invited, "skipped": skipped}
+
+
+@app.get("/api/me/shared-folders")
+async def me_list_shared_folders(current_user: dict = Depends(verify_token)):
+    """Lista cartelle che ho condiviso io (owned) e quelle condivise con me (member)."""
+    owned = await list_owned_shared_folders(current_user["user_id"])
+    member = await list_member_shared_folders(current_user["user_id"])
+    return {"owned": owned, "member": member}
+
+
+@app.get("/api/me/shared-folders/incoming")
+async def me_list_incoming_invites(current_user: dict = Depends(verify_token)):
+    """Inviti pending per me (non ancora accettati o rifiutati)."""
+    invites = await list_pending_invites_for_user(
+        current_user["user_id"],
+        current_user.get("email", "")
+    )
+    return {"invites": invites}
+
+
+@app.post("/api/me/shared-folders/invites/{membership_id}/accept")
+async def me_accept_invite(
+    membership_id: str,
+    current_user: dict = Depends(verify_token),
+):
+    """Accetto un invito: creo cartella mirror nel mio Drive e replica i file
+    esistenti dal Drive del creatore al mio (sync server-mediato, fino a 200 file)."""
+    membership = await get_membership(membership_id)
+    if not membership:
+        raise HTTPException(404, detail="Invito non trovato.")
+    if membership["status"] != "pending":
+        raise HTTPException(400, detail=f"Invito gia' {membership['status']}.")
+
+    # Verifica che l'invito sia per me (per email o user_id)
+    user_email = (current_user.get("email") or "").lower().strip()
+    if (membership["member_user_id"] != current_user["user_id"] and
+        (membership["member_email"] or "").lower() != user_email):
+        raise HTTPException(403, detail="Questo invito non e' per te.")
+
+    sf = await get_shared_folder(membership["shared_folder_id"])
+    if not sf:
+        raise HTTPException(404, detail="Cartella condivisa non esiste piu'.")
+
+    # Drive del destinatario
+    my_creds = await get_gdrive_credentials(current_user["user_id"])
+    if not my_creds or not my_creds.get("refresh_token_encrypted"):
+        raise HTTPException(409, detail="Devi prima connettere Google Drive.")
+    my_refresh = gdrive.decrypt_token(my_creds["refresh_token_encrypted"])
+
+    # Drive dell'owner
+    owner_creds = await get_gdrive_credentials(sf["owner_user_id"])
+    if not owner_creds or not owner_creds.get("refresh_token_encrypted"):
+        raise HTTPException(503,
+            detail="Il proprietario ha disconnesso il suo Drive. Sincronizzazione non possibile.")
+    owner_refresh = gdrive.decrypt_token(owner_creds["refresh_token_encrypted"])
+
+    # 1. Creo cartella mirror nel mio Drive (dentro Syntesis-ICP)
+    mirror_name = f"[Condiviso] {sf['folder_name']}"
+    try:
+        mirror = gdrive.create_folder_in(my_refresh, mirror_name, parent_id=None)
+    except Exception as e:
+        logger.exception("create mirror folder fallito")
+        raise HTTPException(500, detail=f"Errore creazione cartella mirror: {e}")
+
+    # 2. Aggiorno DB: status=active + member_drive_folder_id
+    ok = await accept_shared_invite(
+        membership_id=membership_id,
+        accepting_user_id=current_user["user_id"],
+        user_email=user_email,
+        member_drive_folder_id=mirror["id"],
+    )
+    if not ok:
+        raise HTTPException(500, detail="Aggiornamento DB fallito.")
+
+    # 3. Replica i file esistenti (sync iniziale, fino a 200 file totali)
+    replicated = 0
+    errors = 0
+    try:
+        files_to_replicate = gdrive.list_files_recursive(
+            owner_refresh, sf["owner_drive_folder_id"], max_files=200
+        )
+        logger.info(f"[accept_invite] {len(files_to_replicate)} files to replicate")
+        for f in files_to_replicate:
+            try:
+                # Se il file e' troppo grande, skippo
+                if f.get("size", 0) > 100 * 1024 * 1024:
+                    errors += 1
+                    continue
+                # Scarico dal Drive owner
+                data, _, mime = gdrive.download_file_bytes(owner_refresh, f["id"])
+                # Trovo o creo la sottocartella nel mirror
+                target_folder = gdrive.ensure_subfolder_path(
+                    my_refresh, mirror["id"], f.get("relative_path", "")
+                )
+                # Carico nel mio Drive
+                gdrive.upload_file_to_folder(
+                    my_refresh, target_folder, f["name"], data, mime
+                )
+                replicated += 1
+            except Exception as e:
+                logger.warning(f"[accept_invite] replicate fail '{f['name']}': {e}")
+                errors += 1
+    except Exception as e:
+        logger.exception("sync iniziale fallito (cartella accettata, file da risincronizzare)")
+
+    return {
+        "ok": True,
+        "shared_folder_id": sf["id"],
+        "mirror_drive_folder_id": mirror["id"],
+        "files_replicated": replicated,
+        "files_failed": errors,
+    }
+
+
+@app.post("/api/me/shared-folders/invites/{membership_id}/decline")
+async def me_decline_invite(
+    membership_id: str,
+    current_user: dict = Depends(verify_token),
+):
+    user_email = (current_user.get("email") or "").lower().strip()
+    ok = await decline_shared_invite(
+        membership_id=membership_id,
+        declining_user_id=current_user["user_id"],
+        user_email=user_email,
+    )
+    if not ok:
+        raise HTTPException(404, detail="Invito non trovato o gia' processato.")
+    return {"ok": True}
+
+
+@app.post("/api/me/folders/{folder_drive_id}/upload")
+async def me_upload_file_to_folder(
+    folder_drive_id: str,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(verify_token),
+):
+    """Upload di un file in una cartella Drive. Se la cartella e' condivisa
+    (owner o member), replica il file sui Drive degli altri membri attivi."""
+    creds_data = await get_gdrive_credentials(current_user["user_id"])
+    if not creds_data or not creds_data.get("refresh_token_encrypted"):
+        raise HTTPException(409, detail="Google Drive non connesso.")
+    refresh_token = gdrive.decrypt_token(creds_data["refresh_token_encrypted"])
+
+    # Limite upload: 50MB
+    MAX_SIZE = 50 * 1024 * 1024
+    data = await file.read()
+    if len(data) > MAX_SIZE:
+        raise HTTPException(413, detail="File troppo grande (max 50MB).")
+    if len(data) == 0:
+        raise HTTPException(400, detail="File vuoto.")
+
+    filename = file.filename or "file"
+    mime = file.content_type or "application/octet-stream"
+
+    # Upload nel Drive dell'utente
+    try:
+        result = gdrive.upload_file_to_folder(refresh_token, folder_drive_id, filename, data, mime)
+    except Exception as e:
+        logger.exception("upload fallito")
+        raise HTTPException(500, detail=f"Errore upload Drive: {e}")
+
+    # Verifico se e' una cartella condivisa
+    shared = await get_shared_folder_by_drive_id(folder_drive_id, current_user["user_id"])
+    if shared:
+        # Replica negli altri Drive in background
+        background_tasks.add_task(
+            _replicate_file_to_members,
+            shared_folder_id=shared["id"],
+            owner_user_id=shared["owner_user_id"],
+            uploader_user_id=current_user["user_id"],
+            uploader_drive_folder_id=folder_drive_id,
+            file_data=data,
+            filename=filename,
+            mime_type=mime,
+        )
+
+    return {"ok": True, "file": result, "replicating": shared is not None}
+
+
+async def _replicate_file_to_members(
+    shared_folder_id: str,
+    owner_user_id: str,
+    uploader_user_id: str,
+    uploader_drive_folder_id: str,
+    file_data: bytes,
+    filename: str,
+    mime_type: str,
+):
+    """Background task: replica un file su tutti i Drive dei membri attivi
+    (escluso chi ha caricato). Per la replica all'owner, usa owner_drive_folder_id."""
+    try:
+        sf = await get_shared_folder(shared_folder_id)
+        if not sf:
+            return
+        active_members = await list_active_members_of_folder(shared_folder_id)
+        # Ricavo i target: owner + tutti i membri attivi tranne chi ha caricato
+        targets = []
+        if owner_user_id != uploader_user_id:
+            targets.append({"user_id": owner_user_id,
+                            "drive_folder_id": sf["owner_drive_folder_id"]})
+        for m in active_members:
+            if m["member_user_id"] and m["member_user_id"] != uploader_user_id:
+                targets.append({"user_id": m["member_user_id"],
+                                "drive_folder_id": m["member_drive_folder_id"]})
+        for t in targets:
+            try:
+                creds = await get_gdrive_credentials(t["user_id"])
+                if not creds or not creds.get("refresh_token_encrypted"):
+                    logger.warning(f"[replicate] skip {t['user_id']}: no creds")
+                    continue
+                rt = gdrive.decrypt_token(creds["refresh_token_encrypted"])
+                gdrive.upload_file_to_folder(rt, t["drive_folder_id"], filename, file_data, mime_type)
+                logger.info(f"[replicate] OK -> user={t['user_id']} folder={t['drive_folder_id']}")
+            except Exception as e:
+                logger.warning(f"[replicate] fail user={t['user_id']}: {e}")
+    except Exception as e:
+        logger.exception("replicate task crashed")
     try:
         refresh_token = gdrive.decrypt_token(creds["refresh_token_encrypted"])
         service = gdrive.get_drive_service(refresh_token)
