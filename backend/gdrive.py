@@ -190,6 +190,25 @@ def build_credentials_from_refresh_token(refresh_token: str) -> Credentials:
     )
 
 
+
+def get_access_token(refresh_token: str) -> tuple[str, int]:
+    """Genera un access_token short-lived (~1h) usando il refresh_token.
+    Ritorna (access_token, expires_in_seconds). Il browser usera\' questo
+    token per chiamare Drive API direttamente, senza passare bytes
+    attraverso il nostro server.
+    Il refresh_token NON e\' mai esposto al frontend."""
+    from google.auth.transport.requests import Request as GoogleRequest
+    creds = build_credentials_from_refresh_token(refresh_token)
+    creds.refresh(GoogleRequest())
+    # creds.expiry e\' un datetime UTC
+    if creds.expiry:
+        from datetime import datetime as _dt, timezone as _tz
+        delta = creds.expiry - _dt.now(_tz.utc).replace(tzinfo=None)
+        expires_in = max(60, int(delta.total_seconds()))
+    else:
+        expires_in = 3600
+    return creds.token, expires_in
+
 def get_drive_service(refresh_token: str):
     """Ritorna un service Drive API autenticato per l'utente.
     Solleva HttpError 401/403 se il token e' stato revocato."""
