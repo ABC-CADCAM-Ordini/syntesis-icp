@@ -801,28 +801,58 @@ async def gdrive_connect_start(token: str):
 async def gdrive_callback(code: str = "", state: str = "", error: str = ""):
     """Callback OAuth da Google. Verifica state, scambia code per token,
     cifra il refresh_token, salva nel DB. Poi redirect a /dashboard."""
+    logger.info(f"[gdrive_callback] called code={bool(code)} state={bool(state)} error={error!r}")
     if error:
+        logger.warning(f"[gdrive_callback] OAuth error from Google: {error}")
+        from urllib.parse import quote as _q
         return RedirectResponse(
-            url=f"/dashboard?tab=cloud&error={error}", status_code=302)
+            url=f"/dashboard?tab=cloud&gdrive_error={_q(error)}", status_code=302)
     if not code or not state:
-        raise HTTPException(400, detail="Parametri OAuth mancanti.")
+        logger.warning(f"[gdrive_callback] missing params code={bool(code)} state={bool(state)}")
+        return RedirectResponse(
+            url="/dashboard?tab=cloud&gdrive_error=missing_params", status_code=302)
     user_id = gdrive.verify_state_token(state)
     if not user_id:
-        raise HTTPException(400, detail="State token non valido o scaduto.")
+        logger.warning("[gdrive_callback] state token invalid or expired")
+        return RedirectResponse(
+            url="/dashboard?tab=cloud&gdrive_error=state_invalid", status_code=302)
+    logger.info(f"[gdrive_callback] state OK user_id={user_id}")
     try:
         tokens = gdrive.exchange_code_for_tokens(code)
+        logger.info(f"[gdrive_callback] tokens received: refresh_token={'PRESENT' if tokens.get('refresh_token') else 'MISSING'} email={tokens.get('email','?')}")
     except Exception as e:
+        from urllib.parse import quote as _q
+        msg = str(e)
+        logger.error(f"[gdrive_callback] exchange_code_for_tokens FAILED: {msg}")
         return RedirectResponse(
-            url=f"/dashboard?tab=cloud&error={str(e)[:200]}", status_code=302)
-    encrypted = gdrive.encrypt_token(tokens["refresh_token"])
-    ok = await set_gdrive_credentials(
-        user_id=user_id,
-        email=tokens.get("email", ""),
-        refresh_token_encrypted=encrypted,
-    )
+            url=f"/dashboard?tab=cloud&gdrive_error={_q(msg[:200])}", status_code=302)
+    if not tokens.get("refresh_token"):
+        logger.error("[gdrive_callback] refresh_token MISSING from tokens dict")
+        return RedirectResponse(
+            url="/dashboard?tab=cloud&gdrive_error=no_refresh_token", status_code=302)
+    try:
+        encrypted = gdrive.encrypt_token(tokens["refresh_token"])
+        logger.info(f"[gdrive_callback] token encrypted len={len(encrypted)}")
+    except Exception as e:
+        logger.exception("[gdrive_callback] encrypt_token failed")
+        return RedirectResponse(
+            url="/dashboard?tab=cloud&gdrive_error=encrypt_failed", status_code=302)
+    try:
+        ok = await set_gdrive_credentials(
+            user_id=user_id,
+            email=tokens.get("email", ""),
+            refresh_token_encrypted=encrypted,
+        )
+        logger.info(f"[gdrive_callback] set_gdrive_credentials ok={ok}")
+    except Exception as e:
+        logger.exception("[gdrive_callback] set_gdrive_credentials raised")
+        return RedirectResponse(
+            url="/dashboard?tab=cloud&gdrive_error=db_save_exception", status_code=302)
     if not ok:
+        logger.error("[gdrive_callback] set_gdrive_credentials returned False")
         return RedirectResponse(
-            url="/dashboard?tab=cloud&error=save_failed", status_code=302)
+            url="/dashboard?tab=cloud&gdrive_error=db_save_failed", status_code=302)
+    logger.info(f"[gdrive_callback] SUCCESS user_id={user_id}")
     return RedirectResponse(
         url="/dashboard?tab=cloud&connected=1", status_code=302)
 
