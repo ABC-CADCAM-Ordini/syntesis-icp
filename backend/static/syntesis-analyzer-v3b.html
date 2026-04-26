@@ -1527,6 +1527,28 @@ function onViewportClick(event){
 //   2. Their centroid is the center of the flat face
 //   3. Their average normal is the axis direction (deterministic regardless of exact click pixel)
 function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
+  // ═══════════════════════════════════════════════════════════════════════
+  // ALGORITMO: FIT DI CERCHIO A RAGGIO FISSO CAD-aware (client-side)
+  // USATO DA: workflow Analizza (default), Sostituire (con opts.radius)
+  //
+  // Architettura del progetto - i tre algoritmi di posizionamento (v7.3.9.042):
+  //   - Misurare    -> analyze_stl_pair       (backend Python, weighted ICP)
+  //   - Analizza    -> findScanbodyCenter     (questa funzione, fit specializzato)
+  //   - Sostituire  -> sostAlignAll           (ICP locale, riusa questa)
+  // Vedi MASTER_DOC.md sezione 3.1 per il razionale.
+  //
+  // Perche' fit specializzato e non weighted ICP generalista in Analizza?
+  // Conoscendo il raggio nominale CAD (1T3=2.515mm, OS=1.78mm, SR=2.03mm),
+  // il problema si riduce a un solo parametro libero (il centro).
+  // Errore tipico < 15um sotto rumore di scansione, deterministico,
+  // tempo di calcolo in millisecondi. Per questa geometria specifica, e'
+  // piu' accurato del weighted ICP, che non sfrutta la conoscenza del raggio.
+  //
+  // v7.3.9.042: opt-in alternativa server-side via /api/place-mua quando
+  // l'utente seleziona "Algoritmo: server" nelle impostazioni. La routing
+  // logic e' in alignAll() che chiama alignAllServer() oppure questa.
+  // ═══════════════════════════════════════════════════════════════════════
+  //
   // Cylinder fitting deterministico con raggio noto (scanbody 1T3: r=2.515mm)
   // 1. Trova la faccia piatta -> asse
   // 2. Proietta i punti su piano perpendicolare all'asse
