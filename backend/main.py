@@ -189,7 +189,8 @@ async def analyze(
         filename_a=file_a.filename,
         filename_b=file_b.filename,
         score=result["score"],
-        rmsd=result["icp_rmsd"]
+        rmsd=result["icp_rmsd"],
+        result_json=result
     )
 
     if save_to_leaderboard and consent and operator_name and location:
