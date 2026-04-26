@@ -272,6 +272,14 @@ function pdf(){
     });
   }
 
+  // v7.3.9.043 - Score model + Algoritmo nella cover (tracciabilita')
+  // Misurare usa SEMPRE backend weighted ICP, marcato come Syntesis Score v1.0
+  doc.setFont('helvetica','normal');doc.setFontSize(7);
+  doc.setTextColor(180,190,200);
+  var scoreModel = (p && p.score_model_version) ? p.score_model_version : 'Syntesis Score v1.0';
+  var algoLabel = (p && p.algorithm) ? p.algorithm : 'server_weighted_icp_v1';
+  doc.text('Modello voto: ' + scoreModel + '   Algoritmo: ' + algoLabel, W/2, H-12, {align:'center'});
+
   // ── Bottom bar (gold) + footer ──────────────────────────────────────
   doc.setFillColor(255,215,0);doc.rect(0,H-3,W,3,'F');
   doc.setFillColor(245,158,11);doc.rect(0,H-4.5,W,1.5,'F');
