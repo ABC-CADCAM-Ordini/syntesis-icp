@@ -13,7 +13,7 @@ import math
 from datetime import datetime
 from typing import Optional
 
-VERSION = "7.3.9.040"
+VERSION = "7.3.9.043"
 SCORE_MODEL_VERSION = "Syntesis Score v1.0"
 
 
@@ -61,6 +61,7 @@ PDF_STRINGS = {
         "diff": "Differenza",
         "note": "Note",
         "scoreModel": "Modello voto",
+        "algorithm": "Algoritmo",
         "warnings": "Avvertenze",
         "notEvaluable": "Caso non valutabile",
     },
@@ -104,6 +105,7 @@ PDF_STRINGS = {
         "diff": "Difference",
         "note": "Notes",
         "scoreModel": "Score model",
+        "algorithm": "Algorithm",
         "warnings": "Warnings",
         "notEvaluable": "Not evaluable",
     },
@@ -147,6 +149,7 @@ PDF_STRINGS = {
         "diff": "Diferencia",
         "note": "Notas",
         "scoreModel": "Modelo de puntuacion",
+        "algorithm": "Algoritmo",
         "warnings": "Advertencias",
         "notEvaluable": "No evaluable",
     },
@@ -190,6 +193,7 @@ PDF_STRINGS = {
         "diff": "Difference",
         "note": "Notes",
         "scoreModel": "Modele de score",
+        "algorithm": "Algorithme",
         "warnings": "Avertissements",
         "notEvaluable": "Non evaluable",
     },
@@ -233,6 +237,7 @@ PDF_STRINGS = {
         "diff": "Differenz",
         "note": "Notizen",
         "scoreModel": "Bewertungsmodell",
+        "algorithm": "Algorithmus",
         "warnings": "Warnungen",
         "notEvaluable": "Nicht bewertbar",
     },
@@ -309,6 +314,8 @@ def _generate_reportlab(record: dict) -> bytes:
     score_model  = record.get("score_model_version", SCORE_MODEL_VERSION)
     warnings     = record.get("warnings", [])
     analysis_mode = record.get("analysis_mode", "pairwise")
+    # v7.3.9.043: tipo di calcolo usato (per Misurare = sempre server/weighted ICP)
+    algorithm = record.get("algorithm", "server_weighted_icp_v1")
 
     # Modalita' template -> non valutabile metrologicamente
     is_template_mode = analysis_mode == "template"
@@ -355,7 +362,7 @@ def _generate_reportlab(record: dict) -> bytes:
         Paragraph(
             f"<font color='#{score_col.hexval()[2:]}' size='14'><b>{score_lbl}</b></font><br/>"
             f"<font size='8' color='#7A90A4'>{LS['rmsdLabel']}: {rmsd:.4f} mm - {LS['profile']}: {profile}</font><br/>"
-            f"<font size='7' color='#94A3B8'>{LS['scoreModel']}: {score_model}</font>",
+            f"<font size='7' color='#94A3B8'>{LS['scoreModel']}: {score_model} - {LS['algorithm']}: {algorithm}</font>",
             body_style
         ),
         Paragraph(
