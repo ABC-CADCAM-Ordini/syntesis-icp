@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<!-- Syntesis-ICP - Dashboard utente
+     Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
+     v7.3.9.046 - Backend utente: mie analisi, profilo, classifica -->
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Syntesis-ICP - Area personale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#0065B3; --blue-mid:#0077CC; --blue-light:#E8F4FF;
+  --dark:#0F1923; --mid:#3D5166; --gray:#7A90A4;
+  --pearl:#F0F5FA; --light:#F7F9FC; --border:#D6E4F0;
+  --white:#FFFFFF; --green:#0D9E6E; --red:#DC2626; --gold:#F59E0B;
+  --radius:14px;
+  --font:'Source Sans 3','Source Sans Pro',sans-serif;
+  --mono:'Source Sans 3','Source Sans Pro',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{
+  font-family:var(--font);
+  background:#E2EBF5;
+  background-image:radial-gradient(ellipse at 15% 0%,rgba(0,101,179,.08) 0%,transparent 55%),
+                   radial-gradient(ellipse at 85% 100%,rgba(0,101,179,.05) 0%,transparent 50%);
+  min-height:100vh;color:var(--dark);
+  font-feature-settings:"tnum";font-variant-numeric:tabular-nums;
+  padding:28px 16px 48px;
+}
+.app-wrapper{width:100%;max-width:1100px;margin:0 auto}
+
+/* Header coerente con altre pagine */
+.app-card{
+  background:var(--white);border-radius:var(--radius);
+  box-shadow:0 8px 40px rgba(0,50,100,.12),0 2px 8px rgba(0,50,100,.07);
+  margin-bottom:18px;overflow:hidden;
+}
+.app-header{
+  padding:18px 24px;border-bottom:3px solid var(--blue);
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+}
+.app-title{font-size:18px;font-weight:800;color:var(--dark);letter-spacing:-.01em}
+.app-sub{font-size:11px;font-weight:600;color:var(--gray);margin-top:2px}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn-outline{
+  padding:8px 14px;background:var(--white);border:1.5px solid var(--border);
+  border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;
+  color:var(--dark);transition:.15s;font-family:var(--font);
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+.btn-cta{
+  padding:8px 14px;background:linear-gradient(135deg,#0077CC,#0050A0);color:#fff;
+  border:none;border-radius:9px;font-size:12px;font-weight:800;cursor:pointer;
+  transition:.2s;font-family:var(--font);box-shadow:0 4px 12px rgba(0,100,180,.2);
+}
+.btn-cta:hover{opacity:.92;transform:translateY(-1px)}
+.btn-danger{
+  padding:6px 12px;background:#FFF5F5;border:1.5px solid #FCA5A5;
+  border-radius:7px;color:var(--red);font-size:11px;font-weight:700;cursor:pointer;
+  font-family:var(--font);
+}
+.btn-danger:hover{background:#FEE2E2}
+
+/* Tabs */
+.tabs{
+  display:flex;gap:4px;background:var(--pearl);border-radius:10px;
+  padding:4px;margin:16px 24px 0;
+}
+.tab{
+  padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;
+  cursor:pointer;color:var(--gray);border:none;background:transparent;
+  transition:.15s;font-family:var(--font);flex:1;text-align:center;
+}
+.tab.active{background:var(--white);color:var(--blue);box-shadow:0 1px 5px rgba(0,50,100,.12)}
+
+.tab-content{padding:22px 24px 28px;display:none}
+.tab-content.active{display:block}
+
+/* Stats cards */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+@media(max-width:720px){.stats-row{grid-template-columns:repeat(2,1fr)}}
+.stat-card{
+  background:var(--light);border:1.5px solid var(--border);border-radius:10px;
+  padding:14px 16px;
+}
+.stat-label{font-size:10px;font-weight:800;color:var(--gray);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.stat-value{font-size:24px;font-weight:800;color:var(--dark);line-height:1}
+.stat-sub{font-size:11px;color:var(--gray);margin-top:4px}
+
+/* Lista analisi */
+.list-toolbar{
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap;
+}
+.filter-group{display:flex;gap:6px;align-items:center}
+.filter-btn{
+  padding:6px 14px;border:1.5px solid var(--border);border-radius:18px;
+  font-size:11px;font-weight:700;cursor:pointer;background:var(--white);
+  color:var(--gray);transition:.15s;font-family:var(--font);
+}
+.filter-btn.active{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+
+.analysis-table{
+  width:100%;border-collapse:collapse;font-family:var(--font);
+  border:1.5px solid var(--border);border-radius:10px;overflow:hidden;
+  background:var(--white);
+}
+.analysis-table thead{background:var(--light)}
+.analysis-table th{
+  text-align:left;padding:11px 14px;font-size:10px;font-weight:800;
+  color:var(--gray);text-transform:uppercase;letter-spacing:.06em;
+  border-bottom:1.5px solid var(--border);
+}
+.analysis-table th.right{text-align:right}
+.analysis-table td{
+  padding:11px 14px;font-size:13px;border-bottom:1px solid var(--light);
+  color:var(--dark);vertical-align:middle;
+}
+.analysis-table td.right{text-align:right}
+.analysis-table tr:last-child td{border-bottom:none}
+.analysis-table tr:hover td{background:var(--light)}
+.cell-name{font-weight:700;cursor:pointer}
+.cell-name:hover{color:var(--blue);text-decoration:underline}
+.cell-meta{font-size:11px;color:var(--gray);font-family:var(--mono);margin-top:2px}
+.score-badge{
+  display:inline-block;padding:3px 10px;border-radius:14px;font-size:12px;
+  font-weight:800;font-family:var(--mono);
+}
+.score-eccellente{background:#EAF3DE;color:#3B6D11}
+.score-buono{background:#FEF3C7;color:#854D0E}
+.score-sufficiente{background:#FFEDD5;color:#9A3412}
+.score-scarso{background:#FEE2E2;color:#991B1B}
+.score-critico{background:#F3E0F7;color:#6B21A8}
+.row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.row-actions button{
+  padding:5px 10px;border:1px solid var(--border);background:var(--white);
+  border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;
+  font-family:var(--font);color:var(--mid);transition:.15s;
+}
+.row-actions button:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+.row-actions .danger{color:var(--red);border-color:#FCA5A5}
+.row-actions .danger:hover{background:#FEE2E2;color:var(--red)}
+
+.empty-state{
+  text-align:center;padding:48px 24px;color:var(--gray);
+  font-family:var(--mono);font-size:13px;line-height:1.7;
+}
+.empty-state .ico{font-size:42px;margin-bottom:12px;opacity:.4}
+
+.pagination{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--gray);
+}
+
+/* Modal */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(15,25,35,.7);z-index:200;
+  display:none;align-items:center;justify-content:center;padding:18px;
+}
+.modal-overlay.show{display:flex}
+.modal{
+  background:var(--white);border-radius:14px;padding:22px;
+  max-width:480px;width:100%;box-shadow:0 24px 60px rgba(0,30,80,.5);
+}
+.modal-title{font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px}
+.modal-sub{font-size:12px;color:var(--gray);font-family:var(--mono);margin-bottom:16px;line-height:1.5}
+.modal-field{margin-bottom:12px}
+.modal-field label{display:block;font-size:10px;font-weight:800;color:var(--gray);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.modal-field input,.modal-field textarea{
+  width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;
+  font-family:var(--font);font-size:13px;color:var(--dark);background:var(--white);
+  outline:none;transition:.15s;
+}
+.modal-field input:focus,.modal-field textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,119,204,.1)}
+.modal-field textarea{min-height:90px;resize:vertical}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+
+/* Profilo */
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:720px){.profile-grid{grid-template-columns:1fr}}
+.profile-card{
+  background:var(--light);border:1.5px solid var(--border);
+  border-radius:10px;padding:18px;
+}
+.profile-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #E2E8F0;font-size:13px}
+.profile-row:last-child{border-bottom:none}
+.profile-row .lbl{color:var(--gray);font-weight:600}
+.profile-row .val{color:var(--dark);font-weight:700;font-family:var(--mono)}
+.profile-section-title{font-size:11px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--dark);color:#fff;font-size:12px;font-weight:700;
+  padding:10px 22px;border-radius:22px;opacity:0;pointer-events:none;
+  transition:.3s;z-index:999;white-space:nowrap;max-width:90vw;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{background:var(--red)}
+
+/* Loading */
+.spinner{
+  display:inline-block;width:14px;height:14px;
+  border:2px solid rgba(0,0,0,.1);border-top-color:var(--blue);
+  border-radius:50%;animation:spin .7s linear infinite;
+  vertical-align:middle;margin-right:6px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading{padding:32px;text-align:center;color:var(--gray);font-family:var(--mono);font-size:12px}
+
+/* Login required state */
+.auth-required{
+  background:linear-gradient(135deg,var(--blue-light),#F0F9FF);
+  border:1.5px solid #BAE0FF;border-radius:var(--radius);
+  padding:28px;text-align:center;margin:24px 0;
+}
+.auth-required .ico{font-size:42px;margin-bottom:10px;opacity:.6}
+.auth-required .title{font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px}
+.auth-required .desc{font-size:12px;color:var(--gray);font-family:var(--mono);line-height:1.7;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="app-wrapper">
+
+  <!-- Header -->
+  <div class="app-card">
+    <div class="app-header">
+      <div>
+        <div class="app-title">Area personale</div>
+        <div class="app-sub">Le tue analisi, il tuo profilo, le classifiche</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-outline" onclick="location.href='/analizzare'">Vai all'analisi</button>
+        <button class="btn-outline" id="btnLogout" onclick="doLogout()">Esci</button>
+      </div>
+    </div>
+
+    <!-- Auth gate -->
+    <div id="authGate" class="auth-required" hidden>
+      <div class="ico">&#x1F510;</div>
+      <div class="title">Accesso richiesto</div>
+      <div class="desc">Per visualizzare le tue analisi devi essere autenticato.<br>Apri il modulo Analizza e accedi prima di tornare qui.</div>
+      <button class="btn-cta" onclick="location.href='/analizzare'">Vai al login</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="tabsNav" hidden>
+      <button class="tab active" data-tab="analyses" onclick="switchTab('analyses')">Le mie analisi</button>
+      <button class="tab" data-tab="profile" onclick="switchTab('profile')">Profilo</button>
+      <button class="tab" data-tab="leaderboard" onclick="switchTab('leaderboard')">Classifica</button>
+    </div>
+
+    <!-- TAB: ANALISI -->
+    <div class="tab-content active" id="tabAnalyses" hidden>
+      <div class="stats-row" id="statsRow"></div>
+
+      <div class="list-toolbar">
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="active" onclick="switchFilter('active')">Attive</button>
+          <button class="filter-btn" data-filter="archived" onclick="switchFilter('archived')">Archiviate</button>
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="totalCount">&mdash;</div>
+      </div>
+
+      <div id="analysesContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
+      <div class="pagination" id="pagination" hidden></div>
+    </div>
+
+    <!-- TAB: PROFILO -->
+    <div class="tab-content" id="tabProfile">
+      <div id="profileContainer" class="loading"><span class="spinner"></span>Caricamento profilo...</div>
+    </div>
+
+    <!-- TAB: CLASSIFICA -->
+    <div class="tab-content" id="tabLeaderboard">
+      <div id="leaderboardContainer" class="loading"><span class="spinner"></span>Caricamento classifica...</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;font-size:10px;color:var(--gray);font-weight:600;letter-spacing:.04em;margin-top:14px">
+    Syntesis-ICP &middot; Area personale &middot; v7.3.9.046
+  </div>
+</div>
+
+<!-- Modal rinomina/modifica -->
+<div class="modal-overlay" id="modalEdit">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Modifica analisi</div>
+    <div class="modal-sub">I file STL originali non vengono memorizzati. Puoi solo cambiare nome e note.</div>
+    <div class="modal-field">
+      <label>Nome dell'analisi</label>
+      <input type="text" id="modalName" maxlength="200" placeholder="Es. Caso Rossi - 12 marzo">
+    </div>
+    <div class="modal-field">
+      <label>Note (opzionale)</label>
+      <textarea id="modalNotes" maxlength="5000" placeholder="Annotazioni cliniche, ID paziente, dettagli..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeModal()">Annulla</button>
+      <button class="btn-cta" onclick="saveModal()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal profilo -->
+<div class="modal-overlay" id="modalProfile">
+  <div class="modal">
+    <div class="modal-title">Modifica profilo</div>
+    <div class="modal-sub">Email e licenza non sono modificabili.</div>
+    <div class="modal-field">
+      <label>Nome</label>
+      <input type="text" id="modalProfileName" maxlength="200">
+    </div>
+    <div class="modal-field">
+      <label>Organizzazione</label>
+      <input type="text" id="modalProfileOrg" maxlength="200" placeholder="Studio dentistico, laboratorio...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeProfileModal()">Annulla</button>
+      <button class="btn-cta" onclick="saveProfileModal()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+// ── Stato ───────────────────────────────────────────────────────────────────
+var TOKEN_KEY = 'syntesis_token';
+var state = {
+  token: null,
+  filter: 'active',
+  page: 0,
+  pageSize: 25,
+  editing: null   // analisi corrente in modifica
+};
+
+function getToken(){
+  try { return localStorage.getItem(TOKEN_KEY) || ''; } catch(e){ return ''; }
+}
+
+function authHeaders(){
+  return { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' };
+}
+
+function showToast(msg, isError){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(function(){ t.classList.remove('show'); }, 2800);
+}
+
+function fmtDate(iso){
+  if(!iso) return '—';
+  var d = new Date(iso);
+  if(isNaN(d.getTime())) return iso;
+  var dd = String(d.getDate()).padStart(2,'0');
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var yy = d.getFullYear();
+  var hh = String(d.getHours()).padStart(2,'0');
+  var mi = String(d.getMinutes()).padStart(2,'0');
+  return dd+'/'+mm+'/'+yy+' '+hh+':'+mi;
+}
+
+function scoreBadge(score){
+  if(score == null) return '<span class="score-badge">—</span>';
+  var cls = 'score-critico', lbl = 'Critico';
+  if(score >= 85){ cls = 'score-eccellente'; lbl = 'Eccellente'; }
+  else if(score >= 70){ cls = 'score-buono'; lbl = 'Buono'; }
+  else if(score >= 50){ cls = 'score-sufficiente'; lbl = 'Sufficiente'; }
+  else if(score >= 33){ cls = 'score-scarso'; lbl = 'Scarso'; }
+  return '<span class="score-badge '+cls+'">'+score+' &middot; '+lbl+'</span>';
+}
+
+// ── Auth check ──────────────────────────────────────────────────────────────
+function checkAuth(){
+  state.token = getToken();
+  if(!state.token){
+    document.getElementById('authGate').hidden = false;
+    document.getElementById('tabsNav').hidden = true;
+    document.querySelectorAll('.tab-content').forEach(function(el){ el.hidden = true; });
+    document.getElementById('btnLogout').hidden = true;
+    return false;
+  }
+  document.getElementById('authGate').hidden = true;
+  document.getElementById('tabsNav').hidden = false;
+  document.getElementById('tabAnalyses').hidden = false;
+  return true;
+}
+
+function doLogout(){
+  try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
+  showToast('Disconnesso');
+  setTimeout(function(){ location.href = '/analizzare'; }, 800);
+}
+
+// ── Tab switching ───────────────────────────────────────────────────────────
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.classList.toggle('active', t.dataset.tab === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(function(c){
+    c.classList.toggle('active', c.id === 'tab' + name.charAt(0).toUpperCase() + name.slice(1));
+  });
+  if(name === 'analyses'){ loadAnalyses(); loadStats(); }
+  else if(name === 'profile'){ loadProfile(); }
+  else if(name === 'leaderboard'){ loadLeaderboard(); }
+}
+
+function switchFilter(f){
+  state.filter = f;
+  state.page = 0;
+  document.querySelectorAll('.filter-btn').forEach(function(b){
+    b.classList.toggle('active', b.dataset.filter === f);
+  });
+  loadAnalyses();
+}
+
+// ── Stats (dal /api/me/profile) ─────────────────────────────────────────────
+async function loadStats(){
+  try {
+    var r = await fetch('/api/me/profile', { headers: authHeaders() });
+    if(!r.ok) return;
+    var data = await r.json();
+    var stats = data.stats || {};
+    var avg = stats.avg_score != null ? Math.round(stats.avg_score) : '—';
+    var best = stats.best_score != null ? stats.best_score : '—';
+    document.getElementById('statsRow').innerHTML =
+      '<div class="stat-card"><div class="stat-label">Totali</div><div class="stat-value">' + (stats.n_total || 0) + '</div><div class="stat-sub">analisi salvate</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Media voto</div><div class="stat-value">' + avg + '</div><div class="stat-sub">su tutte</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Miglior voto</div><div class="stat-value">' + best + '</div><div class="stat-sub">storico</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Archiviate</div><div class="stat-value">' + (stats.n_archived || 0) + '</div><div class="stat-sub">non visibili</div></div>';
+  } catch(e){ console.warn('stats', e); }
+}
+
+// ── Lista analisi ───────────────────────────────────────────────────────────
+async function loadAnalyses(){
+  var box = document.getElementById('analysesContainer');
+  box.className = 'loading';
+  box.innerHTML = '<span class="spinner"></span>Caricamento...';
+  try {
+    var url = '/api/me/analyses?archived=' + (state.filter === 'archived' ? 'true' : 'false') +
+              '&limit=' + state.pageSize + '&offset=' + (state.page * state.pageSize);
+    var r = await fetch(url, { headers: authHeaders() });
+    if(r.status === 401){ checkAuth(); return; }
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    renderAnalyses(data);
+  } catch(e){
+    box.className = 'empty-state';
+    box.innerHTML = '<div class="ico">&#9888;</div>Errore caricamento: ' + e.message;
+  }
+}
+
+function renderAnalyses(data){
+  var box = document.getElementById('analysesContainer');
+  box.className = '';
+  document.getElementById('totalCount').textContent = data.total + ' totali';
+  if(!data.items || data.items.length === 0){
+    box.className = 'empty-state';
+    box.innerHTML = '<div class="ico">&#x1F4C1;</div>' +
+      (state.filter === 'archived'
+        ? 'Nessuna analisi archiviata.'
+        : 'Nessuna analisi salvata. Esegui un confronto STL nel modulo Analizza per iniziare.');
+    document.getElementById('pagination').hidden = true;
+    return;
+  }
+  var html = '<table class="analysis-table"><thead><tr>' +
+             '<th>Nome</th><th class="right">Voto</th><th class="right">RMSD</th>' +
+             '<th class="right">Data</th><th class="right">Azioni</th></tr></thead><tbody>';
+  data.items.forEach(function(a){
+    var name = a.display_name || (a.filename_a + ' vs ' + a.filename_b) || a.id.slice(0,8);
+    var rmsdMm = a.rmsd != null ? a.rmsd.toFixed(4) : '—';
+    var rmsdUm = a.rmsd != null ? Math.round(a.rmsd * 1000) + ' &mu;m' : '—';
+    var meta = (a.filename_a || '?') + ' &middot; ' + (a.filename_b || '?');
+    html += '<tr data-id="' + a.id + '">' +
+      '<td><div class="cell-name" onclick="openDetail(\'' + a.id + '\')">' + escapeHtml(name) + '</div>' +
+      '<div class="cell-meta">' + escapeHtml(meta) + '</div>' +
+      (a.notes ? '<div class="cell-meta" style="color:#94A3B8;font-style:italic">' + escapeHtml(a.notes.slice(0,80)) + (a.notes.length > 80 ? '...' : '') + '</div>' : '') +
+      '</td>' +
+      '<td class="right">' + scoreBadge(a.score) + '</td>' +
+      '<td class="right" style="font-family:var(--mono);font-size:12px">' + rmsdUm + '</td>' +
+      '<td class="right" style="font-family:var(--mono);font-size:11px;color:var(--gray)">' + fmtDate(a.created_at) + '</td>' +
+      '<td class="right"><div class="row-actions">' +
+        '<button onclick="openEdit(\'' + a.id + '\')" title="Rinomina">Modifica</button>' +
+        '<button onclick="downloadPdf(\'' + a.id + '\')" title="Scarica PDF">PDF</button>' +
+        (state.filter === 'archived'
+          ? '<button onclick="setArchived(\'' + a.id + '\', false)" title="Ripristina">Ripristina</button>'
+          : '<button onclick="setArchived(\'' + a.id + '\', true)" title="Archivia">Archivia</button>') +
+        '<button class="danger" onclick="deleteAnalysis(\'' + a.id + '\')" title="Elimina">Elimina</button>' +
+      '</div></td></tr>';
+  });
+  html += '</tbody></table>';
+  box.innerHTML = html;
+
+  // Pagination
+  var pag = document.getElementById('pagination');
+  var totalPages = Math.ceil(data.total / state.pageSize);
+  if(totalPages > 1){
+    pag.hidden = false;
+    pag.innerHTML =
+      '<button class="btn-outline" ' + (state.page === 0 ? 'disabled' : '') + ' onclick="changePage(-1)">&larr; Precedente</button>' +
+      '<span>Pagina ' + (state.page + 1) + ' di ' + totalPages + '</span>' +
+      '<button class="btn-outline" ' + (state.page >= totalPages - 1 ? 'disabled' : '') + ' onclick="changePage(1)">Successiva &rarr;</button>';
+  } else {
+    pag.hidden = true;
+  }
+}
+
+function changePage(delta){
+  state.page = Math.max(0, state.page + delta);
+  loadAnalyses();
+}
+
+function escapeHtml(s){
+  if(!s) return '';
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+// ── Modal modifica ──────────────────────────────────────────────────────────
+function openEdit(id){
+  // Recupero dati riga corrente
+  var row = document.querySelector('tr[data-id="' + id + '"]');
+  if(!row) return;
+  state.editing = id;
+  // Carico dettaglio
+  fetch('/api/me/analyses/' + id, { headers: authHeaders() })
+    .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function(a){
+      document.getElementById('modalName').value = a.display_name ||
+        ((a.filename_a || '') + ' vs ' + (a.filename_b || ''));
+      document.getElementById('modalNotes').value = a.notes || '';
+      document.getElementById('modalEdit').classList.add('show');
+      setTimeout(function(){ document.getElementById('modalName').focus(); }, 50);
+    })
+    .catch(function(err){ showToast('Errore: ' + err, true); });
+}
+
+function closeModal(){
+  document.getElementById('modalEdit').classList.remove('show');
+  state.editing = null;
+}
+
+async function saveModal(){
+  if(!state.editing) return;
+  var name = document.getElementById('modalName').value.trim();
+  var notes = document.getElementById('modalNotes').value.trim();
+  if(name.length < 1){ showToast('Il nome non puo\' essere vuoto.', true); return; }
+  try {
+    var r = await fetch('/api/me/analyses/' + state.editing, {
+      method: 'PATCH', headers: authHeaders(),
+      body: JSON.stringify({ display_name: name, notes: notes })
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Salvato.');
+    closeModal();
+    loadAnalyses();
+  } catch(e){ showToast('Errore salvataggio: ' + e.message, true); }
+}
+
+async function setArchived(id, val){
+  try {
+    var r = await fetch('/api/me/analyses/' + id, {
+      method: 'PATCH', headers: authHeaders(),
+      body: JSON.stringify({ archived: val })
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    showToast(val ? 'Analisi archiviata.' : 'Analisi ripristinata.');
+    loadAnalyses();
+    loadStats();
+  } catch(e){ showToast('Errore: ' + e.message, true); }
+}
+
+async function deleteAnalysis(id){
+  if(!confirm('Eliminare definitivamente questa analisi?\nL\'azione non puo\' essere annullata.')) return;
+  try {
+    var r = await fetch('/api/me/analyses/' + id, {
+      method: 'DELETE', headers: authHeaders()
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Analisi eliminata.');
+    loadAnalyses();
+    loadStats();
+  } catch(e){ showToast('Errore eliminazione: ' + e.message, true); }
+}
+
+async function downloadPdf(id){
+  try {
+    showToast('Generazione PDF...');
+    var r = await fetch('/api/report/' + id, { method: 'POST', headers: authHeaders() });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var blob = await r.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'syntesis-report-' + id.slice(0,8) + '.pdf';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  } catch(e){ showToast('Errore PDF: ' + e.message, true); }
+}
+
+function openDetail(id){
+  // Per ora apre la modal di modifica. Future: pagina dedicata con grafici.
+  openEdit(id);
+}
+
+// ── Profilo ─────────────────────────────────────────────────────────────────
+async function loadProfile(){
+  var box = document.getElementById('profileContainer');
+  box.className = 'loading';
+  box.innerHTML = '<span class="spinner"></span>Caricamento...';
+  try {
+    var r = await fetch('/api/me/profile', { headers: authHeaders() });
+    if(r.status === 401){ checkAuth(); return; }
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var p = await r.json();
+    var s = p.stats || {};
+    box.className = '';
+    box.innerHTML =
+      '<div class="profile-grid">' +
+        '<div class="profile-card">' +
+          '<div class="profile-section-title">Dati account</div>' +
+          '<div class="profile-row"><span class="lbl">Nome</span><span class="val">' + escapeHtml(p.name || '—') + '</span></div>' +
+          '<div class="profile-row"><span class="lbl">Email</span><span class="val">' + escapeHtml(p.email || '—') + '</span></div>' +
+          '<div class="profile-row"><span class="lbl">Organizzazione</span><span class="val">' + escapeHtml(p.organization || '—') + '</span></div>' +
+          '<div class="profile-row"><span class="lbl">Ruolo</span><span class="val">' + escapeHtml(p.role || 'user') + '</span></div>' +
+          '<div class="profile-row"><span class="lbl">Iscritto dal</span><span class="val">' + fmtDate(p.created_at) + '</span></div>' +
+          '<div style="margin-top:14px;text-align:right">' +
+            '<button class="btn-outline" onclick="openProfileModal(' + JSON.stringify(escapeHtml(p.name||'')).replace(/"/g, '&quot;') + ', ' + JSON.stringify(escapeHtml(p.organization||'')).replace(/"/g, '&quot;') + ')">Modifica</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="profile-card">' +
+          '<div class="profile-section-title">Statistiche</div>' +
+          '<div class="profile-row"><span class="lbl">Analisi totali</span><span class="val">' + (s.n_total || 0) + '</span></div>' +
+          '<div class="profile-row"><span class="lbl">Voto medio</span><span class="val">' + (s.avg_score != null ? Math.round(s.avg_score) : '—') + '</span></div>' +
+          '<div class="profile-row"><span class="lbl">Miglior voto</span><span class="val">' + (s.best_score != null ? s.best_score : '—') + '</span></div>' +
+          '<div class="profile-row"><span class="lbl">Archiviate</span><span class="val">' + (s.n_archived || 0) + '</span></div>' +
+        '</div>' +
+      '</div>';
+  } catch(e){
+    box.className = 'empty-state';
+    box.innerHTML = '<div class="ico">&#9888;</div>Errore caricamento profilo: ' + e.message;
+  }
+}
+
+function openProfileModal(name, org){
+  document.getElementById('modalProfileName').value = name;
+  document.getElementById('modalProfileOrg').value = org;
+  document.getElementById('modalProfile').classList.add('show');
+}
+
+function closeProfileModal(){
+  document.getElementById('modalProfile').classList.remove('show');
+}
+
+async function saveProfileModal(){
+  var name = document.getElementById('modalProfileName').value.trim();
+  var org = document.getElementById('modalProfileOrg').value.trim();
+  if(name.length < 1){ showToast('Il nome non puo\' essere vuoto.', true); return; }
+  try {
+    var r = await fetch('/api/me/profile', {
+      method: 'PATCH', headers: authHeaders(),
+      body: JSON.stringify({ name: name, organization: org })
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Profilo aggiornato.');
+    closeProfileModal();
+    loadProfile();
+  } catch(e){ showToast('Errore: ' + e.message, true); }
+}
+
+// ── Classifica ──────────────────────────────────────────────────────────────
+async function loadLeaderboard(){
+  var box = document.getElementById('leaderboardContainer');
+  box.className = 'loading';
+  box.innerHTML = '<span class="spinner"></span>Caricamento classifica...';
+  try {
+    var r = await fetch('/api/leaderboard?limit=50');
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var rows = await r.json();
+    box.className = '';
+    if(!rows || rows.length === 0){
+      box.className = 'empty-state';
+      box.innerHTML = '<div class="ico">&#x1F3C6;</div>Nessuna entry in classifica al momento.';
+      return;
+    }
+    var html = '<table class="analysis-table"><thead><tr>' +
+               '<th style="width:40px">#</th><th>Operatore</th><th>Sede</th>' +
+               '<th class="right">Voto</th><th class="right">RMSD</th>' +
+               '<th class="right">Coppie</th><th class="right">Data</th></tr></thead><tbody>';
+    rows.forEach(function(row, i){
+      var rmsdUm = row.rmsd != null ? Math.round(row.rmsd * 1000) + ' &mu;m' : '—';
+      html += '<tr><td style="font-weight:800;color:var(--blue)">#' + (i+1) + '</td>' +
+        '<td>' + escapeHtml(row.operator_name || '—') + '</td>' +
+        '<td style="color:var(--gray);font-size:12px">' + escapeHtml(row.location || '—') + '</td>' +
+        '<td class="right">' + scoreBadge(row.score) + '</td>' +
+        '<td class="right" style="font-family:var(--mono);font-size:12px">' + rmsdUm + '</td>' +
+        '<td class="right" style="font-family:var(--mono);font-size:12px">' + (row.n_pairs || '—') + '</td>' +
+        '<td class="right" style="font-family:var(--mono);font-size:11px;color:var(--gray)">' + fmtDate(row.created_at) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+  } catch(e){
+    box.className = 'empty-state';
+    box.innerHTML = '<div class="ico">&#9888;</div>Errore caricamento: ' + e.message;
+  }
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function(){
+  if(checkAuth()){
+    loadStats();
+    loadAnalyses();
+  }
+});
+
+// Tasti scorciatoia: Esc chiude i modal
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    closeModal();
+    closeProfileModal();
+  }
+});
+</script>
+</body>
+</html>
