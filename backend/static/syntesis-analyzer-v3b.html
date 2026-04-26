@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.025</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.026</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Source Sans 3','Source Sans Pro',sans-serif;--mono:'Source Sans 3','Source Sans Pro',sans-serif}
@@ -321,7 +321,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .mis-tree-slider-row input[type=range]{flex:1;height:12px;accent-color:#0065B3;cursor:pointer;margin:0}
 .mis-tree-val{font-size:9px;color:var(--gray);min-width:30px;text-align:right}
 
-/* Certificato Taratura modal v7.3.9.025 */
+/* Certificato Taratura modal v7.3.9.026 */
 .calmodal-back{position:fixed;inset:0;background:rgba(15,25,35,.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px}
 .calmodal-back.show{display:flex}
 .calmodal{background:#fff;border-radius:14px;max-width:600px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(15,25,35,.3);font-family:var(--font)}
@@ -345,7 +345,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .calmodal-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
 .calmodal-btn.primary:hover{background:#004F8A}
 
-/* v7.3.9.025 draggable+resizable panels */
+/* v7.3.9.026 draggable+resizable panels */
 .syn-drag-handle {
   cursor: move;
   user-select: none;
@@ -375,7 +375,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.025</span>
+      <span class="sep" style="margin-left:8px;font-size:10px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.026</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -960,7 +960,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '7.3.9.025';
+window.ANALIZZA_BUILD = '7.3.9.026';
 window.ANALIZZA_BUILD_DATE = '2026-04-25';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2395,7 +2395,7 @@ function selectWorkflow(wf){
   // Se sto uscendo da Misurare verso un altro workflow, smonto il viewport ICP
   if(prev === 'misurare' && wf !== 'misurare'){
     try { misICP_unmountViewport(); } catch(e){ console.warn('[Misurare] unmount fallito:', e); }
-    // FIX v7.3.9.025: riaccendi artefatti Analizza se torni in analizza/accoppia
+    // FIX v7.3.9.026: riaccendi artefatti Analizza se torni in analizza/accoppia
     if(wf === 'analizza' || wf === 'accoppia'){
       try { _setAnalyzaArtifactsVisible(true); } catch(e){}
     }
@@ -2452,7 +2452,7 @@ function selectWorkflow(wf){
   }
   else if(wf === 'misurare'){
     analysisMode = 'misurare';
-    // FIX v7.3.9.025: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
+    // FIX v7.3.9.026: nascondi artefatti Analizza/Accoppia per evitare residui nel viewport Misurare
     try { _setAnalyzaArtifactsVisible(false); } catch(e){}
     if(panAng)  panAng.style.display  = 'none';
     if(panAx)   panAx.style.display   = 'none';
@@ -2544,7 +2544,7 @@ var FRES_PROXIMITY_DEG = 2.0;
 var fresState = {
   db: null,                    // { machines, selectedId, lastCustomAxis, lastCustomAxisByGid }
   mode: 'mean',                // 'mean' | 'minimax' | 'custom' (globale)
-  // v7.3.9.025: stato per-gruppo
+  // v7.3.9.026: stato per-gruppo
   axesByGid: {},               // { gid: {meanAxis, minimaxAxis, customAxis, setupAxis} }
   arrowsByGid: {},             // { gid: THREE.Group }
   pickersByGid: {},            // { gid: THREE.Mesh sfera }
@@ -2673,9 +2673,8 @@ function fresComputeMinimaxAxis(axes){
 
 // ===== Costruzione e aggiornamento freccia di setup =====
 function fresBuildArrow(gid, origin){
-  // v7.3.9.025: costruisce UNA freccia per uno specifico gruppo gid.
-  // origin: punto di base (centroide dei MUA del gruppo).
-  // Colore in linea col sistema: blu primario per gid=0, palette per gid>=1.
+  // v7.3.9.026: arrow SOLIDO stile cartoon - cilindro + cono mesh.
+  // depthTest:false e renderOrder alto -> sempre visibile sopra l'arcata.
   if(fresState.arrowsByGid[gid]){
     scene.remove(fresState.arrowsByGid[gid]);
     delete fresState.arrowsByGid[gid];
@@ -2684,46 +2683,91 @@ function fresBuildArrow(gid, origin){
   var grp = new THREE.Group();
   grp.name = 'FresabilitaArrow_g' + gid;
 
-  var len = 32;                       // era 25 (piu' visibile)
+  var totalLen = 32;        // mm totali della freccia
+  var coneLen  = 9;
+  var coneR    = 3.0;
+  var shaftR   = 1.4;       // asta robusta - cartoon
+  var shaftLen = totalLen - coneLen;
+
   var dir = new THREE.Vector3(0, 0, 1);
   var colorInt = getGroupArrowColorInt(gid);
-  // ArrowHelper(dir, origin, length, color, headLength, headWidth)
-  // Cono e linea piu' generosi rispetto al precedente 6/4
-  var arrow = new THREE.ArrowHelper(dir, origin, len, colorInt, 9, 5.5);
-  // L'ArrowHelper non supporta linewidth in WebGL; aggiungo un cilindro
-  // sottile come "shaft" per dare spessore visibile.
-  var shaftR = 0.55;
-  var shaftLen = len * 0.78;
-  var shaftGeo = new THREE.CylinderGeometry(shaftR, shaftR, shaftLen, 16);
-  var shaftMat = new THREE.MeshBasicMaterial({ color: colorInt, transparent: true, opacity: 0.95 });
-  var shaft = new THREE.Mesh(shaftGeo, shaftMat);
+
+  // Materiale: solido, sempre in primo piano, con piccolo bordo scuro per cartoon look
+  function solidMat(opacity){
+    var m = new THREE.MeshBasicMaterial({
+      color: colorInt,
+      transparent: opacity < 1.0,
+      opacity: opacity,
+      depthTest: false,        // sempre sopra
+      depthWrite: false
+    });
+    return m;
+  }
+
+  // ASTA cilindrica (CylinderGeometry orientato lungo Y, lo orientero' poi)
+  var shaftGeo = new THREE.CylinderGeometry(shaftR, shaftR, shaftLen, 24);
+  var shaft = new THREE.Mesh(shaftGeo, solidMat(0.95));
   shaft.userData.isFresShaft = true;
   shaft.userData.gid = gid;
-  // Lo shaft sara' orientato e posizionato in fresUpdateArrow
-  grp.add(arrow);
-  grp.add(shaft);
-  grp.userData.arrow = arrow;
-  grp.userData.shaft = shaft;
-  grp.userData.shaftLen = shaftLen;
-  grp.userData.origin = origin.clone();
-  grp.userData.length = len;
-  grp.userData.gid = gid;
+  shaft.renderOrder = 998;
 
-  // Sfera picker piu' grande e opaca
-  var pickGeo = new THREE.SphereGeometry(4, 24, 24);
-  var pickMat = new THREE.MeshBasicMaterial({ color: colorInt, transparent: true, opacity: 0.92 });
-  var picker = new THREE.Mesh(pickGeo, pickMat);
+  // CONO testa (CylinderGeometry con topR=0)
+  var coneGeo = new THREE.CylinderGeometry(0, coneR, coneLen, 24);
+  var cone = new THREE.Mesh(coneGeo, solidMat(0.95));
+  cone.userData.isFresCone = true;
+  cone.userData.gid = gid;
+  cone.renderOrder = 999;
+
+  // BORDO cartoon: edge geometry sopra cilindro+cono per il look "fumetto"
+  var edgeMat = new THREE.LineBasicMaterial({
+    color: 0x0F1923,           // var(--dark)
+    transparent: true,
+    opacity: 0.5,
+    depthTest: false,
+    depthWrite: false
+  });
+
+  // SFERA picker (drag handle) - grossa, opaca, sempre in primo piano
+  var pickGeo = new THREE.SphereGeometry(4, 32, 32);
+  var picker = new THREE.Mesh(pickGeo, solidMat(0.95));
   picker.userData.isFresPicker = true;
   picker.userData.gid = gid;
-  picker.position.copy(origin).addScaledVector(dir, len);
+  picker.renderOrder = 1000;
+  picker.position.copy(origin).addScaledVector(dir, totalLen);
+
+  // Anello scuro intorno alla sfera per cartoon look
+  var ringGeo = new THREE.RingGeometry(4.2, 4.6, 32);
+  var ringMat = new THREE.MeshBasicMaterial({
+    color: 0x0F1923,
+    transparent: true,
+    opacity: 0.35,
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  var ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.renderOrder = 999;
+  ring.position.copy(picker.position);
+
+  grp.add(shaft);
+  grp.add(cone);
   grp.add(picker);
+  grp.add(ring);
+
+  grp.userData.shaft = shaft;
+  grp.userData.cone = cone;
+  grp.userData.picker = picker;
+  grp.userData.ring = ring;
+  grp.userData.shaftLen = shaftLen;
+  grp.userData.coneLen = coneLen;
+  grp.userData.totalLen = totalLen;
+  grp.userData.origin = origin.clone();
+  grp.userData.gid = gid;
 
   fresState.arrowsByGid[gid] = grp;
   fresState.pickersByGid[gid] = picker;
   scene.add(grp);
 
-  // Backward-compat: il primo gruppo costruito viene anche assegnato ai
-  // riferimenti "globali" che alcuni codepath legacy potrebbero leggere.
   if(!fresState.arrowGroup){
     fresState.arrowGroup = grp;
     fresState.pickerSphere = picker;
@@ -2731,7 +2775,49 @@ function fresBuildArrow(gid, origin){
   return grp;
 }
 
-// v7.3.9.025: cleanup di tutte le frecce
+function fresClearAllArrows(){
+  Object.keys(fresState.arrowsByGid).forEach(function(k){
+    var g = fresState.arrowsByGid[k];
+    if(g){
+      // dispose geometries/materials
+      g.traverse(function(o){
+        if(o.geometry) o.geometry.dispose();
+        if(o.material){
+          if(Array.isArray(o.material)) o.material.forEach(function(mm){mm.dispose();});
+          else o.material.dispose();
+        }
+      });
+      scene.remove(g);
+    }
+  });
+  fresState.arrowsByGid = {};
+  fresState.pickersByGid = {};
+  fresState.arrowGroup = null;
+  fresState.pickerSphere = null;
+}
+
+function fresBuildAllArrows(){
+  fresClearAllArrows();
+  var aligned = muaObjects.filter(function(m){ return m.aligned; });
+  if(aligned.length < 2) return;
+  var groupsMap = {};
+  aligned.forEach(function(m){
+    var g = m.groupId || 0;
+    if(!groupsMap[g]) groupsMap[g] = [];
+    groupsMap[g].push(m);
+  });
+  Object.keys(groupsMap).forEach(function(gKey){
+    var gid = parseInt(gKey, 10);
+    var gr = groupsMap[gKey];
+    if(gr.length < 2) return;
+    var origin = new THREE.Vector3(0, 0, 0);
+    gr.forEach(function(m){ origin.add(m.position); });
+    origin.divideScalar(gr.length);
+    fresBuildArrow(gid, origin);
+  });
+}
+
+// v7.3.9.026: cleanup di tutte le frecce
 function fresClearAllArrows(){
   Object.keys(fresState.arrowsByGid).forEach(function(k){
     var g = fresState.arrowsByGid[k];
@@ -2743,7 +2829,7 @@ function fresClearAllArrows(){
   fresState.pickerSphere = null;
 }
 
-// v7.3.9.025: ricostruisce frecce per tutti i gruppi presenti
+// v7.3.9.026: ricostruisce frecce per tutti i gruppi presenti
 function fresBuildAllArrows(){
   fresClearAllArrows();
   var aligned = muaObjects.filter(function(m){ return m.aligned; });
@@ -2767,31 +2853,57 @@ function fresBuildAllArrows(){
   });
 }
 function fresUpdateArrow(gid){
-  // v7.3.9.025: aggiorna la freccia di UN gruppo specifico
+  // v7.3.9.026: aggiorna posizione e orientazione dei mesh solidi
   var grp = fresState.arrowsByGid[gid];
   if(!grp) return;
   var axes = fresState.axesByGid[gid];
   if(!axes || !axes.setupAxis) return;
+
   var d = axes.setupAxis.clone().normalize();
-  grp.userData.arrow.setDirection(d);
   var origin = grp.userData.origin;
-  var len = grp.userData.length;
-  // Picker all'estremita'
-  var picker = fresState.pickersByGid[gid];
-  if(picker) picker.position.copy(origin).addScaledVector(d, len);
-  // Shaft cilindro: posiziono e oriento
+  var shaftLen = grp.userData.shaftLen;
+  var coneLen = grp.userData.coneLen;
+  var totalLen = grp.userData.totalLen;
+
+  // Quaternion che mappa Y (asse di base dei CylinderGeometry) -> d
+  var yAxis = new THREE.Vector3(0, 1, 0);
+  var q = new THREE.Quaternion().setFromUnitVectors(yAxis, d);
+
+  // Shaft: centro a meta' tra origin e origin + d*shaftLen
   var shaft = grp.userData.shaft;
   if(shaft){
-    var shaftLen = grp.userData.shaftLen;
-    // CylinderGeometry e' lungo l'asse Y; lo metto a meta' tra origin e
-    // origin + d * shaftLen
-    var midPoint = origin.clone().addScaledVector(d, shaftLen * 0.5);
-    shaft.position.copy(midPoint);
-    // Quaternion che mappa Y -> d
-    var yAxis = new THREE.Vector3(0,1,0);
-    var q = new THREE.Quaternion().setFromUnitVectors(yAxis, d);
+    var shaftMid = origin.clone().addScaledVector(d, shaftLen * 0.5);
+    shaft.position.copy(shaftMid);
     shaft.quaternion.copy(q);
   }
+
+  // Cone: centro a shaftLen + coneLen/2 lungo d
+  var cone = grp.userData.cone;
+  if(cone){
+    var coneMid = origin.clone().addScaledVector(d, shaftLen + coneLen * 0.5);
+    cone.position.copy(coneMid);
+    cone.quaternion.copy(q);
+  }
+
+  // Picker: estremita' (origin + d*totalLen) - oltre la punta del cono
+  var picker = grp.userData.picker;
+  if(picker){
+    picker.position.copy(origin).addScaledVector(d, totalLen + 4);
+  }
+  // Ring intorno al picker, orientato verso la camera
+  var ring = grp.userData.ring;
+  if(ring && picker){
+    ring.position.copy(picker.position);
+    if(camera){
+      ring.lookAt(camera.position);
+    }
+  }
+}
+
+function fresUpdateAllArrows(){
+  Object.keys(fresState.arrowsByGid).forEach(function(k){
+    fresUpdateArrow(parseInt(k,10));
+  });
 }
 
 function fresUpdateAllArrows(){
@@ -3120,7 +3232,7 @@ function fresScreenToSphere(x, y){
   return new THREE.Vector3(nx/r, ny/r, 0);
 }
 function fresIsClickOnPicker(x, y){
-  // v7.3.9.025: ritorna gid del picker cliccato, o null se nessuno
+  // v7.3.9.026: cerca su tutti i picker, parent walk per gid
   var pickers = Object.values(fresState.pickersByGid).filter(Boolean);
   if(pickers.length === 0) return null;
   var rect = renderer.domElement.getBoundingClientRect();
@@ -3128,10 +3240,16 @@ function fresIsClickOnPicker(x, y){
   var py = -((y - rect.top)  / rect.height) * 2 + 1;
   var ray = new THREE.Raycaster();
   ray.setFromCamera({ x: px, y: py }, camera);
+  // I picker hanno depthTest:false ma raycast funziona normalmente
   var hits = ray.intersectObjects(pickers, false);
   if(hits.length > 0){
     var picked = hits[0].object;
-    return (picked.userData && typeof picked.userData.gid !== 'undefined') ? picked.userData.gid : null;
+    while(picked){
+      if(picked.userData && typeof picked.userData.gid !== 'undefined'){
+        return picked.userData.gid;
+      }
+      picked = picked.parent;
+    }
   }
   return null;
 }
@@ -3996,7 +4114,7 @@ function misICP_renderPerCylinder(pairs, bgTrisA, bgTrisB){
     controls.update && controls.update();
   }
 
-  // FIX v7.3.9.025: applico la modalita\' di rendering corrente
+  // FIX v7.3.9.026: applico la modalita\' di rendering corrente
   // alle nuove mesh (recupero da localStorage o envSettings.renderMode)
   try {
     var savedMode = null;
@@ -4882,7 +5000,7 @@ function misICP_pdfFooter(doc, title, pageInfo, darkBg){
  * Disegna la copertina comune (sfondo scuro, anello, badge, info, mappa).
  */
 
-// Helper v7.3.9.025: schiarisce/scurisce un hex color di una percentuale
+// Helper v7.3.9.026: schiarisce/scurisce un hex color di una percentuale
 function misICP_shadeHex(hex, pct){
   hex = hex.replace('#','');
   var r = parseInt(hex.substr(0,2), 16);
@@ -4904,7 +5022,7 @@ function misICP_shadeHex(hex, pct){
 }
 
 function misICP_pdfDrawCover(doc, data, reportTitle){
-  // COVER CLINICO v7.3.9.025: anello smooth con gradient sottile (no doppio glow)
+  // COVER CLINICO v7.3.9.026: anello smooth con gradient sottile (no doppio glow)
   var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
   function setFill(hex){ var c=misICP_hexRGB(hex); doc.setFillColor(c[0],c[1],c[2]); }
   function setTxt (hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
@@ -5801,7 +5919,7 @@ function misICP_renderClinicalPDF(data){
   var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
-  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.025)', null, true);
+  misICP_pdfFooter(doc, 'Syntesis-ICP - Report Clinico (Analizza v7.3.9.026)', null, true);
 
   // Pagina 2: Note metodologiche (statica, identica per ogni report)
   doc.addPage();
@@ -5847,7 +5965,7 @@ function misICP_renderClinicalPDF(data){
 // ────────────────────────────────────────────────────────────────────
 
 
-// ── CERTIFICATO DI TARATURA v7.3.9.025 ─────────────────────────────
+// ── CERTIFICATO DI TARATURA v7.3.9.026 ─────────────────────────────
 // Modal di raccolta metadati + helpers di classificazione PASS/VERIFICA/FAIL
 // Soglie industriali standard: PASS \u2264 50\u03bcm, VERIFICA 50-100\u03bcm, FAIL > 100\u03bcm
 // (per angoli: PASS \u2264 0.5\u00b0, VERIFICA 0.5-1.0\u00b0, FAIL > 1.0\u00b0)
@@ -5922,7 +6040,7 @@ function misICP_submitCalibration(){
 
 
 function misICP_renderCalibrationPDF(data, calibMeta){
-  // CERTIFICATO DI TARATURA v7.3.9.025
+  // CERTIFICATO DI TARATURA v7.3.9.026
   // Cover con anello gradient conico + logo Syntesis bianco watermark in pagine interne
   if(!calibMeta){
     calibMeta = { type:'\u2014', maker:'\u2014', model:'\u2014', sn:'\u2014',
@@ -6064,7 +6182,7 @@ function misICP_pdfDrawCalibrationCover(doc, data, calibMeta){
   doc.setFont('helvetica','normal'); doc.setFontSize(9); setTxt('#B0B8C1');
   doc.text('Precision Scanner Report - Taratura', W/2, 46, {align:'center'});
 
-  // Anello smooth - gradient SOTTILE nel colore base (v7.3.9.025)
+  // Anello smooth - gradient SOTTILE nel colore base (v7.3.9.026)
   var scoreRingSrc = (function(){
     var sizePx = 700;
     var c = document.createElement('canvas');
@@ -6220,7 +6338,7 @@ function misICP_pdfDrawCalibrationIdPage(doc, calibMeta, data){
   h = drawInfoBox(ml, y, cw, 'OPERAZIONE', [
     ['Data taratura', calibMeta.dateStr + '  alle  ' + calibMeta.timeStr],
     ['Procedura',     'Allineamento Kabsch + SVD + ICP iterativo'],
-    ['Software',      'Syntesis-ICP - Misurare (Analizza v7.3.9.025)']
+    ['Software',      'Syntesis-ICP - Misurare (Analizza v7.3.9.026)']
   ]); y += h + 6;
   h = drawInfoBox(ml, y, cw, 'FILE DI RIFERIMENTO', [
     ['Master STL',      data.fileAfull || data.fileA || '\u2014'],
@@ -6441,7 +6559,7 @@ function misICP_renderExcel(data){
     ['Scala mappa colorimetrica', data.scaleUm,                       'μm'],
     [],
     ['SOFTWARE'],
-    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.025)'],
+    ['Applicativo',  'Syntesis-ICP - Misurare (Analizza v7.3.9.026)'],
     ['Produttore',   'Biaggini Medical Devices S.r.l.'],
     ['Sito',         'https://syntesis-icp.com'],
     [],
@@ -6656,7 +6774,7 @@ function misICP_renderExcel(data){
     ['File B slug filesystem',           slugB],
     ['Data analisi (locale)',            dtStr],
     ['Data analisi (ISO 8601)',          dtIso],
-    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.025)'],
+    ['Software',                         'Syntesis-ICP - Misurare (Analizza v7.3.9.026)'],
     ['Produttore',                       'Biaggini Medical Devices S.r.l.'],
     ['Sito',                             'https://syntesis-icp.com'],
     ['User-Agent browser',               ua]
@@ -6731,7 +6849,7 @@ function misICP_generateReport(kind){
   if(btn){ btn.classList.add('busy'); btn.innerHTML='<span>Generazione in corso...</span>'; }
   misICP_clearError();
 
-  // FIX v7.3.9.025: per Taratura apri modal di raccolta metadati invece di generare subito
+  // FIX v7.3.9.026: per Taratura apri modal di raccolta metadati invece di generare subito
   if(kind === 'taratura'){
     var btn0 = document.getElementById('misBtnReport');
     if(btn0){ btn0.classList.remove('busy'); btn0.innerHTML = '<span>Scarica report</span><span style="font-size:11px;opacity:0.8">&#9662;</span>'; }
@@ -6851,7 +6969,7 @@ function misICP_updateLabels(){
   var rect = vp.getBoundingClientRect();
   var W = rect.width, H = rect.height;
 
-  // FIX v7.3.9.025: compensa body.style.zoom (vedi updateDivergenceLabels)
+  // FIX v7.3.9.026: compensa body.style.zoom (vedi updateDivergenceLabels)
   var zoomF = (typeof syntesisGetUiZoom === 'function') ? syntesisGetUiZoom() : 1.0;
 
   var svg = document.getElementById('labelLines');
@@ -8334,7 +8452,7 @@ function updateDivergenceLabels(){
     return;
   }
 
-  // FIX v7.3.9.025: compensa body.style.zoom. getBoundingClientRect()
+  // FIX v7.3.9.026: compensa body.style.zoom. getBoundingClientRect()
   // ritorna coordinate post-zoom, ma style.left viene RI-zoomato dal
   // browser. Devo dividere per il zoom prima di applicare le coordinate.
   var zoomF = (typeof syntesisGetUiZoom === 'function') ? syntesisGetUiZoom() : 1.0;
@@ -8844,7 +8962,9 @@ function closeGroupDialog(){
 }
 
 function confirmGroup(){
-  // Raccolgo MUA selezionati
+  // v7.3.9.026: Quando si crea un nuovo gruppo, i MUA che erano in gid=0
+  // (gruppo di base "default") vengono SPOSTATI automaticamente in un secondo
+  // gruppo complementare, perche' dividere implica due insiemi distinti.
   var selected = [];
   muaObjects.forEach(function(m, i){
     var cb = document.getElementById('groupDlgMua_' + i);
@@ -8854,24 +8974,37 @@ function confirmGroup(){
     alert('Seleziona almeno 1 MUA per il nuovo gruppo.');
     return;
   }
-  // Trovo prossimo groupId disponibile
   var maxId = 0;
   muaObjects.forEach(function(m){ if(m.groupId && m.groupId > maxId) maxId = m.groupId; });
   var newId = maxId + 1;
-  // Assegno il nuovo gruppo ai MUA selezionati
-  selected.forEach(function(idx){
-    muaObjects[idx].groupId = newId;
-  });
-  // I non selezionati rimangono nel loro gruppo corrente (o 0 se non ne hanno uno)
+  selected.forEach(function(idx){ muaObjects[idx].groupId = newId; });
+  // Orfani: chi era senza gruppo (gid=0 o undefined) ora in gid complemento
+  var orphans = [];
   muaObjects.forEach(function(m){
     if(m.groupId === undefined) m.groupId = 0;
+    if(m.groupId === 0) orphans.push(m);
   });
+  if(orphans.length > 0){
+    var complementId = newId + 1;
+    orphans.forEach(function(m){ m.groupId = complementId; });
+  }
   closeGroupDialog();
-  showStatus('Gruppo G' + newId + ' creato con ' + selected.length + ' MUA.');
-  // Ricalcolo tutto
+  if(orphans.length > 0){
+    showStatus('Gruppo G' + newId + ' creato con ' + selected.length + ' MUA. I restanti ' + orphans.length + ' MUA vanno in G' + (newId+1) + '.');
+  } else {
+    showStatus('Gruppo G' + newId + ' creato con ' + selected.length + ' MUA.');
+  }
   if(typeof calcMeanAxis === 'function') calcMeanAxis();
   rebuildTree();
   try { updateGroupSplines(); } catch(e){}
+  // Reset frecce per ricalcolare con nuovi gruppi
+  try {
+    if(fresState && fresState.isOpen){
+      fresState.axesByGid = {};
+      if(typeof fresClearAllArrows === 'function') fresClearAllArrows();
+      fresRecompute();
+    }
+  } catch(e){}
 }
 
 // Reset gruppi: tutti tornano al gruppo 0
@@ -8896,7 +9029,7 @@ function getMuaByGroup(){
 
 // Helper: colore unico per badge gruppo
 
-// Helper v7.3.9.025: colore freccia di setup per gruppo
+// Helper v7.3.9.026: colore freccia di setup per gruppo
 // Distinto da getGroupBadgeColor per coerenza visiva (gid 0 blu primario,
 // non grigio come il badge che e' "senza gruppo")
 function getGroupArrowColor(gid){
@@ -9302,7 +9435,7 @@ function applyRenderModeToScene(){
       if(m.scanbodyScanMesh) applyRenderModeToMesh(m.scanbodyScanMesh);
     });
   }
-  // FIX v7.3.9.025: applico la modalita\' anche alle mesh Misurare
+  // FIX v7.3.9.026: applico la modalita\' anche alle mesh Misurare
   // (arcate riferimento/confronto + scanbody A e B post-ICP)
   if(typeof misICP_bgMeshA !== 'undefined' && misICP_bgMeshA){
     applyRenderModeToMesh(misICP_bgMeshA);
@@ -9637,12 +9770,12 @@ try {
 
 
 
-// ── UI ZOOM v7.3.9.025 ─────────────────────────────────────────────
+// ── UI ZOOM v7.3.9.026 ─────────────────────────────────────────────
 // Scaling globale del testo interfaccia. Salva preferenza in localStorage.
 var SYNTESIS_UI_ZOOM_KEY = 'syntesis_ui_zoom';
 
 
-// Helper v7.3.9.025: ritorna il fattore zoom corrente del body
+// Helper v7.3.9.026: ritorna il fattore zoom corrente del body
 // (per compensare coordinate label che vengono ri-zoomate dal browser)
 function syntesisGetUiZoom(){
   try {
@@ -9653,7 +9786,7 @@ function syntesisGetUiZoom(){
 }
 
 function applyUiZoom(zoom, opts){
-  // v7.3.9.025: opts.silent=true applica senza salvare in localStorage
+  // v7.3.9.026: opts.silent=true applica senza salvare in localStorage
   // (usato da loadUiZoom quando applica il default 115%)
   zoom = parseFloat(zoom);
   if(!zoom || isNaN(zoom)) zoom = 1.15;
@@ -9674,7 +9807,7 @@ function applyUiZoom(zoom, opts){
 }
 
 function loadUiZoom(){
-  // v7.3.9.025: default 115% per nuovi utenti.
+  // v7.3.9.026: default 115% per nuovi utenti.
   // Se utente ha gia' una preferenza (anche 100%), la rispettiamo.
   var DEFAULT_UI_ZOOM = 1.15;
   try {
@@ -13892,7 +14025,7 @@ window.onSyntesisViewModeChange = function(mode){
   }
 };
 
-// ── DRAGGABLE + RESIZABLE PANELS (v7.3.9.025) ─────────────────────
+// ── DRAGGABLE + RESIZABLE PANELS (v7.3.9.026) ─────────────────────
 // Rende un pannello assoluto trascinabile (handle = elemento con classe
 // .syn-drag-handle dentro il pannello) e ridimensionabile (handle in basso
 // a destra, classe .syn-resize-handle). Stato salvato in localStorage.
@@ -14070,7 +14203,7 @@ window.onSyntesisViewModeChange = function(mode){
 </script>
 
 
-<!-- Modal Certificato Taratura v7.3.9.025 -->
+<!-- Modal Certificato Taratura v7.3.9.026 -->
 <div class="calmodal-back" id="calibrationModal">
   <div class="calmodal">
     <div class="calmodal-h">
