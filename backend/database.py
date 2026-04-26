@@ -52,8 +52,19 @@ async def init_db():
             score           INTEGER,
             rmsd            DOUBLE PRECISION,
             created_at      TIMESTAMPTZ DEFAULT NOW(),
-            result_json     JSONB
+            result_json     JSONB,
+            -- v7.3.9.046: gestione utente
+            display_name    TEXT,
+            notes           TEXT,
+            archived        BOOLEAN DEFAULT FALSE,
+            updated_at      TIMESTAMPTZ DEFAULT NOW()
         );
+
+        -- v7.3.9.046: migrazione idempotente per DB esistenti
+        ALTER TABLE analyses ADD COLUMN IF NOT EXISTS display_name TEXT;
+        ALTER TABLE analyses ADD COLUMN IF NOT EXISTS notes TEXT;
+        ALTER TABLE analyses ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE;
+        ALTER TABLE analyses ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
         CREATE TABLE IF NOT EXISTS leaderboard (
             id              TEXT PRIMARY KEY,
@@ -194,6 +205,136 @@ async def get_leaderboard(brand: Optional[str] = None, limit: int = 50) -> list[
                 LIMIT $1
             """, limit)
         return [dict(r) for r in rows]
+
+
+
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# v7.3.9.046 - Backend utente: lista, dettaglio, rinomina, archivio, elimina
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def list_user_analyses(user_id: str, archived: bool = False,
+                              limit: int = 100, offset: int = 0) -> list[dict]:
+    """Lista analisi dell'utente, ordinate per data desc.
+    archived=False: solo attive, archived=True: solo archiviate."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT id, filename_a, filename_b, display_name, notes,
+                   score, rmsd, created_at, updated_at, archived
+            FROM analyses
+            WHERE user_id = $1 AND COALESCE(archived, FALSE) = $2
+            ORDER BY COALESCE(updated_at, created_at) DESC
+            LIMIT $3 OFFSET $4
+        """, user_id, archived, limit, offset)
+        return [dict(r) for r in rows]
+
+
+async def count_user_analyses(user_id: str, archived: bool = False) -> int:
+    """Conta totale analisi dell'utente (per paginazione)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT COUNT(*) AS n FROM analyses
+            WHERE user_id = $1 AND COALESCE(archived, FALSE) = $2
+        """, user_id, archived)
+        return int(row["n"]) if row else 0
+
+
+async def update_analysis_meta(analysis_id: str, user_id: str,
+                                display_name: Optional[str] = None,
+                                notes: Optional[str] = None,
+                                archived: Optional[bool] = None) -> bool:
+    """Aggiorna metadati di un'analisi (solo se appartiene all'utente).
+    Restituisce True se la riga e' stata modificata."""
+    if display_name is None and notes is None and archived is None:
+        return False
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        # Costruisco UPDATE dinamico mantenendo i parametri esistenti immutati
+        sets = ["updated_at = NOW()"]
+        params = []
+        if display_name is not None:
+            sets.append(f"display_name = ${len(params)+1}")
+            params.append(display_name)
+        if notes is not None:
+            sets.append(f"notes = ${len(params)+1}")
+            params.append(notes)
+        if archived is not None:
+            sets.append(f"archived = ${len(params)+1}")
+            params.append(archived)
+        params.append(analysis_id)
+        params.append(user_id)
+        sql = f"""
+            UPDATE analyses SET {", ".join(sets)}
+            WHERE id = ${len(params)-1} AND user_id = ${len(params)}
+        """
+        result = await conn.execute(sql, *params)
+        # asyncpg restituisce 'UPDATE n' come stringa
+        return result.endswith(" 1")
+
+
+async def delete_user_analysis(analysis_id: str, user_id: str) -> bool:
+    """Elimina permanentemente un'analisi (solo se appartiene all'utente).
+    Cascata: rimuove anche eventuali entry leaderboard collegate."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # Prima rimuovo dalla leaderboard (FK)
+            await conn.execute(
+                "DELETE FROM leaderboard WHERE analysis_id = $1", analysis_id)
+            # Poi l'analisi
+            result = await conn.execute("""
+                DELETE FROM analyses
+                WHERE id = $1 AND user_id = $2
+            """, analysis_id, user_id)
+            return result.endswith(" 1")
+
+
+async def get_user_profile(user_id: str) -> Optional[dict]:
+    """Profilo utente (senza password_hash/salt) + statistiche minime."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT id, email, name, organization, role, active,
+                   license_key, created_at
+            FROM users WHERE id = $1
+        """, user_id)
+        if not row:
+            return None
+        prof = dict(row)
+        # Statistiche
+        stats_row = await conn.fetchrow("""
+            SELECT COUNT(*) AS n_total,
+                   COUNT(*) FILTER (WHERE COALESCE(archived, FALSE) = TRUE) AS n_archived,
+                   AVG(score) AS avg_score,
+                   MAX(score) AS best_score
+            FROM analyses WHERE user_id = $1
+        """, user_id)
+        prof["stats"] = dict(stats_row) if stats_row else {}
+        return prof
+
+
+async def update_user_profile(user_id: str, name: Optional[str] = None,
+                               organization: Optional[str] = None) -> bool:
+    """Aggiorna nome o organizzazione (mai email/role/license)."""
+    if name is None and organization is None:
+        return False
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        sets = []
+        params = []
+        if name is not None:
+            sets.append(f"name = ${len(params)+1}")
+            params.append(name)
+        if organization is not None:
+            sets.append(f"organization = ${len(params)+1}")
+            params.append(organization)
+        params.append(user_id)
+        sql = f"UPDATE users SET {', '.join(sets)} WHERE id = ${len(params)}"
+        result = await conn.execute(sql, *params)
+        return result.endswith(" 1")
 
 
 # ── Utility admin: crea licenze (da usare via script) ─────────────────────────
