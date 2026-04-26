@@ -719,15 +719,29 @@ def cluster_comps(cents: np.ndarray, thresh: float) -> list[list[int]]:
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 def parse_stl_with_normals(data: bytes):
-    """Restituisce (tris, normals) shape (N,3,3) e (N,3)."""
+    """Restituisce (tris, normals) shape (N,3,3) e (N,3).
+    v7.3.9.039: usa dtype strutturato (12 normale + 36 vertici + 2 attribute byte
+    count = 50 byte per triangolo). La vecchia implementazione leggeva 48 byte
+    consecutivi come float, disallineandosi triangolo dopo triangolo."""
     if len(data) < 84:
         raise ValueError("STL troppo corto.")
     n_tri = struct.unpack_from("<I", data, 80)[0]
     expected = 84 + n_tri * 50
     if expected == len(data) and n_tri > 0:
-        raw = np.frombuffer(data, dtype="<f4",
-                            count=n_tri * 12, offset=84).reshape(n_tri, 12)
-        return raw[:, 3:12].reshape(n_tri, 3, 3).copy(), raw[:, :3].copy()
+        dt = np.dtype([
+            ("normal", "<f4", 3),
+            ("v0", "<f4", 3),
+            ("v1", "<f4", 3),
+            ("v2", "<f4", 3),
+            ("attr", "<u2"),
+        ])
+        arr = np.frombuffer(data, dtype=dt, count=n_tri, offset=84)
+        tris = np.empty((n_tri, 3, 3), dtype=np.float32)
+        tris[:, 0, :] = arr["v0"]
+        tris[:, 1, :] = arr["v1"]
+        tris[:, 2, :] = arr["v2"]
+        normals = arr["normal"].astype(np.float32, copy=True)
+        return tris, normals
     tris, nms, cur = [], [], None
     for line in data.decode("utf-8", errors="ignore").splitlines():
         line = line.strip()
@@ -1012,6 +1026,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     landmarks: {"a":[{x,y,z}x3], "b":[{x,y,z}x3]} per pre-allineamento manuale.
     Se fornito, bypassa il robust_pre_align automatico.
     """
+    _warnings: list = []  # v7.3.9.039: warnings accumulati durante la pipeline
     tris_a = parse_stl(data_a)
     tris_b = parse_stl(data_b)
 
@@ -1178,12 +1193,30 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
             _ct_b_aft = (R_mesh @ _ct_b_bef.T).T + t_mesh
             D_bef = np.linalg.norm(_ct_a_chk[:,None]-_ct_b_bef[None,:], axis=2).min(axis=1).mean()
             D_aft = np.linalg.norm(_ct_a_chk[:,None]-_ct_b_aft[None,:], axis=2).min(axis=1).mean()
-            if D_aft < D_bef * 1.05:
+            # v7.3.9.039 - PATCH B: accetta solo se migliora (era 1.05, accettava
+            # +5% di peggioramento, in contraddizione col commento "Accetta solo
+            # se migliora")
+            if D_aft < D_bef:
                 R_pre = R_mesh @ R_pre
                 t_pre = R_mesh @ t_pre + t_mesh
                 tris_b_aligned = apply_transform_tris(tris_b_aligned, R_mesh, t_mesh)
-        except Exception:
-            pass
+                # v7.3.9.039 - PATCH C: ricalcola raw_ct_b_aligned con la NUOVA
+                # trasformazione (prima usava la vecchia: incoerenza fra triangoli
+                # e centroidi nel matching finale)
+                raw_ct_b_aligned = (R_pre @ raw_ct_b_shifted.T).T + t_pre
+            else:
+                _warnings.append({
+                    "stage": "mesh_icp",
+                    "severity": "info",
+                    "message": "Mesh ICP non migliora (D_bef=%.4f vs D_aft=%.4f), scartato." % (D_bef, D_aft)
+                })
+        except Exception as _exc:
+            # v7.3.9.039 - PATCH E: warning loggato invece di silenzio
+            _warnings.append({
+                "stage": "mesh_icp",
+                "severity": "warning",
+                "message": "Mesh ICP fallito: %s: %s" % (type(_exc).__name__, str(_exc)[:200])
+            })
 
     # ── Clustering finale su B allineato + hungarian matching ────────────────
     thresh_b2 = auto_thresh(raw_ct_b_aligned)
@@ -1208,11 +1241,21 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     ct_b_cl = np.array([raw_ct_b_aligned[[c for c in cl]].mean(0) for cl in clust_b])
 
     from scipy.optimize import linear_sum_assignment as hungarian
-    n_cl = min(len(ct_a_cl), len(ct_b_cl))
-    D_cl = np.linalg.norm(ct_a_cl[:n_cl, None] - ct_b_cl[None, :n_cl], axis=2)
+    # v7.3.9.039 - PATCH D: hungarian su matrice PIENA (era truncated a min(nA,nB),
+    # ignorando candidati extra in B). scipy.linear_sum_assignment gestisce
+    # automaticamente matrici rettangolari restituendo solo i match trovati.
+    D_cl = np.linalg.norm(ct_a_cl[:, None] - ct_b_cl[None, :], axis=2)
     r_cl, c_cl = hungarian(D_cl)
     clust_a_sorted = [clust_a[i] for i in r_cl]
     clust_b_sorted = [clust_b[i] for i in c_cl]
+    # Log se ci sono cluster B non matchati (potenziali extra ignorati)
+    n_extras_b = max(0, len(clust_b) - len(c_cl))
+    if n_extras_b > 0:
+        _warnings.append({
+            "stage": "matching",
+            "severity": "info",
+            "message": "Matching: %d cluster B non assegnati (extras)." % n_extras_b
+        })
 
     ct_a = np.array([raw_ct_a[[c for c in cl]].mean(0) for cl in clust_a_sorted])
     ct_b_raw = np.array([raw_ct_b_aligned[[c for c in cl]].mean(0) for cl in clust_b_sorted])
