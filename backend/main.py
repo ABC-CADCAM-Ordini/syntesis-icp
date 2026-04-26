@@ -25,7 +25,9 @@ from pdf_gen import generate_pdf
 from database import (
     init_db, log_analysis, get_leaderboard, save_result,
     list_user_analyses, count_user_analyses, update_analysis_meta,
-    delete_user_analysis, get_user_profile, update_user_profile
+    delete_user_analysis, get_user_profile, update_user_profile,
+    list_user_projects, get_user_project, create_user_project,
+    update_user_project, delete_user_project, assign_analysis_to_project
 )
 from security_config import validate_security_config
 from rate_limit import limiter, ANALYZE_PUBLIC_LIMIT
@@ -606,3 +608,140 @@ async def me_delete_analysis(analysis_id: str,
     if not ok:
         raise HTTPException(404, detail="Analisi non trovata.")
     return {"ok": True, "deleted": analysis_id}
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.047 - PROGETTI
+# Un progetto raggruppa analisi e (in futuro) file su cloud personale.
+# La cartella cloud verra' creata da Drive/Dropbox solo dopo connessione OAuth.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    patient_ref: Optional[str] = None
+    color: Optional[str] = None
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    patient_ref: Optional[str] = None
+    color: Optional[str] = None
+    archived: Optional[bool] = None
+
+
+class AnalysisAssignToProject(BaseModel):
+    project_id: Optional[str] = None  # None per dissociare
+
+
+@app.get("/api/me/projects")
+async def me_list_projects(archived: bool = False,
+                            current_user: dict = Depends(verify_token)):
+    """Lista progetti dell'utente con conteggio analisi."""
+    items = await list_user_projects(current_user["user_id"], archived=archived)
+    # Serializzo datetimes
+    for it in items:
+        for k in ("created_at", "updated_at", "last_analysis_at"):
+            v = it.get(k)
+            if v and hasattr(v, "isoformat"):
+                it[k] = v.isoformat()
+    return {"items": items}
+
+
+@app.get("/api/me/projects/{project_id}")
+async def me_project_detail(project_id: str,
+                              current_user: dict = Depends(verify_token)):
+    """Dettaglio progetto + analisi associate."""
+    proj = await get_user_project(project_id, current_user["user_id"])
+    if not proj:
+        raise HTTPException(404, detail="Progetto non trovato.")
+    for k in ("created_at", "updated_at"):
+        v = proj.get(k)
+        if v and hasattr(v, "isoformat"):
+            proj[k] = v.isoformat()
+    for a in proj.get("analyses", []):
+        for k in ("created_at",):
+            v = a.get(k)
+            if v and hasattr(v, "isoformat"):
+                a[k] = v.isoformat()
+    return proj
+
+
+@app.post("/api/me/projects")
+async def me_create_project(req: ProjectCreate,
+                              current_user: dict = Depends(verify_token)):
+    """Crea un nuovo progetto."""
+    name = (req.name or "").strip()
+    if len(name) < 1 or len(name) > 200:
+        raise HTTPException(400, detail="Nome progetto richiesto (1-200 caratteri).")
+    desc = req.description.strip() if req.description else None
+    if desc and len(desc) > 2000:
+        raise HTTPException(400, detail="Descrizione troppo lunga (max 2000).")
+    patient = req.patient_ref.strip() if req.patient_ref else None
+    if patient and len(patient) > 200:
+        raise HTTPException(400, detail="Riferimento paziente troppo lungo (max 200).")
+    color = req.color.strip() if req.color else None
+    if color and not (color.startswith("#") and len(color) in (4, 7)):
+        raise HTTPException(400, detail="Colore deve essere hex tipo #0065B3.")
+
+    project_id = await create_user_project(
+        user_id=current_user["user_id"],
+        name=name, description=desc, patient_ref=patient, color=color
+    )
+
+    # NOTA: la creazione della cartella su Google Drive avverra' nella Fase C
+    # quando l'utente avra' connesso il provider via OAuth. Per ora gdrive_folder_id
+    # resta NULL e verra' valorizzato lazy al primo upload.
+
+    return {"id": project_id, "ok": True}
+
+
+@app.patch("/api/me/projects/{project_id}")
+async def me_update_project(project_id: str, req: ProjectUpdate,
+                              current_user: dict = Depends(verify_token)):
+    """Aggiorna metadati progetto."""
+    name = req.name.strip() if req.name is not None else None
+    if name is not None and (len(name) < 1 or len(name) > 200):
+        raise HTTPException(400, detail="Nome progetto lunghezza non valida.")
+    desc = req.description.strip() if req.description is not None else None
+    if desc and len(desc) > 2000:
+        raise HTTPException(400, detail="Descrizione troppo lunga.")
+    patient = req.patient_ref.strip() if req.patient_ref is not None else None
+    color = req.color.strip() if req.color is not None else None
+    if color and not (color.startswith("#") and len(color) in (4, 7)):
+        raise HTTPException(400, detail="Colore deve essere hex tipo #0065B3.")
+    ok = await update_user_project(
+        project_id=project_id, user_id=current_user["user_id"],
+        name=name, description=desc, patient_ref=patient,
+        color=color, archived=req.archived
+    )
+    if not ok:
+        raise HTTPException(404, detail="Progetto non trovato o nessun campo da aggiornare.")
+    return {"ok": True}
+
+
+@app.delete("/api/me/projects/{project_id}")
+async def me_delete_project(project_id: str, cascade: bool = False,
+                              current_user: dict = Depends(verify_token)):
+    """Elimina un progetto.
+    cascade=False (default): le analisi restano ma con project_id=NULL
+    cascade=True: elimina anche le analisi associate."""
+    ok = await delete_user_project(project_id, current_user["user_id"],
+                                    cascade_analyses=cascade)
+    if not ok:
+        raise HTTPException(404, detail="Progetto non trovato.")
+    return {"ok": True, "deleted": project_id, "cascade": cascade}
+
+
+@app.patch("/api/me/analyses/{analysis_id}/project")
+async def me_assign_analysis(analysis_id: str, req: AnalysisAssignToProject,
+                                current_user: dict = Depends(verify_token)):
+    """Associa o dissocia un'analisi a un progetto."""
+    ok = await assign_analysis_to_project(
+        analysis_id, current_user["user_id"], req.project_id
+    )
+    if not ok:
+        raise HTTPException(404, detail="Analisi o progetto non trovato.")
+    return {"ok": True, "project_id": req.project_id}
