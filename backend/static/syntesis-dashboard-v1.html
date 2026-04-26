@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* v7.3.9.061 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
-/* v7.3.9.061 - Cornice nera sobria, una sola, niente animazione */
+/* v7.3.9.062 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
+/* v7.3.9.062 - Cornice nera sobria, una sola, niente animazione */
 html{background:#0F1923;margin:0;padding:0}
 body{
   margin:18px !important;
@@ -24,7 +24,7 @@ body{
   overflow-x:hidden !important;
   box-shadow:0 4px 24px rgba(0,0,0,.4) !important;
 }
-/* v7.3.9.061 - Scrollbar custom dentro la cornice */
+/* v7.3.9.062 - Scrollbar custom dentro la cornice */
 body::-webkit-scrollbar{width:10px}
 body::-webkit-scrollbar-track{background:transparent}
 body::-webkit-scrollbar-thumb{background:rgba(122,144,164,.35);border-radius:5px}
@@ -271,7 +271,7 @@ body{
 .contact-card .cc-actions .danger:hover{background:#FEE2E2}
 .cc-drive-icon{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green);margin-right:4px;vertical-align:middle}
 
-/* v7.3.9.061 - Hero stats card */
+/* v7.3.9.062 - Hero stats card */
 .hs-card{
   background:var(--white);border:1px solid var(--border);border-radius:10px;
   padding:16px 18px;position:relative;overflow:hidden;transition:.18s;
@@ -316,7 +316,7 @@ body{
 .storage-foot a:hover{text-decoration:underline}
 .storage-ok{color:var(--green);font-weight:700}
 
-/* v7.3.9.061 - Leaderboard pubblica (uguale al modulo principale) */
+/* v7.3.9.062 - Leaderboard pubblica (uguale al modulo principale) */
 .lb-filter-row{display:flex;gap:6px;align-items:flex-start;flex-wrap:nowrap;margin-bottom:8px}
 .lb-filter-label{font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;padding-top:7px;min-width:60px;font-family:var(--font)}
 .lb-filters{display:flex;gap:5px;flex-wrap:wrap;flex:1}
@@ -342,7 +342,7 @@ body{
 .lb-score-bar{height:4px;border-radius:2px;margin-top:3px}
 .lb-empty{padding:40px;text-align:center;color:var(--gray);font-family:var(--mono);font-size:13px}
 
-/* v7.3.9.061 - File browser Drive */
+/* v7.3.9.062 - File browser Drive */
 .fb-toolbar{
   display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:10px 14px;background:var(--white);border:1.5px solid var(--border);
@@ -453,7 +453,7 @@ body{
 <body>
 <div class="app-wrapper">
 
-  <!-- Header (v7.3.9.061 - ridisegnato con logo, hero stats, storage bar) -->
+  <!-- Header (v7.3.9.062 - ridisegnato con logo, hero stats, storage bar) -->
   <div class="app-card">
     <div class="app-header" style="border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:18px">
       <div style="display:flex;align-items:center;gap:18px">
@@ -539,7 +539,7 @@ body{
       <div id="projectsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
     </div>
 
-    <!-- TAB: FILE (file browser Drive - v7.3.9.061) -->
+    <!-- TAB: FILE (file browser Drive - v7.3.9.062) -->
     <div class="tab-content" id="tabFiles">
       <div id="filesContainer">
         <div class="loading"><span class="spinner"></span>Caricamento file...</div>
@@ -607,7 +607,7 @@ body{
       <div id="profileContainer" class="loading"><span class="spinner"></span>Caricamento profilo...</div>
     </div>
 
-    <!-- TAB: CLASSIFICA pubblica (v7.3.9.061) -->
+    <!-- TAB: CLASSIFICA pubblica (v7.3.9.062) -->
     <div class="tab-content" id="tabLeaderboard">
       <div id="lb-section">
         <div style="background:linear-gradient(135deg,#FFFBEB,#FFF7E6);border:1.5px solid #FCD34D;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
@@ -764,7 +764,7 @@ async function loadStats(){
   } catch(e){ console.warn('stats', e); }
 }
 
-// ── v7.3.9.061 - Storage consumption ────────────────────────────────────────
+// ── v7.3.9.062 - Storage consumption ────────────────────────────────────────
 async function loadStorage(){
   var el = document.getElementById('storageBar');
   if(!el) return;
@@ -1508,7 +1508,7 @@ async function deleteContact(id){
   } catch(e){ showToast('Errore: ' + e.message, true); }
 }
 
-// ── v7.3.9.061 - Leaderboard pubblica (Supabase) per tab Classifica ────────
+// ── v7.3.9.062 - Leaderboard pubblica (Supabase) per tab Classifica ────────
 var LBdash = (function(){
   var SUPABASE_URL = 'https://gnqnebjuhnxvndrpcdtt.supabase.co';
   var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImducW5lYmp1aG54dm5kcnBjZHR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMTg5ODAsImV4cCI6MjA4ODc5NDk4MH0.ZE_RHhx4KUiwG-_s4pVnRKbvxUZhqEATgNaRowSP6H8';
@@ -1672,7 +1672,7 @@ var LBdash = (function(){
   };
 })();
 
-// ── v7.3.9.061 - File Browser Drive ─────────────────────────────────────────
+// ── v7.3.9.062 - File Browser Drive ─────────────────────────────────────────
 var fbState = {
   currentFolderId: null,    // null = root Syntesis-ICP
   breadcrumb: [],
@@ -1822,7 +1822,7 @@ function renderFiles(data){
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────
-// v7.3.9.061 - Notifiche errore/successo OAuth Drive da query param
+// v7.3.9.062 - Notifiche errore/successo OAuth Drive da query param
 function checkGdriveCallbackParams(){
   try {
     var params = new URLSearchParams(window.location.search);
