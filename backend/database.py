@@ -5,6 +5,7 @@ PostgreSQL via asyncpg
 
 import os
 import asyncpg
+import re
 from typing import Optional
 from datetime import datetime
 
@@ -112,6 +113,30 @@ async def init_db():
         ALTER TABLE users ADD COLUMN IF NOT EXISTS dropbox_email TEXT;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS dropbox_refresh_token_enc TEXT;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS dropbox_connected_at TIMESTAMPTZ;
+
+        -- v7.3.9.053 - Rubrica contatti per scambio file fra utenti
+        CREATE TABLE IF NOT EXISTS contacts (
+            id                  TEXT PRIMARY KEY,
+            owner_user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            -- Email del contatto (puo\' essere o non essere un utente Syntesis registrato)
+            contact_email       TEXT NOT NULL,
+            -- Se il contatto ha un account Syntesis, FK al suo user_id (altrimenti NULL = pending)
+            contact_user_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+            -- Etichetta libera (es. "Studio Rossi", "Lab Bianchi")
+            display_name        TEXT,
+            -- Ruolo descrittivo libero (clinica, laboratorio, collega, ...)
+            role                TEXT,
+            -- Note libere
+            notes               TEXT,
+            -- Stato: pending (l\'altro non e\' ancora registrato), active (attivo), blocked
+            status              TEXT DEFAULT 'pending',
+            created_at          TIMESTAMPTZ DEFAULT NOW(),
+            updated_at          TIMESTAMPTZ DEFAULT NOW(),
+            -- Un utente non puo\' avere due contatti con la stessa email
+            UNIQUE(owner_user_id, contact_email)
+        );
+        CREATE INDEX IF NOT EXISTS idx_contacts_owner ON contacts(owner_user_id);
+        CREATE INDEX IF NOT EXISTS idx_contacts_target ON contacts(contact_user_id) WHERE contact_user_id IS NOT NULL;
         """)
 
 
@@ -572,6 +597,127 @@ async def set_project_gdrive_folder(project_id: str, user_id: str,
             WHERE id = $2 AND user_id = $3
         """, folder_id, project_id, user_id)
         return result.endswith(" 1")
+
+
+
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# v7.3.9.053 - Rubrica contatti
+# Ogni utente ha una sua rubrica di "colleghi/laboratori/clinici" con cui
+# scambia file. Un contatto puo' essere "pending" (email non ancora registrata
+# su Syntesis) o "active" (collegato a un utente esistente).
+# ──────────────────────────────────────────────────────────────────────────────
+
+async def list_user_contacts(user_id: str) -> list[dict]:
+    """Lista contatti dell'utente, con dettagli su ognuno se registrato."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT c.id, c.contact_email, c.contact_user_id, c.display_name,
+                   c.role, c.notes, c.status, c.created_at, c.updated_at,
+                   u.name AS contact_real_name,
+                   u.organization AS contact_organization,
+                   (u.gdrive_refresh_token_enc IS NOT NULL) AS contact_drive_connected
+            FROM contacts c
+            LEFT JOIN users u ON u.id = c.contact_user_id
+            WHERE c.owner_user_id = $1
+            ORDER BY c.display_name ASC NULLS LAST, c.contact_email ASC
+        """, user_id)
+        return [dict(r) for r in rows]
+
+
+async def create_user_contact(owner_user_id: str, contact_email: str,
+                                display_name: Optional[str] = None,
+                                role: Optional[str] = None,
+                                notes: Optional[str] = None) -> dict:
+    """Aggiunge un contatto. Se l'email corrisponde a un utente Syntesis,
+    lo collega automaticamente (status=active). Altrimenti pending.
+    Solleva ValueError se duplicato (owner+email)."""
+    import uuid
+    contact_id = str(uuid.uuid4())
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        # Check se esiste utente con questa email
+        target = await conn.fetchrow(
+            "SELECT id FROM users WHERE LOWER(email) = LOWER($1)", contact_email)
+        contact_user_id = target["id"] if target else None
+        status = "active" if target else "pending"
+
+        # Non permettere di aggiungersi da soli
+        if contact_user_id == owner_user_id:
+            raise ValueError("Non puoi aggiungere te stesso ai contatti.")
+
+        try:
+            await conn.execute("""
+                INSERT INTO contacts (id, owner_user_id, contact_email, contact_user_id,
+                                       display_name, role, notes, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            """, contact_id, owner_user_id, contact_email, contact_user_id,
+                display_name, role, notes, status)
+        except asyncpg.UniqueViolationError:
+            raise ValueError("Hai gia' un contatto con questa email.")
+    return {
+        "id": contact_id,
+        "contact_email": contact_email,
+        "contact_user_id": contact_user_id,
+        "display_name": display_name,
+        "role": role,
+        "notes": notes,
+        "status": status,
+    }
+
+
+async def update_user_contact(contact_id: str, owner_user_id: str,
+                                display_name: Optional[str] = None,
+                                role: Optional[str] = None,
+                                notes: Optional[str] = None) -> bool:
+    """Aggiorna metadati di un contatto (nome/ruolo/note). NON cambia email."""
+    if display_name is None and role is None and notes is None:
+        return False
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        sets = ["updated_at = NOW()"]
+        params = []
+        if display_name is not None:
+            sets.append(f"display_name = ${len(params)+1}"); params.append(display_name)
+        if role is not None:
+            sets.append(f"role = ${len(params)+1}"); params.append(role)
+        if notes is not None:
+            sets.append(f"notes = ${len(params)+1}"); params.append(notes)
+        params.append(contact_id)
+        params.append(owner_user_id)
+        sql = f"""UPDATE contacts SET {', '.join(sets)}
+                  WHERE id = ${len(params)-1} AND owner_user_id = ${len(params)}"""
+        result = await conn.execute(sql, *params)
+        return result.endswith(" 1")
+
+
+async def delete_user_contact(contact_id: str, owner_user_id: str) -> bool:
+    """Elimina un contatto dalla rubrica."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("""
+            DELETE FROM contacts WHERE id = $1 AND owner_user_id = $2
+        """, contact_id, owner_user_id)
+        return result.endswith(" 1")
+
+
+async def reconcile_pending_contacts(new_user_id: str, new_user_email: str) -> int:
+    """Quando un nuovo utente si registra, controlla se ci sono contatti pending
+    con la sua email e li attiva. Ritorna numero di contatti riconciliati."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE contacts
+            SET contact_user_id = $1, status = 'active', updated_at = NOW()
+            WHERE LOWER(contact_email) = LOWER($2)
+              AND contact_user_id IS NULL
+              AND status = 'pending'
+        """, new_user_id, new_user_email)
+        # asyncpg ritorna 'UPDATE n' come stringa
+        m = re.search(r'UPDATE (\d+)', result)
+        return int(m.group(1)) if m else 0
 
 
 # ── Utility admin: crea licenze (da usare via script) ─────────────────────────
