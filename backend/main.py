@@ -1005,17 +1005,17 @@ async def me_gdrive_browse(
     if not creds_data or not creds_data.get("refresh_token"):
         raise HTTPException(409, detail="Google Drive non connesso. Vai su Cloud per collegarlo.")
     try:
-        result = browse_folder(creds_data, folder_id=folder_id)
+        result = gdrive.browse_folder(creds_data, folder_id=folder_id)
         # Aggiungo breadcrumb se siamo dentro una sottocartella
         if folder_id:
             try:
-                breadcrumb = get_folder_breadcrumb(creds_data, folder_id)
+                breadcrumb = gdrive.get_folder_breadcrumb(creds_data, folder_id)
             except Exception:
                 breadcrumb = []
         else:
             breadcrumb = [{"id": result["folder_id"], "name": result["folder_name"]}]
         result["breadcrumb"] = breadcrumb
-        result["drive_web_url"] = get_drive_web_url(result["folder_id"])
+        result["drive_web_url"] = gdrive.get_drive_web_url(result["folder_id"])
         return result
     except ValueError as e:
         raise HTTPException(400, detail=str(e))
