@@ -22,7 +22,11 @@ from pydantic import BaseModel
 from auth import router as auth_router, verify_token
 from icp_engine import analyze_stl_pair
 from pdf_gen import generate_pdf
-from database import init_db, log_analysis, get_leaderboard, save_result
+from database import (
+    init_db, log_analysis, get_leaderboard, save_result,
+    list_user_analyses, count_user_analyses, update_analysis_meta,
+    delete_user_analysis, get_user_profile, update_user_profile
+)
 from security_config import validate_security_config
 from rate_limit import limiter, ANALYZE_PUBLIC_LIMIT
 
@@ -476,3 +480,121 @@ async def place_mua(req: PlaceMuaRequest, current_user: dict = Depends(verify_to
         "template_id": req.template_id,
         "template_radius": radius
     }
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.3.9.046 - BACKEND UTENTE
+# Area personale: lista mie analisi, rinomina, archivia, elimina, profilo
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AnalysisMetaUpdate(BaseModel):
+    display_name: Optional[str] = None
+    notes: Optional[str] = None
+    archived: Optional[bool] = None
+
+
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    organization: Optional[str] = None
+
+
+@app.get("/api/me/profile")
+async def me_profile(current_user: dict = Depends(verify_token)):
+    """Profilo utente corrente con statistiche."""
+    profile = await get_user_profile(current_user["user_id"])
+    if not profile:
+        raise HTTPException(404, detail="Utente non trovato.")
+    return profile
+
+
+@app.patch("/api/me/profile")
+async def me_update_profile(req: ProfileUpdate,
+                              current_user: dict = Depends(verify_token)):
+    """Aggiorna nome o organizzazione del profilo (mai email/role)."""
+    # Validazione minima dei valori
+    name = req.name.strip() if req.name else None
+    org = req.organization.strip() if req.organization else None
+    if name is not None and (len(name) < 1 or len(name) > 200):
+        raise HTTPException(400, detail="Nome lunghezza non valida (1-200 caratteri).")
+    if org is not None and len(org) > 200:
+        raise HTTPException(400, detail="Organizzazione troppo lunga (max 200).")
+    ok = await update_user_profile(current_user["user_id"], name=name, organization=org)
+    if not ok:
+        raise HTTPException(400, detail="Nessun campo da aggiornare.")
+    return {"ok": True}
+
+
+@app.get("/api/me/analyses")
+async def me_analyses(archived: bool = False, limit: int = 50, offset: int = 0,
+                        current_user: dict = Depends(verify_token)):
+    """Lista delle mie analisi (paginate, filtrabili per archived).
+    archived=False (default): solo attive
+    archived=True: solo archiviate"""
+    if limit < 1 or limit > 200:
+        raise HTTPException(400, detail="limit deve essere fra 1 e 200.")
+    if offset < 0:
+        raise HTTPException(400, detail="offset non puo' essere negativo.")
+    items = await list_user_analyses(
+        user_id=current_user["user_id"],
+        archived=archived, limit=limit, offset=offset
+    )
+    total = await count_user_analyses(
+        user_id=current_user["user_id"], archived=archived
+    )
+    # Serializzo datetimes a ISO string
+    for it in items:
+        for k in ("created_at", "updated_at"):
+            v = it.get(k)
+            if v and hasattr(v, "isoformat"):
+                it[k] = v.isoformat()
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/me/analyses/{analysis_id}")
+async def me_analysis_detail(analysis_id: str,
+                               current_user: dict = Depends(verify_token)):
+    """Dettaglio completo di un'analisi (con result_json fuso)."""
+    from database import get_analysis
+    record = await get_analysis(analysis_id, current_user["user_id"])
+    if not record:
+        raise HTTPException(404, detail="Analisi non trovata.")
+    # Serializzo datetimes
+    for k in ("created_at", "updated_at"):
+        v = record.get(k)
+        if v and hasattr(v, "isoformat"):
+            record[k] = v.isoformat()
+    return record
+
+
+@app.patch("/api/me/analyses/{analysis_id}")
+async def me_update_analysis(analysis_id: str, req: AnalysisMetaUpdate,
+                               current_user: dict = Depends(verify_token)):
+    """Aggiorna metadata di un'analisi (rinomina, note, archivia/de-archivia)."""
+    name = req.display_name.strip() if req.display_name is not None else None
+    if name is not None and (len(name) < 1 or len(name) > 200):
+        raise HTTPException(400, detail="Nome lunghezza non valida (1-200 caratteri).")
+    notes = req.notes.strip() if req.notes is not None else None
+    if notes is not None and len(notes) > 5000:
+        raise HTTPException(400, detail="Note troppo lunghe (max 5000 caratteri).")
+    ok = await update_analysis_meta(
+        analysis_id=analysis_id,
+        user_id=current_user["user_id"],
+        display_name=name,
+        notes=notes,
+        archived=req.archived
+    )
+    if not ok:
+        raise HTTPException(404, detail="Analisi non trovata o nessun campo da aggiornare.")
+    return {"ok": True}
+
+
+@app.delete("/api/me/analyses/{analysis_id}")
+async def me_delete_analysis(analysis_id: str,
+                               current_user: dict = Depends(verify_token)):
+    """Elimina permanentemente un'analisi.
+    Rimuove cascata l'eventuale entry leaderboard."""
+    ok = await delete_user_analysis(analysis_id, current_user["user_id"])
+    if not ok:
+        raise HTTPException(404, detail="Analisi non trovata.")
+    return {"ok": True, "deleted": analysis_id}
