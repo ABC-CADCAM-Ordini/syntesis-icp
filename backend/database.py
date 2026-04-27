@@ -278,6 +278,28 @@ async def init_db():
 
 
 
+async def get_user_pro_role(user_id: str) -> Optional[str]:
+    """Ritorna 'medico'/'laboratorio'/None per l\'utente."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT pro_role FROM users WHERE id = $1", user_id)
+        return row["pro_role"] if row else None
+
+
+async def set_user_pro_role(user_id: str, pro_role: str) -> bool:
+    """Imposta il ruolo professionale dell\'utente (medico/laboratorio).
+    Si puo\' settare solo una volta: se gia\' impostato, ritorna False."""
+    if pro_role not in ("medico", "laboratorio"):
+        raise ValueError("pro_role deve essere 'medico' o 'laboratorio'")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE users SET pro_role = $1, pro_role_set_at = NOW()
+            WHERE id = $2 AND pro_role IS NULL
+        """, pro_role, user_id)
+        return result.endswith("1")
+
+
 async def get_user_by_email(email: str) -> Optional[dict]:
     pool = await get_pool()
     async with pool.acquire() as conn:
