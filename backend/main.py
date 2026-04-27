@@ -38,7 +38,8 @@ from database import (
     list_pending_invites_for_user, get_membership,
     accept_shared_invite, decline_shared_invite,
     list_active_members_of_folder, get_shared_folder_by_drive_id,
-    reconcile_pending_shared_invites
+    reconcile_pending_shared_invites,
+    get_user_pro_role, set_user_pro_role,
 )
 import gdrive  # v7.3.9.048: modulo OAuth + Drive API
 import email_service  # v7.3.9.065 - email transazionali Resend
@@ -1095,7 +1096,7 @@ class ProRoleRequest(BaseModel):
 @app.get("/api/me/pro-role")
 async def me_get_pro_role(current_user: dict = Depends(verify_token)):
     """Ritorna il pro_role dell\'utente loggato (o null se non ancora scelto)."""
-    pro_role = await database.get_user_pro_role(current_user["user_id"])
+    pro_role = await get_user_pro_role(current_user["user_id"])
     return {"pro_role": pro_role}
 
 
@@ -1109,12 +1110,12 @@ async def me_set_pro_role(
     if req.pro_role not in ("medico", "laboratorio"):
         raise HTTPException(400, detail="pro_role deve essere 'medico' o 'laboratorio'")
     try:
-        ok = await database.set_user_pro_role(current_user["user_id"], req.pro_role)
+        ok = await set_user_pro_role(current_user["user_id"], req.pro_role)
     except ValueError as e:
         raise HTTPException(400, detail=str(e))
     if not ok:
         # Era gia\' impostato - ritorno il valore corrente
-        current = await database.get_user_pro_role(current_user["user_id"])
+        current = await get_user_pro_role(current_user["user_id"])
         raise HTTPException(409, detail=f"Ruolo gia\' impostato: {current}")
     return {"pro_role": req.pro_role, "ok": True}
 
