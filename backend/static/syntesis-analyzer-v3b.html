@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.093</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.092</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.093</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.092</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -4981,238 +4981,171 @@ function misICP_matchPairs(centsA, centsB){
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// v7.3.9.093 - MIGRAZIONE A SERVER-SIDE
-// ═══════════════════════════════════════════════════════════════════════════
-// La pipeline JS (parsing STL, componenti, partizione, clustering, ICP locale,
-// matching) e' stata DEPRECATA. Tutto il calcolo passa ora al motore Python
-// di backend (icp_engine.analyze_stl_pair) che include:
-//   - PATCH F (Hungarian-permutation guard)  -> protezione minimi locali
-//   - PATCH G (brute-force safety net)       -> robusto su SR/RS rotati >60°
-//   - weighted ICP cap+cilindro               -> v7.3.7.004
-//   - robust ICP con Tukey outlier rejection -> v7.3.7.003
-//   - flip Z automatico per SR                -> v7.3.6.004
-//   - Syntesis Score v1.0 canonico            -> identico al client deprecato
-// Le funzioni JS misICP_kabsch / misICP_runICP / misICP_comps / misICP_partition /
-// misICP_clusterComps / misICP_matchPairs / misICP_pSTL ecc. restano in vita per
-// compatibilita' di build ma non sono piu' invocate. Saranno rimosse in v094.
-// ═══════════════════════════════════════════════════════════════════════════
 function misICP_run(){
   if(!misICP_stlA || !misICP_stlB) return;
   var btn=document.getElementById('misBtnRun');
-  if(btn){ btn.classList.add('busy'); btn.textContent='Caricamento file...'; }
+  if(btn){ btn.classList.add('busy'); btn.textContent='Parsing e allineamento in corso...'; }
   misICP_clearError();
+  // Async per non bloccare UI durante parsing/ICP (che possono durare qualche secondo)
+  setTimeout(function(){
+    try {
+      // 1. Parsing STL
+      var triA=misICP_pSTL(misICP_stlA);
+      var triB=misICP_pSTL(misICP_stlB);
+      if(!triA.length) throw new Error('File A: nessun triangolo rilevato');
+      if(!triB.length) throw new Error('File B: nessun triangolo rilevato');
 
-  // FormData con i due File originali (XHR supporta progress su upload, fetch no)
-  var fd = new FormData();
-  fd.append('file_a', misICP_stlA, misICP_nameA || 'A.stl');
-  fd.append('file_b', misICP_stlB, misICP_nameB || 'B.stl');
+      // 2. Componenti connessi (ogni scanbody e/o l'arcata gengivale sono componenti)
+      var compsA=misICP_comps(triA);
+      var compsB=misICP_comps(triB);
+      if(compsA.length===0) throw new Error('File A: nessun componente connesso (servono scanbody)');
+      if(compsB.length===0) throw new Error('File B: nessun componente connesso (servono scanbody)');
 
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', '/api/analyze-public');
-  xhr.responseType = 'json';
+      // 3. Partiziono: scanbody (piccoli, < 15mm bbox) vs background (arcata/gengiva)
+      var partA=misICP_partition(triA, compsA);
+      var partB=misICP_partition(triB, compsB);
+      if(partA.scan.length===0) throw new Error('File A: nessuno scanbody rilevato (componenti troppo grandi)');
+      if(partB.scan.length===0) throw new Error('File B: nessuno scanbody rilevato (componenti troppo grandi)');
 
-  // Fase 1: upload (0-100% bytes inviati al server)
-  xhr.upload.onprogress = function(e){
-    if(!e.lengthComputable || !btn) return;
-    var pct = Math.round((e.loaded/e.total)*100);
-    btn.textContent = 'Caricamento ' + pct + '%';
-  };
-  xhr.upload.onload = function(){
-    if(btn) btn.textContent = 'Allineamento server...';
-  };
+      // 4. CLUSTERING: uno scanbody reale puo' essere composto da piu' componenti
+      //    (cilindro + disco di flangia). Raggruppo le componenti vicine.
+      var rawCentsA = partA.scan.map(function(ci){return misICP_cen(triA, compsA[ci]);});
+      var rawCentsB = partB.scan.map(function(ci){return misICP_cen(triB, compsB[ci]);});
+      var threshA = misICP_autoThresh(rawCentsA);
+      var threshB = misICP_autoThresh(rawCentsB);
+      // Uso la soglia comune (la piu' conservativa) per essere coerenti tra A e B
+      var thresh = Math.max(threshA, threshB);
+      var clustersA = misICP_clusterComps(rawCentsA, thresh); // array di array di indici in partA.scan
+      var clustersB = misICP_clusterComps(rawCentsB, thresh);
 
-  // Fase 2: server processing (indeterminata, nessun byte in arrivo finche'
-  // il backend non chiude la response)
-  // Fase 3: download response (parte automaticamente quando server risponde)
-  xhr.onprogress = function(e){
-    if(!btn) return;
-    if(e.lengthComputable && e.total > 0){
-      var pct = Math.round((e.loaded/e.total)*100);
-      btn.textContent = 'Download risultato ' + pct + '%';
-    }
-  };
+      // 4b. Centroidi dei CLUSTER (= centroidi degli scanbody reali, fusi)
+      var scanCentsA = clustersA.map(function(cl){ return misICP_clusterCentroid(triA, compsA, partA.scan, cl); });
+      var scanCentsB = clustersB.map(function(cl){ return misICP_clusterCentroid(triB, compsB, partB.scan, cl); });
+      if(scanCentsA.length===0) throw new Error('File A: nessuno scanbody rilevato dopo clustering.');
+      if(scanCentsB.length===0) throw new Error('File B: nessuno scanbody rilevato dopo clustering.');
 
-  xhr.onload = function(){
-    if(xhr.status !== 200){
-      var msg = 'Errore server (HTTP ' + xhr.status + ')';
-      try {
-        var err = xhr.response;
-        if(err && typeof err === 'object'){
-          if(err.detail) msg = (typeof err.detail === 'string') ? err.detail : JSON.stringify(err.detail);
-          else if(err.message) msg = err.message;
+      // 5. ICP tra i centroidi dei CLUSTER
+      var icpRes=misICP_runICP(scanCentsA, scanCentsB, 60);
+
+      // 6. Trasformo TUTTI i triangoli di B (scanbody + arcata) con la matrice ICP
+      var triBt=misICP_applyTform(triB, icpRes.R, icpRes.t);
+      var scanCentsBt=scanCentsB.map(function(p){
+        var rp=misICP_mv3(icpRes.R,p);
+        return [rp[0]+icpRes.t[0], rp[1]+icpRes.t[1], rp[2]+icpRes.t[2]];
+      });
+
+      // 7. Matching scanbody A <-> B sui centroidi post-ICP
+      var pairs=misICP_matchPairs(scanCentsA, scanCentsBt);
+
+      // 8. Per ogni pair calcolo asse scanbody A e B post-ICP, angolo, livello clinico.
+      //    trisA e trisBt sono i triangoli dell'INTERO cluster (cilindro+disco uniti).
+      pairs.forEach(function(p, localIdx){
+        var trisOfA = misICP_clusterTris(triA, compsA, partA.scan, clustersA[p.iA]);
+        p.trisA = trisOfA;
+        p.axA = misICP_cylAxis(trisOfA);
+        if(p.iB >= 0){
+          // Per B uso compsB con i triangoli gia' trasformati (triBt)
+          var trisOfBt = misICP_clusterTris(triBt, compsB, partB.scan, clustersB[p.iB]);
+          p.trisBt = trisOfBt;
+          p.axBt = misICP_cylAxis(trisOfBt);
+          p.axAngleDeg = (p.axA && p.axBt) ? misICP_axisAngleDeg(p.axA, p.axBt) : 0;
+          p.d3um  = p.d3  * 1000;
+          p.dxyum = p.dxy * 1000;
+          p.dxum  = p.dx  * 1000;
+          p.dyum  = p.dy  * 1000;
+          p.dzum  = p.dz  * 1000;
+          p.level = misICP_clinLevel(Math.round(p.d3um));
+          p.axLevel = misICP_clinAx(p.axAngleDeg);
+        } else {
+          p.axBt=null; p.trisBt=null; p.axAngleDeg=0;
+          p.d3um=null; p.dxyum=null; p.dxum=null; p.dyum=null; p.dzum=null;
+          p.level=null; p.axLevel=null;
         }
-      } catch(_){}
-      misICP_showError(msg);
-      if(btn){ btn.classList.remove('busy'); btn.textContent='Esegui allineamento ICP'; }
-      return;
+      });
+
+      // 8b. Triangoli dell'arcata/background di A (tutte le componenti non-scanbody)
+      var bgTrisA=[];
+      partA.bg.forEach(function(ci){ compsA[ci].forEach(function(i){bgTrisA.push(triA[i]);}); });
+      // 8c. Triangoli dell'arcata/background di B post-ICP (uso triBt gia' trasformato)
+      var bgTrisB=[];
+      partB.bg.forEach(function(ci){ compsB[ci].forEach(function(i){bgTrisB.push(triBt[i]);}); });
+
+      // 8. Metriche aggregate
+      var nMatch=pairs.filter(function(p){return p.iB>=0;}).length;
+      var angleSum=0, angleCount=0;
+      pairs.forEach(function(p){
+        if(p.axAngleDeg!=null && p.iB>=0){ angleSum+=p.axAngleDeg; angleCount++; }
+      });
+      var avgAngle = angleCount ? (angleSum/angleCount) : 0;
+      var rmsdUm = icpRes.rmsd * 1000;
+      var penRmsd = Math.min(50, rmsdUm/10);
+      var penAngle = Math.min(30, avgAngle*10);
+      // v7.3.9.082: SCORE PRELIMINARE rapido durante ICP, NON e' il punteggio canonico.
+      // Il valore canonico viene calcolato da misICP_score() (Syntesis Score v1.0)
+      // a fine pipeline e SOSTITUISCE questo. Vedi L5256 per la formula canonica.
+      var score = Math.max(0, 100 - penRmsd - penAngle);
+      var scoreLabel = score>=90 ? 'Eccellente' : score>=75 ? 'Buono' : score>=55 ? 'Accettabile' : score>=35 ? 'Verifica' : 'Critico';
+
+      // 9. Salva stato
+      misICP_trisA=triA;
+      misICP_trisB=triBt;
+      misICP_result={
+        rmsd: icpRes.rmsd, rmsdUm: rmsdUm,
+        R: icpRes.R, t: icpRes.t,
+        nCyl: nMatch,
+        avgAngle: avgAngle,
+        score: score, scoreLabel: scoreLabel,
+        pairs: pairs,
+        compsA: compsA, compsB: compsB,
+        partA: partA, partB: partB,
+        bgTrisA: bgTrisA,
+        bgTrisB: bgTrisB,
+        scanCentsA: scanCentsA, scanCentsBt: scanCentsBt,
+        fileA: misICP_nameA, fileB: misICP_nameB
+      };
+
+      // 10. Render mesh per-cilindro + arcate A/B
+      //     (arcata A solida, arcata B trasparente; dischi A arancio, dischi B blu)
+      misICP_renderPerCylinder(pairs, bgTrisA, bgTrisB);
+
+      // 10b. Sincronizzo il tree Scena (CATIA-style) con i default e lo mostro
+      misICP_resetTreeDefaults();
+      misICP_updateTreeBadges();
+      misICP_showTree();
+
+      // 11. Riepilogo header
+      document.getElementById('misSumN').textContent=String(nMatch);
+      document.getElementById('misSumRmsd').textContent=rmsdUm.toFixed(1)+' um';
+      document.getElementById('misSumAng').textContent=avgAngle.toFixed(2)+' gradi';
+      document.getElementById('misSumScore').textContent=score.toFixed(1);
+      document.getElementById('misSumLabel').textContent=scoreLabel;
+      document.getElementById('misSummary').style.display='';
+
+      // 12. Elenco scanbody nel pannello destro
+      misICP_renderScanbodyList(pairs);
+      document.getElementById('misScbListWrap').style.display='';
+
+      // 12b. Label 3D sopra ogni scanbody nel viewport
+      misICP_createLabels();
+
+      // 12c. Popolo il selettore del pannello cutview
+      misICP_populateCutSelect();
+
+      // 13. Nasconde stage placeholder
+      var stage=document.getElementById('misurareStage');
+      if(stage) stage.classList.add('hidden');
+
+      showStatus('ICP completato. RMSD '+rmsdUm.toFixed(1)+' um, '+nMatch+' cilindri.');
     }
-    if(btn) btn.textContent = 'Rendering...';
-    // Yield al browser cosi' la label "Rendering..." appare prima del lavoro pesante
-    setTimeout(function(){
-      try {
-        var data = xhr.response;
-        if(!data || typeof data !== 'object') throw new Error('Response non valida');
-        misICP_applyServerResult(data);
-        var rmsdUm = (data.icp_rmsd || 0) * 1000;
-        var n = (data.pairs || []).length;
-        var meth = data.pre_method || 'n/a';
-        showStatus('ICP completato (server, ' + meth + '). RMSD ' + rmsdUm.toFixed(1) + ' um, ' + n + ' cilindri.');
-      } catch(err){
-        console.error('[Misurare] Errore mapping server result:', err);
-        misICP_showError(err.message || 'Errore nel processare il risultato del server.');
-      } finally {
-        if(btn){ btn.classList.remove('busy'); btn.textContent='Esegui allineamento ICP'; }
-      }
-    }, 30);
-  };
-
-  xhr.onerror = function(){
-    misICP_showError('Errore di rete. Verifica la connessione e riprova.');
-    if(btn){ btn.classList.remove('busy'); btn.textContent='Esegui allineamento ICP'; }
-  };
-  xhr.ontimeout = function(){
-    misICP_showError('Timeout server. Il file potrebbe essere troppo grande o complesso.');
-    if(btn){ btn.classList.remove('busy'); btn.textContent='Esegui allineamento ICP'; }
-  };
-
-  xhr.timeout = 120000; // 2 minuti, generosi per STL grandi
-  xhr.send(fd);
-}
-
-// v7.3.9.093 - Mappa la response del server (icp_engine.analyze_stl_pair)
-// nelle strutture dati che il rendering JS si aspetta. Mantiene il contratto
-// di misICP_result per compatibilita' con misICP_buildReportData (PDF) e con
-// tutte le funzioni di rendering (renderPerCylinder, renderScanbodyList, ecc.)
-function misICP_applyServerResult(data){
-  var rmsdMm   = data.icp_rmsd || 0;
-  var rmsdUm   = rmsdMm * 1000;
-  var avgAngle = data.icp_angle || 0;
-  var score    = (typeof data.score === 'number') ? data.score : 0;
-  var scoreLbl = data.score_label || 'Critico';
-
-  var srvPairs   = data.pairs       || [];
-  var srvAxes    = data.cyl_axes    || [];
-  var ctA        = data.ct_a        || [];
-  var ctBfinal   = data.ct_b_final  || [];
-  var cylTrisA   = data.cyl_tris_a  || [];
-  var cylTrisB   = data.cyl_tris_b  || [];
-  var bgA        = data.bg_a        || [];
-  var bgB        = data.bg_b        || [];
-  var trisA      = data.tris_a      || [];
-  var trisBall   = data.tris_b_all  || [];
-
-  // Costruisco pairs nel formato che il rendering JS si aspetta. Indici iA/iB
-  // sono assegnati per posizione: pairs[i].iA = i, pairs[i].iB = i (il server
-  // ha gia' fatto il matching e restituisce i pair gia' allineati per ordine).
-  var pairs = srvPairs.map(function(sp, i){
-    var ax = srvAxes[i] || {};
-    var d3   = sp.d3   || 0;
-    var dxy  = sp.dxy  || 0;
-    var dx   = sp.dx   || 0;
-    var dy   = sp.dy   || 0;
-    var dz   = sp.dz   || 0;
-    var d3um = d3  * 1000;
-    var axDeg = ax.angle_deg || 0;
-    return {
-      iA: i, iB: i,
-      // Centroidi: cA/cB per misICP_buildReportData, a/b per altre funzioni
-      cA: sp.a || ctA[i] || [0,0,0],
-      cB: sp.b || ctBfinal[i] || [0,0,0],
-      a:  sp.a || ctA[i] || [0,0,0],
-      b:  sp.b || ctBfinal[i] || [0,0,0],
-      // Deviazioni in mm e in um
-      dx: dx, dy: dy, dz: dz, dxy: dxy, d3: d3,
-      d3um:  d3um,
-      dxyum: dxy * 1000,
-      dxum:  dx  * 1000,
-      dyum:  dy  * 1000,
-      dzum:  dz  * 1000,
-      // Triangoli per cilindro (gia' trasformati lato server per B)
-      trisA:  cylTrisA[i] || [],
-      trisBt: cylTrisB[i] || [],
-      // Assi del cilindro
-      axA:   ax.ax_a || null,
-      axBt:  ax.ax_b || null,
-      axAngleDeg: axDeg,
-      // Livelli clinici (riusiamo le funzioni client-side, sono leggere)
-      level:   misICP_clinLevel(Math.round(d3um)),
-      axLevel: misICP_clinAx(axDeg),
-      // Confidence per pair (campo nuovo dal server, lo passiamo al PDF)
-      confidence: sp.confidence || null
-    };
-  });
-
-  // Stato globale: triangoli interi per i due file (per render arcate complete)
-  misICP_trisA = trisA;
-  misICP_trisB = trisBall;
-
-  misICP_result = {
-    // Metriche globali
-    rmsd: rmsdMm, rmsdUm: rmsdUm,
-    nCyl: pairs.length,
-    avgAngle: avgAngle,
-    score: score,
-    scoreLabel: scoreLbl,
-    // Trasformazione finale ICP (server espone in v7.3.9.093). Il client tipico
-    // NON deve riapplicarla: tris_b_all e cyl_tris_b sono gia' trasformati.
-    R: data.R_final || [[1,0,0],[0,1,0],[0,0,1]],
-    t: data.t_final || [0,0,0],
-    // Pairs e dati cilindri
-    pairs: pairs,
-    // Compatibilita' con il vecchio shape (campi non piu' usati ma referenziati
-    // qua e la' come fallback): li tengo come empty/no-op
-    compsA: [], compsB: [],
-    partA: { scan: [], bg: [] },
-    partB: { scan: [], bg: [] },
-    // Background tris (arcata gengivale) per il rendering
-    bgTrisA: bgA,
-    bgTrisB: bgB,
-    // Centroidi scanbody A / B post-ICP
-    scanCentsA: ctA,
-    scanCentsBt: ctBfinal,
-    // File names + telemetria server
-    fileA: data.filename_a || misICP_nameA || 'A.stl',
-    fileB: data.filename_b || misICP_nameB || 'B.stl',
-    score_model_version: data.score_model_version || 'Syntesis Score v1.0',
-    algorithm: 'server_icp_v7.3.9.093',
-    pre_method: data.pre_method || null,           // brute_force telemetry
-    detected_profile: data.detected_profile || 'Generico',
-    analysis_mode: data.analysis_mode || 'pairwise',
-    extra_instances_b: data.extra_instances_b || 0,
-    warnings: data.warnings || []
-  };
-
-  // Render: invariate rispetto a prima del refactor. Le funzioni leggono
-  // dai campi sopra; il loro contratto e' rispettato.
-  misICP_renderPerCylinder(pairs, bgA, bgB);
-
-  // Sincronizza tree Scena (CATIA-style)
-  misICP_resetTreeDefaults();
-  misICP_updateTreeBadges();
-  misICP_showTree();
-
-  // Riepilogo header (numeri canonici dal server)
-  document.getElementById('misSumN').textContent     = String(pairs.length);
-  document.getElementById('misSumRmsd').textContent  = rmsdUm.toFixed(1) + ' um';
-  document.getElementById('misSumAng').textContent   = avgAngle.toFixed(2) + ' gradi';
-  document.getElementById('misSumScore').textContent = score.toFixed(1);
-  document.getElementById('misSumLabel').textContent = scoreLbl;
-  document.getElementById('misSummary').style.display = '';
-
-  // Pannello laterale con elenco scanbody
-  misICP_renderScanbodyList(pairs);
-  document.getElementById('misScbListWrap').style.display = '';
-
-  // Label 3D sopra ogni scanbody nel viewport
-  misICP_createLabels();
-
-  // Popola selettore del pannello cutview
-  misICP_populateCutSelect();
-
-  // Nasconde stage placeholder
-  var stage = document.getElementById('misurareStage');
-  if(stage) stage.classList.add('hidden');
+    catch(err){
+      console.error('[Misurare] ICP fallito:', err);
+      misICP_showError(err.message || 'Errore durante allineamento ICP.');
+    }
+    finally {
+      var btn=document.getElementById('misBtnRun');
+      if(btn){ btn.classList.remove('busy'); btn.textContent='Esegui allineamento ICP'; }
+    }
+  }, 40);
 }
 
 // --- MESH THREE.JS PER MISURARE (A blu, B arancione) ---
