@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.092</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.093</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.092</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.093</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -4798,6 +4798,75 @@ function misICP_runICP(fixed,moving,maxIter){
   var angle=Math.acos(Math.min(1,Math.max(-1,(trace-1)/2)))*180/Math.PI;
   return { R:Racc, t:tacc, aligned:Bt, rmsd:prev, angle:angle };
 }
+// v7.3.9.093 - PATCH G in JavaScript: brute-force permutation safety net.
+// Risolve la rotational ambiguity quando A e B hanno la stessa configurazione
+// geometrica ma sono ruotate fra loro >60 gradi (caso tipico di scanbody SR/RS
+// dove i 6 cilindri sono praticamente intercambiabili a meno di una rotazione
+// circolare). In quel caso l'ICP nearest-neighbor sbaglia il matching iniziale
+// e converge a un local minimum molto distante dall'allineamento reale.
+//
+// Logica: per n<=8 scanbody, prova tutte le n! permutazioni di matching B->A,
+// calcola Kabsch e RMSD post-allineamento per ognuna, tiene la migliore. Per
+// n=6 sono 720 prove, per n=7 sono 5040, per n=8 sono 40320: tutte sotto 100ms
+// in JavaScript moderno con Kabsch su nuvole da pochi punti.
+//
+// Equivalente alla logica gia' validata server-side in icp_engine.robust_pre_align
+// (v7.3.7.004 backend). Ritorna {R, t, applied} dove applied=true significa che
+// e' stata trovata una permutazione migliore dell'identita' di almeno 1um.
+function misICP_bruteForcePreAlign(centsA, centsB){
+  var n = centsA.length;
+  if(n !== centsB.length || n < 3 || n > 8){
+    return { R: misICP_eye3(), t: [0,0,0], rmsd: Infinity, applied: false };
+  }
+  function _evalPerm(perm){
+    var Bp = perm.map(function(idx){ return centsB[idx]; });
+    var kb = misICP_kabsch(Bp, centsA); // R*Bp + t -> centsA
+    var sumSq = 0;
+    for(var i=0; i<n; i++){
+      var rp = misICP_mv3(kb.R, Bp[i]);
+      var dx = (rp[0] + kb.t[0]) - centsA[i][0];
+      var dy = (rp[1] + kb.t[1]) - centsA[i][1];
+      var dz = (rp[2] + kb.t[2]) - centsA[i][2];
+      sumSq += dx*dx + dy*dy + dz*dz;
+    }
+    return { R: kb.R, t: kb.t, rmsd: Math.sqrt(sumSq / n) };
+  }
+  var idIdx = [];
+  for(var k=0; k<n; k++) idIdx.push(k);
+  var bestRes = _evalPerm(idIdx);
+  var baselineRmsd = bestRes.rmsd;
+  var bestPerm = idIdx.slice();
+  // Heap's algorithm: genera tutte le n! permutazioni in-place
+  function _heapPermute(arr, k){
+    if(k === 1){
+      var res = _evalPerm(arr);
+      if(res.rmsd < bestRes.rmsd){
+        bestRes = res;
+        bestPerm = arr.slice();
+      }
+      return;
+    }
+    _heapPermute(arr, k-1);
+    for(var i=0; i<k-1; i++){
+      var swapAt = (k % 2 === 0) ? i : 0;
+      var tmp = arr[swapAt]; arr[swapAt] = arr[k-1]; arr[k-1] = tmp;
+      _heapPermute(arr, k-1);
+    }
+  }
+  _heapPermute(idIdx.slice(), n);
+  // Tolerance: applichiamo solo se ha migliorato di almeno 1um (1e-3 mm)
+  // per evitare di perturbare casi gia' allineati con micro-rumore numerico.
+  var improved = (bestRes.rmsd < baselineRmsd - 1e-3);
+  return {
+    R: bestRes.R,
+    t: bestRes.t,
+    rmsd: bestRes.rmsd,
+    rmsdBaseline: baselineRmsd,
+    perm: bestPerm,
+    applied: improved,
+    n: n
+  };
+}
 function misICP_applyTform(tris,R,t){
   return tris.map(function(tri){
     return tri.map(function(v){
@@ -5024,8 +5093,43 @@ function misICP_run(){
       if(scanCentsA.length===0) throw new Error('File A: nessuno scanbody rilevato dopo clustering.');
       if(scanCentsB.length===0) throw new Error('File B: nessuno scanbody rilevato dopo clustering.');
 
-      // 5. ICP tra i centroidi dei CLUSTER
-      var icpRes=misICP_runICP(scanCentsA, scanCentsB, 60);
+      // 5. PRE-ALIGN brute-force (v7.3.9.093, PATCH G in JS): risolve la
+      //    rotational ambiguity per scanbody simmetrici (SR/RS) ruotati >60
+      //    gradi tra A e B. Per n<=8, prova tutte le n! permutazioni di
+      //    matching e tiene la migliore. Costo: <100ms anche per n=8 (40320
+      //    Kabsch su 8 punti). Se nessuna permutazione migliora rispetto
+      //    all'identita', applied=false e l'ICP riceve i centroidi originali.
+      var preAlign = misICP_bruteForcePreAlign(scanCentsA, scanCentsB);
+      var scanCentsBpre;
+      if(preAlign.applied){
+        scanCentsBpre = scanCentsB.map(function(p){
+          var rp = misICP_mv3(preAlign.R, p);
+          return [rp[0]+preAlign.t[0], rp[1]+preAlign.t[1], rp[2]+preAlign.t[2]];
+        });
+        try {
+          console.log('[Misurare PATCH G] brute-force attivata: n=' + preAlign.n +
+                      ', RMSD baseline=' + (preAlign.rmsdBaseline*1000).toFixed(1) +
+                      'um -> migliore=' + (preAlign.rmsd*1000).toFixed(1) + 'um, perm=' +
+                      JSON.stringify(preAlign.perm));
+        } catch(_){}
+      } else {
+        scanCentsBpre = scanCentsB;
+      }
+
+      // 5b. ICP tra i centroidi dei CLUSTER (gia' pre-allineati se PATCH G ha agito)
+      var icpRes = misICP_runICP(scanCentsA, scanCentsBpre, 60);
+
+      // 5c. Compongo la trasformazione TOTALE: T_total = T_icp * T_pre.
+      //     R_total = R_icp * R_pre,    t_total = R_icp * t_pre + t_icp
+      //     L'angolo va ricalcolato dalla R combinata.
+      if(preAlign.applied){
+        var Rcomb = misICP_mul3(icpRes.R, preAlign.R);
+        var Rt_pre = misICP_mv3(icpRes.R, preAlign.t);
+        var tcomb = [Rt_pre[0]+icpRes.t[0], Rt_pre[1]+icpRes.t[1], Rt_pre[2]+icpRes.t[2]];
+        var trCombined = Rcomb[0][0]+Rcomb[1][1]+Rcomb[2][2];
+        var angleComb = Math.acos(Math.min(1,Math.max(-1,(trCombined-1)/2)))*180/Math.PI;
+        icpRes = { R: Rcomb, t: tcomb, aligned: icpRes.aligned, rmsd: icpRes.rmsd, angle: angleComb };
+      }
 
       // 6. Trasformo TUTTI i triangoli di B (scanbody + arcata) con la matrice ICP
       var triBt=misICP_applyTform(triB, icpRes.R, icpRes.t);
