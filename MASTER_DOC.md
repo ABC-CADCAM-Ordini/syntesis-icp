@@ -777,3 +777,47 @@ Il file `syntesis-analyzer-v3b.html` ora coincide tra working copy e produzione:
 ---
 
 *Fine appendice B — v7.3.9.001 deploy SUCCESS commit 5111c84e — Sezione redatta da Claude il pomeriggio del 2026-04-25*
+
+---
+
+# Appendice C — Migrazione Misurare server-side (2026-04-27 sera)
+
+## C.1 Cosa cambia in v7.3.9.093
+
+Il modulo Misurare dentro Analizzare smette di calcolare l'allineamento ICP nel browser. La funzione `misICP_run()` non fa più parsing STL, componenti connesse, partizione, clustering, Kabsch, ICP, matching client-side. Invia i due File originali via `XMLHttpRequest` POST `multipart/form-data` all'endpoint `/api/analyze-public`, riceve la response JSON e mappa i campi nelle strutture dati che il rendering 3D già conosce.
+
+Conseguenza diretta: tutte le migliorie algoritmiche introdotte negli ultimi mesi sull'engine Python entrano automaticamente in vigore in Misurare. In particolare il caso che ha innescato questa migrazione, due scansioni con scanbody SR ruotate fra loro di oltre 60° (rotational ambiguity), passa da RMSD 2341 µm e angolo medio 11.78° (ICP JS senza brute-force, output di v7.3.9.092) a RMSD ~217 µm e angolo medio ~1.62° (PATCH G server attiva, brute-force su 720 permutazioni di matching).
+
+## C.2 Architettura del response esteso
+
+Il return di `analyze_stl_pair` in `backend/icp_engine.py` espone tre nuovi campi rispetto a v7.3.9.092: `pre_method` riporta il nome del pre-align effettivamente usato (`signature_kabsch3d`, `signature_kabsch3d+brute_force`, `landmark`, `centroid_only`, `empty`) e serve da telemetria per verificare quando PATCH G entra in azione; `R_final` e `t_final` contengono la rotazione e traslazione finali dell'ICP in forma serializzabile, utili per consumer che vogliano replicare la trasformazione altrove. Il client tipico non ha bisogno di applicarli, perché `tris_b_all` e `cyl_tris_b` arrivano già pre-trasformati.
+
+Il response complessivo per due STL da circa 600 KB pesa 6.8 MB, dominati dai triangoli (`cyl_tris_a/b`, `tris_a`, `tris_b_all`, `bg_a/b`). La scelta esplicita è di non comprimere lato applicativo né di rimuovere i `cyl_tris_*`: il rendering 3D ha bisogno della struttura per cilindro pronta, e una eventuale ottimizzazione di payload andrebbe affrontata a livello FastAPI con `gzip` middleware, indipendente da questa migrazione.
+
+## C.3 Nuova funzione `misICP_applyServerResult(data)`
+
+La funzione mantiene il contratto storico di `misICP_result`. Le sue chiavi sono lette da `misICP_buildReportData` per il PDF, da `misICP_renderPerCylinder`, `misICP_renderScanbodyList`, `misICP_createLabels`, `misICP_populateCutSelect`, e dai vari handler della tree Scena. Niente di tutto questo è stato toccato. La mappa server → client copre `pairs[]` con tutti i campi `dx/dy/dz/dxy/d3` in mm e in µm, `cA/cB/a/b` come centroidi, `trisA/trisBt` come triangoli per cilindro presi da `cyl_tris_a/b`, `axA/axBt/axAngleDeg` da `cyl_axes[i]`, `level/axLevel` ricalcolati con le funzioni client-side `misICP_clinLevel` e `misICP_clinAx`. Background tris da `bg_a/bg_b`. Punteggio canonico `score/scoreLabel` direttamente dal server, eliminando la duplicazione di `misICP_calcScore` (la formula resta in vita per backward-compat ma non è più la fonte di verità).
+
+## C.4 Progress UI
+
+`XMLHttpRequest` invece di `fetch` per supportare il progress event sull'upload, che fetch non espone. Tre fasi visibili nel pulsante: "Caricamento NN%" durante l'upload bytes, "Allineamento server..." mentre il backend elabora (indeterminato), "Rendering..." subito dopo il `xhr.onload` e prima del lavoro di mapping/rendering. Il timeout è impostato a 120 secondi per coprire STL grossi su rete lenta. In caso di errore di rete, timeout, o status non 200, l'errore viene mostrato con `misICP_showError` e il pulsante torna allo stato iniziale.
+
+## C.5 Funzioni JS deprecate
+
+Restano in vita per non rompere la build, ma non sono più invocate da `misICP_run`: `misICP_pSTL`, `misICP_pBin`, `misICP_pAsc` (parsing STL); `misICP_comps`, `misICP_partition`, `misICP_autoThresh`, `misICP_clusterComps`, `misICP_clusterCentroid`, `misICP_clusterTris` (componenti, partizione, clustering); `misICP_kabsch`, `misICP_svd3`, `misICP_jacobi3`, `misICP_runICP` (matematica ICP); `misICP_matchPairs` (matching greedy); `misICP_applyTform`, `misICP_mv3`, `misICP_mul3`, `misICP_eye3`, `misICP_tr3`, `misICP_det3` (algebra di supporto). Tutte previste in rimozione in v7.3.9.094, dopo verifica che la nuova architettura funzioni stabilmente sul campo. Stima di sfoltitura: circa 520 righe di JavaScript, da circa 2.67 MB attuali a circa 2.55 MB.
+
+## C.6 Trade-off accettato: dipendenza dal server
+
+Prima di v7.3.9.093, Misurare funzionava anche con il backend irraggiungibile. Dopo questa migrazione, server giù significa Misurare non funzionante. La scelta è esplicita di Francesco: la robustezza algoritmica e la singola fonte di verità valgono più della disponibilità offline.
+
+## C.7 Stato deploy
+
+Deploy v7.3.9.093 ha richiesto bump del title (riga 9 di `syntesis-analyzer-v3b.html`) e del footer (riga 699), aggiunta di `pre_method`, `R_final`, `t_final` al return di `analyze_stl_pair`, refactor della funzione `misICP_run` con nuova `misICP_applyServerResult`, bump CACHEBUST in `Dockerfile`, deploy esplicito su entrambi i servizi Railway (`syntesis-icp` legacy e `backend` corrente) tramite `serviceInstanceDeploy latestCommit=true`. `pdf_gen.py` era già allineato a v7.3.9.093.
+
+## C.8 Verifica live
+
+Test sul caso che ha innescato la migrazione: due STL `quadrato_stampa_3d_reverse_scanbody_SR.stl` e `quadrato_in_metallo_reverse_scanbody_SR.stl`, sei scanbody SR ciascuno con rotational ambiguity di oltre 60°. Atteso: `pre_method` = `signature_kabsch3d+brute_force`, RMSD intorno ai 217 µm, angolo medio intorno a 1.6°, dischi blu e arancioni visivamente sovrapposti per tutti e sei i pair.
+
+---
+
+*Fine appendice C — v7.3.9.093 — Sezione redatta da Claude la sera del 2026-04-27 in sessione di lavoro con Francesco Biaggini.*

@@ -1669,6 +1669,16 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         "extra_instances_b": max(0, len(scan_b) - len(pairs)),
         "filename_a": name_a,
         "filename_b": name_b,
+        # v7.3.9.093 - telemetria pre-align: ci dice se brute-force (PATCH G) e'
+        # scattato sul caso. Valori tipici: "signature_kabsch3d", "landmark",
+        # "signature_kabsch3d+brute_force", "centroid_only", "empty".
+        "pre_method": method_pre,
+        # v7.3.9.093 - rotazione e traslazione finali ICP (per diagnostica e
+        # per consumer client che vogliano applicare la trasformazione altrove).
+        # Nota: tris_b_all e' gia' pre-trasformato con queste matrici; il client
+        # tipico NON ha bisogno di applicarle a sua volta.
+        "R_final":   icp["R"].tolist() if hasattr(icp.get("R", None), "tolist") else None,
+        "t_final":   icp["t"].tolist() if hasattr(icp.get("t", None), "tolist") else None,
         # Dati mesh per anteprime e PDF
         "tris_a":    tris_to_list(tris_a, 6000),
         "tris_b_all": tris_to_list(tris_b_all, 6000),
