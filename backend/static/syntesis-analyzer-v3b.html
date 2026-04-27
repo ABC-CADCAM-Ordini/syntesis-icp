@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.094</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.098</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.094</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.098</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13832,10 +13832,22 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // Costruisci i 3 group, tutti con origine = connessione implantare
+    // v7.3.9.098 - Costruisci i 3 group: ognuno con la SUA connection per
+    // far coincidere il SUO disco con discWorld (il punto cliccato).
+    // Il flip SR di v7.3.6.004 e' MANTENUTO (parsing in linee precedenti),
+    // quindi tutti i template hanno disco a Zmax positivo:
+    //   1T3: zMax ~+8.5  SR (post-flip): zMax ~+5  OS: zMax ~+6
+    // connectionK = discWorld - zDiscK*axis fa coincidere il disco di ogni
+    // template con discWorld. I corpi cilindrici si estendono dentro la
+    // scansione (verso -axis), tutti cap-up con i dischi sovrapposti.
+    // p.position resta connectionWorld (del source) perche' il refinement
+    // ICP usa CULL_CYL nel sistema locale del source.
     var groups = {};
     TPL_KEYS.forEach(function(k){
-      var g = sostBuildTemplateGroup(k, geos[k], connectionWorld, axis);
+      geos[k].computeBoundingBox();
+      var zDiscK = geos[k].boundingBox.max.z;
+      var connectionK = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscK));
+      var g = sostBuildTemplateGroup(k, geos[k], connectionK, axis);
       g.name = id + '_' + k;
       g.visible = (k === activeKey);
       scene.add(g);
