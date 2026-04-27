@@ -941,9 +941,16 @@ class ContactUpdate(BaseModel):
 
 
 @app.get("/api/me/contacts")
-async def me_list_contacts(current_user: dict = Depends(verify_token)):
-    """Lista contatti dell'utente corrente."""
+async def me_list_contacts(
+    pro_role: Optional[str] = None,
+    current_user: dict = Depends(verify_token)
+):
+    """Lista contatti dell'utente corrente. Filtro opzionale ?pro_role=medico|laboratorio."""
     items = await list_user_contacts(current_user["user_id"])
+    if pro_role:
+        if pro_role not in ("medico", "laboratorio"):
+            raise HTTPException(400, detail="pro_role deve essere 'medico' o 'laboratorio'.")
+        items = [it for it in items if it.get("contact_pro_role") == pro_role]
     # Serializzo datetimes
     for it in items:
         for k in ("created_at", "updated_at"):
