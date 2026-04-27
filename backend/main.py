@@ -971,6 +971,9 @@ async def me_create_contact(req: ContactCreate,
     notes = req.notes.strip() if req.notes else None
     if notes and len(notes) > 2000:
         raise HTTPException(400, detail="Note troppo lunghe (max 2000).")
+    contact_pro_role = req.contact_pro_role.strip() if req.contact_pro_role else None
+    if contact_pro_role and contact_pro_role not in ("medico", "laboratorio"):
+        raise HTTPException(400, detail="contact_pro_role deve essere 'medico' o 'laboratorio'.")
 
     try:
         contact = await create_user_contact(
@@ -995,9 +998,12 @@ async def me_update_contact(contact_id: str, req: ContactUpdate,
         raise HTTPException(400, detail="Nome troppo lungo.")
     role = req.role.strip() if req.role is not None else None
     notes = req.notes.strip() if req.notes is not None else None
+    contact_pro_role = req.contact_pro_role.strip() if req.contact_pro_role is not None else None
+    if contact_pro_role and contact_pro_role not in ("medico", "laboratorio", ""):
+        raise HTTPException(400, detail="contact_pro_role deve essere 'medico'/'laboratorio'/''.")
     ok = await update_user_contact(
         contact_id, current_user["user_id"],
-        display_name=name, role=role, notes=notes
+        display_name=name, role=role, contact_pro_role=contact_pro_role, notes=notes
     )
     if not ok:
         raise HTTPException(404, detail="Contatto non trovato o nessun campo da aggiornare.")
