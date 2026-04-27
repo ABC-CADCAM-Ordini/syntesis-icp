@@ -707,7 +707,7 @@ body{
   font-size:11px;color:#64748b;font-weight:600;letter-spacing:.04em;
 }
 
-/* v7.3.9.089 - Icone nei tab */
+/* v7.3.9.090 - Icone nei tab */
 .tab{display:inline-flex;align-items:center;gap:8px;line-height:1}
 .tab-ico{width:15px;height:15px;flex-shrink:0;color:currentColor;display:inline-block;vertical-align:middle}
 .tab.active .tab-ico,.tab:hover .tab-ico{color:var(--blue)}
@@ -717,10 +717,39 @@ body{
   .tab-ico{width:18px;height:18px}
 }
 
-/* v7.3.9.089 - Badge pro-role su card contatto */
+/* v7.3.9.090 - Badge pro-role su card contatto */
 .cc-pro-role{display:inline-block;font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono);margin-right:6px;vertical-align:middle}
 .cc-pro-role.medico{background:#E8F4FF;color:var(--blue)}
 .cc-pro-role.laboratorio{background:#DCFCE7;color:#0D9E6E}
+
+/* v7.3.9.090 - Sezione cartelle condivise */
+.sf-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.sf-title-block{flex:1;min-width:0}
+.sf-title{font-size:16px;font-weight:800;color:var(--dark);margin-bottom:3px}
+.sf-subtitle{font-size:11px;color:var(--gray);font-family:var(--mono);letter-spacing:.04em}
+.sf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.sf-card{background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:18px 18px 14px;cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+.sf-card:hover{border-color:var(--blue);box-shadow:0 4px 14px rgba(0,82,163,.08);transform:translateY(-1px)}
+.sf-card-name{font-weight:800;color:var(--dark);font-size:14px;line-height:1.3;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sf-card-meta{font-size:10px;color:var(--gray);font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px}
+.sf-card-partner{font-size:12px;color:var(--gray);margin-bottom:8px}
+.sf-card-partner b{color:var(--dark)}
+.sf-card-cases{font-size:11px;color:var(--blue);font-family:var(--mono);font-weight:800;letter-spacing:.05em}
+.sf-card-cases.zero{color:var(--gray)}
+.sf-section-title{font-size:13px;font-weight:800;color:var(--dark);margin-bottom:4px}
+.sf-section-sub{font-size:11px;color:var(--gray);font-family:var(--mono);letter-spacing:.04em;margin-bottom:14px;line-height:1.5}
+.sf-empty{padding:36px 20px;text-align:center;background:#F8FAFC;border:1.5px dashed var(--border);border-radius:12px;grid-column:1/-1}
+.sf-empty-ico{font-size:32px;margin-bottom:8px;opacity:.5}
+.sf-empty-title{font-weight:800;color:var(--dark);font-size:13px;margin-bottom:6px}
+.sf-empty-text{font-size:11px;color:var(--gray);font-family:var(--mono);line-height:1.7;letter-spacing:.04em}
+.sf-pro-badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono)}
+.sf-pro-badge.medico{background:#E8F4FF;color:var(--blue)}
+.sf-pro-badge.laboratorio{background:#DCFCE7;color:#0D9E6E}
+.sf-pro-badge.untagged{background:#F1F5F9;color:#64748B}
+@media(max-width:600px){
+  .sf-header{flex-direction:column;align-items:stretch}
+  .sf-grid{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -818,8 +847,24 @@ body{
 
     <!-- TAB: FILE (file browser Drive - v7.3.9.080) -->
     <div class="tab-content" id="tabFiles">
-      <div id="filesContainer">
-        <div class="loading"><span class="spinner"></span>Caricamento file...</div>
+      <div id="sharedFoldersSection" style="margin-bottom:24px">
+        <div class="sf-header">
+          <div class="sf-title-block">
+            <div class="sf-title" id="sfMainTitle">Le tue cartelle</div>
+            <div class="sf-subtitle" id="sfSubtitle">Carica per iniziare</div>
+          </div>
+          <button class="btn-cta" onclick="openCreateSharedFolder()" style="background:var(--blue);color:#fff;font-weight:800">+ Nuova cartella</button>
+        </div>
+        <div id="sharedFoldersList" class="sf-grid">
+          <div class="loading"><span class="spinner"></span>Caricamento cartelle...</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding-top:18px;border-top:1px solid var(--border)">
+        <div class="sf-section-title">Browse cartella Drive raw</div>
+        <div class="sf-section-sub">Sfoglia la struttura di Syntesis-ICP nel tuo Drive. Utile per recuperi o organizzazione manuale.</div>
+        <div id="filesContainer">
+          <div class="loading"><span class="spinner"></span>Caricamento file...</div>
+        </div>
       </div>
     </div>
 
@@ -941,7 +986,7 @@ body{
 </div>
 
   
-  <!-- MODAL: ONBOARDING PRO-ROLE (v7.3.9.089) -->
+  <!-- MODAL: ONBOARDING PRO-ROLE (v7.3.9.090) -->
   <div class="modal-backdrop" id="modalProRole" style="z-index:99999;background:rgba(15,25,35,.78)">
     <div style="background:#fff;border-radius:14px;width:90vw;max-width:580px;padding:36px 32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
       <div style="text-align:center;margin-bottom:22px">
@@ -1099,6 +1144,7 @@ function doLogout(){
 
 // ── Tab switching ───────────────────────────────────────────────────────────
 function switchTab(name){
+  if(name === 'files'){ setTimeout(function(){ loadSharedFolders(); }, 50); }  // v.090 - carica shared
   document.querySelectorAll('.tab').forEach(function(t){
     t.classList.toggle('active', t.dataset.tab === name);
   });
@@ -2159,6 +2205,152 @@ var fbState = {
   rootId: null,
 };
 
+
+// v7.3.9.090 - Sezione cartelle condivise
+var sharedFoldersState = { owned: [], member: [], contactsMap: {} };
+
+async function loadSharedFolders(){
+  updateSharedFoldersTitle();
+  var box = document.getElementById('sharedFoldersList');
+  if(!box) return;
+  box.innerHTML = '<div class="loading"><span class="spinner"></span>Caricamento cartelle...</div>';
+  try {
+    var r = await fetch('/api/me/shared-folders', { headers: authHeaders() });
+    if(r.status === 401){ checkAuth(); return; }
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    sharedFoldersState.owned = data.owned || [];
+    sharedFoldersState.member = data.member || [];
+    try {
+      var rc = await fetch('/api/me/contacts', { headers: authHeaders() });
+      if(rc.ok){
+        var dc = await rc.json();
+        sharedFoldersState.contactsMap = {};
+        (dc.items || dc.contacts || []).forEach(function(c){
+          if(c.contact_email){
+            sharedFoldersState.contactsMap[c.contact_email.toLowerCase()] = c;
+          }
+        });
+      }
+    } catch(_){}
+    renderSharedFolders();
+  } catch(e){
+    box.innerHTML = '<div class="sf-empty"><div class="sf-empty-title">Errore caricamento</div><div class="sf-empty-text">' + escapeHtml(e.message) + '</div></div>';
+  }
+}
+
+function updateSharedFoldersTitle(){
+  var titleEl = document.getElementById('sfMainTitle');
+  var subEl = document.getElementById('sfSubtitle');
+  if(!titleEl || !subEl) return;
+  if(_userProRole === 'medico'){
+    titleEl.textContent = 'I tuoi laboratori';
+    subEl.textContent = 'Cartelle dedicate ai laboratori con cui collabori';
+  } else if(_userProRole === 'laboratorio'){
+    titleEl.textContent = 'I tuoi medici';
+    subEl.textContent = 'Cartelle dedicate ai medici con cui collabori';
+  } else {
+    titleEl.textContent = 'Le tue cartelle condivise';
+    subEl.textContent = 'Imposta il tuo ruolo per il flusso ottimizzato';
+  }
+}
+
+function renderSharedFolders(){
+  var box = document.getElementById('sharedFoldersList');
+  if(!box) return;
+  var all = [];
+  sharedFoldersState.owned.forEach(function(f){
+    all.push({
+      kind: 'owned',
+      shared_folder_id: f.id,
+      drive_folder_id: f.owner_drive_folder_id,
+      folder_name: f.folder_name,
+      n_active: f.n_active,
+      n_pending: f.n_pending,
+      partner_email: null,
+      partner_name: null
+    });
+  });
+  sharedFoldersState.member.forEach(function(f){
+    all.push({
+      kind: 'member',
+      shared_folder_id: f.shared_folder_id,
+      drive_folder_id: f.member_drive_folder_id,
+      folder_name: f.folder_name,
+      n_active: 1,
+      n_pending: 0,
+      partner_email: f.owner_email,
+      partner_name: f.owner_name
+    });
+  });
+  if(!all.length){
+    var what = _userProRole === 'medico' ? 'laboratorio'
+                : (_userProRole === 'laboratorio' ? 'medico' : 'collaboratore');
+    box.innerHTML =
+      '<div class="sf-empty">' +
+        '<div class="sf-empty-ico">&#x1F4C1;</div>' +
+        '<div class="sf-empty-title">Nessuna cartella condivisa ancora</div>' +
+        '<div class="sf-empty-text">Crea una cartella per iniziare a scambiare file con un ' + what + '.</div>' +
+      '</div>';
+    return;
+  }
+  var h = '';
+  all.forEach(function(f){
+    var contact = f.partner_email ? sharedFoldersState.contactsMap[f.partner_email.toLowerCase()] : null;
+    var partnerLabel = contact && contact.display_name
+                        ? contact.display_name
+                        : (f.partner_name || (f.partner_email || 'condivisa con te'));
+    var proRole = contact ? contact.contact_pro_role : null;
+    var proRoleLbl = proRole === 'medico' ? 'Medico' : (proRole === 'laboratorio' ? 'Lab' : null);
+    var badgeHtml = proRole
+      ? '<span class="sf-pro-badge ' + proRole + '">' + proRoleLbl + '</span>'
+      : (f.kind === 'member' ? '<span class="sf-pro-badge untagged">Da taggare</span>' : '');
+    var partnerLine;
+    if(f.kind === 'owned'){
+      partnerLine = f.n_active + ' membr' + (f.n_active===1?'o':'i') +
+                     (f.n_pending ? ' &middot; ' + f.n_pending + ' in attesa' : '');
+    } else {
+      partnerLine = 'da <b>' + escapeHtml(partnerLabel) + '</b>';
+    }
+    h += '<div class="sf-card" data-sfid="' + f.shared_folder_id +
+         '" data-driveid="' + (f.drive_folder_id||'') +
+         '" data-name="' + escapeHtml(f.folder_name) +
+         '" onclick="onSharedFolderClick(this)">' +
+      '<div class="sf-card-name">' +
+        escapeHtml(f.folder_name) +
+        badgeHtml +
+      '</div>' +
+      '<div class="sf-card-meta">' + (f.kind === 'owned' ? 'Condivisa da te' : 'Ricevuta') + '</div>' +
+      '<div class="sf-card-partner">' + partnerLine + '</div>' +
+      '<div class="sf-card-cases zero">0 casi paziente</div>' +
+    '</div>';
+  });
+  box.innerHTML = h;
+}
+
+function onSharedFolderClick(el){
+  var driveId = el.getAttribute('data-driveid');
+  var name = el.getAttribute('data-name');
+  if(driveId){
+    loadFiles(driveId);
+    showToast('Apro: ' + name);
+    setTimeout(function(){
+      var fc = document.getElementById('filesContainer');
+      if(fc) fc.scrollIntoView({behavior:'smooth', block:'start'});
+    }, 100);
+  } else {
+    showToast('Cartella non ancora replicata nel tuo Drive', true);
+  }
+}
+
+function openCreateSharedFolder(){
+  showToast('Crea una cartella nel browser Drive qui sotto, poi clicca Condividi sulla cartella', false);
+  setTimeout(function(){
+    var fc = document.getElementById('filesContainer');
+    if(fc) fc.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 100);
+}
+
 async function loadFiles(folderId){
   var box = document.getElementById('filesContainer');
   if(!box) return;
@@ -2414,10 +2606,20 @@ async function openShareFolder(folderId, folderName){
   var pickerEl = document.getElementById('sfContactPicker');
   pickerEl.innerHTML = '<div class="cp-empty">Caricamento contatti...</div>';
   try {
+    var targetRole = _userProRole === 'medico' ? 'laboratorio'
+                     : (_userProRole === 'laboratorio' ? 'medico' : null);
     var r = await fetch('/api/me/contacts', { headers: authHeaders() });
     if(!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
-    sfState.contacts = d.contacts || [];
+    var allContacts = d.items || d.contacts || [];
+    if(targetRole){
+      var withTarget = allContacts.filter(function(c){ return c.contact_pro_role === targetRole; });
+      var untagged = allContacts.filter(function(c){ return !c.contact_pro_role; });
+      var others = allContacts.filter(function(c){ return c.contact_pro_role && c.contact_pro_role !== targetRole; });
+      sfState.contacts = withTarget.concat(untagged).concat(others);
+    } else {
+      sfState.contacts = allContacts;
+    }
     renderContactPicker();
   } catch(e){
     pickerEl.innerHTML = '<div class="cp-empty">Errore caricamento: ' + escapeHtml(e.message) + '</div>';
@@ -2437,10 +2639,13 @@ function renderContactPicker(){
   sfState.contacts.forEach(function(c){
     var statusClass = c.status === 'active' ? 'active' : 'pending';
     var statusLbl = c.status === 'active' ? 'Registrato' : 'Non registrato';
+    var pr = c.contact_pro_role;
+    var prLbl = pr === 'medico' ? 'Medico' : (pr === 'laboratorio' ? 'Lab' : null);
+    var prBadge = pr ? '<span class="cc-pro-role ' + pr + '" style="margin-left:6px">' + prLbl + '</span>' : '';
     h += '<label class="cp-row">' +
       '<input type="checkbox" value="' + escapeHtml(c.contact_email) + '" data-name="' + escapeHtml(c.display_name || '') + '">' +
       '<div class="cp-name">' +
-        escapeHtml(c.display_name || c.contact_email) +
+        escapeHtml(c.display_name || c.contact_email) + prBadge +
         '<div class="cp-email">' + escapeHtml(c.contact_email) + '</div>' +
       '</div>' +
       '<span class="cp-status ' + statusClass + '">' + statusLbl + '</span>' +
@@ -3096,7 +3301,7 @@ async function fetchDriveFile(fileId){
 }
 
 
-// v7.3.9.089 - Pro-role onboarding
+// v7.3.9.090 - Pro-role onboarding
 var _selectedProRole = null;
 var _userProRole = null;
 
