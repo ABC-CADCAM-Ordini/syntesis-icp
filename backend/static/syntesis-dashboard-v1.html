@@ -707,7 +707,7 @@ body{
   font-size:11px;color:#64748b;font-weight:600;letter-spacing:.04em;
 }
 
-/* v7.3.9.090 - Icone nei tab */
+/* v7.3.9.091 - Icone nei tab */
 .tab{display:inline-flex;align-items:center;gap:8px;line-height:1}
 .tab-ico{width:15px;height:15px;flex-shrink:0;color:currentColor;display:inline-block;vertical-align:middle}
 .tab.active .tab-ico,.tab:hover .tab-ico{color:var(--blue)}
@@ -717,12 +717,12 @@ body{
   .tab-ico{width:18px;height:18px}
 }
 
-/* v7.3.9.090 - Badge pro-role su card contatto */
+/* v7.3.9.091 - Badge pro-role su card contatto */
 .cc-pro-role{display:inline-block;font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono);margin-right:6px;vertical-align:middle}
 .cc-pro-role.medico{background:#E8F4FF;color:var(--blue)}
 .cc-pro-role.laboratorio{background:#DCFCE7;color:#0D9E6E}
 
-/* v7.3.9.090 - Sezione cartelle condivise */
+/* v7.3.9.091 - Sezione cartelle condivise */
 .sf-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px;flex-wrap:wrap}
 .sf-title-block{flex:1;min-width:0}
 .sf-title{font-size:16px;font-weight:800;color:var(--dark);margin-bottom:3px}
@@ -986,7 +986,7 @@ body{
 </div>
 
   
-  <!-- MODAL: ONBOARDING PRO-ROLE (v7.3.9.090) -->
+  <!-- MODAL: ONBOARDING PRO-ROLE (v7.3.9.091) -->
   <div class="modal-backdrop" id="modalProRole" style="z-index:99999;background:rgba(15,25,35,.78)">
     <div style="background:#fff;border-radius:14px;width:90vw;max-width:580px;padding:36px 32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
       <div style="text-align:center;margin-bottom:22px">
@@ -1472,8 +1472,12 @@ async function loadProfile(){
 }
 
 function openProfileModal(name, org){
-  document.getElementById('modalProfileName').value = name;
-  document.getElementById('modalProfileOrg').value = org;
+  document.getElementById('modalProfileName').value = name || '';
+  document.getElementById('modalProfileOrg').value = org || '';
+  ['modalProfilePwCurrent','modalProfilePwNew','modalProfilePwConfirm'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.value = '';
+  });
   document.getElementById('modalProfile').classList.add('show');
 }
 
@@ -1484,17 +1488,60 @@ function closeProfileModal(){
 async function saveProfileModal(){
   var name = document.getElementById('modalProfileName').value.trim();
   var org = document.getElementById('modalProfileOrg').value.trim();
-  if(name.length < 1){ showToast('Il nome non puo\' essere vuoto.', true); return; }
+  var pwCurrent = (document.getElementById('modalProfilePwCurrent') ? document.getElementById('modalProfilePwCurrent').value : '');
+  var pwNew = (document.getElementById('modalProfilePwNew') ? document.getElementById('modalProfilePwNew').value : '');
+  var pwConfirm = (document.getElementById('modalProfilePwConfirm') ? document.getElementById('modalProfilePwConfirm').value : '');
+  if(name.length < 1){ showToast('Il nome non puo essere vuoto.', true); return; }
+  var wantsPasswordChange = pwCurrent || pwNew || pwConfirm;
+  if(wantsPasswordChange){
+    if(!pwCurrent){ showToast('Inserisci la password attuale.', true); return; }
+    if(!pwNew){ showToast('Inserisci la nuova password.', true); return; }
+    if(pwNew.length < 8){ showToast('La nuova password deve avere almeno 8 caratteri.', true); return; }
+    if(pwNew !== pwConfirm){ showToast('Le due nuove password non coincidono.', true); return; }
+    if(pwNew === pwCurrent){ showToast('La nuova password deve essere diversa.', true); return; }
+  }
+  var btn = document.getElementById('btnSaveProfile');
+  if(btn){ btn.disabled = true; btn.textContent = 'Salvataggio...'; }
   try {
     var r = await fetch('/api/me/profile', {
-      method: 'PATCH', headers: authHeaders(),
+      method: 'PATCH',
+      headers: Object.assign({'Content-Type':'application/json'}, authHeaders()),
       body: JSON.stringify({ name: name, organization: org })
     });
-    if(!r.ok) throw new Error('HTTP ' + r.status);
-    showToast('Profilo aggiornato.');
+    if(!r.ok){
+      var err = await r.json().catch(function(){return {detail:'HTTP '+r.status};});
+      throw new Error(err.detail || 'errore profilo');
+    }
+    if(wantsPasswordChange){
+      var rp = await fetch('/api/me/change-password', {
+        method: 'POST',
+        headers: Object.assign({'Content-Type':'application/json'}, authHeaders()),
+        body: JSON.stringify({ current_password: pwCurrent, new_password: pwNew })
+      });
+      if(!rp.ok){
+        var errp = await rp.json().catch(function(){return {detail:'HTTP '+rp.status};});
+        throw new Error(errp.detail || 'errore password');
+      }
+      showToast('Profilo e password aggiornati.');
+    } else {
+      showToast('Profilo aggiornato.');
+    }
     closeProfileModal();
-    loadProfile();
-  } catch(e){ showToast('Errore: ' + e.message, true); }
+    if(typeof loadProfile === 'function') loadProfile();
+  } catch(e){
+    showToast('Errore: ' + e.message, true);
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = 'Salva modifiche'; }
+  }
+}
+
+function closeProfileModal(){
+  var m = document.getElementById('modalProfile');
+  if(m) m.classList.remove('show');
+  ['modalProfilePwCurrent','modalProfilePwNew','modalProfilePwConfirm'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.value = '';
+  });
 }
 
 // ── Classifica ──────────────────────────────────────────────────────────────
@@ -2206,7 +2253,7 @@ var fbState = {
 };
 
 
-// v7.3.9.090 - Sezione cartelle condivise
+// v7.3.9.091 - Sezione cartelle condivise
 var sharedFoldersState = { owned: [], member: [], contactsMap: {} };
 
 async function loadSharedFolders(){
@@ -3301,7 +3348,7 @@ async function fetchDriveFile(fileId){
 }
 
 
-// v7.3.9.090 - Pro-role onboarding
+// v7.3.9.091 - Pro-role onboarding
 var _selectedProRole = null;
 var _userProRole = null;
 
@@ -3396,7 +3443,44 @@ document.addEventListener('keydown', function(e){
 });
 </script>
 <!-- v7.3.9.080 - Modali condivisione -->
-<div class="modal-backdrop" id="modalCreateFolder" onclick="if(event.target===this) closeModal('modalCreateFolder')">
+
+  <!-- MODAL: PROFILO + CAMBIO PASSWORD (v7.3.9.091) -->
+  <div class="modal-backdrop" id="modalProfile">
+    <div class="modal-card">
+      <div class="modal-title">Modifica profilo</div>
+      <div class="modal-sub">Aggiorna nome, organizzazione e password.</div>
+      <div class="modal-row">
+        <label>Nome <span style="color:#EF4444">*</span></label>
+        <input type="text" id="modalProfileName" placeholder="Il tuo nome">
+      </div>
+      <div class="modal-row">
+        <label>Organizzazione</label>
+        <input type="text" id="modalProfileOrg" placeholder="Es. Studio Bianchi">
+      </div>
+      <div style="border-top:1px solid var(--border);margin:18px 0 0;padding-top:16px">
+        <div style="font-weight:800;color:var(--dark);font-size:13px;margin-bottom:4px">Cambia password</div>
+        <div style="font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:14px;line-height:1.5">Lascia vuoto se non vuoi cambiarla. Minimo 8 caratteri.</div>
+        <div class="modal-row">
+          <label>Password attuale</label>
+          <input type="password" id="modalProfilePwCurrent" placeholder="La tua password attuale" autocomplete="current-password">
+        </div>
+        <div class="modal-row">
+          <label>Nuova password</label>
+          <input type="password" id="modalProfilePwNew" placeholder="Almeno 8 caratteri" autocomplete="new-password">
+        </div>
+        <div class="modal-row">
+          <label>Conferma nuova password</label>
+          <input type="password" id="modalProfilePwConfirm" placeholder="Ripeti la nuova password" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeProfileModal()">Annulla</button>
+        <button class="btn-cta" id="btnSaveProfile" onclick="saveProfileModal()">Salva modifiche</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modalCreateFolder" onclick="if(event.target===this) closeModal('modalCreateFolder')">
   <div class="modal-card">
     <div class="modal-title">Crea nuova cartella</div>
     <div class="modal-sub">La cartella verra\' creata dentro <code style="background:#FFFBEB;padding:1px 5px;border-radius:3px">Syntesis-ICP</code> nel tuo Drive personale.</div>
