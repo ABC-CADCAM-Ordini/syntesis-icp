@@ -549,6 +549,56 @@ async def me_update_profile(req: ProfileUpdate,
     return {"ok": True}
 
 
+
+# v7.3.9.091 - Endpoint cambio password
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/api/me/change-password")
+async def me_change_password(
+    req: ChangePasswordRequest,
+    current_user: dict = Depends(verify_token)
+):
+    """Cambia la password dell utente. Richiede la password attuale."""
+    import os, hashlib, hmac
+    if not req.current_password or not req.new_password:
+        raise HTTPException(400, detail="Password mancanti.")
+    if len(req.new_password) < 8:
+        raise HTTPException(400, detail="La nuova password deve essere lunga almeno 8 caratteri.")
+    if len(req.new_password) > 200:
+        raise HTTPException(400, detail="Password troppo lunga.")
+    if req.current_password == req.new_password:
+        raise HTTPException(400, detail="La nuova password deve essere diversa dalla corrente.")
+    
+    # Carico user con hash + salt
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT password_hash, salt FROM users WHERE id = $1",
+            current_user["user_id"]
+        )
+        if not row:
+            raise HTTPException(404, detail="Utente non trovato.")
+        
+        # Verifica password corrente
+        h_check = hashlib.pbkdf2_hmac("sha256", req.current_password.encode(), row["salt"].encode(), 260000).hex()
+        if not hmac.compare_digest(h_check, row["password_hash"]):
+            raise HTTPException(403, detail="Password attuale non corretta.")
+        
+        # Imposta nuova password con nuovo salt
+        new_salt = os.urandom(16).hex()
+        new_hash = hashlib.pbkdf2_hmac("sha256", req.new_password.encode(), new_salt.encode(), 260000).hex()
+        await conn.execute(
+            "UPDATE users SET password_hash = $1, salt = $2 WHERE id = $3",
+            new_hash, new_salt, current_user["user_id"]
+        )
+    
+    return {"ok": True, "message": "Password aggiornata con successo."}
+
+
 @app.get("/api/me/analyses")
 async def me_analyses(archived: bool = False, limit: int = 50, offset: int = 0,
                         current_user: dict = Depends(verify_token)):
