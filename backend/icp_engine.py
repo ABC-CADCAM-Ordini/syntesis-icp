@@ -437,6 +437,9 @@ def robust_pre_align(ct_a: np.ndarray, ct_b: np.ndarray) -> dict:
     1. Matching per firma distanze inter-centroide (invariante a roto-traslazione)
     2. Kabsch 3D su punti matchati -> rotazione 3D completa (pitch + roll + yaw)
     3. Refinamento ICP centroidi
+    4. (v7.3.9.092) Brute-force safety net per N<=8: prova tutte le permutazioni
+       e tiene la migliore per RMSD post-Kabsch. Risolve rotational ambiguity
+       quando i scanbody sono geometricamente simili (es. SR/RS con rot >60°).
     """
     from scipy.optimize import linear_sum_assignment as hungarian
 
@@ -501,11 +504,49 @@ def robust_pre_align(ct_a: np.ndarray, ct_b: np.ndarray) -> dict:
     rf, cf = hungarian(D_f)
     rmsd = float(np.sqrt(np.mean(D_f[rf,cf]**2)))
 
+    # ── v7.3.9.092 - PATCH G: brute-force safety net per N<=8 ──────────────
+    # Quando 2 scansioni hanno la stessa configurazione geometrica ma sono
+    # ruotate >60 gradi tra loro (caso tipico RS/reverse scanbody), il
+    # signature matching puo' produrre matchings sub-ottimali per via di
+    # bias topologici. Brute-force su 8! = 40320 permutazioni e' fattibile
+    # in <2s, e garantisce di trovare il minimo globale del RMSD post-Kabsch.
+    method_used = "signature_kabsch3d"
+    if n <= 8:
+        from itertools import permutations as _perms
+        def _kab(P, Q):
+            cP, cQ = P.mean(0), Q.mean(0)
+            PC, QC = P - cP, Q - cQ
+            H = PC.T @ QC
+            U, S, Vt = np.linalg.svd(H)
+            d = np.sign(np.linalg.det(Vt.T @ U.T))
+            D = np.diag([1.0, 1.0, d])
+            R_k = Vt.T @ D @ U.T
+            t_k = cQ - R_k @ cP
+            P2 = (R_k @ P.T).T + t_k
+            return R_k, t_k, float(np.sqrt(np.mean(np.sum((P2 - Q)**2, axis=1))))
+        best_rmsd = rmsd
+        best_R = R
+        best_t = t
+        for _perm in _perms(range(n)):
+            try:
+                Rp, tp, rp = _kab(B[list(_perm)], A)
+                if rp < best_rmsd:
+                    best_rmsd = rp
+                    best_R = Rp
+                    best_t = tp
+            except Exception:
+                continue
+        if best_rmsd < rmsd - 1e-6:
+            R = best_R
+            t = best_t
+            rmsd = best_rmsd
+            method_used = "signature_kabsch3d+brute_force"
+
     # Applica la stessa trasformazione a ct_b completo
     aligned_full = (R @ ct_b.T).T + t
 
     return {"aligned": aligned_full, "R": R, "t": t,
-            "method": "signature_kabsch3d", "rmsd_centroids": rmsd}
+            "method": method_used, "rmsd_centroids": rmsd}
 
 
 def run_icp(fixed: np.ndarray, moving: np.ndarray, max_iter: int = 80) -> dict:
@@ -1218,10 +1259,23 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
             _ct_b_aft = (R_mesh @ _ct_b_bef.T).T + t_mesh
             D_bef = np.linalg.norm(_ct_a_chk[:,None]-_ct_b_bef[None,:], axis=2).min(axis=1).mean()
             D_aft = np.linalg.norm(_ct_a_chk[:,None]-_ct_b_aft[None,:], axis=2).min(axis=1).mean()
-            # v7.3.9.039 - PATCH B: accetta solo se migliora (era 1.05, accettava
-            # +5% di peggioramento, in contraddizione col commento "Accetta solo
-            # se migliora")
-            if D_aft < D_bef:
+            # v7.3.9.092 - PATCH F: Hungarian-permutation guard.
+            # Se mesh ICP cambia il PAIRING dei centroidi cap rispetto al
+            # pre-mesh, significa che e' convergito a un minimo locale errato
+            # (tipico con scanbody simmetrici come SR/RS quando la rotazione
+            # iniziale e' >60 gradi). In quel caso scarta il refinement, anche
+            # se il D_aft < D_bef sembra migliorato.
+            from scipy.optimize import linear_sum_assignment as _hung_guard
+            _D_full_bef = np.linalg.norm(_ct_a_chk[:,None]-_ct_b_bef[None,:], axis=2)
+            _D_full_aft = np.linalg.norm(_ct_a_chk[:,None]-_ct_b_aft[None,:], axis=2)
+            _r_bef, _c_bef = _hung_guard(_D_full_bef)
+            _r_aft, _c_aft = _hung_guard(_D_full_aft)
+            _perm_bef = tuple(zip(_r_bef.tolist(), _c_bef.tolist()))
+            _perm_aft = tuple(zip(_r_aft.tolist(), _c_aft.tolist()))
+            _perm_changed = (_perm_bef != _perm_aft)
+            # v7.3.9.039 - PATCH B: accetta solo se migliora.
+            # v7.3.9.092 - PATCH F: AND la permutazione non e' cambiata.
+            if D_aft < D_bef and not _perm_changed:
                 R_pre = R_mesh @ R_pre
                 t_pre = R_mesh @ t_pre + t_mesh
                 tris_b_aligned = apply_transform_tris(tris_b_aligned, R_mesh, t_mesh)
@@ -1230,10 +1284,15 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
                 # e centroidi nel matching finale)
                 raw_ct_b_aligned = (R_pre @ raw_ct_b_shifted.T).T + t_pre
             else:
+                _reason = []
+                if not (D_aft < D_bef):
+                    _reason.append("D_aft=%.4f >= D_bef=%.4f" % (D_aft, D_bef))
+                if _perm_changed:
+                    _reason.append("permutazione cambiata (rotational ambiguity)")
                 _warnings.append({
                     "stage": "mesh_icp",
                     "severity": "info",
-                    "message": "Mesh ICP non migliora (D_bef=%.4f vs D_aft=%.4f), scartato." % (D_bef, D_aft)
+                    "message": "Mesh ICP scartato: " + "; ".join(_reason)
                 })
         except Exception as _exc:
             # v7.3.9.039 - PATCH E: warning loggato invece di silenzio
