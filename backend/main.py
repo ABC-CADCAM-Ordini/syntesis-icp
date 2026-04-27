@@ -1085,6 +1085,40 @@ async def me_gdrive_file_link(
 
 
 
+
+
+# ── v7.3.9.088 - Pro-role endpoints ────────────────────────────────────────
+class ProRoleRequest(BaseModel):
+    pro_role: str  # 'medico' | 'laboratorio'
+
+
+@app.get("/api/me/pro-role")
+async def me_get_pro_role(current_user: dict = Depends(verify_token)):
+    """Ritorna il pro_role dell\'utente loggato (o null se non ancora scelto)."""
+    pro_role = await database.get_user_pro_role(current_user["user_id"])
+    return {"pro_role": pro_role}
+
+
+@app.post("/api/me/pro-role")
+async def me_set_pro_role(
+    req: ProRoleRequest,
+    current_user: dict = Depends(verify_token)
+):
+    """Imposta il pro_role dell\'utente (medico/laboratorio).
+    Si puo\' settare una sola volta. Cambi successivi richiedono supporto admin."""
+    if req.pro_role not in ("medico", "laboratorio"):
+        raise HTTPException(400, detail="pro_role deve essere 'medico' o 'laboratorio'")
+    try:
+        ok = await database.set_user_pro_role(current_user["user_id"], req.pro_role)
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    if not ok:
+        # Era gia\' impostato - ritorno il valore corrente
+        current = await database.get_user_pro_role(current_user["user_id"])
+        raise HTTPException(409, detail=f"Ruolo gia\' impostato: {current}")
+    return {"pro_role": req.pro_role, "ok": True}
+
+
 @app.get("/api/me/gdrive/file/{file_id}/content")
 async def me_gdrive_file_content(
     file_id: str,
