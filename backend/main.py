@@ -5,6 +5,7 @@ Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -103,6 +104,12 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+# v7.3.9.093 - Compressione gzip delle response.
+# Riduce ~75% il payload di /api/analyze-public (da ~6.8 MB a ~1.5 MB tipici).
+# Trasparente al client: i browser decomprimono automaticamente.
+# minimum_size=1024 evita compressione su payload piccoli (overhead).
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.include_router(auth_router, prefix="/auth")
 

@@ -1152,6 +1152,10 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     gc_b = global_centroid(tris_b)
 
     offset = gc_a - gc_b
+    # v7.3.9.093 - salvo l'offset iniziale per esporre R/t totale nel response.
+    # Serve a Misurare frontend per applicare la stessa trasformazione client-side
+    # (es. rendering 3D di mesh non incluse nel response).
+    offset_init = offset.copy()
     raw_ct_b_shifted = raw_ct_b + offset
 
     # ── Clustering preliminare: raggruppa parti dello stesso scanbody ──────────
@@ -1611,6 +1615,14 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     for bi in bg_idx_a:
         bg_tris_a.extend(tris_a[comps_a[bi]].tolist())
 
+    # v7.3.9.093 - Background triangoli di B post-trasformazione completa.
+    # comps_b indicizza tris_b originale, ma apply_transform_tris non riordina,
+    # quindi gli indici sono ancora validi su tris_b_all (che e' la versione
+    # post pre-align + R_min/t_min_v).
+    bg_tris_b = []
+    for bi in bg_idx_b:
+        bg_tris_b.extend(tris_b_all[comps_b[bi]].tolist())
+
     # Triangoli per cilindro A e B (per report)
     cyl_tris_a = []
     cyl_tris_b = []
@@ -1661,11 +1673,20 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
         "tris_a":    tris_to_list(tris_a, 6000),
         "tris_b_all": tris_to_list(tris_b_all, 6000),
         "bg_a":      tris_to_list(bg_tris_a, 2000) if bg_tris_a else [],
+        # v7.3.9.093 - bg_b per Misurare server-side (rendering arcata B post-ICP)
+        "bg_b":      tris_to_list(np.asarray(bg_tris_b, dtype=np.float32), 2000) if bg_tris_b else [],
         "cyl_tris_a": cyl_tris_a,
         "cyl_tris_b": cyl_tris_b,
         "ct_a":      ct_a.tolist(),
         "ct_b_final": icp["aligned"].tolist(),
         "off":       offset.tolist(),
+        # v7.3.9.093 - trasformazione totale tris_b_originale -> tris_b_all,
+        # esposta per consumo client (Misurare server-side). Composizione:
+        #   R_total = R_min @ R_pre
+        #   t_total = R_total @ offset_init + R_min @ t_pre + t_min_v
+        "R":         (R_min @ R_pre).tolist(),
+        "t":         ((R_min @ R_pre) @ offset_init + R_min @ t_pre + t_min_v).tolist(),
+        "pre_align_method": pre["method"],
     }
 
 

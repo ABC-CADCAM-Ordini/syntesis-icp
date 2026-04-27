@@ -13,7 +13,7 @@ import math
 from datetime import datetime
 from typing import Optional
 
-VERSION = "7.3.9.043"
+VERSION = "7.3.9.093"
 SCORE_MODEL_VERSION = "Syntesis Score v1.0"
 
 
