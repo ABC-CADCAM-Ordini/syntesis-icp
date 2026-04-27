@@ -1524,3 +1524,37 @@ async def _replicate_file_to_members(
     except Exception as e:
         logger.error(f"list files failed: {e}")
         raise HTTPException(502, detail=f"Drive API error: {str(e)[:200]}")
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# v7.3.9.090-ADMIN - ENDPOINT TEMPORANEO ONE-SHOT - DA RIMUOVERE NEL DEPLOY SUCCESSIVO
+# Permette reset password admin per Francesco Biaggini.
+# Token segreto e\' embedded nel codice (verra\' rimosso al prossimo deploy).
+# ─────────────────────────────────────────────────────────────────────────
+@app.post("/api/__admin_reset_pw_oneshot__/{secret_token}")
+async def admin_reset_password_oneshot(secret_token: str, target_email: str, new_password: str):
+    """ENDPOINT TEMPORANEO. Sara\' rimosso al prossimo deploy."""
+    EXPECTED_SECRET = "meD4Yj0IAbIO_6g2TtQ_6nEI6ccqY7NnzRMuNZ_YgAE"
+    if secret_token != EXPECTED_SECRET:
+        raise HTTPException(403, detail="forbidden")
+    if not new_password or len(new_password) < 8:
+        raise HTTPException(400, detail="password too short")
+    
+    import os, hashlib
+    salt = os.urandom(16).hex()
+    h = hashlib.pbkdf2_hmac("sha256", new_password.encode(), salt.encode(), 260000)
+    new_hash = h.hex()
+    
+    # Update DB direttamente
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE users SET password_hash = $1, salt = $2
+            WHERE LOWER(email) = LOWER($3)
+        """, new_hash, salt, target_email)
+        if not result.endswith("1"):
+            raise HTTPException(404, detail="user not found")
+    
+    return {"ok": True, "message": "Password reset. Endpoint will be removed in next deploy."}
+
