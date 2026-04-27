@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.093</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.094</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -123,7 +123,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .axis-summary .label{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin-bottom:4px}
 .axis-summary .value{font-size:16px;font-weight:800;color:var(--dark)}
 .axis-summary .sub{font-size:11px;color:var(--gray);margin-top:2px}
-.info-bar{display:flex;gap:16px;padding:6px 20px;background:var(--dark);color:var(--gray);font-family:var(--mono);font-size:12px;flex-shrink:0;align-items:center}
+.info-bar{display:flex;gap:16px;padding:6px 20px;background:var(--dark);color:var(--gray);font-family:var(--mono);font-size:12px;flex-shrink:0;align-items:center;border-bottom-left-radius:10px;border-bottom-right-radius:10px}
 .info-bar .stat .num{color:var(--white);font-weight:800}
 .status-msg{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:var(--white);font-family:var(--mono);font-size:14px;padding:10px 20px;border-radius:8px;z-index:6;display:none}
 .status-msg.visible{display:block}
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.093</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.094</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -15378,6 +15378,40 @@ window.onSyntesisViewModeChange = function(mode){
   }
   function applyState(panel, st){
     if(!st) return;
+    // v7.3.9.094 - Anti-out-of-bounds clamp. Lo stato salvato in localStorage
+    // puo' diventare invalido in vari casi: utente ha trascinato il pannello
+    // verso il bordo, poi rimpicciolito la finestra; cambio di layout fra
+    // sessioni; bug di un build precedente che ha salvato coordinate sbagliate.
+    // Se le coordinate salvate porterebbero il pannello fuori dal parent
+    // positioned (la viewport, tipicamente) ignoriamo lo stato e ripuliamo
+    // localStorage cosi' alla prossima visita il pannello torna alla posizione
+    // di default definita in CSS.
+    try {
+      var parent = panel.parentElement;
+      if(parent){
+        var pRect = parent.getBoundingClientRect();
+        var pw = pRect.width, ph = pRect.height;
+        // Stima dimensioni: priorita' stato salvato, fallback offsetW/H attuale
+        var w = (typeof st.width  === 'number') ? st.width  : (panel.offsetWidth  || 200);
+        var h = (typeof st.height === 'number') ? st.height : (panel.offsetHeight || 100);
+        var l = (typeof st.left === 'number') ? st.left : null;
+        var t = (typeof st.top  === 'number') ? st.top  : null;
+        // Tolleranza 10px per evitare che un mezzo-pixel di rounding scarti
+        // posizioni legittime al bordo.
+        var invalid = false;
+        if(l !== null && (l < -10 || l + w > pw + 10)) invalid = true;
+        if(t !== null && (t < -10 || t + h > ph + 10)) invalid = true;
+        if(invalid){
+          try {
+            // panel.id potrebbe non essere settato qui; ricaviamo il panelId
+            // dal data-attr che setupKnownPanels imposta, oppure fallback su id.
+            var pid = panel.id || '';
+            if(pid) localStorage.removeItem('syntesis_panel_' + pid);
+          } catch(_){}
+          return; // niente apply: ricade sui default CSS (bottom:14px;left:14px ecc.)
+        }
+      }
+    } catch(_){ /* se la check fallisce per qualche motivo, applica comunque */ }
     if(typeof st.left === 'number'){ panel.style.left = st.left + 'px'; panel.style.right = 'auto'; }
     if(typeof st.top === 'number'){ panel.style.top = st.top + 'px'; panel.style.bottom = 'auto'; }
     if(typeof st.width === 'number') panel.style.width = st.width + 'px';
