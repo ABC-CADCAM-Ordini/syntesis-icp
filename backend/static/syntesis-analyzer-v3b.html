@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.094</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.101</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.094</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.101</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13738,7 +13738,7 @@ function sostUpdateLabels(){
 //   - SR:  disco a Z=-5.0 locale -> -5.0 axis nel mondo (sotto la connessione)
 // Nessun flip SR: la convenzione STL ha gia' il verso corretto rispetto
 // all'origine clinica condivisa.
-function sostBuildTemplateGroup(key, geo, connectionWorld, axis){
+function sostBuildTemplateGroup(key, geo, connectionWorld, axis, mirror){
   var info = SOSTITUIRE_TEMPLATE_INFO[key] || {label:'Custom', color: 0x888888};
   var color = info.color;
   var mat = new THREE.MeshPhongMaterial({
@@ -13756,13 +13756,18 @@ function sostBuildTemplateGroup(key, geo, connectionWorld, axis){
   group.add(mesh);
   // Origine locale (0,0,0) = connessione implantare.
   group.position.copy(connectionWorld);
-  // up locale = +Z. Quaternion porta +Z -> axis, i punti a Z>0 locale
-  // vanno in +axis nel mondo, quelli a Z<0 vanno in -axis.
+  // v7.3.9.101 - parametro mirror (default false):
+  //   false = quaternion +Z locale -> +axis mondo (cap-up sopra la connessione)
+  //   true  = quaternion +Z locale -> -axis mondo (cap-down sotto la connessione)
+  // Usato per riflessione speculare dei sostituti attraverso il piano della
+  // connessione clinica condivisa con il source (stessa connectionWorld).
+  var refDir = mirror ? axis.clone().multiplyScalar(-1) : axis.clone();
   var up = new THREE.Vector3(0, 0, 1);
-  group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, axis));
+  group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, refDir));
   group.userData.isSostituire = true;
   group.userData.sostRole = 'template';
   group.userData.templateKey = key;
+  group.userData.isMirrored = !!mirror;
   // Applica opacita' corrente del gruppo (se l'utente l'ha gia' regolata)
   var uiState = sostGroupUI[key];
   if(uiState && typeof uiState.opacity === 'number'){
@@ -13832,10 +13837,17 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // Costruisci i 3 group, tutti con origine = connessione implantare
+    // v7.3.9.101 - Riflessione speculare dei sostituti attraverso il piano
+    // della connessione clinica del source. Tutti i template condividono la
+    // stessa connectionWorld; il source ha cap-up (mirror=false) e quindi il
+    // suo corpo si estende verso +axis (cap su disco scansionato, corpo dentro
+    // la scansione - identico a v094). I sostituti hanno cap-down (mirror=true)
+    // e il loro corpo si estende verso -axis (oltre la connessione del source,
+    // riflessione speculare attraverso il piano della base comune).
     var groups = {};
     TPL_KEYS.forEach(function(k){
-      var g = sostBuildTemplateGroup(k, geos[k], connectionWorld, axis);
+      var isSource = (k === sostSourceTemplate);
+      var g = sostBuildTemplateGroup(k, geos[k], connectionWorld, axis, !isSource);
       g.name = id + '_' + k;
       g.visible = (k === activeKey);
       scene.add(g);
