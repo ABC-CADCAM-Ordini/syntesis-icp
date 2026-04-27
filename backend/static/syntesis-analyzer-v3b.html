@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.094</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.097</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.094</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.097</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13738,7 +13738,18 @@ function sostUpdateLabels(){
 //   - SR:  disco a Z=-5.0 locale -> -5.0 axis nel mondo (sotto la connessione)
 // Nessun flip SR: la convenzione STL ha gia' il verso corretto rispetto
 // all'origine clinica condivisa.
-function sostBuildTemplateGroup(key, geo, connectionWorld, axis){
+function sostBuildTemplateGroup(key, geo, originWorld, axis, mirror){
+  // v7.3.9.097 - parametro `mirror`:
+  //   false (default): comportamento originale. originWorld = connessione clinica
+  //                    (sotto il disco, dentro la scansione). +Z locale -> +axis mondo,
+  //                    il corpo del template si estende dalla connection verso il disco.
+  //   true: rendering specchiato rispetto al piano del disco. originWorld = "mirror
+  //         connection" posizionata sopra il disco (= discWorld + zDisc*axis). +Z
+  //         locale -> -axis mondo, cosi' il disco a +zDisc locale finisce ancora su
+  //         discWorld ma il corpo si estende oltre il piano del disco (verso +axis,
+  //         fuori dalla scansione). Usato per i template NON-SOURCE in Sostituire,
+  //         per visualizzarli come "fantasmi specchiati" del source senza
+  //         compromettere il refinement (che opera solo sul source group).
   var info = SOSTITUIRE_TEMPLATE_INFO[key] || {label:'Custom', color: 0x888888};
   var color = info.color;
   var mat = new THREE.MeshPhongMaterial({
@@ -13754,15 +13765,16 @@ function sostBuildTemplateGroup(key, geo, connectionWorld, axis){
   mesh.name = 'template';
   var group = new THREE.Group();
   group.add(mesh);
-  // Origine locale (0,0,0) = connessione implantare.
-  group.position.copy(connectionWorld);
-  // up locale = +Z. Quaternion porta +Z -> axis, i punti a Z>0 locale
-  // vanno in +axis nel mondo, quelli a Z<0 vanno in -axis.
+  group.position.copy(originWorld);
+  // Quaternion: orienta +Z locale verso refDir mondo. Per source refDir=axis (corpo
+  // dentro la scansione); per mirror refDir=-axis (corpo fuori dalla scansione).
+  var refDir = mirror ? axis.clone().multiplyScalar(-1) : axis.clone();
   var up = new THREE.Vector3(0, 0, 1);
-  group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, axis));
+  group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, refDir));
   group.userData.isSostituire = true;
   group.userData.sostRole = 'template';
   group.userData.templateKey = key;
+  group.userData.isMirrored = !!mirror;
   // Applica opacita' corrente del gruppo (se l'utente l'ha gia' regolata)
   var uiState = sostGroupUI[key];
   if(uiState && typeof uiState.opacity === 'number'){
@@ -13832,10 +13844,29 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // Costruisci i 3 group, tutti con origine = connessione implantare
+    // Costruisci i 3 group: il SOURCE template (selezionato nel radio "marker
+    // presente") va nella sua connessione clinica, gli ALTRI vengono renderizzati
+    // specchiati attorno al piano del disco (cap su discWorld, corpo oltre il
+    // piano nella direzione opposta al source). v7.3.9.097.
     var groups = {};
     TPL_KEYS.forEach(function(k){
-      var g = sostBuildTemplateGroup(k, geos[k], connectionWorld, axis);
+      var isSource = (k === sostSourceTemplate);
+      geos[k].computeBoundingBox();
+      var zDiscK = geos[k].boundingBox.max.z;  // Zmax post-flip uniforme tra 1T3, SR, OS
+      var originK, mirrorMode;
+      if(isSource){
+        // Source: connessione clinica sotto il disco. Disco template -> discWorld.
+        originK = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscK));
+        mirrorMode = false;
+      } else {
+        // Non-source: mirror connection sopra il disco. Quaternion +Z->-axis fa
+        // finire il disco template (a +zDisc locale) ancora su discWorld, ma il
+        // corpo si estende verso +axis (fuori dalla scansione, lato opposto al
+        // source). I dischi di tutti i template attivi coincidono su discWorld.
+        originK = discWorld.clone().add(axis.clone().multiplyScalar(zDiscK));
+        mirrorMode = true;
+      }
+      var g = sostBuildTemplateGroup(k, geos[k], originK, axis, mirrorMode);
       g.name = id + '_' + k;
       g.visible = (k === activeKey);
       scene.add(g);
