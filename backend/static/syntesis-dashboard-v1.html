@@ -707,7 +707,7 @@ body{
   font-size:11px;color:#64748b;font-weight:600;letter-spacing:.04em;
 }
 
-/* v7.3.9.086 - Icone nei tab */
+/* v7.3.9.088 - Icone nei tab */
 .tab{display:inline-flex;align-items:center;gap:8px;line-height:1}
 .tab-ico{width:15px;height:15px;flex-shrink:0;color:currentColor;display:inline-block;vertical-align:middle}
 .tab.active .tab-ico,.tab:hover .tab-ico{color:var(--blue)}
@@ -931,9 +931,35 @@ body{
   </div>
 </div>
 <div class="app-footer">
-  <div class="brand-sub-footer">Synthesis ICP &middot; v7.3.9.080 &middot; Biaggini Medical Devices S.r.l.</div>
+  <div class="brand-sub-footer"><span id="proRoleBadge" style="display:none;background:#E8F4FF;color:var(--blue);padding:2px 10px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono);margin-right:10px"></span>Synthesis ICP &middot; v7.3.9.080 &middot; Biaggini Medical Devices S.r.l.</div>
   <div class="footer-legal">syntesis-icp.com</div>
 </div>
+
+  
+  <!-- MODAL: ONBOARDING PRO-ROLE (v7.3.9.088) -->
+  <div class="modal-backdrop" id="modalProRole" style="z-index:99999;background:rgba(15,25,35,.78)">
+    <div style="background:#fff;border-radius:14px;width:90vw;max-width:580px;padding:36px 32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+      <div style="text-align:center;margin-bottom:22px">
+        <div style="font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--blue);background:#E8F4FF;padding:4px 12px;border-radius:20px;display:inline-block;margin-bottom:14px">Configurazione iniziale</div>
+        <div style="font-size:22px;font-weight:800;color:var(--dark);line-height:1.25">Sei un medico o un laboratorio?</div>
+        <div style="font-size:13px;color:var(--gray);margin-top:8px;line-height:1.55">Questa scelta determina come funzioneranno cartelle e flussi di lavoro. Si imposta una sola volta.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+        <button onclick="selectProRole('medico')" id="prMedico" style="background:#fff;border:2px solid var(--border);border-radius:12px;padding:24px 18px;cursor:pointer;text-align:center;transition:.15s;font-family:var(--font)">
+          <svg width="40" height="40" viewBox="0 0 28 28" fill="none" style="margin-bottom:10px"><circle cx="14" cy="9" r="4" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M5 24 C5 18 9 16 14 16 C19 16 23 18 23 24" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M14 6 L14 12 M11 9 L17 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <div style="font-weight:800;font-size:15px;color:var(--dark);margin-bottom:4px">Medico</div>
+          <div style="font-size:11px;color:var(--gray);font-family:var(--mono);line-height:1.5">Invio i casi paziente al laboratorio</div>
+        </button>
+        <button onclick="selectProRole('laboratorio')" id="prLab" style="background:#fff;border:2px solid var(--border);border-radius:12px;padding:24px 18px;cursor:pointer;text-align:center;transition:.15s;font-family:var(--font)">
+          <svg width="40" height="40" viewBox="0 0 28 28" fill="none" style="margin-bottom:10px"><rect x="6" y="10" width="16" height="12" rx="1.5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M9 10 L9 6 L19 6 L19 10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M11 14 L11 18 M14 14 L14 18 M17 14 L17 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <div style="font-weight:800;font-size:15px;color:var(--dark);margin-bottom:4px">Laboratorio</div>
+          <div style="font-size:11px;color:var(--gray);font-family:var(--mono);line-height:1.5">Ricevo, lavoro e consegno i casi</div>
+        </button>
+      </div>
+      <button id="prConfirm" onclick="confirmProRole()" disabled style="width:100%;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:800;font-family:var(--font);font-size:13px;cursor:pointer;letter-spacing:.04em;opacity:.4;transition:.15s">Conferma scelta</button>
+      <div style="text-align:center;margin-top:14px;font-size:10px;color:var(--gray);font-family:var(--mono);letter-spacing:.04em">Per modificare in seguito contatta il supporto</div>
+    </div>
+  </div>
 
   <!-- MODAL: ANTEPRIMA FILE (v7.3.9.080) -->
   <div class="modal-backdrop" id="modalPreview">
@@ -1047,6 +1073,8 @@ function checkAuth(){
   document.getElementById('authGate').hidden = true;
   document.getElementById('tabsNav').hidden = false;
   document.getElementById('tabAnalyses').hidden = false;
+  // v.088 - controllo pro-role asincrono
+  setTimeout(function(){ checkProRole(); }, 100);
   return true;
 }
 
@@ -3046,6 +3074,86 @@ async function fetchDriveFile(fileId){
   }
   if(!r.ok) throw new Error('Drive HTTP ' + r.status);
   return await r.blob();
+}
+
+
+// v7.3.9.088 - Pro-role onboarding
+var _selectedProRole = null;
+var _userProRole = null;
+
+async function checkProRole(){
+  try {
+    var r = await fetch('/api/me/pro-role', {
+      headers: {'Authorization': 'Bearer ' + getToken()}
+    });
+    if(!r.ok) return null;
+    var data = await r.json();
+    _userProRole = data.pro_role;
+    if(!_userProRole){
+      openModal('modalProRole');
+    } else {
+      updateProRoleDisplay();
+    }
+    return _userProRole;
+  } catch(e){
+    console.error('[pro-role check]', e);
+    return null;
+  }
+}
+
+function selectProRole(role){
+  _selectedProRole = role;
+  var med = document.getElementById('prMedico');
+  var lab = document.getElementById('prLab');
+  if(med){
+    med.style.borderColor = role === 'medico' ? 'var(--blue)' : 'var(--border)';
+    med.style.background = role === 'medico' ? '#E8F4FF' : '#fff';
+    med.style.color = role === 'medico' ? 'var(--blue)' : 'var(--dark)';
+  }
+  if(lab){
+    lab.style.borderColor = role === 'laboratorio' ? 'var(--blue)' : 'var(--border)';
+    lab.style.background = role === 'laboratorio' ? '#E8F4FF' : '#fff';
+    lab.style.color = role === 'laboratorio' ? 'var(--blue)' : 'var(--dark)';
+  }
+  var btn = document.getElementById('prConfirm');
+  if(btn){ btn.disabled = false; btn.style.opacity = '1'; }
+}
+
+async function confirmProRole(){
+  if(!_selectedProRole) return;
+  var btn = document.getElementById('prConfirm');
+  btn.disabled = true;
+  btn.textContent = 'Salvataggio...';
+  try {
+    var r = await fetch('/api/me/pro-role', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + getToken(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({pro_role: _selectedProRole})
+    });
+    if(!r.ok){
+      var err = await r.json().catch(function(){return {detail:'Errore'};});
+      throw new Error(err.detail || ('HTTP ' + r.status));
+    }
+    _userProRole = _selectedProRole;
+    closeModal('modalProRole');
+    updateProRoleDisplay();
+    showToast('Ruolo impostato: ' + (_selectedProRole === 'medico' ? 'Medico' : 'Laboratorio'));
+  } catch(e){
+    showToast('Errore: ' + e.message, true);
+    btn.disabled = false;
+    btn.textContent = 'Conferma scelta';
+  }
+}
+
+function updateProRoleDisplay(){
+  var el = document.getElementById('proRoleBadge');
+  if(el && _userProRole){
+    el.textContent = _userProRole === 'medico' ? 'Medico' : 'Laboratorio';
+    el.style.display = 'inline-block';
+  }
 }
 
 // Refresh hero stats dopo create/delete che cambiano i contatori
