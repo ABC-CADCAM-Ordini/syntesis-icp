@@ -706,6 +706,16 @@ body{
 .footer-legal{
   font-size:11px;color:#64748b;font-weight:600;letter-spacing:.04em;
 }
+
+/* v7.3.9.084 - Icone nei tab */
+.tab{display:inline-flex;align-items:center;gap:8px;line-height:1}
+.tab-ico{width:16px;height:16px;flex-shrink:0;stroke-width:2;color:currentColor}
+.tab.active .tab-ico,.tab:hover .tab-ico{color:var(--blue)}
+@media(max-width:760px){
+  .tab span{display:none}
+  .tab{padding:10px 14px}
+  .tab-ico{width:18px;height:18px}
+}
 </style>
 </head>
 <body>
@@ -761,13 +771,13 @@ body{
 
     <!-- Tabs -->
     <div class="tabs" id="tabsNav" hidden>
-      <button class="tab active" data-tab="analyses" onclick="switchTab('analyses')">Le mie analisi</button>
-      <button class="tab" data-tab="projects" onclick="switchTab('projects')">I miei progetti</button>
-      <button class="tab" data-tab="files" onclick="switchTab('files')">I miei file</button>
-      <button class="tab" data-tab="contacts" onclick="switchTab('contacts')">Contatti</button>
-      <button class="tab" data-tab="cloud" onclick="switchTab('cloud')">Cloud</button>
-      <button class="tab" data-tab="profile" onclick="switchTab('profile')">Profilo</button>
-      <button class="tab" data-tab="leaderboard" onclick="switchTab('leaderboard')">Classifica</button>
+      <button class="tab active" data-tab="analyses" onclick="switchTab('analyses')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg><span>Le mie analisi</span></button>
+      <button class="tab" data-tab="projects" onclick="switchTab('projects')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span>I miei progetti</span></button>
+      <button class="tab" data-tab="files" onclick="switchTab('files')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>I miei file</span></button>
+      <button class="tab" data-tab="contacts" onclick="switchTab('contacts')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Contatti</span></button>
+      <button class="tab" data-tab="cloud" onclick="switchTab('cloud')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg><span>Cloud</span></button>
+      <button class="tab" data-tab="profile" onclick="switchTab('profile')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profilo</span></button>
+      <button class="tab" data-tab="leaderboard" onclick="switchTab('leaderboard')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg><span>Classifica</span></button>
     </div>
 
     <!-- TAB: ANALISI -->
