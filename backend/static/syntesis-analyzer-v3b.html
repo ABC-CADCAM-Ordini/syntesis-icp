@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.094</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.095</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.094</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.095</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13408,9 +13408,16 @@ var SOSTITUIRE_SOURCE_OFFSET = {
 
 // --- METADATA TEMPLATE ---
 var SOSTITUIRE_TEMPLATE_INFO = {
-  '1T3': { label: 'Marker 1T3', radius: 2.515, color: 0xffaa44 },
-  'SR':  { label: 'Marker SR',  radius: 2.030, color: 0x0065B3 },
-  'OS':  { label: 'Marker OS',  radius: 1.780, color: 0x639922 }
+  // v7.3.9.095 - zDisc: coordinata Z locale del piano del disco nel CAD originale.
+  // Convenzione clinica: disco = parte planare visibile (testa del marker), connessione
+  // = bordo che si avvita all'implant a Z=0 locale.
+  //   1T3, OS: disco a Z+ (sopra la connessione, axis verso il disco = asse del cilindro)
+  //   SR:      disco a Z- (sotto la connessione locale: il CAD SR e' modellato specchiato
+  //            rispetto a 1T3/OS, cosi' che fisicamente nello scan i tre marker abbiano
+  //            geometrie speculari due a due lungo l'asse implantare)
+  '1T3': { label: 'Marker 1T3', radius: 2.515, color: 0xffaa44, zDisc:  8.5 },
+  'SR':  { label: 'Marker SR',  radius: 2.030, color: 0x0065B3, zDisc: -5.0 },
+  'OS':  { label: 'Marker OS',  radius: 1.780, color: 0x639922, zDisc:  6.0 }
 };
 
 // ── Decompressione template base64+gzip (cache Uint8Array) ──
@@ -13803,30 +13810,32 @@ function sostPlaceTemplate(rawPoint, rawNormal){
         sostShowStatus('Errore parsing template ' + TPL_KEYS[i], true);
         return;
       }
-      // v7.3.6.004: hotfix flip SR.
-      // Il CAD SR e` modellato con convenzione Z invertita (disco a Zmin,
-      // piattaforma a Zmax) rispetto a 1T3/OS. Normalizziamo con rotazione
-      // 180 gradi attorno a X cosi` tutti i template condividono la stessa
-      // convenzione (disco = Zmax, piattaforma = Zmin).
-      if(TPL_KEYS[i] === 'SR'){
-        geos[TPL_KEYS[i]].applyMatrix4(
-          new THREE.Matrix4().makeRotationX(Math.PI)
-        );
-        geos[TPL_KEYS[i]].computeBoundingBox();
-      }
+      // v7.3.9.095 - RIPRISTINO SPECULARITA' CLINICA.
+      // Le versioni v7.3.6.004 -> v7.3.9.094 applicavano qui un flip 180 X
+      // alla geometria SR per "uniformare" tutti i template a disco=Zmax.
+      // Quel flip era utile per semplificare il calcolo della connessione
+      // (zDisc sempre positivo) ma faceva perdere la specularita' clinica:
+      // i marker 1T3 e SR sono modellati nei CAD originali in modo SPECULARE
+      // lungo Z (1T3: disco a Z=+8.5; SR: disco a Z=-5). Rimuovendo il flip
+      // ripristiniamo la geometria originale; il calcolo della connessione
+      // gestisce gia' zDisc signed, vedi sotto.
     }
 
     // CONNESSIONE IMPLANTARE = origine clinica condivisa da tutti i template.
-    // Dal disco scannerizzato (sostSourceTemplate), risali lungo l'asse di
-    // Z_disco_source fino alla connessione. Convenzione locale:
-    //   - 1T3/OS: disco a Zmax (+8.5, +6.0) -> connessione = disco - zDisc*axis
-    //   - SR:     disco a Zmin (-5.0)        -> connessione = disco - (-5)*axis = disco + 5*axis
-    // In entrambi i casi: connessione = disco - zDisc_signed * axis, dove zDisc_signed
-    // e' la coordinata Z locale del piano del disco (positiva per 1T3/OS, negativa per SR).
-    var sourceGeo = geos[sostSourceTemplate];
-    sourceGeo.computeBoundingBox();
-    var srcBB = sourceGeo.boundingBox;
-    var zDiscSource = srcBB.max.z;  // v7.3.6.004: SR ora normalizzato via flip, disco sempre a Zmax
+    // Dal disco scannerizzato (sostSourceTemplate), risali lungo l'asse fino
+    // alla connessione. Convenzione locale (post v7.3.9.095, CAD originali):
+    //   - 1T3/OS: disco a Z+ (+8.5, +6.0) -> connessione = disco - zDisc*axis
+    //   - SR:     disco a Z- (-5.0)       -> connessione = disco - (-5)*axis = disco + 5*axis
+    // In entrambi i casi: connessione = discWorld - zDisc_signed * axis
+    var sourceInfo = SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {};
+    var zDiscSource = (typeof sourceInfo.zDisc === 'number') ? sourceInfo.zDisc : null;
+    if(zDiscSource === null){
+      // Fallback robusto per template Custom o template senza zDisc dichiarato:
+      // assume disco al Zmax assoluto della bbox (convenzione 1T3/OS).
+      var sourceGeoFb = geos[sostSourceTemplate];
+      sourceGeoFb.computeBoundingBox();
+      zDiscSource = sourceGeoFb.boundingBox.max.z;
+    }
     var connectionWorld = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscSource));
 
     sostCounter++;
@@ -13939,12 +13948,9 @@ function sostAlignAll(){
       var geos = {};
       for(var i = 0; i < TPL_KEYS.length; i++){
         geos[TPL_KEYS[i]] = sostParseSTLToGeometry(bufs[i]);
-        if(TPL_KEYS[i] === 'SR' && geos[TPL_KEYS[i]]){
-          geos[TPL_KEYS[i]].applyMatrix4(
-            new THREE.Matrix4().makeRotationX(Math.PI)
-          );
-          geos[TPL_KEYS[i]].computeBoundingBox();
-        }
+        // v7.3.9.095 - rimosso flip SR anche qui dentro sostAlignAll. La
+        // geometria template usata dal refinement deve combaciare con quella
+        // renderizzata (post-v095 = CAD originale, niente flip).
       }
 
       var scanPos = sostMesh.geometry.attributes.position.array;
@@ -13982,8 +13988,11 @@ function sostAlignAll(){
             // Peso in base alla feature locale:
             //   - cap (disco): normale locale circa +/-Z (asse cilindro) -> guida planarita`
             //   - body (cilindro): normale laterale                      -> guida centro XY
-            // Dopo il flip SR (v7.3.6.004) tutti i template hanno convenzione coerente:
-            // cap a Zmax, normali cap in direzione +Z locale.
+            // v7.3.9.095: dopo il ripristino della specularita' clinica, la cap di SR
+            // ha normali locali in direzione -Z (perche' il disco SR e' a Zmin=-5),
+            // mentre 1T3/OS hanno cap-normali in +Z. Il check |nlz|>0.8 e' invariante
+            // al verso, quindi continua a riconoscere correttamente le facce della
+            // cap per entrambe le convenzioni.
             if(cadNorm){
               var nlz = cadNorm[o + 2];
               // Peso 5x sul cap: con ratio area_body/area_cap ~5:1 per OS, il peso 5x
@@ -14200,7 +14209,10 @@ function sostRenderPlacedList(){
 // zMax lungo l'asse. Valori tarati empiricamente.
 var SOSTITUIRE_CULL_CYL = {
   '1T3': { radius: 2.815, zMin: -2.000, zMax: 10.000 },   // corpo marker si estende fino a ~Z=0
-  'SR':  { radius: 2.330, zMin: 2.000, zMax: 5.000 },   // v7.3.6.004: post-flip X (disco a Zmax)
+  // v7.3.9.095 - SR ripristinato a convenzione CAD originale (disco a Zmin=-5).
+  // Pre v7.3.9.095 era post-flip {zMin:2, zMax:5}. Ora lavoriamo nel frame
+  // locale dove SR ha disco a Z=-5 e corpo cilindrico tra Z=-5 e Z~-2.
+  'SR':  { radius: 2.330, zMin: -5.000, zMax: -2.000 },
   'OS':  { radius: 2.080, zMin: -2.000, zMax: 6.000 }
 };
 
@@ -14245,13 +14257,9 @@ function sostExportSTL(){
         return;
       }
       destGeos[activeTypes[i]] = sostParseSTLToGeometry(bufs[i]);
-      // v7.3.6.004: flip SR anche in export per coerenza visuale
-      if(activeTypes[i] === 'SR' && destGeos[activeTypes[i]]){
-        destGeos[activeTypes[i]].applyMatrix4(
-          new THREE.Matrix4().makeRotationX(Math.PI)
-        );
-        destGeos[activeTypes[i]].computeBoundingBox();
-      }
+      // v7.3.9.095 - rimosso flip SR in export (era v7.3.6.004 hotfix).
+      // L'export adesso usa la geometria originale del CAD, coerente con
+      // quanto visualizzato a runtime dopo il ripristino della specularita'.
     }
     setTimeout(function(){
       try {
