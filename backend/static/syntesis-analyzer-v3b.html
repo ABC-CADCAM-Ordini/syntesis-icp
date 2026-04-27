@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.095</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.096</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.095</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.096</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13821,12 +13821,21 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       // gestisce gia' zDisc signed, vedi sotto.
     }
 
-    // CONNESSIONE IMPLANTARE = origine clinica condivisa da tutti i template.
-    // Dal disco scannerizzato (sostSourceTemplate), risali lungo l'asse fino
-    // alla connessione. Convenzione locale (post v7.3.9.095, CAD originali):
-    //   - 1T3/OS: disco a Z+ (+8.5, +6.0) -> connessione = disco - zDisc*axis
-    //   - SR:     disco a Z- (-5.0)       -> connessione = disco - (-5)*axis = disco + 5*axis
-    // In entrambi i casi: connessione = discWorld - zDisc_signed * axis
+    // CONNESSIONE IMPLANTARE = origine clinica del SOURCE template (il marker
+    // presente nella scansione). Salvata in p.position per il refinement ICP
+    // (CULL_CYL e' espresso in coordinate locali del source).
+    //
+    // v7.3.9.096 - I tre template (1T3, SR, OS) ricevono ognuno la PROPRIA
+    // connection, calcolata in modo che il SUO disco coincida con discWorld
+    // (il punto cliccato dall'utente). Questo combina due proprieta':
+    //   1. specularita' clinica: SR e' modellato con disco a Z=-5, corpo
+    //      verso +Z; 1T3 ha disco a Z=+8.5, corpo verso -Z. Mantenendo i CAD
+    //      originali (no flip) i due appaiono visivamente specchiati lungo
+    //      l'asse implantare.
+    //   2. sovrapposizione: quando piu' template sono attivi insieme per lo
+    //      stesso marker, i loro dischi cadono tutti sul punto cliccato.
+    //      Ogni template ha la sua connection, ma tutti soddisfano
+    //      "disco_template -> discWorld".
     var sourceInfo = SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {};
     var zDiscSource = (typeof sourceInfo.zDisc === 'number') ? sourceInfo.zDisc : null;
     if(zDiscSource === null){
@@ -13836,15 +13845,23 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       sourceGeoFb.computeBoundingBox();
       zDiscSource = sourceGeoFb.boundingBox.max.z;
     }
-    var connectionWorld = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscSource));
+    var connectionSource = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscSource));
 
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // Costruisci i 3 group, tutti con origine = connessione implantare
+    // Costruisci i 3 group: ognuno con la SUA connection. Per il source
+    // template connectionK == connectionSource per definizione.
     var groups = {};
     TPL_KEYS.forEach(function(k){
-      var g = sostBuildTemplateGroup(k, geos[k], connectionWorld, axis);
+      var infoK = SOSTITUIRE_TEMPLATE_INFO[k] || {};
+      var zDiscK = (typeof infoK.zDisc === 'number') ? infoK.zDisc : null;
+      if(zDiscK === null){
+        geos[k].computeBoundingBox();
+        zDiscK = geos[k].boundingBox.max.z;
+      }
+      var connectionK = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscK));
+      var g = sostBuildTemplateGroup(k, geos[k], connectionK, axis);
       g.name = id + '_' + k;
       g.visible = (k === activeKey);
       scene.add(g);
@@ -13853,7 +13870,7 @@ function sostPlaceTemplate(rawPoint, rawNormal){
 
     // Linea asse (riferimento, non visibile di default)
     var axisDir = axis.clone().multiplyScalar(20);
-    var axisGeo = new THREE.BufferGeometry().setFromPoints([connectionWorld, connectionWorld.clone().add(axisDir)]);
+    var axisGeo = new THREE.BufferGeometry().setFromPoints([connectionSource, connectionSource.clone().add(axisDir)]);
     var axisMat = new THREE.LineBasicMaterial({
       color: (SOSTITUIRE_TEMPLATE_INFO[activeKey] || {color:0x888888}).color,
       linewidth: 2
@@ -13874,7 +13891,10 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       group: groups[activeKey],
       clickPoint: rawPoint.clone(),
       clickNormal: rawNormal.clone(),
-      position: connectionWorld.clone(),   // connessione implantare (origine clinica)
+      // v7.3.9.096 - p.position e' la connection del SOURCE template
+      // (l'origine clinica del marker presente nella scansione). Usata dal
+      // refinement ICP che lavora nel sistema locale del source via CULL_CYL.
+      position: connectionSource.clone(),
       discWorld: discWorld.clone(),         // faccia del disco source scansionato
       axisDir: axis.clone(),
       templateKey: activeKey,
