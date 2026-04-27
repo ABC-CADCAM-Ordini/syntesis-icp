@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.101</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.102</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.101</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.102</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13408,9 +13408,16 @@ var SOSTITUIRE_SOURCE_OFFSET = {
 
 // --- METADATA TEMPLATE ---
 var SOSTITUIRE_TEMPLATE_INFO = {
-  '1T3': { label: 'Marker 1T3', radius: 2.515, color: 0xffaa44 },
-  'SR':  { label: 'Marker SR',  radius: 2.030, color: 0x0065B3 },
-  'OS':  { label: 'Marker OS',  radius: 1.780, color: 0x639922 }
+  // v7.3.9.102 - zDisc: distanza nominale CLINICA tra il disco del marker e
+  // la connessione implantare (Z=0 locale del marker fisico). I CAD STL
+  // template caricati nell'app contengono solo la cap (per ridurre i triangoli):
+  // bbox.max.z del 1T3 e' 8.5 ma la realta' clinica e' 10 (la cap fisica e'
+  // 1.5mm piu' alta del CAD ridotto). bbox di SR e OS coincide con i nominali.
+  // Usato per calcolare la distanza disco-a-disco corretta tra source e
+  // sostituto specchiato (es. 1T3+SR = 10+5 = 15mm, NON 8.5+5 = 13.5).
+  '1T3': { label: 'Marker 1T3', radius: 2.515, color: 0xffaa44, zDisc: 10.0 },
+  'SR':  { label: 'Marker SR',  radius: 2.030, color: 0x0065B3, zDisc:  5.0 },
+  'OS':  { label: 'Marker OS',  radius: 1.780, color: 0x639922, zDisc:  6.0 }
 };
 
 // ── Decompressione template base64+gzip (cache Uint8Array) ──
@@ -13837,17 +13844,41 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // v7.3.9.101 - Riflessione speculare dei sostituti attraverso il piano
-    // della connessione clinica del source. Tutti i template condividono la
-    // stessa connectionWorld; il source ha cap-up (mirror=false) e quindi il
-    // suo corpo si estende verso +axis (cap su disco scansionato, corpo dentro
-    // la scansione - identico a v094). I sostituti hanno cap-down (mirror=true)
-    // e il loro corpo si estende verso -axis (oltre la connessione del source,
-    // riflessione speculare attraverso il piano della base comune).
+    // v7.3.9.102 - Riflessione speculare con distanza disco-a-disco
+    // CLINICAMENTE CORRETTA. I CAD template hanno solo la cap (1T3 bbox=8.5
+    // ma nominale fisico 10), quindi per posizionare il sostituto uso
+    // SOSTITUIRE_TEMPLATE_INFO.zDisc (valore nominale clinico) invece di
+    // bbox.max.z. Il source resta calcolato con bbox (cap su disco scansionato,
+    // "accoppia bene"). Il sostituto e' posizionato in modo che la distanza
+    // tra il suo disco e quello del source nel mondo sia exactly nominalSrc +
+    // nominalSostituto (es. 1T3+SR = 10+5 = 15mm).
+    var sostInfoSrc = SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {};
+    var nominalSrc = (typeof sostInfoSrc.zDisc === 'number') ? sostInfoSrc.zDisc : zDiscSource;
+
     var groups = {};
     TPL_KEYS.forEach(function(k){
       var isSource = (k === sostSourceTemplate);
-      var g = sostBuildTemplateGroup(k, geos[k], connectionWorld, axis, !isSource);
+      var g;
+      if(isSource){
+        // Source: invariato, cap-up sul disco scansionato (logica v094).
+        g = sostBuildTemplateGroup(k, geos[k], connectionWorld, axis, false);
+      } else {
+        // Sostituto: posizionato in modo che la distanza tra il suo disco e
+        // discWorld lungo axis sia (nominalSrc + nominalSostituto). Quaternion
+        // mirror (+Z locale -> -axis mondo, cap-down).
+        var infoK = SOSTITUIRE_TEMPLATE_INFO[k] || {};
+        geos[k].computeBoundingBox();
+        var bboxK = geos[k].boundingBox.max.z;
+        var nominalK = (typeof infoK.zDisc === 'number') ? infoK.zDisc : bboxK;
+        var distToCap = nominalSrc + nominalK;  // distanza disco-a-disco voluta
+        // Cap del sostituto in mirror finisce a origin - bboxK*axis.
+        // Voglio cap a discWorld - distToCap*axis.
+        // => origin = discWorld - (distToCap - bboxK) * axis
+        var originSost = discWorld.clone().sub(
+          axis.clone().multiplyScalar(distToCap - bboxK)
+        );
+        g = sostBuildTemplateGroup(k, geos[k], originSost, axis, true);
+      }
       g.name = id + '_' + k;
       g.visible = (k === activeKey);
       scene.add(g);
