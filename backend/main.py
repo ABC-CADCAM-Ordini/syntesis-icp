@@ -929,12 +929,14 @@ class ContactCreate(BaseModel):
     contact_email: str
     display_name: Optional[str] = None
     role: Optional[str] = None
+    contact_pro_role: Optional[str] = None
     notes: Optional[str] = None
 
 
 class ContactUpdate(BaseModel):
     display_name: Optional[str] = None
     role: Optional[str] = None
+    contact_pro_role: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -976,6 +978,7 @@ async def me_create_contact(req: ContactCreate,
             contact_email=email,
             display_name=name,
             role=role,
+            contact_pro_role=contact_pro_role,
             notes=notes,
         )
     except ValueError as e:
