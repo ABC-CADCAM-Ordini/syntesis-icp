@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.099</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.100</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.099</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.100</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13832,18 +13832,29 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // v7.3.9.099 - Posizionamento "specularmente opposto" lungo l'asse implantare:
+    // v7.3.9.100 - Posizionamento finale di Sostituire:
     //   - SOURCE (il marker presente nella scansione): cap-up sul disco
-    //     scansionato, corpo dentro la scansione (verso l'implant). origin =
-    //     discWorld - zDiscSource*axis (la connessione clinica, sotto il disco).
-    //   - SOSTITUTI (template alternativi attivi nell'albero): cap-up SOPRA
-    //     il disco scansionato, base appoggiata sul disco, corpo che si estende
-    //     verso +axis (fuori dalla scansione, lato opposto al source). origin =
-    //     discWorld (la base del template = sul disco scansionato).
+    //     scansionato, corpo dentro la scansione (verso l'implant), come v099.
+    //     origin = discWorld - zDiscSource*axis (connessione clinica, sotto il disco).
+    //   - SOSTITUTI (template alternativi attivi nell'albero): SPOSTATI
+    //     LATERALMENTE rispetto al source, base appoggiata sul piano del disco
+    //     scansionato, corpo che si estende verso +axis (fuori dalla scansione).
+    //     Cap-up come il source. Posizionamento coerente con il CAD viewer di
+    //     Francesco (image 2 reference): tutti i template visibili sopra il
+    //     piano del disco, ognuno nella sua posizione laterale per non
+    //     sovrapporsi.
     // Entrambi usano lo stesso quaternion +Z->+axis (no flip, no mirror).
-    // Visivamente: source e sostituti specchiati rispetto al piano del disco
-    // ma con la stessa orientation (entrambi cap-up).
     // p.position resta connectionWorld (del source) per il refinement.
+    //
+    // Calcolo direzione "right" perpendicolare ad axis (per offset laterale dei
+    // sostituti): cross product axis x ref con ref scelto per evitare quasi-parallelismo.
+    var sostRef = (Math.abs(axis.x) < 0.9) ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    var sostRight = new THREE.Vector3().crossVectors(axis, sostRef).normalize();
+    var sostLateralOffset = 8.0;  // mm tra il source e ogni sostituto, laterale
+    // Lista dei sostituti nell'ordine TPL_KEYS (escludendo il source).
+    // Primo sostituto -> +right, secondo -> -right (lati opposti).
+    var sostNonSourceKeys = TPL_KEYS.filter(function(k){ return k !== sostSourceTemplate; });
+
     var groups = {};
     TPL_KEYS.forEach(function(k){
       var isSource = (k === sostSourceTemplate);
@@ -13851,11 +13862,15 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       var zDiscK = geos[k].boundingBox.max.z;
       var originK;
       if(isSource){
-        // Source: connection clinica sotto il disco. Cap a discWorld.
+        // Source: connection clinica sotto il disco. Cap su discWorld.
         originK = discWorld.clone().sub(axis.clone().multiplyScalar(zDiscK));
       } else {
-        // Sostituto: base sul disco. Cap a discWorld + zDiscK*axis (sopra).
-        originK = discWorld.clone();
+        // Sostituto: base sul piano del disco scansionato, spostato lateralmente.
+        // Cap a originK + zDiscK*axis (sopra il disco scansionato).
+        var idxSost = sostNonSourceKeys.indexOf(k);
+        var sign = (idxSost === 0) ? 1 : -1;  // primo sostituto a +right, secondo a -right
+        var lateralOff = sostRight.clone().multiplyScalar(sign * sostLateralOffset);
+        originK = discWorld.clone().add(lateralOff);
       }
       var g = sostBuildTemplateGroup(k, geos[k], originK, axis);
       g.name = id + '_' + k;
