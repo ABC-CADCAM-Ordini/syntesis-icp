@@ -271,6 +271,19 @@ async def init_db():
                 ON case_events(case_folder_id, created_at DESC);
         """)
 
+        # === v7.3.9.089 - Tag ruolo professionale sui contatti ===
+        # Nuova colonna pulita con CHECK. La vecchia contacts.role
+        # resta per backward compat ma la UI ignora.
+        await conn.execute("""
+            ALTER TABLE contacts ADD COLUMN IF NOT EXISTS contact_pro_role TEXT
+                CHECK (contact_pro_role IS NULL OR contact_pro_role IN ('medico','laboratorio'));
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_contacts_pro_role
+                ON contacts(owner_user_id, contact_pro_role)
+                WHERE contact_pro_role IS NOT NULL;
+        """)
+
         # Migrazione retroattiva: i contatti esistenti hanno gia\' role (TEXT libero)
         # ma per il nuovo flusso vogliamo solo medico/laboratorio. Aggiungo un commento
         # senza vincoli (i vecchi role restano validi). La UI filtrera\' solo per
@@ -864,7 +877,7 @@ async def list_user_contacts(user_id: str) -> list[dict]:
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT c.id, c.contact_email, c.contact_user_id, c.display_name,
-                   c.role, c.notes, c.status, c.created_at, c.updated_at,
+                   c.role, c.contact_pro_role, c.notes, c.status, c.created_at, c.updated_at,
                    u.name AS contact_real_name,
                    u.organization AS contact_organization,
                    (u.gdrive_refresh_token_enc IS NOT NULL) AS contact_drive_connected
@@ -879,10 +892,13 @@ async def list_user_contacts(user_id: str) -> list[dict]:
 async def create_user_contact(owner_user_id: str, contact_email: str,
                                 display_name: Optional[str] = None,
                                 role: Optional[str] = None,
+                                contact_pro_role: Optional[str] = None,
                                 notes: Optional[str] = None) -> dict:
     """Aggiunge un contatto. Se l'email corrisponde a un utente Syntesis,
     lo collega automaticamente (status=active). Altrimenti pending.
     Solleva ValueError se duplicato (owner+email)."""
+    if contact_pro_role is not None and contact_pro_role not in ('medico', 'laboratorio'):
+        raise ValueError("contact_pro_role deve essere 'medico' o 'laboratorio'")
     import uuid
     contact_id = str(uuid.uuid4())
     pool = await get_pool()
@@ -900,10 +916,10 @@ async def create_user_contact(owner_user_id: str, contact_email: str,
         try:
             await conn.execute("""
                 INSERT INTO contacts (id, owner_user_id, contact_email, contact_user_id,
-                                       display_name, role, notes, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                                       display_name, role, contact_pro_role, notes, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             """, contact_id, owner_user_id, contact_email, contact_user_id,
-                display_name, role, notes, status)
+                display_name, role, contact_pro_role, notes, status)
         except asyncpg.UniqueViolationError:
             raise ValueError("Hai gia' un contatto con questa email.")
     return {
@@ -912,6 +928,7 @@ async def create_user_contact(owner_user_id: str, contact_email: str,
         "contact_user_id": contact_user_id,
         "display_name": display_name,
         "role": role,
+        "contact_pro_role": contact_pro_role,
         "notes": notes,
         "status": status,
     }
@@ -920,9 +937,10 @@ async def create_user_contact(owner_user_id: str, contact_email: str,
 async def update_user_contact(contact_id: str, owner_user_id: str,
                                 display_name: Optional[str] = None,
                                 role: Optional[str] = None,
+                                contact_pro_role: Optional[str] = None,
                                 notes: Optional[str] = None) -> bool:
     """Aggiorna metadati di un contatto (nome/ruolo/note). NON cambia email."""
-    if display_name is None and role is None and notes is None:
+    if display_name is None and role is None and contact_pro_role is None and notes is None:
         return False
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -932,6 +950,12 @@ async def update_user_contact(contact_id: str, owner_user_id: str,
             sets.append(f"display_name = ${len(params)+1}"); params.append(display_name)
         if role is not None:
             sets.append(f"role = ${len(params)+1}"); params.append(role)
+        if contact_pro_role is not None:
+            if contact_pro_role and contact_pro_role not in ('medico', 'laboratorio'):
+                raise ValueError("contact_pro_role deve essere 'medico'/'laboratorio'/''")
+            # stringa vuota = clear (NULL)
+            value = contact_pro_role if contact_pro_role else None
+            sets.append(f"contact_pro_role = ${len(params)+1}"); params.append(value)
         if notes is not None:
             sets.append(f"notes = ${len(params)+1}"); params.append(notes)
         params.append(contact_id)
