@@ -707,7 +707,7 @@ body{
   font-size:11px;color:#64748b;font-weight:600;letter-spacing:.04em;
 }
 
-/* v7.3.9.088 - Icone nei tab */
+/* v7.3.9.089 - Icone nei tab */
 .tab{display:inline-flex;align-items:center;gap:8px;line-height:1}
 .tab-ico{width:15px;height:15px;flex-shrink:0;color:currentColor;display:inline-block;vertical-align:middle}
 .tab.active .tab-ico,.tab:hover .tab-ico{color:var(--blue)}
@@ -936,7 +936,7 @@ body{
 </div>
 
   
-  <!-- MODAL: ONBOARDING PRO-ROLE (v7.3.9.088) -->
+  <!-- MODAL: ONBOARDING PRO-ROLE (v7.3.9.089) -->
   <div class="modal-backdrop" id="modalProRole" style="z-index:99999;background:rgba(15,25,35,.78)">
     <div style="background:#fff;border-radius:14px;width:90vw;max-width:580px;padding:36px 32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
       <div style="text-align:center;margin-bottom:22px">
@@ -992,7 +992,15 @@ body{
         <input type="text" id="contactName" placeholder="Es. Lab Mario Rossi">
       </div>
       <div class="modal-row">
-        <label>Ruolo / Funzione</label>
+        <label>Tipo</label>
+        <select id="contactProRole" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;color:var(--dark);background:#fff;cursor:pointer">
+          <option value="">Non specificato</option>
+          <option value="medico">Medico</option>
+          <option value="laboratorio">Laboratorio</option>
+        </select>
+      </div>
+      <div class="modal-row">
+        <label>Ruolo / Funzione (descrittivo)</label>
         <input type="text" id="contactRole" placeholder="Es. Odontotecnico, Clinica">
       </div>
       <div class="modal-row">
@@ -1778,10 +1786,13 @@ async function saveContact(){
     emailEl.focus();
     return;
   }
+  var proRoleEl = document.getElementById('contactProRole');
+  var contactProRole = proRoleEl ? proRoleEl.value : '';
   var body = {
     contact_email: email,
     display_name: name || null,
     role: role || null,
+    contact_pro_role: contactProRole || null,
     notes: notes || null,
   };
   try {
@@ -1880,6 +1891,7 @@ function renderContacts(){
       '<div class="cc-name">' +
         (c.contact_drive_connected ? '<span class="cc-drive-icon" title="Drive connesso"></span>' : '') +
         escapeHtml(displayName) +
+        (c.contact_pro_role ? '<span class="cc-pro-role ' + c.contact_pro_role + '">' + (c.contact_pro_role === 'medico' ? 'Medico' : 'Lab') + '</span>' : '') +
         '<span class="cc-status ' + c.status + '">' + (isActive ? 'Attivo' : 'In attesa') + '</span>' +
       '</div>' +
       '<div class="cc-email">' + escapeHtml(c.contact_email) + realName + '</div>' +
@@ -1904,6 +1916,7 @@ function openContactCreate(){
   document.getElementById('contactEmail').disabled = false;
   document.getElementById('contactName').value = '';
   document.getElementById('contactRole').value = '';
+  var pr = document.getElementById('contactProRole'); if(pr) pr.value = '';
   document.getElementById('contactNotes').value = '';
   document.getElementById('modalContact').classList.add('show');
   setTimeout(function(){ document.getElementById('contactEmail').focus(); }, 50);
@@ -1918,6 +1931,7 @@ function openContactEdit(id){
   document.getElementById('contactEmail').disabled = true;  // email non modificabile
   document.getElementById('contactName').value = c.display_name || '';
   document.getElementById('contactRole').value = c.role || '';
+  var pr = document.getElementById('contactProRole'); if(pr) pr.value = c.contact_pro_role || '';
   document.getElementById('contactNotes').value = c.notes || '';
   document.getElementById('modalContact').classList.add('show');
 }
@@ -3077,7 +3091,7 @@ async function fetchDriveFile(fileId){
 }
 
 
-// v7.3.9.088 - Pro-role onboarding
+// v7.3.9.089 - Pro-role onboarding
 var _selectedProRole = null;
 var _userProRole = null;
 
