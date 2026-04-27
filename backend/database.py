@@ -200,6 +200,84 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_sf_owner
                 ON shared_folders(owner_user_id);
         """)
+
+        # === v7.3.9.087 - Modello Medico/Laboratorio + cartelle paziente ===
+        # users.pro_role: ruolo professionale dell'utente (medico/laboratorio)
+        # Diverso da users.role che e\' privilege level (user/admin/etc)
+        await conn.execute("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS pro_role TEXT
+                CHECK (pro_role IS NULL OR pro_role IN ('medico','laboratorio'));
+        """)
+        await conn.execute("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS pro_role_set_at TIMESTAMPTZ;
+        """)
+
+        # case_folders: cartella-paziente DENTRO una shared_folder
+        # E\' una sotto-cartella nel Drive del medico, replicata sul lab.
+        # Contiene tutti i file e i metadati clinico-organizzativi del caso.
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS case_folders (
+                id                        TEXT PRIMARY KEY,
+                shared_folder_id          TEXT NOT NULL REFERENCES shared_folders(id) ON DELETE CASCADE,
+                drive_folder_id           TEXT,
+                case_label                TEXT NOT NULL,
+                case_notes                TEXT,
+                urgenza                   TEXT NOT NULL DEFAULT 'standard'
+                    CHECK (urgenza IN ('non_urgente','standard','urgente','molto_urgente')),
+                data_consegna_richiesta   DATE,
+                data_consegna_proposta    DATE,
+                pipeline_stato            TEXT NOT NULL DEFAULT 'inviata'
+                    CHECK (pipeline_stato IN ('inviata','ricevuta','in_lavorazione','in_consegna','chiuso')),
+                created_by                TEXT NOT NULL REFERENCES users(id),
+                created_at                TIMESTAMPTZ DEFAULT NOW(),
+                updated_at                TIMESTAMPTZ DEFAULT NOW()
+            );
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cf_shared_folder
+                ON case_folders(shared_folder_id);
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cf_pipeline_stato
+                ON case_folders(pipeline_stato);
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cf_urgenza
+                ON case_folders(urgenza)
+                WHERE pipeline_stato NOT IN ('chiuso');
+        """)
+
+        # case_events: audit log immutabile di ogni evento sul caso.
+        # Necessario per medico-legale: chi-quando-cosa.
+        # Per ora viene popolato silenzioso, l\'UI lo espone in v.095.
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS case_events (
+                id                  TEXT PRIMARY KEY,
+                case_folder_id      TEXT NOT NULL REFERENCES case_folders(id) ON DELETE CASCADE,
+                event_type          TEXT NOT NULL
+                    CHECK (event_type IN (
+                        'created','file_uploaded','file_downloaded',
+                        'urgenza_changed','date_proposed','state_changed',
+                        'message_added'
+                    )),
+                event_data          JSONB,
+                actor_user_id       TEXT REFERENCES users(id),
+                actor_pro_role      TEXT,
+                created_at          TIMESTAMPTZ DEFAULT NOW()
+            );
+        """)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ce_case
+                ON case_events(case_folder_id, created_at DESC);
+        """)
+
+        # Migrazione retroattiva: i contatti esistenti hanno gia\' role (TEXT libero)
+        # ma per il nuovo flusso vogliamo solo medico/laboratorio. Aggiungo un commento
+        # senza vincoli (i vecchi role restano validi). La UI filtrera\' solo per
+        # medico/laboratorio quando serve.
+
+
+
 async def get_user_by_email(email: str) -> Optional[dict]:
     pool = await get_pool()
     async with pool.acquire() as conn:
