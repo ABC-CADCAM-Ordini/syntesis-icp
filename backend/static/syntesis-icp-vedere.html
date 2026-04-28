@@ -126,6 +126,99 @@ body{
 .viewport{flex:1;min-width:0;position:relative;background:linear-gradient(180deg,#438DD6,#89B2E0);overflow:hidden}
 #canvas{display:block;width:100%;height:100%}
 
+/* === PIP Sezione === */
+.section-pip{
+  position:absolute;
+  bottom:64px;right:14px;
+  width:520px;height:420px;
+  min-width:240px;min-height:200px;
+  max-width:calc(100% - 28px);max-height:calc(100% - 78px);
+  background:#0F1923;
+  border:1px solid var(--border);
+  border-radius:10px;
+  box-shadow:0 8px 24px rgba(15,25,35,.35);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  z-index:8;
+  transition:box-shadow .18s ease;
+}
+.section-pip.maxi{
+  top:14px;right:14px;left:14px;bottom:64px;
+  width:auto;height:auto;
+}
+.section-pip-header{
+  display:flex;align-items:center;
+  padding:6px 10px;
+  background:#1a2935;
+  border-bottom:1px solid #2a3a48;
+  flex-shrink:0;
+  cursor:move;
+  user-select:none;
+}
+.section-pip-title{
+  font-family:var(--mono);font-size:10px;font-weight:800;
+  letter-spacing:.12em;color:#e8f0f7;
+  flex:1;
+}
+.section-pip-actions{display:flex;gap:3px;align-items:center}
+.section-tools{display:flex;gap:3px}
+
+/* Quando swap attivo: i tools della cut view fluttuano in alto a destra del viewport */
+.section-tools-floating{
+  position:absolute;
+  top:14px;right:14px;
+  display:flex;gap:4px;
+  background:rgba(15,25,35,0.92);
+  backdrop-filter:blur(8px);
+  padding:5px 6px;
+  border-radius:8px;
+  box-shadow:0 4px 16px rgba(15,25,35,.3);
+  z-index:9;
+}
+.section-tools-floating .section-pip-btn{color:#a0b4c8;background:transparent}
+.section-tools-floating .section-pip-btn:hover{background:#2a3a48;color:#fff}
+.section-tools-floating .section-pip-btn.active{background:var(--blue);color:#fff}
+.section-pip-btn{
+  width:24px;height:22px;
+  border:none;background:transparent;color:#a0b4c8;
+  border-radius:4px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:all .12s;
+}
+.section-pip-btn:hover{background:#2a3a48;color:#fff}
+.section-pip-btn.active{background:var(--blue);color:#fff}
+#sectionCanvas{flex:1;display:block;width:100%;height:100%;cursor:default}
+#sectionCanvas.ruler-active{cursor:crosshair}
+
+/* Quando lo swap è attivo, il canvas 2D è figlio diretto del viewport e ne occupa lo spazio.
+   Il canvas 3D è dentro la PIP e ne occupa lo spazio sotto l'header. */
+.viewport.section-swapped > #sectionCanvas{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  background:#0F1923;
+}
+.section-pip.swapped > #canvas{
+  flex:1;display:block;width:100%;height:100%;
+  background:transparent;
+}
+.section-pip-hint{
+  position:absolute;top:36px;left:50%;transform:translateX(-50%);
+  background:rgba(0,101,179,.95);color:#fff;
+  padding:5px 10px;border-radius:14px;
+  font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.06em;
+  pointer-events:none;
+  white-space:nowrap;
+  z-index:5;
+}
+.section-pip-resize{
+  position:absolute;
+  left:0;bottom:0;
+  width:14px;height:14px;
+  cursor:nwse-resize;
+  background:linear-gradient(135deg,transparent 0%,transparent 50%,#a0b4c8 50%,#a0b4c8 60%,transparent 60%,transparent 70%,#a0b4c8 70%,#a0b4c8 80%,transparent 80%);
+  z-index:6;
+}
+.section-pip.maxi .section-pip-resize{display:none}
+
 .layer-panel{
   position:absolute;top:14px;left:14px;
   width:280px;max-height:calc(100% - 28px);
@@ -446,6 +539,10 @@ input[type="file"]{display:none}
       <button class="vp-btn" id="btnTorx" title="Torx (X)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2 L9.5 5 L13 5.5 L11 8 L13 10.5 L9.5 11 L8 14 L6.5 11 L3 10.5 L5 8 L3 5.5 L6.5 5 Z" stroke-linejoin="round"/></svg>
       </button>
+      <div style="width:1px;height:18px;background:var(--border);margin:0 4px;align-self:center"></div>
+      <button class="vp-btn" id="btnSection" title="Sezione (S)">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" stroke-linejoin="round"/><line x1="2" y1="8" x2="14" y2="8" stroke-dasharray="1.5 1"/></svg>
+      </button>
       <button class="vp-btn" id="btnRulerClear" title="Pulisci misure" disabled>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h10M6 3h4M5 5v8a1 1 0 001 1h4a1 1 0 001-1V5" stroke-linecap="round"/></svg>
       </button>
@@ -457,6 +554,37 @@ input[type="file"]{display:none}
 
     <div class="drop-overlay" id="dropOverlay">
       <div class="drop-overlay-inner">RILASCIA PER CARICARE</div>
+    </div>
+
+    <!-- PIP Sezione: finestra fluttuante con la cut view 2D -->
+    <div class="section-pip" id="sectionPip" style="display:none">
+      <div class="section-pip-header">
+        <span class="section-pip-title">SEZIONE</span>
+        <div class="section-pip-actions">
+          <!-- Tools della cut view (operano sul canvas 2D). Si spostano nel viewport quando swap è attivo. -->
+          <div class="section-tools" id="secTools">
+            <button class="section-pip-btn" id="secRulerBtn" title="Misura nella sezione (M)">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 11l10-10 4 4-10 10z" stroke-linejoin="round"/><path d="M3 9l1 1M5 7l1.5 1.5M7 5l1 1M9 3l1.5 1.5" stroke-linecap="round"/></svg>
+            </button>
+            <button class="section-pip-btn" id="secFitBtn" title="Adatta vista (F)">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6V3h3M13 6V3h-3M3 10v3h3M13 10v3h-3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+          <!-- Tools della finestra PIP (controllano la finestra). Restano sempre nell'header PIP. -->
+          <button class="section-pip-btn" id="secSwapBtn" title="Scambia con vista 3D">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h10M11 3l2 2-2 2M13 11H3M5 9l-2 2 2 2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="section-pip-btn" id="secMaxBtn" title="Ingrandisci/riduci">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6V2h4M14 10v4h-4M14 6V2h-4M2 10v4h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="section-pip-btn" id="secCloseBtn" title="Chiudi sezione">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+      <canvas id="sectionCanvas"></canvas>
+      <div class="section-pip-hint" id="secHint" style="display:none"></div>
+      <div class="section-pip-resize" id="secResize" title="Ridimensiona"></div>
     </div>
 
     <div class="empty-hint" id="emptyHint">
@@ -526,9 +654,17 @@ const state = {
   rulerFirstPoint: null,
   measures: [],
   circleActive: false,
-  activeShape: 'circle',  // 'circle'|'square'|'hex'|'oct'|'torx'
+  activeShape: 'circle',
   circleFirstEdge: null,
-  circles: []               // {center, normal, U, V, radius, ring, handles, labelEl}
+  circles: [],
+  // Sezione (cut view)
+  sectionPlaceMode: false,    // true durante creazione (2 click)
+  sectionFirstPoint: null,    // primo click salvato
+  section: null,              // oggetto sezione attivo: {center, normal, U, V, width, height, handles, plane, line2D[], measures2D[]}
+  sectionPipMaxi: false,
+  sectionSwapped: false,    // true: 3D è nella PIP, 2D è nel viewport principale
+  sectionRulerActive: false,
+  sectionRulerFirstPoint: null,
 };
 
 // Three.js init
@@ -561,7 +697,7 @@ const camera = new THREE.PerspectiveCamera(28, 1, 0.01, 1000);
 camera.up.set(0, 0, 1);
 camera.position.set(30, 30, 50);
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, stencil: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 const controls = new THREE.OrbitControls(camera, canvas);
@@ -2463,6 +2599,14 @@ function pickHandle(e) {
       });
     });
   });
+  // Anche sezione (cut view)
+  if (state.section && state.section.handles) {
+    state.section.handles.forEach(h => {
+      h.mesh.traverse(o => {
+        if (o.isMesh && o.userData.isHandlePart) meshes.push(o);
+      });
+    });
+  }
   if (meshes.length === 0) return null;
   const hits = raycaster.intersectObjects(meshes, false);
   if (hits.length === 0) return null;
@@ -2485,6 +2629,12 @@ function pickHandle(e) {
     if (!m.handles) continue;
     for (const h of m.handles) {
       if (h.mesh === node) return { kind: 'measure', measure: m, handle: h, arrowDir, isRotationRing, rotationAxis };
+    }
+  }
+  // Sezione
+  if (state.section && state.section.handles) {
+    for (const h of state.section.handles) {
+      if (h.mesh === node) return { kind: 'section', section: state.section, handle: h, arrowDir, isRotationRing, rotationAxis };
     }
   }
   return null;
@@ -2531,7 +2681,65 @@ function onCanvasPointerDown(e) {
     return;
   }
 
-  // ===== DRAG SU CERCHIO/FORMA =====
+  // ===== DRAG SU SEZIONE =====
+  if (pick.kind === 'section') {
+    const s = pick.section;
+    if (pick.isRotationRing) {
+      // Rotazione del piano sezione attorno all'asse dell'anello
+      const axis = pick.rotationAxis.clone().normalize();
+      eventToNDC(e);
+      raycaster.setFromCamera(mouseNDC, camera);
+      const ray = raycaster.ray;
+      const denom = ray.direction.dot(axis);
+      if (Math.abs(denom) < 1e-6) return;
+      const t = s.center.clone().sub(ray.origin).dot(axis) / denom;
+      if (t <= 0) return;
+      const startPoint = ray.origin.clone().add(ray.direction.clone().multiplyScalar(t));
+      const startVec = startPoint.clone().sub(s.center).normalize();
+      activeHandle = {
+        kind: 'section',
+        section: s, handle: pick.handle,
+        isRotation: true,
+        rotationAxis: axis, startVec,
+        origU: s.U.clone(), origV: s.V.clone(), origN: s.normal.clone()
+      };
+    } else {
+      activeHandle = {
+        kind: 'section',
+        section: s, handle: pick.handle,
+        arrowDir: pick.arrowDir,
+        isRotation: false,
+        origCenter: s.center.clone(),
+        origWidth: s.width, origHeight: s.height
+      };
+      // Per drag rigido centrale calcolo startPoint sul piano vista
+      if (pick.handle.axis === 'C') {
+        eventToNDC(e);
+        raycaster.setFromCamera(mouseNDC, camera);
+        const ray = raycaster.ray;
+        // Piano = quello della sezione passante per il centro
+        const denom = ray.direction.dot(s.normal);
+        if (Math.abs(denom) > 1e-6) {
+          const t = s.center.clone().sub(ray.origin).dot(s.normal) / denom;
+          if (t > 0) {
+            activeHandle.startPoint = ray.origin.clone().add(ray.direction.clone().multiplyScalar(t));
+          }
+        }
+        // Per il drag normale (frecce N) memorizzo anche la direzione del raggio
+        // così posso proiettare il movimento lungo la normale
+        activeHandle.startRayOrigin = ray.origin.clone();
+        activeHandle.startRayDir = ray.direction.clone();
+      }
+    }
+    controls.enabled = false;
+    canvas.style.cursor = 'grabbing';
+    e.preventDefault();
+    e.stopPropagation();
+    if (canvas.setPointerCapture && e.pointerId !== undefined) {
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+    return;
+  }
   // Se è un anello di rotazione, calcolo subito l'angolo di riferimento iniziale
   if (pick.isRotationRing) {
     const circle = pick.circle;
@@ -2627,6 +2835,117 @@ function onCanvasPointerMoveDrag(e) {
       m.p2.copy(activeHandle.origP2).add(delta);
       updateMeasureVisuals(m);
       updateMeasureLabels();
+      return;
+    }
+    return;
+  }
+
+  // ========== BRANCH SEZIONE ==========
+  if (activeHandle.kind === 'section') {
+    const s = activeHandle.section;
+    const handle = activeHandle.handle;
+
+    // -- Rotazione attorno a U/V/N --
+    if (activeHandle.isRotation) {
+      const axis = activeHandle.rotationAxis;
+      eventToNDC(e);
+      raycaster.setFromCamera(mouseNDC, camera);
+      const ray = raycaster.ray;
+      const denom = ray.direction.dot(axis);
+      if (Math.abs(denom) < 1e-6) return;
+      const t = s.center.clone().sub(ray.origin).dot(axis) / denom;
+      if (t <= 0) return;
+      const currentPoint = ray.origin.clone().add(ray.direction.clone().multiplyScalar(t));
+      const currentVec = currentPoint.clone().sub(s.center).normalize();
+      const cross = new THREE.Vector3().crossVectors(activeHandle.startVec, currentVec);
+      const dotProd = activeHandle.startVec.dot(currentVec);
+      const signedSin = cross.dot(axis);
+      let angle = Math.atan2(signedSin, dotProd);
+      const SMOOTHNESS = 0.35;
+      angle *= SMOOTHNESS;
+      const deltaQ = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+      s.U.copy(activeHandle.origU).applyQuaternion(deltaQ).normalize();
+      s.V.copy(activeHandle.origV).applyQuaternion(deltaQ).normalize();
+      s.normal.copy(activeHandle.origN).applyQuaternion(deltaQ).normalize();
+      updateSectionVisuals();
+      return;
+    }
+
+    // -- Drag laterale (U+/U-/V+/V-): scaling rispetto al centro fisso --
+    if (handle.axis === 'U' || handle.axis === 'V') {
+      const axisVec = (handle.axis === 'U' ? s.U : s.V).clone();
+      const dirOutward = axisVec.clone().multiplyScalar(handle.sign);
+      // Proietto il puntatore sul piano sezione passante per center
+      eventToNDC(e);
+      raycaster.setFromCamera(mouseNDC, camera);
+      const ray = raycaster.ray;
+      const denom = ray.direction.dot(s.normal);
+      if (Math.abs(denom) < 1e-6) return;
+      const t = s.center.clone().sub(ray.origin).dot(s.normal) / denom;
+      if (t <= 0) return;
+      const pointOnPlane = ray.origin.clone().add(ray.direction.clone().multiplyScalar(t));
+      const vec = pointOnPlane.clone().sub(s.center);
+      const newHalf = vec.dot(dirOutward);
+      if (newHalf < 0.25) return;  // limite minimo
+      if (handle.axis === 'U') s.width = newHalf * 2;
+      else                       s.height = newHalf * 2;
+      updateSectionVisuals();
+      return;
+    }
+
+    // -- Drag centrale (C): traslazione rigida sul piano sezione + lungo normale --
+    if (handle.axis === 'C') {
+      const arrow = activeHandle.arrowDir;
+      if (!arrow) return;
+      // Determino se la freccia è lungo U, V o N (prodotto scalare maggiore)
+      const dotU = Math.abs(arrow.dot(s.U));
+      const dotV = Math.abs(arrow.dot(s.V));
+      const dotN = Math.abs(arrow.dot(s.normal));
+      const isAxisN = dotN > dotU && dotN > dotV;
+
+      if (!isAxisN) {
+        // Traslazione sul piano: closest point sul piano sezione
+        eventToNDC(e);
+        raycaster.setFromCamera(mouseNDC, camera);
+        const ray = raycaster.ray;
+        const denom = ray.direction.dot(s.normal);
+        if (Math.abs(denom) < 1e-6) return;
+        const t = s.center.clone().sub(ray.origin).dot(s.normal) / denom;
+        if (t <= 0) return;
+        const currentPoint = ray.origin.clone().add(ray.direction.clone().multiplyScalar(t));
+        if (!activeHandle.startPoint) return;
+        const delta = currentPoint.clone().sub(activeHandle.startPoint);
+        s.center.copy(activeHandle.origCenter).add(delta);
+      } else {
+        // Traslazione lungo la normale: proietto il movimento del puntatore lungo N
+        eventToNDC(e);
+        raycaster.setFromCamera(mouseNDC, camera);
+        const ray = raycaster.ray;
+        // Closest point lungo la retta center+t*N alla retta del raggio: minimizzazione 3D
+        const w0 = activeHandle.origCenter.clone().sub(ray.origin);
+        const a = s.normal.dot(s.normal);
+        const b = s.normal.dot(ray.direction);
+        const cVal = ray.direction.dot(ray.direction);
+        const d = s.normal.dot(w0);
+        const eVal = ray.direction.dot(w0);
+        const denomLine = a*cVal - b*b;
+        if (Math.abs(denomLine) < 1e-6) return;
+        const tLine = (b*eVal - cVal*d) / denomLine;  // parametro lungo la normale
+        // Calcolo il delta tra il tLine attuale e quello iniziale
+        if (activeHandle.startTLine === undefined) {
+          // Prima volta: salvo il riferimento
+          const w0s = activeHandle.origCenter.clone().sub(activeHandle.startRayOrigin);
+          const bs = s.normal.dot(activeHandle.startRayDir);
+          const cs = activeHandle.startRayDir.dot(activeHandle.startRayDir);
+          const ds = s.normal.dot(w0s);
+          const es = activeHandle.startRayDir.dot(w0s);
+          const denoms = a*cs - bs*bs;
+          activeHandle.startTLine = (Math.abs(denoms) < 1e-6) ? 0 : (bs*es - cs*ds) / denoms;
+        }
+        const dt = tLine - activeHandle.startTLine;
+        s.center.copy(activeHandle.origCenter).add(s.normal.clone().multiplyScalar(dt));
+      }
+      updateSectionVisuals();
       return;
     }
     return;
@@ -2864,6 +3183,17 @@ const _origAnimate = animate;
         }
       });
     });
+    // Scaling gizmi sezione: clamp rispetto a metà lato corto del rettangolo
+    if (state.section && state.section.handles) {
+      const refSize = Math.min(state.section.width, state.section.height) * 0.5;
+      state.section.handles.forEach(h => {
+        if (h.axis === 'C') {
+          updateGizmoScaleClamped(h.mesh, refSize, 1.55, 0.55);
+        } else {
+          updateGizmoScaleClamped(h.mesh, refSize, 1.0, 0.40);
+        }
+      });
+    }
     oldRender(s, c);
     if (state.measures.length > 0) updateMeasureLabels();
     if (state.circles.length > 0) updateCircleLabels();
@@ -2916,6 +3246,1080 @@ document.addEventListener('keydown', e => {
     if (state.rulerActive) setRulerActive(false);
     const same = state.circleActive && state.activeShape === 'torx';
     setCircleActive(!same, 'torx');
+  }
+});
+
+// ============================================================
+// SEZIONE / CUT VIEW
+// Piano di taglio infinito definito da un rettangolo handle 3D.
+// Si crea con 2 click (perpendicolare al piano vista corrente).
+// ============================================================
+
+// --- Setup scena 2D per la PIP ---
+const sectionScene = new THREE.Scene();
+sectionScene.background = new THREE.Color(0x0F1923);
+const sectionCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, -1000, 1000);
+const sectionCanvas = document.getElementById('sectionCanvas');
+const sectionRenderer = new THREE.WebGLRenderer({ canvas: sectionCanvas, antialias: true });
+sectionRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+// Pending durante "piazza sezione" (preview tra primo e secondo click)
+let pendingSectionRect = null;
+let pendingSectionLabel = null;
+
+// ----------- Modalità "piazza sezione" (2 click) -----------
+
+function setSectionPlaceMode(on) {
+  state.sectionPlaceMode = on;
+  state.sectionFirstPoint = null;
+  document.getElementById('btnSection').classList.toggle('active', on);
+  document.getElementById('viewport').classList.toggle('ruler-active', on);
+  toggleSectionHint(on);
+  hoverMarker.visible = false;
+  clearPendingSection();
+  if (on) {
+    if (state.rulerActive) setRulerActive(false);
+    if (state.circleActive) setCircleActive(false);
+    deselectLayer();
+    // Una sola sezione alla volta
+    if (state.section) removeSection();
+  }
+}
+
+function toggleSectionHint(on) {
+  let hint = document.getElementById('sectionHint');
+  if (on) {
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.id = 'sectionHint';
+      hint.className = 'measure-hint';
+      document.getElementById('viewport').appendChild(hint);
+    }
+    hint.textContent = state.sectionFirstPoint
+      ? 'CLIC PER IL SECONDO PUNTO DEL TAGLIO  ·  ESC ANNULLA'
+      : 'CLIC PER IL PRIMO PUNTO DEL TAGLIO  ·  ESC ESCE';
+    hint.style.display = '';
+  } else if (hint) {
+    hint.style.display = 'none';
+  }
+}
+
+function clearPendingSection() {
+  if (pendingSectionRect) {
+    scene.remove(pendingSectionRect);
+    pendingSectionRect.geometry.dispose();
+    pendingSectionRect.material.dispose();
+    pendingSectionRect = null;
+  }
+  if (pendingSectionLabel) {
+    pendingSectionLabel.remove();
+    pendingSectionLabel = null;
+  }
+}
+
+// Hover/click handlers durante place mode
+function sectionPlaceOnPointerMove(e) {
+  if (!state.sectionPlaceMode) return;
+  // Il punto di click cade sulla geometria sotto il puntatore (snap mesh) oppure
+  // su un piano virtuale parallelo alla camera passante per l'origine se non c'e' geometria.
+  const p = pickPointForSection(e);
+  if (!p) { hoverMarker.visible = false; return; }
+  hoverMarker.position.copy(p);
+  hoverMarker.visible = true;
+
+  if (state.sectionFirstPoint) {
+    // Preview rettangolo tra primo e secondo punto, sul piano vista corrente
+    drawPendingSection(state.sectionFirstPoint, p);
+  }
+}
+
+function sectionPlaceOnClick(e) {
+  if (!state.sectionPlaceMode) return;
+  if (e.button !== 0) return;
+  const p = pickPointForSection(e);
+  if (!p) return;
+  if (!state.sectionFirstPoint) {
+    state.sectionFirstPoint = p.clone();
+    toggleSectionHint(true);
+    return;
+  }
+  // Secondo click: crea sezione
+  const p1 = state.sectionFirstPoint;
+  const p2 = p.clone();
+  if (p1.distanceTo(p2) < 0.5) {
+    setStatus('Sezione: distanza tra i due punti troppo piccola');
+    return;
+  }
+  createSection(p1, p2);
+  setSectionPlaceMode(false);
+}
+
+function pickPointForSection(e) {
+  // Snap su geometria visibile, altrimenti proietta su un piano parallelo alla camera
+  // passante per l'origine (o al centro della scena).
+  eventToNDC(e);
+  raycaster.setFromCamera(mouseNDC, camera);
+  const meshes = [];
+  state.layers.forEach(l => {
+    if (l.visible && l.object && l.object.isMesh) meshes.push(l.object);
+  });
+  if (meshes.length > 0) {
+    const hits = raycaster.intersectObjects(meshes, false);
+    if (hits.length > 0) return hits[0].point.clone();
+  }
+  // Fallback: piano parallelo alla camera passante per il centro scena
+  const center = sceneCenter();
+  const camDir = new THREE.Vector3();
+  camera.getWorldDirection(camDir);
+  const plane = new THREE.Plane(camDir.clone().negate(), -camDir.dot(center));
+  const target = new THREE.Vector3();
+  if (raycaster.ray.intersectPlane(plane, target)) return target.clone();
+  return null;
+}
+
+function sceneCenter() {
+  // Calcola il centroide della bbox aggregata di tutti i layer visibili
+  const box = new THREE.Box3();
+  let any = false;
+  state.layers.forEach(l => {
+    if (!l.visible) return;
+    l.object.geometry.computeBoundingBox();
+    box.expandByObject(l.object);
+    any = true;
+  });
+  if (!any) return new THREE.Vector3();
+  return box.getCenter(new THREE.Vector3());
+}
+
+function drawPendingSection(p1, p2) {
+  // Preview: una semplice linea tratteggiata blu tra primo e secondo click.
+  // La linea è il piano di taglio visto di taglio. Al secondo click si
+  // genererà un rettangolo handle quadrato di lato pari alla lunghezza della linea.
+  if (pendingSectionRect) {
+    scene.remove(pendingSectionRect);
+    pendingSectionRect.geometry.dispose();
+    pendingSectionRect.material.dispose();
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+  const mat = new THREE.LineDashedMaterial({
+    color: 0x0065B3,
+    dashSize: 0.4, gapSize: 0.3,
+    depthTest: false, transparent: true, opacity: 0.9
+  });
+  pendingSectionRect = new THREE.Line(geo, mat);
+  pendingSectionRect.computeLineDistances();
+  pendingSectionRect.layers.set(GIZMO_LAYER);
+  pendingSectionRect.renderOrder = 999;
+  scene.add(pendingSectionRect);
+}
+
+// ----------- Costruzione rettangolo + handles -----------
+
+function buildSectionRectMesh(center, U, V, width, height, colorHex) {
+  // Rettangolo come LineLoop sul piano (center, U, V) con dimensione width x height
+  const hw = width * 0.5, hh = height * 0.5;
+  const corners = [
+    center.clone().addScaledVector(U, -hw).addScaledVector(V, -hh),
+    center.clone().addScaledVector(U, +hw).addScaledVector(V, -hh),
+    center.clone().addScaledVector(U, +hw).addScaledVector(V, +hh),
+    center.clone().addScaledVector(U, -hw).addScaledVector(V, +hh),
+    center.clone().addScaledVector(U, -hw).addScaledVector(V, -hh)  // chiusura
+  ];
+  const geo = new THREE.BufferGeometry().setFromPoints(corners);
+  const mat = new THREE.LineBasicMaterial({ color: colorHex, linewidth: 2, depthTest: false, transparent: true, opacity: 0.9 });
+  const line = new THREE.Line(geo, mat);
+  line.layers.set(GIZMO_LAYER);
+  line.renderOrder = 999;
+  return line;
+}
+
+function createSection(p1, p2) {
+  // Stesso calcolo del pending, ma definitivo
+  const camDir = new THREE.Vector3();
+  camera.getWorldDirection(camDir);
+  const N = camDir.clone().negate().normalize();
+  let U = p2.clone().sub(p1);
+  U.sub(N.clone().multiplyScalar(U.dot(N))).normalize();
+  if (U.lengthSq() < 1e-6) U.set(1,0,0);
+  const V = new THREE.Vector3().crossVectors(N, U).normalize();
+  const center = p1.clone().add(p2).multiplyScalar(0.5);
+  // Quadrato 1:1: lato = distanza tra i due click
+  const side = Math.max(p1.distanceTo(p2), 1.0);
+  const width = side, height = side;
+
+  clearPendingSection();
+
+  // Rettangolo handle visivo
+  const rect = buildSectionRectMesh(center, U, V, width, height, 0x0065B3);
+  scene.add(rect);
+
+  // Plane Three.js per clipping
+  // Equazione plane.constant: per un piano (N,c) con punto sul piano P, c = -N.dot(P)
+  const plane = new THREE.Plane(N.clone(), -N.dot(center));
+
+  // 4 maniglie cardinali ai centri dei lati (rosse U / verdi V)
+  const handles = [];
+  const RED = 0xDC2626;
+  const GREEN = 0x0D9E6E;
+  const YELLOW = 0xF59E0B;
+
+  const cardinalSpecs = [
+    { axis: 'U', sign: +1, color: RED,   arrows: [U.clone(), U.clone().negate()] },
+    { axis: 'U', sign: -1, color: RED,   arrows: [U.clone(), U.clone().negate()] },
+    { axis: 'V', sign: +1, color: GREEN, arrows: [V.clone(), V.clone().negate()] },
+    { axis: 'V', sign: -1, color: GREEN, arrows: [V.clone(), V.clone().negate()] }
+  ];
+  for (const spec of cardinalSpecs) {
+    const dir = (spec.axis === 'U' ? U : V).clone().multiplyScalar(spec.sign);
+    const half = (spec.axis === 'U' ? width : height) * 0.5;
+    const gizmo = buildHandleGizmo(spec.color, spec.arrows);
+    gizmo.position.copy(center).add(dir.clone().multiplyScalar(half));
+    scene.add(gizmo);
+    handles.push({ mesh: gizmo, axis: spec.axis, sign: spec.sign });
+  }
+
+  // Maniglia centrale gialla con frecce + 3 anelli rotazione
+  const centerHandle = buildHandleGizmo(YELLOW, [
+    U.clone(), U.clone().negate(),
+    V.clone(), V.clone().negate(),
+    N.clone(), N.clone().negate()
+  ]);
+  addRotationRings(centerHandle, U, V, N);
+  centerHandle.position.copy(center);
+  scene.add(centerHandle);
+  handles.push({ mesh: centerHandle, axis: 'C', sign: 0 });
+
+  state.section = {
+    id: state.nextId++,
+    visible: true,
+    kind: 'section',
+    center: center.clone(),
+    normal: N.clone(), U: U.clone(), V: V.clone(),
+    width, height,
+    rect, plane, handles,
+    measures2D: [],            // misure dentro la sezione 2D
+    sectionLines: []           // mesh delle linee di intersezione (calcolate ogni frame)
+  };
+
+  // Mostra PIP e applica clipping
+  applySectionClipping(true);
+  showSectionPip(true);
+  updateSectionVisuals();
+  rebuildSectionLines();
+
+  setStatus('Sezione attiva. Trascina i control point per orientarla.');
+  renderLayerList();
+}
+
+function removeSection() {
+  if (!state.section) return;
+  const s = state.section;
+  scene.remove(s.rect);
+  s.rect.geometry.dispose(); s.rect.material.dispose();
+  s.handles.forEach(h => {
+    scene.remove(h.mesh);
+    h.mesh.traverse(o => {
+      if (o.isMesh) {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      }
+    });
+  });
+  // Rimuovo le linee di intersezione dalla scena PIP
+  s.sectionLines.forEach(l => {
+    sectionScene.remove(l);
+    l.geometry.dispose(); l.material.dispose();
+  });
+  // Rimuovo le misure 2D
+  s.measures2D.forEach(m => {
+    sectionScene.remove(m.line);
+    m.line.geometry.dispose(); m.line.material.dispose();
+    if (m.labelEl) m.labelEl.remove();
+  });
+  state.section = null;
+  applySectionClipping(false);
+  showSectionPip(false);
+  setSectionRulerActive(false);
+  renderLayerList();
+}
+
+// Stencil cap: per ogni layer creo due mesh "ombra" (front e back) che scrivono nello
+// stencil buffer dove la mesh originale viene clippata, poi un grande quadrato sul piano
+// di taglio renderizza solo dove lo stencil è marcato, simulando un solido pieno.
+let _capGroup = null;       // THREE.Group con back+front+cap mesh
+let _capStencilMeshes = []; // mesh extra per stencil writing (back e front per ogni layer)
+
+function buildCapForSection() {
+  // Pulisco eventuali cap precedenti
+  removeCap();
+  if (!state.section) return;
+  const s = state.section;
+
+  _capGroup = new THREE.Group();
+  scene.add(_capGroup);
+
+  // Per ogni layer mesh visibile creo due mesh "ombra" che scrivono lo stencil
+  state.layers.forEach((l) => {
+    if (!l.visible || !l.object || !l.object.isMesh) return;
+
+    // Material BACK: render solo le facce posteriori (rispetto alla camera),
+    // scrive nello stencil incrementando.
+    const matBack = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      side: THREE.BackSide,
+      depthWrite: false, depthTest: true,
+      colorWrite: false,
+      stencilWrite: true,
+      stencilFunc: THREE.AlwaysStencilFunc,
+      stencilFail: THREE.KeepStencilOp,
+      stencilZFail: THREE.KeepStencilOp,
+      stencilZPass: THREE.IncrementWrapStencilOp,
+      clippingPlanes: [s.plane]
+    });
+    const meshBack = new THREE.Mesh(l.object.geometry, matBack);
+    meshBack.matrixAutoUpdate = false;
+    meshBack.matrix.copy(l.object.matrixWorld);
+    meshBack.renderOrder = 1;
+    _capGroup.add(meshBack);
+    _capStencilMeshes.push({ mesh: meshBack, layer: l });
+
+    // Material FRONT: render solo facce anteriori, decrementa.
+    const matFront = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      side: THREE.FrontSide,
+      depthWrite: false, depthTest: true,
+      colorWrite: false,
+      stencilWrite: true,
+      stencilFunc: THREE.AlwaysStencilFunc,
+      stencilFail: THREE.KeepStencilOp,
+      stencilZFail: THREE.KeepStencilOp,
+      stencilZPass: THREE.DecrementWrapStencilOp,
+      clippingPlanes: [s.plane]
+    });
+    const meshFront = new THREE.Mesh(l.object.geometry, matFront);
+    meshFront.matrixAutoUpdate = false;
+    meshFront.matrix.copy(l.object.matrixWorld);
+    meshFront.renderOrder = 1;
+    _capGroup.add(meshFront);
+    _capStencilMeshes.push({ mesh: meshFront, layer: l });
+  });
+
+  // Cap plane: un grande quadrato sul piano di taglio, abbastanza grande da
+  // coprire tutta la scena. Renderizza solo dove lo stencil è !=0 (cioè dentro
+  // la mesh tagliata). Colore = colore del primo layer (semplificazione: tutti
+  // i layer condividono il cap; per layer multipli con colori diversi servirebbero
+  // cap separati con stencil-id distinti).
+  const firstLayer = state.layers.find(l => l.visible && l.object && l.object.isMesh);
+  if (!firstLayer) return;
+
+  // Dimensiona il cap per coprire l'intera bbox della scena con margine
+  const box = new THREE.Box3();
+  state.layers.forEach(l => {
+    if (l.visible && l.object) box.expandByObject(l.object);
+  });
+  const size = box.getSize(new THREE.Vector3()).length();
+  const capSize = Math.max(size * 2, 50);
+
+  const capGeo = new THREE.PlaneGeometry(capSize, capSize);
+  const capMat = new THREE.MeshPhongMaterial({
+    color: colorHexToInt(firstLayer.color || '#b8a090'),
+    specular: 0x111111,
+    shininess: 30,
+    side: THREE.DoubleSide,
+    stencilWrite: true,
+    stencilRef: 0,
+    stencilFunc: THREE.NotEqualStencilFunc,
+    stencilFail: THREE.ReplaceStencilOp,
+    stencilZFail: THREE.ReplaceStencilOp,
+    stencilZPass: THREE.ReplaceStencilOp
+  });
+  const capMesh = new THREE.Mesh(capGeo, capMat);
+  capMesh.renderOrder = 2;
+  _capGroup.add(capMesh);
+
+  // Posiziona il cap sul piano di taglio: il PlaneGeometry ha normale +Z di default,
+  // serve orientarlo lungo s.normal e posizionarlo in s.center.
+  const z = new THREE.Vector3(0, 0, 1);
+  const q = new THREE.Quaternion().setFromUnitVectors(z, s.normal);
+  capMesh.quaternion.copy(q);
+  capMesh.position.copy(s.center);
+  // Sposta leggermente il cap nella direzione opposta alla normale per evitare z-fighting
+  capMesh.position.addScaledVector(s.normal, -0.001);
+
+  _capGroup.userData.capMesh = capMesh;
+}
+
+function removeCap() {
+  if (_capGroup) {
+    scene.remove(_capGroup);
+    _capGroup.traverse(o => {
+      if (o.isMesh) {
+        // Geometry condivise con i layer: NON le dispose
+        if (o.material) {
+          if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+          else o.material.dispose();
+        }
+        // Solo il cap plane ha geometria propria
+        if (o === (_capGroup && _capGroup.userData.capMesh) && o.geometry) {
+          o.geometry.dispose();
+        }
+      }
+    });
+    _capGroup = null;
+  }
+  _capStencilMeshes = [];
+}
+
+function updateCapPosition() {
+  if (!_capGroup || !state.section) return;
+  const s = state.section;
+  const capMesh = _capGroup.userData.capMesh;
+  if (!capMesh) return;
+  const z = new THREE.Vector3(0, 0, 1);
+  const q = new THREE.Quaternion().setFromUnitVectors(z, s.normal);
+  capMesh.quaternion.copy(q);
+  capMesh.position.copy(s.center);
+  capMesh.position.addScaledVector(s.normal, -0.001);
+  // Sincronizza anche le matrici delle mesh stencil con quelle dei layer
+  // (in caso i layer siano stati ruotati/spostati - nel nostro caso non succede ma per sicurezza)
+  _capStencilMeshes.forEach(entry => {
+    entry.mesh.matrix.copy(entry.layer.object.matrixWorld);
+  });
+}
+
+function applySectionClipping(on) {
+  if (on && state.section) {
+    sectionRenderer.localClippingEnabled = false; // PIP non vuole clipping interno
+    state.layers.forEach(l => {
+      if (l.material) {
+        l.material.clippingPlanes = [state.section.plane];
+        l.material.clipShadows = false;
+        // DoubleSide: aiuta a vedere correttamente quando la sezione mostra l'interno
+        l.material.side = THREE.DoubleSide;
+        l.material.needsUpdate = true;
+      }
+    });
+    renderer.localClippingEnabled = true;
+    // Costruisco le mesh stencil + cap plane
+    buildCapForSection();
+  } else {
+    state.layers.forEach(l => {
+      if (l.material) {
+        l.material.clippingPlanes = [];
+        l.material.needsUpdate = true;
+      }
+    });
+    renderer.localClippingEnabled = false;
+    removeCap();
+  }
+}
+
+function updateSectionVisuals() {
+  if (!state.section) return;
+  const s = state.section;
+  // Rigenera rettangolo handle
+  scene.remove(s.rect);
+  s.rect.geometry.dispose(); s.rect.material.dispose();
+  s.rect = buildSectionRectMesh(s.center, s.U, s.V, s.width, s.height, 0x0065B3);
+  scene.add(s.rect);
+
+  // Aggiorna posizione maniglie cardinali e centrale
+  s.handles.forEach(h => {
+    if (h.axis === 'C') {
+      h.mesh.position.copy(s.center);
+    } else {
+      const axisVec = (h.axis === 'U' ? s.U : s.V).clone().multiplyScalar(h.sign);
+      const half = (h.axis === 'U' ? s.width : s.height) * 0.5;
+      h.mesh.position.copy(s.center).add(axisVec.clone().multiplyScalar(half));
+    }
+  });
+
+  // Aggiorna piano di clipping
+  s.plane.normal.copy(s.normal);
+  s.plane.constant = -s.normal.dot(s.center);
+
+  // Aggiorna posizione del cap plane
+  updateCapPosition();
+
+  // Ricostruisce linee di intersezione (sezione 2D)
+  rebuildSectionLines();
+}
+
+// ----------- Rendering 2D: intersezione mesh-piano -----------
+
+function rebuildSectionLines() {
+  if (!state.section) return;
+  const s = state.section;
+
+  // Rimuovo le precedenti
+  s.sectionLines.forEach(l => {
+    sectionScene.remove(l);
+    l.geometry.dispose(); l.material.dispose();
+  });
+  s.sectionLines = [];
+
+  // Per ogni layer mesh visibile, calcolo segmenti di intersezione
+  state.layers.forEach(l => {
+    if (!l.visible || !l.object || !l.object.isMesh) return;
+    const segments3D = computeMeshPlaneIntersection(l.object.geometry, s.plane);
+    if (segments3D.length === 0) return;
+
+    // Le linee in PIP sono nelle coordinate 2D del piano (U, V).
+    // Proietto i segmenti 3D sul piano della sezione: per ogni punto P,
+    //   u = (P - center) . U, v = (P - center) . V
+    const pts2D = [];
+    for (let i = 0; i < segments3D.length; i += 2) {
+      const a = segments3D[i], b = segments3D[i+1];
+      const da = a.clone().sub(s.center);
+      const db = b.clone().sub(s.center);
+      pts2D.push(new THREE.Vector3(da.dot(s.U), da.dot(s.V), 0));
+      pts2D.push(new THREE.Vector3(db.dot(s.U), db.dot(s.V), 0));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts2D);
+    const mat = new THREE.LineBasicMaterial({ color: l.color || '#b8a090', linewidth: 1.5 });
+    const lineSeg = new THREE.LineSegments(geo, mat);
+    sectionScene.add(lineSeg);
+    s.sectionLines.push(lineSeg);
+  });
+
+  // Aggiorna camera ortografica per inquadrare tutto il rettangolo + 5% padding
+  fitSectionCamera();
+}
+
+function fitSectionCamera(reset) {
+  if (!state.section) return;
+  const s = state.section;
+  // Zoom (1 = fit, >1 = zoom in) e pan (offset in coordinate UV) salvati sulla sezione
+  if (reset || s.zoom === undefined) {
+    s.zoom = 1;
+    s.panU = 0;
+    s.panV = 0;
+  }
+  const pad = Math.max(s.width, s.height) * 0.06;
+  const halfW = s.width * 0.5 + pad;
+  const halfH = s.height * 0.5 + pad;
+  const cw = sectionCanvas.clientWidth || 1;
+  const ch = sectionCanvas.clientHeight || 1;
+  const aspect = cw / ch;
+  // Limiti base: copertura del rettangolo, rispettando aspect ratio del canvas
+  let baseHalfW, baseHalfH;
+  const rectAspect = halfW / halfH;
+  if (aspect > rectAspect) {
+    baseHalfH = halfH;
+    baseHalfW = halfH * aspect;
+  } else {
+    baseHalfW = halfW;
+    baseHalfH = halfW / aspect;
+  }
+  // Applica zoom (più zoom = limiti più stretti) e pan (offset)
+  const z = s.zoom;
+  const halfWz = baseHalfW / z;
+  const halfHz = baseHalfH / z;
+  sectionCamera.left   = -halfWz + s.panU;
+  sectionCamera.right  =  halfWz + s.panU;
+  sectionCamera.top    =  halfHz + s.panV;
+  sectionCamera.bottom = -halfHz + s.panV;
+  sectionCamera.updateProjectionMatrix();
+  sectionCamera.position.set(0, 0, 10);
+  sectionCamera.lookAt(0, 0, 0);
+}
+
+// Calcola segmenti di intersezione tra una mesh (BufferGeometry) e un piano.
+// Restituisce coppie di Vector3 (a0,b0, a1,b1, ...) ognuna rappresenta un segmento.
+function computeMeshPlaneIntersection(geometry, plane) {
+  const segments = [];
+  const positions = geometry.attributes.position;
+  if (!positions) return segments;
+  const indexAttr = geometry.index;
+  const triCount = indexAttr ? indexAttr.count / 3 : positions.count / 3;
+
+  const vA = new THREE.Vector3();
+  const vB = new THREE.Vector3();
+  const vC = new THREE.Vector3();
+  const tmp = new THREE.Vector3();
+
+  for (let i = 0; i < triCount; i++) {
+    let ia, ib, ic;
+    if (indexAttr) {
+      ia = indexAttr.getX(i*3);
+      ib = indexAttr.getX(i*3+1);
+      ic = indexAttr.getX(i*3+2);
+    } else {
+      ia = i*3; ib = i*3+1; ic = i*3+2;
+    }
+    vA.fromBufferAttribute(positions, ia);
+    vB.fromBufferAttribute(positions, ib);
+    vC.fromBufferAttribute(positions, ic);
+
+    const dA = plane.distanceToPoint(vA);
+    const dB = plane.distanceToPoint(vB);
+    const dC = plane.distanceToPoint(vC);
+
+    // Tutti dallo stesso lato: skip
+    if ((dA >= 0 && dB >= 0 && dC >= 0) || (dA <= 0 && dB <= 0 && dC <= 0)) continue;
+
+    // Trovo i due edges che attraversano il piano
+    const pts = [];
+    addEdgeIntersection(vA, vB, dA, dB, pts);
+    addEdgeIntersection(vB, vC, dB, dC, pts);
+    addEdgeIntersection(vC, vA, dC, dA, pts);
+    if (pts.length >= 2) {
+      segments.push(pts[0], pts[1]);
+    }
+  }
+  return segments;
+}
+
+function addEdgeIntersection(p1, p2, d1, d2, out) {
+  // Se i due punti sono dai lati opposti del piano, calcolo il punto di intersezione
+  if ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) {
+    const t = d1 / (d1 - d2);
+    const x = p1.x + (p2.x - p1.x) * t;
+    const y = p1.y + (p2.y - p1.y) * t;
+    const z = p1.z + (p2.z - p1.z) * t;
+    out.push(new THREE.Vector3(x, y, z));
+  } else if (d1 === 0) {
+    out.push(p1.clone());
+  } else if (d2 === 0) {
+    out.push(p2.clone());
+  }
+}
+
+// ----------- PIP: visibilità e bottoni -----------
+
+function showSectionPip(on) {
+  document.getElementById('sectionPip').style.display = on ? '' : 'none';
+  if (on) {
+    // Resize canvas dopo che è visibile
+    setTimeout(() => { fitSectionCamera(); resizeSectionRenderer(); }, 0);
+  }
+}
+
+function resizeSectionRenderer() {
+  const cw = sectionCanvas.clientWidth;
+  const ch = sectionCanvas.clientHeight;
+  if (cw > 0 && ch > 0) {
+    sectionRenderer.setSize(cw, ch, false);
+    fitSectionCamera();
+  }
+}
+
+function toggleSectionPipMaxi() {
+  state.sectionPipMaxi = !state.sectionPipMaxi;
+  document.getElementById('sectionPip').classList.toggle('maxi', state.sectionPipMaxi);
+  setTimeout(resizeSectionRenderer, 280);
+}
+
+function swapSectionPip() {
+  // Vero swap: scambia il canvas 3D e il canvas 2D nei loro container DOM.
+  // I due renderer continuano a scrivere sui rispettivi canvas (che hanno cambiato posizione).
+  if (!state.section) return;
+  const viewport = document.getElementById('viewport');
+  const pip = document.getElementById('sectionPip');
+  const canvas3D = document.getElementById('canvas');
+  const canvas2D = document.getElementById('sectionCanvas');
+
+  // Se la PIP è in maxi, esco prima dal maxi (non ha senso swap+maxi)
+  if (state.sectionPipMaxi) {
+    state.sectionPipMaxi = false;
+    pip.classList.remove('maxi');
+  }
+
+  state.sectionSwapped = !state.sectionSwapped;
+  pip.classList.toggle('swapped', state.sectionSwapped);
+  viewport.classList.toggle('section-swapped', state.sectionSwapped);
+
+  if (state.sectionSwapped) {
+    // 3D va nella PIP (subito dopo l'header), 2D va nel viewport (come primo figlio)
+    pip.insertBefore(canvas3D, pip.querySelector('.section-pip-hint'));
+    viewport.insertBefore(canvas2D, viewport.firstChild);
+    // Sposto i tools della cut view nel viewport (overlay flottante in alto a destra)
+    const tools = document.getElementById('secTools');
+    tools.classList.add('section-tools-floating');
+    viewport.appendChild(tools);
+  } else {
+    // Ripristino
+    viewport.insertBefore(canvas3D, viewport.firstChild);
+    pip.insertBefore(canvas2D, pip.querySelector('.section-pip-hint'));
+    // Riporto i tools nell'header della PIP
+    const tools = document.getElementById('secTools');
+    tools.classList.remove('section-tools-floating');
+    pip.querySelector('.section-pip-actions').insertBefore(tools, pip.querySelector('.section-pip-actions').firstChild);
+  }
+
+  // Resize forzato di entrambi i renderer dopo lo spostamento DOM (CSS settle)
+  setTimeout(() => {
+    resizeMainRenderer();
+    resizeSectionRenderer();
+  }, 50);
+}
+
+function resizeMainRenderer() {
+  // Resize del renderer 3D in base alla dimensione attuale del canvas3D
+  const c = document.getElementById('canvas');
+  const cw = c.clientWidth, ch = c.clientHeight;
+  if (cw > 0 && ch > 0) {
+    renderer.setSize(cw, ch, false);
+    camera.aspect = cw / ch;
+    camera.updateProjectionMatrix();
+  }
+}
+
+// ----------- Misure 2D nella sezione -----------
+
+function setSectionRulerActive(on) {
+  state.sectionRulerActive = on;
+  state.sectionRulerFirstPoint = null;
+  document.getElementById('secRulerBtn').classList.toggle('active', on);
+  sectionCanvas.classList.toggle('ruler-active', on);
+  const hint = document.getElementById('secHint');
+  if (on) {
+    hint.textContent = 'CLIC SUL PRIMO PUNTO';
+    hint.style.display = '';
+  } else {
+    hint.style.display = 'none';
+    clearPendingSectionMeasure();
+  }
+}
+
+let pendingSecMeasure = null;
+let pendingSecMeasureLabel = null;
+
+function clearPendingSectionMeasure() {
+  if (pendingSecMeasure) {
+    sectionScene.remove(pendingSecMeasure);
+    pendingSecMeasure.geometry.dispose();
+    pendingSecMeasure.material.dispose();
+    pendingSecMeasure = null;
+  }
+  if (pendingSecMeasureLabel) {
+    pendingSecMeasureLabel.remove();
+    pendingSecMeasureLabel = null;
+  }
+}
+
+function sectionCanvasToWorld2D(e) {
+  // Da pixel a coordinate UV nel piano sezione, gestendo la camera ortografica
+  const rect = sectionCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const cw = rect.width, ch = rect.height;
+  const u = sectionCamera.left + (x / cw) * (sectionCamera.right - sectionCamera.left);
+  const v = sectionCamera.top - (y / ch) * (sectionCamera.top - sectionCamera.bottom);
+  return new THREE.Vector3(u, v, 0);
+}
+
+function sectionCanvasMouseMove(e) {
+  if (!state.sectionRulerActive) return;
+  if (!state.sectionRulerFirstPoint) return;
+  const p = sectionCanvasToWorld2D(e);
+  // Preview
+  if (pendingSecMeasure) {
+    sectionScene.remove(pendingSecMeasure);
+    pendingSecMeasure.geometry.dispose();
+    pendingSecMeasure.material.dispose();
+  }
+  const a = state.sectionRulerFirstPoint;
+  const geo = new THREE.BufferGeometry().setFromPoints([a, p]);
+  const mat = new THREE.LineDashedMaterial({ color: 0x0065B3, dashSize: 0.4, gapSize: 0.3 });
+  pendingSecMeasure = new THREE.Line(geo, mat);
+  pendingSecMeasure.computeLineDistances();
+  sectionScene.add(pendingSecMeasure);
+
+  const dist = a.distanceTo(p);
+  if (!pendingSecMeasureLabel) {
+    pendingSecMeasureLabel = document.createElement('div');
+    pendingSecMeasureLabel.className = 'measure-label';
+    pendingSecMeasureLabel.style.background = '#0065B3';
+    document.getElementById('sectionPip').appendChild(pendingSecMeasureLabel);
+  }
+  pendingSecMeasureLabel.textContent = formatDistance(dist);
+  // posizione label: coordinate canvas (in pixel)
+  const rect = sectionCanvas.getBoundingClientRect();
+  const pipRect = document.getElementById('sectionPip').getBoundingClientRect();
+  const headerH = rect.top - pipRect.top;
+  pendingSecMeasureLabel.style.left = (e.clientX - pipRect.left) + 'px';
+  pendingSecMeasureLabel.style.top  = (e.clientY - pipRect.top) + 'px';
+}
+
+function sectionCanvasClick(e) {
+  if (!state.sectionRulerActive) return;
+  if (e.button !== 0) return;
+  const p = sectionCanvasToWorld2D(e);
+  if (!state.sectionRulerFirstPoint) {
+    state.sectionRulerFirstPoint = p.clone();
+    document.getElementById('secHint').textContent = 'CLIC SUL SECONDO PUNTO  ·  ESC ANNULLA';
+    return;
+  }
+  // Secondo click: misura definitiva
+  const a = state.sectionRulerFirstPoint;
+  const b = p.clone();
+  const dist = a.distanceTo(b);
+  if (dist < 0.001) return;
+
+  // Crea linea 2D
+  if (pendingSecMeasure) {
+    sectionScene.remove(pendingSecMeasure);
+    pendingSecMeasure.geometry.dispose();
+    pendingSecMeasure.material.dispose();
+    pendingSecMeasure = null;
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
+  const mat = new THREE.LineBasicMaterial({ color: 0x0065B3, linewidth: 2 });
+  const line = new THREE.Line(geo, mat);
+  sectionScene.add(line);
+
+  // Sfere agli estremi
+  const sphereGeo = new THREE.CircleGeometry(0.06, 16);
+  const sphereMat = new THREE.MeshBasicMaterial({ color: 0x0065B3 });
+  const s1 = new THREE.Mesh(sphereGeo, sphereMat);
+  s1.position.copy(a);
+  sectionScene.add(s1);
+  const s2 = new THREE.Mesh(sphereGeo.clone(), sphereMat.clone());
+  s2.position.copy(b);
+  sectionScene.add(s2);
+
+  // Label DOM persistente
+  const labelEl = document.createElement('div');
+  labelEl.className = 'measure-label';
+  labelEl.style.background = '#0065B3';
+  labelEl.textContent = formatDistance(dist);
+  document.getElementById('sectionPip').appendChild(labelEl);
+
+  state.section.measures2D.push({
+    a: a.clone(), b: b.clone(),
+    line, sphere1: s1, sphere2: s2, labelEl, distance: dist
+  });
+
+  // Reset per altra misura
+  state.sectionRulerFirstPoint = null;
+  if (pendingSecMeasureLabel) { pendingSecMeasureLabel.remove(); pendingSecMeasureLabel = null; }
+  document.getElementById('secHint').textContent = 'CLIC SUL PRIMO PUNTO  ·  ESC ESCE';
+  setStatus('Misura sezione: ' + formatDistance(dist));
+}
+
+function updateSectionMeasureLabels() {
+  if (!state.section) return;
+  const pipRect = document.getElementById('sectionPip').getBoundingClientRect();
+  const rect = sectionCanvas.getBoundingClientRect();
+  state.section.measures2D.forEach(m => {
+    // Punto medio in UV → in pixel del canvas
+    const mid = m.a.clone().add(m.b).multiplyScalar(0.5);
+    const cw = rect.width, ch = rect.height;
+    const x = ((mid.x - sectionCamera.left) / (sectionCamera.right - sectionCamera.left)) * cw;
+    const y = ((sectionCamera.top - mid.y) / (sectionCamera.top - sectionCamera.bottom)) * ch;
+    m.labelEl.style.left = (x + (rect.left - pipRect.left)) + 'px';
+    m.labelEl.style.top  = (y + (rect.top  - pipRect.top))  + 'px';
+  });
+}
+
+// ----------- Bind eventi sezione -----------
+
+canvas.addEventListener('pointermove', sectionPlaceOnPointerMove);
+canvas.addEventListener('click', sectionPlaceOnClick);
+
+document.getElementById('btnSection').addEventListener('click', () => {
+  if (state.section) {
+    // Sezione attiva → rimuovi
+    removeSection();
+    setStatus('Sezione rimossa');
+  } else {
+    setSectionPlaceMode(!state.sectionPlaceMode);
+  }
+});
+
+document.getElementById('secCloseBtn').addEventListener('click', () => {
+  removeSection();
+});
+document.getElementById('secMaxBtn').addEventListener('click', toggleSectionPipMaxi);
+document.getElementById('secSwapBtn').addEventListener('click', swapSectionPip);
+document.getElementById('secRulerBtn').addEventListener('click', () => {
+  setSectionRulerActive(!state.sectionRulerActive);
+});
+document.getElementById('secFitBtn').addEventListener('click', () => {
+  if (state.section) fitSectionCamera(true);
+});
+
+// === Drag della PIP per riposizionarla (solo se non è in maxi) ===
+(function bindPipDrag(){
+  const pip = document.getElementById('sectionPip');
+  const header = pip.querySelector('.section-pip-header');
+  let dragging = false, sx = 0, sy = 0, startLeft = 0, startTop = 0;
+
+  header.addEventListener('mousedown', (e) => {
+    // Ignora se il click è su un bottone dell'header
+    if (e.target.closest('.section-pip-btn')) return;
+    if (pip.classList.contains('maxi')) return;
+    dragging = true;
+    const rect = pip.getBoundingClientRect();
+    const vpRect = document.getElementById('viewport').getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY;
+    startLeft = rect.left - vpRect.left;
+    startTop  = rect.top  - vpRect.top;
+    // Switcho ad ancoraggio top/left invece di bottom/right
+    pip.style.left = startLeft + 'px';
+    pip.style.top  = startTop  + 'px';
+    pip.style.right = 'auto';
+    pip.style.bottom = 'auto';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - sx;
+    const dy = e.clientY - sy;
+    const vpRect = document.getElementById('viewport').getBoundingClientRect();
+    const newLeft = Math.max(0, Math.min(vpRect.width  - pip.offsetWidth,  startLeft + dx));
+    const newTop  = Math.max(0, Math.min(vpRect.height - pip.offsetHeight, startTop  + dy));
+    pip.style.left = newLeft + 'px';
+    pip.style.top  = newTop  + 'px';
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+})();
+
+// === Resize della PIP dall'angolo in basso a sinistra ===
+(function bindPipResize(){
+  const pip = document.getElementById('sectionPip');
+  const handle = document.getElementById('secResize');
+  let resizing = false, sx = 0, sy = 0, startW = 0, startH = 0, startLeft = 0;
+
+  handle.addEventListener('mousedown', (e) => {
+    if (pip.classList.contains('maxi')) return;
+    resizing = true;
+    const rect = pip.getBoundingClientRect();
+    const vpRect = document.getElementById('viewport').getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY;
+    startW = rect.width; startH = rect.height;
+    startLeft = rect.left - vpRect.left;
+    // Forzo ancoraggio top/left così il resize sposta correttamente l'angolo
+    pip.style.left = startLeft + 'px';
+    pip.style.top  = (rect.top - vpRect.top) + 'px';
+    pip.style.right = 'auto'; pip.style.bottom = 'auto';
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!resizing) return;
+    const dx = e.clientX - sx;
+    const dy = e.clientY - sy;
+    // Resize: angolo basso-sinistra. Larghezza diminuisce con dx>0, altezza aumenta con dy>0.
+    const newW = Math.max(240, startW - dx);
+    const newH = Math.max(200, startH + dy);
+    pip.style.width  = newW + 'px';
+    pip.style.height = newH + 'px';
+    // Sposto il bordo sinistro per mantenere il bordo destro fisso
+    pip.style.left = (startLeft + dx) + 'px';
+    resizeSectionRenderer();
+  });
+  window.addEventListener('mouseup', () => { resizing = false; });
+})();
+
+sectionCanvas.addEventListener('mousemove', sectionCanvasMouseMove);
+sectionCanvas.addEventListener('click', sectionCanvasClick);
+
+// === Zoom con rotella ===
+sectionCanvas.addEventListener('wheel', (e) => {
+  if (!state.section) return;
+  e.preventDefault();
+  const s = state.section;
+  // Zoom focalizzato sotto al cursore: mantengo il punto UV sotto al puntatore
+  // alla stessa coordinata schermo prima e dopo lo zoom.
+  const before = sectionCanvasToWorld2D(e);
+  const factor = e.deltaY < 0 ? 1.15 : 1/1.15;
+  const newZoom = Math.max(0.2, Math.min(20, (s.zoom || 1) * factor));
+  s.zoom = newZoom;
+  // Aggiorno camera per applicare il nuovo zoom (usa s.panU/V invariati)
+  fitSectionCamera();
+  // Punto UV ora sotto al cursore con il nuovo zoom: lo correggo via pan
+  const after = sectionCanvasToWorld2D(e);
+  s.panU += before.x - after.x;
+  s.panV += before.y - after.y;
+  fitSectionCamera();
+}, { passive: false });
+
+// === Pan con tasto destro o tasto medio (drag) ===
+let _secPan = null;
+sectionCanvas.addEventListener('mousedown', (e) => {
+  if (!state.section) return;
+  if (e.button === 1 || e.button === 2) {
+    _secPan = { x: e.clientX, y: e.clientY, startU: state.section.panU, startV: state.section.panV };
+    sectionCanvas.style.cursor = 'grabbing';
+    e.preventDefault();
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  if (!_secPan || !state.section) return;
+  const s = state.section;
+  // Conversione pixel→unità UV: derivata dalla larghezza visibile della camera
+  const cw = sectionCanvas.clientWidth || 1;
+  const ch = sectionCanvas.clientHeight || 1;
+  const wView = sectionCamera.right - sectionCamera.left;
+  const hView = sectionCamera.top - sectionCamera.bottom;
+  const dxPx = e.clientX - _secPan.x;
+  const dyPx = e.clientY - _secPan.y;
+  s.panU = _secPan.startU - (dxPx / cw) * wView;
+  s.panV = _secPan.startV + (dyPx / ch) * hView;
+  fitSectionCamera();
+});
+window.addEventListener('mouseup', (e) => {
+  if (_secPan) {
+    _secPan = null;
+    sectionCanvas.style.cursor = state.sectionRulerActive ? 'crosshair' : 'default';
+  }
+});
+// Sopprimo il menu contestuale del tasto destro sopra al canvas sezione
+sectionCanvas.addEventListener('contextmenu', (e) => { if (state.section) e.preventDefault(); });
+
+// Resize della PIP quando la finestra cambia
+window.addEventListener('resize', () => {
+  if (state.section) resizeSectionRenderer();
+});
+
+// Render loop PIP: si aggancia al render principale
+const _origSecRender = renderer.render;
+(function hookSectionRender(){
+  const old = renderer.render.bind(renderer);
+  renderer.render = function(s, c) {
+    old(s, c);
+    if (state.section) {
+      sectionRenderer.render(sectionScene, sectionCamera);
+      updateSectionMeasureLabels();
+    }
+  };
+})();
+
+// Scorciatoia tastiera S = sezione
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 's' || e.key === 'S') {
+    if (state.rulerActive) setRulerActive(false);
+    if (state.circleActive) setCircleActive(false);
+    if (state.section) {
+      removeSection();
+    } else {
+      setSectionPlaceMode(!state.sectionPlaceMode);
+    }
+  }
+  // Esc nella section ruler
+  if (e.key === 'Escape') {
+    if (state.sectionRulerActive) {
+      if (state.sectionRulerFirstPoint) {
+        state.sectionRulerFirstPoint = null;
+        clearPendingSectionMeasure();
+        document.getElementById('secHint').textContent = 'CLIC SUL PRIMO PUNTO  ·  ESC ESCE';
+      } else {
+        setSectionRulerActive(false);
+      }
+      e.stopPropagation();
+    } else if (state.sectionPlaceMode) {
+      if (state.sectionFirstPoint) {
+        state.sectionFirstPoint = null;
+        clearPendingSection();
+        toggleSectionHint(true);
+      } else {
+        setSectionPlaceMode(false);
+      }
+      e.stopPropagation();
+    }
   }
 });
 
