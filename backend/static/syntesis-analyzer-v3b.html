@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.103</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.104</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.103</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.104</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13844,44 +13844,43 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // v7.3.9.103 - REGOLA FINALE: blocco rigido + orientation intrinseca al template.
+    // v7.3.9.104 - Fix accoppiamento del source SR.
     //
-    // BLOCCO RIGIDO: i 3 marker hanno una disposizione relativa fissa rispetto
-    // alla connessione clinica condivisa, indipendente da quale sia il source.
-    // Per ogni template k il piatto del suo disco si trova a:
-    //   piatto_k = connessione_clinica + zDisc_k * axis      (k cap-up)
-    //   piatto_k = connessione_clinica - zDisc_k * axis      (k cap-down riflesso)
+    // In v103 il source SR risultava posizionato sopra la scansione (fantasma)
+    // invece che annidato dentro: causa = ho applicato TPL_MIRROR['SR']=true
+    // anche al source, rovesciando la connessione clinica.
     //
-    // POSIZIONAMENTO DEL BLOCCO: il source ha sempre il piatto sul disco
-    // scansionato, quindi la connessione clinica scende a:
-    //   connessione_clinica = discWorld - sgnSrc * zDisc_source * axis
-    // dove sgnSrc = +1 se source e' cap-up (1T3, OS), -1 se source e' cap-down (SR).
+    // Regola corretta: il SOURCE e' SEMPRE cap-up (accoppiamento standard
+    // "barattolo dentro barattolo" come nello scenario singolo). La regola
+    // TPL_MIRROR si applica solo all'orientation dei SOSTITUTI rispetto alla
+    // connessione clinica del source.
     //
-    // ORIENTATION INTRINSECA AL TEMPLATE (non dipende dal ruolo source/sostituto):
-    //   1T3, OS  -> sempre cap-up    (mirror=false, +Z locale -> +axis mondo)
-    //   SR       -> sempre cap-down  (mirror=true,  +Z locale -> -axis mondo,
-    //                                  riflesso speculare attraverso connessione)
+    // BLOCCO RIGIDO: la disposizione relativa dei 3 marker e' sempre la stessa.
+    //   piatto_k = connClin + sgnK_block * zDisc_k * axis
+    // dove sgnK_block = +1 per 1T3/OS, -1 per SR (orientation intrinseca al template).
     //
-    // Esempio: source = SR
-    //   connessione_clinica = discWorld - (-1) * 5 * axis = discWorld + 5*axis
-    //   piatto SR  = connessione - 5*axis  = discWorld          (sul disco) ✓
-    //   piatto 1T3 = connessione + 10*axis = discWorld + 15*axis (15mm sopra)
-    //   piatto OS  = connessione + 6*axis  = discWorld + 11*axis (11mm sopra)
+    // POSIZIONAMENTO BLOCCO: il source ha sempre piatto su discWorld con cap-up.
+    //   connClin = discWorld - zDisc_source * axis  (sempre, niente sgnSrc)
     //
-    // p.position resta connectionWorld (calcolato con bbox del source) per
-    // compatibilita' con il refinement ICP che lavora nel sistema locale del source.
-    var TPL_MIRROR = {  // orientation intrinseca: SR e' l'unico template riflesso
+    // ORIENTATION DEL TEMPLATE RENDERIZZATO:
+    //   - se k == source: cap-up (mirror=false), accoppiamento standard
+    //   - se k != source: applica TPL_MIRROR[k] (1T3/OS cap-up, SR cap-down)
+    //
+    // Verifica:
+    //   source=SR, mirror_source=false -> connClin = discWorld - 5*axis (sotto disco)
+    //   piatto SR = connClin + 5*axis = discWorld (sul disco) cap-up CORRETTO
+    //   piatto 1T3 sostituto = connClin + 10*axis = discWorld + 5*axis (5mm sopra disco)
+    //   piatto OS sostituto = connClin + 6*axis = discWorld + 1*axis (1mm sopra disco)
+    var TPL_MIRROR = {  // orientation intrinseca del template come SOSTITUTO
       '1T3': false,
       'OS':  false,
       'SR':  true
     };
 
-    // Posizione della connessione clinica rispetto a discWorld (il source si
-    // ancora sempre col suo piatto al disco scansionato).
     var sostInfoSrc = SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {};
     var nominalSrc = (typeof sostInfoSrc.zDisc === 'number') ? sostInfoSrc.zDisc : zDiscSource;
-    var sgnSrc = TPL_MIRROR[sostSourceTemplate] ? -1 : 1;
-    var connClin = discWorld.clone().sub(axis.clone().multiplyScalar(sgnSrc * nominalSrc));
+    // connClin posizionata sotto il disco scansionato (source sempre cap-up).
+    var connClin = discWorld.clone().sub(axis.clone().multiplyScalar(nominalSrc));
 
     var groups = {};
     TPL_KEYS.forEach(function(k){
@@ -13889,14 +13888,17 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       geos[k].computeBoundingBox();
       var bboxK = geos[k].boundingBox.max.z;
       var nominalK = (typeof infoK.zDisc === 'number') ? infoK.zDisc : bboxK;
-      var mirrorK = !!TPL_MIRROR[k];
 
-      // Origine del template = posizione di Z=0 locale nel mondo. Il piatto
-      // (a +bboxK locale) deve coincidere con piattoTarget_k.
-      // Cap-up:   piatto_k = connClin + nominalK*axis,  origin = connClin + (nominalK - bboxK)*axis
-      // Cap-down: piatto_k = connClin - nominalK*axis,  in mirror la cap finisce a origin - bboxK*axis,
-      //           quindi origin = connClin - nominalK*axis + bboxK*axis = connClin - (nominalK - bboxK)*axis
+      // Source sempre cap-up. Sostituti seguono TPL_MIRROR.
+      var isSource = (k === sostSourceTemplate);
+      var mirrorK = isSource ? false : !!TPL_MIRROR[k];
       var sgnK = mirrorK ? -1 : 1;
+
+      // Origine in modo che il piatto (a +bboxK locale) finisca a:
+      //   piatto_k = connClin + sgnK * nominalK * axis
+      // In quaternion mirror cap-up il piatto e' a origin + bboxK*axis (k cap-up)
+      // o a origin - bboxK*axis (k cap-down). In entrambi i casi:
+      //   origin_k = connClin + sgnK * (nominalK - bboxK) * axis
       var originK = connClin.clone().add(
         axis.clone().multiplyScalar(sgnK * (nominalK - bboxK))
       );
