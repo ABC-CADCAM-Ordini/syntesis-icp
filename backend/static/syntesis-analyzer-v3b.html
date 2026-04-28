@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.105</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.106</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.105</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.106</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13899,7 +13899,10 @@ function sostPlaceTemplate(rawPoint, rawNormal){
 
       // Orientation: source sempre cap-up, sostituti seguono TPL_MIRROR_AS_SUBSTITUTE.
       var isSource = (k === sostSourceTemplate);
-      var mirrorK = isSource ? false : !!TPL_MIRROR_AS_SUBSTITUTE[k];
+      // v7.3.9.106 - SR sempre cap-down, anche quando e' source.
+      // Lo schema rigido vince sempre: 1T3/OS sempre cap-up, SR sempre
+      // cap-down, indipendente dal ruolo source/sostituto. Niente eccezione.
+      var mirrorK = !!TPL_MIRROR_AS_SUBSTITUTE[k];
 
       // Origin del template = Z=0 locale nel mondo. Il piatto e' a +bboxK locale.
       // Cap-up:   plate = origin + bboxK*axis  -> origin = plate - bboxK*axis
