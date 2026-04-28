@@ -749,6 +749,13 @@ body .panel {
       WorkFlow <span style="font-size:10px;margin-left:-1px">▾</span>
     </button>
     <div class="workflow-menu" id="workflowMenu">
+      <div class="workflow-menu-item" data-wf="vedere" onclick="selectWorkflow('vedere')">
+        <span class="wf-icon">
+          <svg width="12" height="12" viewBox="0 0 28 28" fill="none"><path d="M2 14 C5 8 9 5 14 5 C19 5 23 8 26 14 C23 20 19 23 14 23 C9 23 5 20 2 14 Z" stroke="#0065B3" stroke-width="1.6" fill="none"/><circle cx="14" cy="14" r="4" stroke="#0065B3" stroke-width="1.6" fill="none"/><circle cx="14" cy="14" r="1.5" fill="#0065B3"/></svg>
+        </span>
+        <span class="wf-label"><span class="wf-name">Vedere</span><span class="wf-desc">Visualizza, misura, annota</span></span>
+      </div>
+      <div class="workflow-menu-sep"></div>
       <div class="workflow-menu-item active" data-wf="analizza" onclick="selectWorkflow('analizza')">
         <span class="wf-icon">
           <svg width="12" height="12" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="9" stroke="#0065B3" stroke-width="1.6" fill="none"/><line x1="14" y1="5" x2="14" y2="14" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/><line x1="14" y1="14" x2="20" y2="14" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -3214,6 +3221,12 @@ function _hasUnsavedDataInWorkflow(wf){
 }
 
 function selectWorkflow(wf){
+  // Vedere e' un workflow separato, ospitato su /vedere. Redirect immediato.
+  if(wf === 'vedere'){
+    closeWorkflowMenu();
+    window.location.href = '/vedere';
+    return;
+  }
   if(!WORKFLOWS[wf]) return;
   closeWorkflowMenu();
   var prev = currentWorkflow;
