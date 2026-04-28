@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.105</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.107</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.105</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.107</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13844,76 +13844,194 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // v7.3.9.105 - REGOLA CORRETTA: blocco rigido con offset fissi.
+    // v7.3.9.107 - TRIADE CANONICA via ROOT (specifica Francesco 2026-04-28).
     //
-    // Il blocco dei 3 marker ha offset RELATIVI fissi tra i piatti, indipendenti
-    // dal source. Lo schema approvato (riassunto Francesco):
-    //   1T3 in alto (offset blocco = 0)
-    //   OS  a 4 mm sotto 1T3 (offset blocco = -4)
-    //   SR  a 15 mm sotto 1T3 (offset blocco = -15)
+    // Cambio di approccio fondamentale: i 3 marker (1T3, OS, SR) costituiscono
+    // una TRIADE CANONICA legata da un sistema ROOT condiviso. Le pose dei tre
+    // marker nel ROOT sono FISSE e documentate (T_root_*).
     //
-    // Il source determina la TRASLAZIONE del blocco: il piatto del source
-    // coincide sempre con discWorld, quindi tutto il blocco si trasla di
-    // -BLOCK_PLATE_OFFSET[source].
+    // L'ICP locale del marker source serve SOLO a trovare T_world_anchor (la
+    // posa del source nel mondo). Da li' si ricostruisce il ROOT:
+    //   T_world_root = T_world_anchor * inverse(T_root_anchor)
+    // E si richiama l'intera triade dal ROOT:
+    //   T_world_k = T_world_root * T_root_k   per k in {1T3, OS, SR}
     //
-    // I 9 valori (offset piatti da discWorld lungo axis, mm):
-    //                  1T3      OS       SR
-    //   source=1T3:     0       -4      -15
-    //   source=SR:    +15      +11        0
-    //   source=OS:    +4         0      -11
+    // I marker possono compenetrare la scansione e tra loro: questo non e'
+    // errore. L'errore sarebbe rompere lo schema canonico applicando offset
+    // empirici lungo axis derivati dalla compenetrazione visiva.
     //
-    // ORIENTATION INTRINSECA AL TEMPLATE:
-    //   1T3, OS  -> sempre cap-up    (mirror=false)
-    //   SR       -> sempre cap-down  (mirror=true, riflesso speculare attraverso
-    //                                  il piano di simmetria)
-    // ECCEZIONE: il SOURCE e' sempre cap-up (anche SR), perche' deve annidarsi
-    // dentro il marker scansionato fisico ("barattolo dentro barattolo").
+    // SISTEMA DI RIFERIMENTO ROOT:
+    //   origine     = piatto del 1T3
+    //   asse Z_ROOT = verso il piatto del 1T3 (= +axis del mondo dopo ICP)
+    //   piano XY    = piano del piatto del 1T3
     //
-    // Per ogni template k il piatto deve finire alla posizione del blocco.
-    // origin_k = posizione_piatto_k - sgnK_local * bbox_k
-    // dove sgnK_local indica se il template e' renderizzato cap-up (+1) o cap-down (-1).
-    var BLOCK_PLATE_OFFSET = {  // offset relativo del piatto di k nel blocco rigido (mm)
-      '1T3':   0.0,
-      'OS':   -4.0,
-      'SR':  -15.0
-    };
-    var TPL_MIRROR_AS_SUBSTITUTE = {  // orientation intrinseca quando NON e' source
+    // POSE CANONICHE (T_root_k = trasformazione 4x4 dal frame locale del CAD k
+    // al frame ROOT):
+    //
+    // 1T3 (cap-up, piatto a Z_ROOT=0):
+    //   il CAD ha frame locale con origine alla connessione clinica (Z=0) e
+    //   piatto a Z_local=8.5 (bbox max). Per portare il piatto in Z_ROOT=0
+    //   basta traslare di -8.5 lungo Z. Niente rotazione (cap-up gia' allineato).
+    //   T_root_1T3 = traslazione(0, 0, -8.5)
+    //
+    // OS (cap-up co-orientato, piatto a Z_ROOT=-4):
+    //   CAD: piatto a Z_local=6.0 (bbox max). Per portare il piatto a
+    //   Z_ROOT=-4 traslo di -10. Niente rotazione.
+    //   T_root_OS = traslazione(0, 0, -10)
+    //
+    // SR (cap-down riflesso, piatto a Z_ROOT=-15):
+    //   CAD post-flip-v7.3.6.004: piatto a Z_local=5.0 (bbox max), cap-up
+    //   come gli altri. Per renderlo cap-down nel ROOT: rotation 180 X
+    //   (ribalta Z), poi traslazione che porta il piatto (post-rotation a
+    //   Z_local'=-5) in Z_ROOT=-15, cioe' traslazione di -10.
+    //   T_root_SR = traslazione(0,0,-10) * rotation_X(180)
+    //
+    // Distanze piatto-piatto risultanti nel ROOT:
+    //   1T3 (Z=0)  <-> OS  (Z=-4)  = 4 mm  (sopra il piano di compressione)
+    //   1T3 (Z=0)  <-> SR  (Z=-15) = 15 mm (sotto il piano, riflesso)
+    //   OS  (Z=-4) <-> SR  (Z=-15) = 11 mm
+
+    function _makeTRoot(translateZ, mirror){
+      // Costruisce T_root_k = (translation lungo Z) [* rotation_X(180) se mirror].
+      // Le matrici si compongono come M = translation * rotation, applicate ai
+      // vertici come v' = M * v (Three.js usa colonne, premultiplicazione standard).
+      var M = new THREE.Matrix4();
+      M.makeTranslation(0, 0, translateZ);
+      if(mirror){
+        var R = new THREE.Matrix4().makeRotationX(Math.PI);
+        M.multiply(R);
+      }
+      return M;
+    }
+
+    var TPL_MIRROR_CANONICAL = {  // intrinseca al template nel ROOT
       '1T3': false,
       'OS':  false,
-      'SR':  true
+      'SR':  true     // l'unico riflesso (cap-down nel ROOT)
     };
+    var T_ROOT = {};
+    var BBOX_LOCAL = {};
+    TPL_KEYS.forEach(function(k){
+      geos[k].computeBoundingBox();
+      var bboxMaxZ = geos[k].boundingBox.max.z;
+      BBOX_LOCAL[k] = bboxMaxZ;
+      // T_root_k traslazione lungo Z = -bboxMaxZ - PLATE_OFFSET_IN_ROOT[k]
+      // dove PLATE_OFFSET_IN_ROOT = {1T3:0, OS:-4, SR:-15}.
+      // Per cap-up: piatto a Z_local=bboxMaxZ -> Z_ROOT=-translateZ-bboxMaxZ. NO,
+      // semplifico: voglio piatto a Z_ROOT=plateOffset.
+      //   senza mirror: piatto e' a Z_local=bboxMaxZ. Dopo translation_Z(t):
+      //     piatto a Z_ROOT = bboxMaxZ + t, devo eguagliare a plateOffset
+      //     -> t = plateOffset - bboxMaxZ
+      //   con mirror (rotation_X 180): piatto a Z_local=bboxMaxZ post-rotation
+      //     diventa Z_local'=-bboxMaxZ. Translation porta a Z_ROOT=-bboxMaxZ+t.
+      //     Eguaglio a plateOffset -> t = plateOffset + bboxMaxZ
+      var PLATE_OFFSET_IN_ROOT = {'1T3': 0, 'OS': -4, 'SR': -15};
+      var plateOffset = PLATE_OFFSET_IN_ROOT[k];
+      var mirror = TPL_MIRROR_CANONICAL[k];
+      var translateZ = mirror ? (plateOffset + bboxMaxZ) : (plateOffset - bboxMaxZ);
+      T_ROOT[k] = _makeTRoot(translateZ, mirror);
+    });
 
-    var srcOffset = BLOCK_PLATE_OFFSET[sostSourceTemplate] || 0;
+    // Costruisco T_world_anchor: frame del source marker nel mondo.
+    // Origine = discWorld (piatto del source). Z = +axis. X, Y ortogonali (auto).
+    var T_world_anchor = new THREE.Matrix4();
+    {
+      // Quaternion che porta +Z mondo iniziale verso +axis
+      var up = new THREE.Vector3(0, 0, 1);
+      var q = new THREE.Quaternion().setFromUnitVectors(up, axis.clone().normalize());
+      T_world_anchor.compose(discWorld, q, new THREE.Vector3(1,1,1));
+    }
 
+    // T_world_root = T_world_anchor * inverse(T_root_anchor)
+    // T_root_anchor mappa CAD locale dell'anchor nel ROOT. La sua INVERSA
+    // mappa ROOT nel locale dell'anchor. Componendo a sinistra con
+    // T_world_anchor (locale -> mondo) ottengo ROOT -> mondo.
+    // ATTENZIONE: il source e' visualizzato col suo PIATTO su discWorld.
+    // T_world_anchor ha origine = discWorld = piatto del source. Quindi
+    // T_world_anchor mappa l'origine LOCALE dell'anchor in discWorld.
+    // Ma il piatto del CAD anchor non e' all'origine locale (e' a Z=bboxMaxZ).
+    // Quindi T_world_anchor cosi' costruita e' il frame con origine al PIATTO
+    // del source. T_root_anchor e' costruita per portare il CAD locale (origine
+    // a connessione clinica) nel ROOT. Per essere coerenti, devo costruire
+    // T_world_anchor come il frame con origine alla CONNESSIONE CLINICA del
+    // source nel mondo (discWorld - bbox_anchor*axis), oppure ridefinire
+    // T_root in modo che le origini siano omologhe.
+    // Scelta: T_world_anchor con origine = discWorld - bbox_anchor*axis
+    // (cioe' la connessione clinica del CAD source proiettata nel mondo).
+    var bboxAnchor = BBOX_LOCAL[sostSourceTemplate];
+    var connWorld_anchor = discWorld.clone().sub(axis.clone().multiplyScalar(bboxAnchor));
+    var T_world_anchor_corrected = new THREE.Matrix4();
+    {
+      var up = new THREE.Vector3(0, 0, 1);
+      var q = new THREE.Quaternion().setFromUnitVectors(up, axis.clone().normalize());
+      T_world_anchor_corrected.compose(connWorld_anchor, q, new THREE.Vector3(1,1,1));
+    }
+
+    // T_world_root = T_world_anchor_corrected * inverse(T_root_anchor)
+    var T_root_anchor_inv = new THREE.Matrix4().copy(T_ROOT[sostSourceTemplate]).invert();
+    var T_world_root = new THREE.Matrix4()
+      .multiplyMatrices(T_world_anchor_corrected, T_root_anchor_inv);
+
+    // Per ogni marker k: T_world_k = T_world_root * T_root_k
+    // Decompongo in posizione + quaternion + scale per applicarla alla mesh.
     var groups = {};
     TPL_KEYS.forEach(function(k){
-      var infoK = SOSTITUIRE_TEMPLATE_INFO[k] || {};
-      geos[k].computeBoundingBox();
-      var bboxK = geos[k].boundingBox.max.z;
+      var T_world_k = new THREE.Matrix4().multiplyMatrices(T_world_root, T_ROOT[k]);
 
-      // Posizione del piatto di k nel mondo (offset da discWorld lungo axis):
-      //   plate_k_offset = BLOCK_PLATE_OFFSET[k] - srcOffset
-      // (porta il source a 0 e tutti gli altri di conseguenza).
-      var plateOffset = (BLOCK_PLATE_OFFSET[k] || 0) - srcOffset;
-      var plateWorld = discWorld.clone().add(axis.clone().multiplyScalar(plateOffset));
+      // sostBuildTemplateGroup vuole (key, geo, position, axis, mirror).
+      // Decompongo T_world_k.
+      var pos = new THREE.Vector3();
+      var quat = new THREE.Quaternion();
+      var scl = new THREE.Vector3();
+      T_world_k.decompose(pos, quat, scl);
 
-      // Orientation: source sempre cap-up, sostituti seguono TPL_MIRROR_AS_SUBSTITUTE.
-      var isSource = (k === sostSourceTemplate);
-      var mirrorK = isSource ? false : !!TPL_MIRROR_AS_SUBSTITUTE[k];
+      var info = SOSTITUIRE_TEMPLATE_INFO[k] || {label:'Custom', color: 0x888888};
+      var color = info.color;
+      var mat = new THREE.MeshPhongMaterial({
+        color: color, specular: 0x222222, shininess: 40,
+        side: THREE.DoubleSide, transparent: true, opacity: 1.0, depthWrite: true
+      });
+      var mesh = new THREE.Mesh(geos[k], mat);
+      mesh.name = 'template';
+      var group = new THREE.Group();
+      group.add(mesh);
+      group.position.copy(pos);
+      group.quaternion.copy(quat);
+      group.userData.isSostituire = true;
+      group.userData.sostRole = 'template';
+      group.userData.templateKey = k;
+      group.userData.isMirrored = !!TPL_MIRROR_CANONICAL[k];
+      var uiState = sostGroupUI[k];
+      if(uiState && typeof uiState.opacity === 'number'){
+        mat.opacity = uiState.opacity;
+        mat.transparent = uiState.opacity < 1.0;
+      }
 
-      // Origin del template = Z=0 locale nel mondo. Il piatto e' a +bboxK locale.
-      // Cap-up:   plate = origin + bboxK*axis  -> origin = plate - bboxK*axis
-      // Cap-down: il quaternion ribalta +Z->-axis, quindi il piatto a +bboxK locale
-      //           finisce a origin - bboxK*axis -> origin = plate + bboxK*axis
-      var sgnK = mirrorK ? -1 : 1;
-      var originK = plateWorld.clone().sub(axis.clone().multiplyScalar(sgnK * bboxK));
-
-      var g = sostBuildTemplateGroup(k, geos[k], originK, axis, mirrorK);
-      g.name = id + '_' + k;
-      g.visible = (k === activeKey);
-      scene.add(g);
-      groups[k] = g;
+      group.name = id + '_' + k;
+      group.visible = (k === activeKey);
+      scene.add(group);
+      groups[k] = group;
     });
+
+    // Verifica numerica delle distanze piatto-piatto risultanti
+    if(typeof console !== 'undefined' && console.log){
+      var p1T3 = new THREE.Vector3(0, 0, BBOX_LOCAL['1T3']).applyMatrix4(
+        new THREE.Matrix4().multiplyMatrices(T_world_root, T_ROOT['1T3'])
+      );
+      var pOS  = new THREE.Vector3(0, 0, BBOX_LOCAL['OS']).applyMatrix4(
+        new THREE.Matrix4().multiplyMatrices(T_world_root, T_ROOT['OS'])
+      );
+      var pSR  = new THREE.Vector3(0, 0, BBOX_LOCAL['SR']).applyMatrix4(
+        new THREE.Matrix4().multiplyMatrices(T_world_root, T_ROOT['SR'])
+      );
+      console.log('[v107 triade canonica] source=' + sostSourceTemplate);
+      console.log('  piatto 1T3 mondo:', p1T3.toArray().map(function(x){return x.toFixed(2);}));
+      console.log('  piatto OS  mondo:', pOS.toArray().map(function(x){return x.toFixed(2);}));
+      console.log('  piatto SR  mondo:', pSR.toArray().map(function(x){return x.toFixed(2);}));
+      console.log('  d(1T3,OS) =', p1T3.distanceTo(pOS).toFixed(3), 'mm (atteso 4.0)');
+      console.log('  d(1T3,SR) =', p1T3.distanceTo(pSR).toFixed(3), 'mm (atteso 15.0)');
+      console.log('  d(OS, SR) =', pOS.distanceTo(pSR).toFixed(3), 'mm (atteso 11.0)');
+    }
 
     // Linea asse (riferimento, non visibile di default)
     var axisDir = axis.clone().multiplyScalar(20);
