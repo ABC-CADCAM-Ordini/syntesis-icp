@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.105</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.094</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.105</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.094</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13408,16 +13408,9 @@ var SOSTITUIRE_SOURCE_OFFSET = {
 
 // --- METADATA TEMPLATE ---
 var SOSTITUIRE_TEMPLATE_INFO = {
-  // v7.3.9.102 - zDisc: distanza nominale CLINICA tra il disco del marker e
-  // la connessione implantare (Z=0 locale del marker fisico). I CAD STL
-  // template caricati nell'app contengono solo la cap (per ridurre i triangoli):
-  // bbox.max.z del 1T3 e' 8.5 ma la realta' clinica e' 10 (la cap fisica e'
-  // 1.5mm piu' alta del CAD ridotto). bbox di SR e OS coincide con i nominali.
-  // Usato per calcolare la distanza disco-a-disco corretta tra source e
-  // sostituto specchiato (es. 1T3+SR = 10+5 = 15mm, NON 8.5+5 = 13.5).
-  '1T3': { label: 'Marker 1T3', radius: 2.515, color: 0xffaa44, zDisc: 10.0 },
-  'SR':  { label: 'Marker SR',  radius: 2.030, color: 0x0065B3, zDisc:  5.0 },
-  'OS':  { label: 'Marker OS',  radius: 1.780, color: 0x639922, zDisc:  6.0 }
+  '1T3': { label: 'Marker 1T3', radius: 2.515, color: 0xffaa44 },
+  'SR':  { label: 'Marker SR',  radius: 2.030, color: 0x0065B3 },
+  'OS':  { label: 'Marker OS',  radius: 1.780, color: 0x639922 }
 };
 
 // ── Decompressione template base64+gzip (cache Uint8Array) ──
@@ -13745,7 +13738,7 @@ function sostUpdateLabels(){
 //   - SR:  disco a Z=-5.0 locale -> -5.0 axis nel mondo (sotto la connessione)
 // Nessun flip SR: la convenzione STL ha gia' il verso corretto rispetto
 // all'origine clinica condivisa.
-function sostBuildTemplateGroup(key, geo, connectionWorld, axis, mirror){
+function sostBuildTemplateGroup(key, geo, connectionWorld, axis){
   var info = SOSTITUIRE_TEMPLATE_INFO[key] || {label:'Custom', color: 0x888888};
   var color = info.color;
   var mat = new THREE.MeshPhongMaterial({
@@ -13763,18 +13756,13 @@ function sostBuildTemplateGroup(key, geo, connectionWorld, axis, mirror){
   group.add(mesh);
   // Origine locale (0,0,0) = connessione implantare.
   group.position.copy(connectionWorld);
-  // v7.3.9.101 - parametro mirror (default false):
-  //   false = quaternion +Z locale -> +axis mondo (cap-up sopra la connessione)
-  //   true  = quaternion +Z locale -> -axis mondo (cap-down sotto la connessione)
-  // Usato per riflessione speculare dei sostituti attraverso il piano della
-  // connessione clinica condivisa con il source (stessa connectionWorld).
-  var refDir = mirror ? axis.clone().multiplyScalar(-1) : axis.clone();
+  // up locale = +Z. Quaternion porta +Z -> axis, i punti a Z>0 locale
+  // vanno in +axis nel mondo, quelli a Z<0 vanno in -axis.
   var up = new THREE.Vector3(0, 0, 1);
-  group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, refDir));
+  group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, axis));
   group.userData.isSostituire = true;
   group.userData.sostRole = 'template';
   group.userData.templateKey = key;
-  group.userData.isMirrored = !!mirror;
   // Applica opacita' corrente del gruppo (se l'utente l'ha gia' regolata)
   var uiState = sostGroupUI[key];
   if(uiState && typeof uiState.opacity === 'number'){
@@ -13844,71 +13832,10 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // v7.3.9.105 - REGOLA CORRETTA: blocco rigido con offset fissi.
-    //
-    // Il blocco dei 3 marker ha offset RELATIVI fissi tra i piatti, indipendenti
-    // dal source. Lo schema approvato (riassunto Francesco):
-    //   1T3 in alto (offset blocco = 0)
-    //   OS  a 4 mm sotto 1T3 (offset blocco = -4)
-    //   SR  a 15 mm sotto 1T3 (offset blocco = -15)
-    //
-    // Il source determina la TRASLAZIONE del blocco: il piatto del source
-    // coincide sempre con discWorld, quindi tutto il blocco si trasla di
-    // -BLOCK_PLATE_OFFSET[source].
-    //
-    // I 9 valori (offset piatti da discWorld lungo axis, mm):
-    //                  1T3      OS       SR
-    //   source=1T3:     0       -4      -15
-    //   source=SR:    +15      +11        0
-    //   source=OS:    +4         0      -11
-    //
-    // ORIENTATION INTRINSECA AL TEMPLATE:
-    //   1T3, OS  -> sempre cap-up    (mirror=false)
-    //   SR       -> sempre cap-down  (mirror=true, riflesso speculare attraverso
-    //                                  il piano di simmetria)
-    // ECCEZIONE: il SOURCE e' sempre cap-up (anche SR), perche' deve annidarsi
-    // dentro il marker scansionato fisico ("barattolo dentro barattolo").
-    //
-    // Per ogni template k il piatto deve finire alla posizione del blocco.
-    // origin_k = posizione_piatto_k - sgnK_local * bbox_k
-    // dove sgnK_local indica se il template e' renderizzato cap-up (+1) o cap-down (-1).
-    var BLOCK_PLATE_OFFSET = {  // offset relativo del piatto di k nel blocco rigido (mm)
-      '1T3':   0.0,
-      'OS':   -4.0,
-      'SR':  -15.0
-    };
-    var TPL_MIRROR_AS_SUBSTITUTE = {  // orientation intrinseca quando NON e' source
-      '1T3': false,
-      'OS':  false,
-      'SR':  true
-    };
-
-    var srcOffset = BLOCK_PLATE_OFFSET[sostSourceTemplate] || 0;
-
+    // Costruisci i 3 group, tutti con origine = connessione implantare
     var groups = {};
     TPL_KEYS.forEach(function(k){
-      var infoK = SOSTITUIRE_TEMPLATE_INFO[k] || {};
-      geos[k].computeBoundingBox();
-      var bboxK = geos[k].boundingBox.max.z;
-
-      // Posizione del piatto di k nel mondo (offset da discWorld lungo axis):
-      //   plate_k_offset = BLOCK_PLATE_OFFSET[k] - srcOffset
-      // (porta il source a 0 e tutti gli altri di conseguenza).
-      var plateOffset = (BLOCK_PLATE_OFFSET[k] || 0) - srcOffset;
-      var plateWorld = discWorld.clone().add(axis.clone().multiplyScalar(plateOffset));
-
-      // Orientation: source sempre cap-up, sostituti seguono TPL_MIRROR_AS_SUBSTITUTE.
-      var isSource = (k === sostSourceTemplate);
-      var mirrorK = isSource ? false : !!TPL_MIRROR_AS_SUBSTITUTE[k];
-
-      // Origin del template = Z=0 locale nel mondo. Il piatto e' a +bboxK locale.
-      // Cap-up:   plate = origin + bboxK*axis  -> origin = plate - bboxK*axis
-      // Cap-down: il quaternion ribalta +Z->-axis, quindi il piatto a +bboxK locale
-      //           finisce a origin - bboxK*axis -> origin = plate + bboxK*axis
-      var sgnK = mirrorK ? -1 : 1;
-      var originK = plateWorld.clone().sub(axis.clone().multiplyScalar(sgnK * bboxK));
-
-      var g = sostBuildTemplateGroup(k, geos[k], originK, axis, mirrorK);
+      var g = sostBuildTemplateGroup(k, geos[k], connectionWorld, axis);
       g.name = id + '_' + k;
       g.visible = (k === activeKey);
       scene.add(g);
