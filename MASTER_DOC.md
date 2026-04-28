@@ -9,7 +9,22 @@
 ---
 
 # SYNTESIS-ICP — DOCUMENTO MAESTRO DI PROGETTO
-## Versione v7.3.9.042 - Ultimo aggiornamento: 2026-04-26
+## Versione v7.4.0.001 - Ultimo aggiornamento: 2026-04-28
+
+---
+
+> **AGGIORNAMENTO v7.4.0.001 (2026-04-28):**
+> Introdotto **Vedere**, primo workflow standalone di Syntesis-ICP.
+> - Rotta: `/vedere` (servita da `backend/main.py`, file statico `backend/static/syntesis-icp-vedere.html`)
+> - Funzione: viewer 3D multi-formato (STL/OBJ/PLY/XYZ/PCD/PTS) con strumenti di misura,
+>   forme tecniche (cerchio, quadrato, esagono, ottagono, torx) e annotazioni.
+> - Aggiunto come prima voce nel menu WorkFlow di `/analizzare` (selectWorkflow).
+> - Stile coerente con Synthesis: header con logo, palette `#0065B3`, font Source Sans 3, cornice arcobaleno animata.
+> - Allineamento luci e materiale identico ad Analizzare (AmbientLight 0.4 + camL1 0.6 + camL2 0.25 agganciate alla camera; MeshPhongMaterial specular 0x111111 shininess 30 opacity 0.85).
+> - Camera FOV 28° identica ad Analizzare.
+> - Parser STL custom (no vertex colors fantasma) identico al pattern Analizzare/Sostituire.
+
+---
 
 ---
 
