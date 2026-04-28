@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.102</title>
+<title>Syntesis-ICP - Analizzare v7.3.9.103</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -696,7 +696,7 @@ body .panel {
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb" id="wfBreadcrumb">
       <span class="current" id="wfName">Analizza</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.102</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.3.9.103</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -13844,41 +13844,63 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sostCounter++;
     var id = 'SOST_' + sostCounter;
 
-    // v7.3.9.102 - Riflessione speculare con distanza disco-a-disco
-    // CLINICAMENTE CORRETTA. I CAD template hanno solo la cap (1T3 bbox=8.5
-    // ma nominale fisico 10), quindi per posizionare il sostituto uso
-    // SOSTITUIRE_TEMPLATE_INFO.zDisc (valore nominale clinico) invece di
-    // bbox.max.z. Il source resta calcolato con bbox (cap su disco scansionato,
-    // "accoppia bene"). Il sostituto e' posizionato in modo che la distanza
-    // tra il suo disco e quello del source nel mondo sia exactly nominalSrc +
-    // nominalSostituto (es. 1T3+SR = 10+5 = 15mm).
+    // v7.3.9.103 - REGOLA FINALE: blocco rigido + orientation intrinseca al template.
+    //
+    // BLOCCO RIGIDO: i 3 marker hanno una disposizione relativa fissa rispetto
+    // alla connessione clinica condivisa, indipendente da quale sia il source.
+    // Per ogni template k il piatto del suo disco si trova a:
+    //   piatto_k = connessione_clinica + zDisc_k * axis      (k cap-up)
+    //   piatto_k = connessione_clinica - zDisc_k * axis      (k cap-down riflesso)
+    //
+    // POSIZIONAMENTO DEL BLOCCO: il source ha sempre il piatto sul disco
+    // scansionato, quindi la connessione clinica scende a:
+    //   connessione_clinica = discWorld - sgnSrc * zDisc_source * axis
+    // dove sgnSrc = +1 se source e' cap-up (1T3, OS), -1 se source e' cap-down (SR).
+    //
+    // ORIENTATION INTRINSECA AL TEMPLATE (non dipende dal ruolo source/sostituto):
+    //   1T3, OS  -> sempre cap-up    (mirror=false, +Z locale -> +axis mondo)
+    //   SR       -> sempre cap-down  (mirror=true,  +Z locale -> -axis mondo,
+    //                                  riflesso speculare attraverso connessione)
+    //
+    // Esempio: source = SR
+    //   connessione_clinica = discWorld - (-1) * 5 * axis = discWorld + 5*axis
+    //   piatto SR  = connessione - 5*axis  = discWorld          (sul disco) ✓
+    //   piatto 1T3 = connessione + 10*axis = discWorld + 15*axis (15mm sopra)
+    //   piatto OS  = connessione + 6*axis  = discWorld + 11*axis (11mm sopra)
+    //
+    // p.position resta connectionWorld (calcolato con bbox del source) per
+    // compatibilita' con il refinement ICP che lavora nel sistema locale del source.
+    var TPL_MIRROR = {  // orientation intrinseca: SR e' l'unico template riflesso
+      '1T3': false,
+      'OS':  false,
+      'SR':  true
+    };
+
+    // Posizione della connessione clinica rispetto a discWorld (il source si
+    // ancora sempre col suo piatto al disco scansionato).
     var sostInfoSrc = SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {};
     var nominalSrc = (typeof sostInfoSrc.zDisc === 'number') ? sostInfoSrc.zDisc : zDiscSource;
+    var sgnSrc = TPL_MIRROR[sostSourceTemplate] ? -1 : 1;
+    var connClin = discWorld.clone().sub(axis.clone().multiplyScalar(sgnSrc * nominalSrc));
 
     var groups = {};
     TPL_KEYS.forEach(function(k){
-      var isSource = (k === sostSourceTemplate);
-      var g;
-      if(isSource){
-        // Source: invariato, cap-up sul disco scansionato (logica v094).
-        g = sostBuildTemplateGroup(k, geos[k], connectionWorld, axis, false);
-      } else {
-        // Sostituto: posizionato in modo che la distanza tra il suo disco e
-        // discWorld lungo axis sia (nominalSrc + nominalSostituto). Quaternion
-        // mirror (+Z locale -> -axis mondo, cap-down).
-        var infoK = SOSTITUIRE_TEMPLATE_INFO[k] || {};
-        geos[k].computeBoundingBox();
-        var bboxK = geos[k].boundingBox.max.z;
-        var nominalK = (typeof infoK.zDisc === 'number') ? infoK.zDisc : bboxK;
-        var distToCap = nominalSrc + nominalK;  // distanza disco-a-disco voluta
-        // Cap del sostituto in mirror finisce a origin - bboxK*axis.
-        // Voglio cap a discWorld - distToCap*axis.
-        // => origin = discWorld - (distToCap - bboxK) * axis
-        var originSost = discWorld.clone().sub(
-          axis.clone().multiplyScalar(distToCap - bboxK)
-        );
-        g = sostBuildTemplateGroup(k, geos[k], originSost, axis, true);
-      }
+      var infoK = SOSTITUIRE_TEMPLATE_INFO[k] || {};
+      geos[k].computeBoundingBox();
+      var bboxK = geos[k].boundingBox.max.z;
+      var nominalK = (typeof infoK.zDisc === 'number') ? infoK.zDisc : bboxK;
+      var mirrorK = !!TPL_MIRROR[k];
+
+      // Origine del template = posizione di Z=0 locale nel mondo. Il piatto
+      // (a +bboxK locale) deve coincidere con piattoTarget_k.
+      // Cap-up:   piatto_k = connClin + nominalK*axis,  origin = connClin + (nominalK - bboxK)*axis
+      // Cap-down: piatto_k = connClin - nominalK*axis,  in mirror la cap finisce a origin - bboxK*axis,
+      //           quindi origin = connClin - nominalK*axis + bboxK*axis = connClin - (nominalK - bboxK)*axis
+      var sgnK = mirrorK ? -1 : 1;
+      var originK = connClin.clone().add(
+        axis.clone().multiplyScalar(sgnK * (nominalK - bboxK))
+      );
+      var g = sostBuildTemplateGroup(k, geos[k], originK, axis, mirrorK);
       g.name = id + '_' + k;
       g.visible = (k === activeKey);
       scene.add(g);
