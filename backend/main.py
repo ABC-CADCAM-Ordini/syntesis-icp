@@ -154,6 +154,15 @@ async def analyzer_page():
         return FileResponse(str(_an), headers=_NO_STORE_HEADERS)
     return JSONResponse({"error": "Analyzer not found"}, status_code=404)
 
+@app.get("/vedere", include_in_schema=False)
+async def vedere_page():
+    """Workflow Vedere: viewer 3D multi-formato (STL/OBJ/PLY/XYZ/PCD/PTS)
+    con strumenti di misura, forme e annotazioni. Prima voce dell'elenco workflow."""
+    _vd = _STATIC_DIR / "syntesis-icp-vedere.html"
+    if _vd.exists():
+        return FileResponse(str(_vd), headers=_NO_STORE_HEADERS)
+    return JSONResponse({"error": "Vedere not found"}, status_code=404)
+
 @app.get("/statistiche", include_in_schema=False)
 async def statistiche_page():
     _st = _STATIC_DIR / "syntesis-statistiche-v7.4.0.002.html"
