@@ -11,6 +11,22 @@
 # SYNTESIS-ICP — DOCUMENTO MAESTRO DI PROGETTO
 ## Versione v7.4.0.001 - Ultimo aggiornamento: 2026-04-28
 
+
+> **Aggiornamento 2026-04-28 — Vedere v7.4.0.001 cutview completa (deploy serale):**
+> Modulo Sezione (cut view) finalizzato e in produzione.
+> - Creazione: 2 click che disegnano una linea (preview tratteggiata blu); il piano di taglio passa per quella linea, perpendicolare al piano vista corrente. Rettangolo handle quadrato definitivo al secondo click, lato = lunghezza linea.
+> - Manipolazione: 5 control point identici alle forme (4 cardinali rosso/verde per scaling, 1 centrale giallo con frecce U/V/N + 3 anelli di rotazione).
+> - Stencil cap: la mesh tagliata appare come solido pieno grazie alla tecnica stencil buffer (back-face increment + front-face decrement + cap plane con NotEqual). Funzione `buildCapForSection` in fondo al file. Renderer principale con `stencil:true`. Cap colore = primo layer visibile (limite noto: cap monocolore).
+> - PIP cut view 2D: finestra fluttuante 520x420 default, draggable dall'header e resizable dall'angolo basso-sinistra (handle 14x14). Bottone maxi per fullscreen del viewport.
+> - Zoom/pan PIP: rotella mouse focalizzato sotto al cursore (range 0.2x-20x), pan con tasto destro/medio drag, bottone fit per inquadratura completa.
+> - Misure 2D nella sezione: solo lineari (cerchio/quadrato/esagono ecc. non hanno senso in 2D). Pattern click+click. Le misure NON sono ancora persistenti nell'albero layer (todo).
+> - Swap interattivo PIP <-> vista 3D (bottone freccia bidirezionale): scambia i due canvas DOM. Entrambe le viste restano interattive. Quando swap attivo, i tools della cut view (righello + fit) si spostano in alto a destra del viewport principale come overlay flottante; gli altri tools della finestra (swap, max, close) restano nell'header PIP.
+> - Decisione di prodotto: niente CAD parametrico in Vedere. Vedere resta viewer/misuratore. Eventuale modulo CAD futuro andrà progettato come prodotto a sé.
+>
+> **Prossimo step pianificato: standardizzazione delle parti comuni dell'UI** (pannello layer e altri elementi condivisi tra Vedere, Analizzare, Sostituire, Misurare).
+
+---
+
 ---
 
 > **AGGIORNAMENTO v7.4.0.001 (2026-04-28):**
