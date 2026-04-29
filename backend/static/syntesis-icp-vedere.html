@@ -3003,75 +3003,28 @@ function setEraserActive(on) {
   }
 }
 
-// Costruisce la mappa di adiacenza dei triangoli per una mesh.
-// adjacency[i] = array di indici di triangoli che condividono almeno un vertice con i.
-// Uso "vertice condiviso" invece di "edge condiviso" per essere robusti su mesh
-// non perfettamente saldate (capita su STL): se un edge e' duplicato come 2 vertici
-// quasi-coincidenti, l'edge non e' formalmente condiviso ma vogliamo trattarli da vicini.
-function buildAdjacency(layer) {
-  if (layer._adjacency) return layer._adjacency;
-
-  const geo = layer.object.geometry;
-  const pos = geo.attributes.position;
-  const idx = geo.index;
-  const triCount = idx ? idx.count / 3 : pos.count / 3;
-
-  // Step 1: per ogni vertice (in coordinate quantizzate), lista dei triangoli che lo toccano
-  // Quantizzo a 1e-3 mm per assorbire piccole differenze numeriche tra triangoli "vicini"
-  const Q = 1000;  // 1/0.001 mm
-  function vkey(x, y, z) {
-    return Math.round(x*Q) + ',' + Math.round(y*Q) + ',' + Math.round(z*Q);
-  }
-  const vertToTris = new Map();
-
-  function getVertexIdx(triIdx, corner) {
-    if (idx) return idx.array[triIdx * 3 + corner];
-    return triIdx * 3 + corner;
-  }
-
-  for (let t = 0; t < triCount; t++) {
-    for (let c = 0; c < 3; c++) {
-      const vi = getVertexIdx(t, c);
-      const k = vkey(pos.array[vi*3], pos.array[vi*3+1], pos.array[vi*3+2]);
-      let arr = vertToTris.get(k);
-      if (!arr) { arr = []; vertToTris.set(k, arr); }
-      arr.push(t);
+// Pattern di campionamento del cerchio gomma (in coordinate UV relative al centro,
+// raggio in [0, 1]). 31 punti: 1 centrale + 6 ring interno + 12 ring medio + 12 ring esterno.
+// Coprono il cerchio uniformemente con buona densita'.
+const _ERASER_RAY_PATTERN = (() => {
+  const pts = [{ u: 0, v: 0 }];
+  const rings = [
+    { count: 6,  radius: 0.33 },
+    { count: 12, radius: 0.66 },
+    { count: 12, radius: 1.00 },
+  ];
+  for (const ring of rings) {
+    for (let i = 0; i < ring.count; i++) {
+      const angle = (i / ring.count) * Math.PI * 2;
+      pts.push({ u: Math.cos(angle) * ring.radius, v: Math.sin(angle) * ring.radius });
     }
   }
+  return pts;
+})();
 
-  // Step 2: per ogni triangolo, raccolgo gli "altri triangoli" che condividono ≥1 vertice
-  // (evitando duplicati con un Set)
-  const adjacency = new Array(triCount);
-  for (let t = 0; t < triCount; t++) {
-    const neigh = new Set();
-    for (let c = 0; c < 3; c++) {
-      const vi = getVertexIdx(t, c);
-      const k = vkey(pos.array[vi*3], pos.array[vi*3+1], pos.array[vi*3+2]);
-      const arr = vertToTris.get(k);
-      if (!arr) continue;
-      for (const ot of arr) if (ot !== t) neigh.add(ot);
-    }
-    adjacency[t] = Array.from(neigh);
-  }
-
-  layer._adjacency = adjacency;
-  layer._triCount = triCount;
-  return adjacency;
-}
-
-// Calcola il centroide di un triangolo in coordinate locali geometry
-function _triCentroidLocal(geo, triIdx) {
-  const pos = geo.attributes.position;
-  const idx = geo.index;
-  const i0 = idx ? idx.array[triIdx*3] : triIdx*3;
-  const i1 = idx ? idx.array[triIdx*3+1] : triIdx*3+1;
-  const i2 = idx ? idx.array[triIdx*3+2] : triIdx*3+2;
-  return new THREE.Vector3(
-    (pos.array[i0*3] + pos.array[i1*3] + pos.array[i2*3]) / 3,
-    (pos.array[i0*3+1] + pos.array[i1*3+1] + pos.array[i2*3+1]) / 3,
-    (pos.array[i0*3+2] + pos.array[i1*3+2] + pos.array[i2*3+2]) / 3,
-  );
-}
+// Raycaster e Vector2 riusabili (no allocazioni nel hot path)
+const _eraserRaycaster = new THREE.Raycaster();
+const _eraserNDC = new THREE.Vector2();
 
 // Cancella un triangolo collassandolo: tutti i 3 vertici diventano uguali
 // al primo. Cosi' ha area zero e non viene renderizzato. Reversibile salvando
@@ -3100,91 +3053,84 @@ function _collapseTriangle(geo, triIdx, savedSnap) {
   pos.array[i2*3] = ax;     pos.array[i2*3+1] = ay;     pos.array[i2*3+2] = az;
 }
 
-// BFS sui vicini topologici a partire dal seed, fermandosi quando la distanza
-// del centroide triangolo dal centro gomma (in coordinate locali) supera il raggio.
-function _bfsTrianglesWithinRadius(layer, seedTri, centerLocal, radius) {
-  const adj = buildAdjacency(layer);
-  const geo = layer.object.geometry;
-  const r2 = radius * radius;
-
-  const visited = new Set();
-  const result = [];
-  const queue = [seedTri];
-  visited.add(seedTri);
-
-  // Hard cap su numero di triangoli per stroke per evitare stalli su mesh enormi
-  // (es. seed in zona piatta, BFS che esplode all'infinito)
-  const HARD_CAP = 5000;
-
-  while (queue.length > 0 && result.length < HARD_CAP) {
-    const t = queue.shift();
-    const c = _triCentroidLocal(geo, t);
-    const d2 = c.distanceToSquared(centerLocal);
-    if (d2 > r2) continue;
-    result.push(t);
-
-    const neigh = adj[t];
-    if (!neigh) continue;
-    for (const n of neigh) {
-      if (!visited.has(n)) {
-        visited.add(n);
-        queue.push(n);
-      }
-    }
-  }
-  return result;
-}
-
-// Esegue una "pennellata" di gomma a una posizione di mouse: raycast +
-// BFS topologica + collasso. Il risultato (triangoli cancellati) viene
-// accumulato nello stroke corrente per undo.
+// Esegue una "pennellata" di gomma a una posizione di mouse usando il sistema a raggi:
+// per ogni punto del pattern (31 punti nel cerchio della gomma), lancia un raycast
+// e cancella il primo triangolo davanti. Niente BFS, niente adiacenza, niente overhead.
+// Risultato: fluido anche su drag veloce, su mesh dense, niente freeze iniziale.
+// Trade-off: piccoli "buchi" possibili sui bordi della gomma se il pattern non copre
+// uniformemente. Accettabile per uso pratico.
 function eraserPaint(e) {
   if (!state.eraserActive) return;
-  eventToNDC(e);
-  raycaster.setFromCamera(mouseNDC, camera);
-  const targets = state.layers
-    .filter(l => l.visible && !l.isPoints)
-    .map(l => l.object);
+  const vp = document.getElementById('viewport');
+  const rect = vp.getBoundingClientRect();
+  const cw = rect.width || 1;
+  const ch = rect.height || 1;
+
+  // Centro della gomma in pixel (relativo al viewport)
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+
+  // Diametro della gomma in pixel (calcolato in updateEraserCursor, salvato nel cursore)
+  // Lo prendo dal cursore visivo per evitare di rifare il raycast di profondita'
+  const cursorEl = document.getElementById('eraserCursor');
+  const cursorWpx = parseFloat(cursorEl.style.width) || 30;
+  const radiusPx = cursorWpx * 0.5;
+
+  // Layer target del raycast
+  const targets = [];
+  for (const l of state.layers) {
+    if (l.visible && !l.isPoints) targets.push(l.object);
+  }
   if (targets.length === 0) return;
-  const hits = raycaster.intersectObjects(targets, false);
-  if (hits.length === 0) return;
-  const hit = hits[0];
-  const layer = state.layers.find(l => l.object === hit.object);
-  if (!layer) return;
-
-  // Indice del triangolo nella geometry (Three.js lo espone come hit.faceIndex
-  // se esiste l'index buffer, altrimenti via face.a/b/c). hit.faceIndex e'
-  // l'indice della faccia 0..F-1.
-  const seedTri = hit.faceIndex != null ? hit.faceIndex : Math.floor(hit.face.a / 3);
-
-  // Centro del raggio in coordinate locali della geometry.
-  // Uso il punto di hit (esatto) trasformato nel local space.
-  const centerLocal = hit.point.clone();
-  hit.object.worldToLocal(centerLocal);
-
-  const radius = state.eraserDiameter / 2;
-  const tris = _bfsTrianglesWithinRadius(layer, seedTri, centerLocal, radius);
-  if (tris.length === 0) return;
 
   // Inizializzo lo stroke se non esiste (primo paint del drag)
   if (!state.eraserCurrentStroke) {
     state.eraserCurrentStroke = {
-      layerId: layer.id,
+      layerId: null,         // verra' settato al primo hit utile
       deletedTriangles: [],
-      seenTris: new Set(),  // per evitare di salvare lo stesso triangolo due volte
+      seenTris: new Set(),   // per evitare di cancellare lo stesso triangolo due volte nello stesso stroke
     };
   }
   const stroke = state.eraserCurrentStroke;
-
-  const geo = layer.object.geometry;
   const snap = stroke.deletedTriangles;
-  for (const t of tris) {
-    if (stroke.seenTris.has(t)) continue;
-    stroke.seenTris.add(t);
-    _collapseTriangle(geo, t, snap);
+
+  // Lancio un raycast per ogni punto del pattern.
+  // Pattern in UV [-1,+1] scalato a radiusPx in pixel, poi convertito in NDC.
+  for (let p = 0; p < _ERASER_RAY_PATTERN.length; p++) {
+    const pt = _ERASER_RAY_PATTERN[p];
+    const px = cx + pt.u * radiusPx;
+    const py = cy + pt.v * radiusPx;
+    // NDC: [-1, +1]
+    _eraserNDC.x = (px / cw) * 2 - 1;
+    _eraserNDC.y = -((py / ch) * 2 - 1);
+
+    _eraserRaycaster.setFromCamera(_eraserNDC, camera);
+    const hits = _eraserRaycaster.intersectObjects(targets, false);
+    if (hits.length === 0) continue;
+    const hit = hits[0];
+    const layer = state.layers.find(l => l.object === hit.object);
+    if (!layer) continue;
+
+    // Indice del triangolo
+    const triIdx = hit.faceIndex != null ? hit.faceIndex : Math.floor(hit.face.a / 3);
+    const seenKey = layer.id + ':' + triIdx;
+    if (stroke.seenTris.has(seenKey)) continue;
+    stroke.seenTris.add(seenKey);
+
+    // Settaggio del layerId al primo hit (lo stroke e' "appartenente" al primo layer toccato)
+    if (stroke.layerId === null) stroke.layerId = layer.id;
+
+    _collapseTriangle(hit.object.geometry, triIdx, snap);
+
+    // Marca la geometria come "dirty" (lo facciamo una volta sola alla fine - vedi dopo)
+    if (!stroke._dirtyGeos) stroke._dirtyGeos = new Set();
+    stroke._dirtyGeos.add(hit.object.geometry);
   }
-  geo.attributes.position.needsUpdate = true;
-  // Bounding sphere/box potrebbe non essere piu' accurato ma e' ok per il raycast successivo
+
+  // Aggiorno needsUpdate UNA volta per ciascuna geometria toccata, non per triangolo
+  if (stroke._dirtyGeos) {
+    for (const g of stroke._dirtyGeos) g.attributes.position.needsUpdate = true;
+  }
 }
 
 function eraserStrokeEnd() {
