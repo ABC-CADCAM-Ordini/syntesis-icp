@@ -32,6 +32,15 @@ body{
   --blue:#0065B3; --dark:#0F1923; --gray:#7A90A4;
   --pearl:#F0F5FA; --light:#F7F9FC; --border:#D6E4F0;
   --white:#FFFFFF; --green:#0D9E6E; --red:#DC2626; --gold:#F59E0B;
+  /* Palette Mario Bros (Blocco 5i): tonalita' calde e giocose per accenti UI */
+  --mario-green:#5BB04C;
+  --mario-red:#D13A35;
+  --mario-orange:#E89042;
+  --mario-yellow:#F5C518;
+  --mario-cream:#F2DE7E;
+  --mario-purple:#A855F7;
+  --mario-cyan:#0891B2;
+  --mario-navy:#2C3275;
   --radius:14px;
   --font:'Source Sans 3','Source Sans Pro',sans-serif;
   --mono:'Source Sans 3','Source Sans Pro',sans-serif;
@@ -61,7 +70,7 @@ body{
 .btn.active{background:var(--blue);color:var(--white);border-color:var(--blue)}
 .btn.blue.primary{background:var(--blue);color:var(--white);border-color:var(--blue)}
 .btn.blue.primary:hover{background:#004F8C;border-color:#004F8C;color:var(--white)}
-.btn.danger{border-color:#E24B4A;color:#A32D2D}
+.btn.danger{border-color:var(--mario-red);color:#A32D2D}
 .btn.danger:hover{background:#FCEBEB;color:#A32D2D;border-color:#A32D2D}
 .btn:disabled,.btn.disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
 .btn svg{flex-shrink:0;display:block}
@@ -292,12 +301,21 @@ body{
 
 /* Sezione di proprietà (titolo + righe key-value) */
 .props-section{margin-bottom:14px}
+/* Titoli sezione: barra colorata laterale che varia per tipo di sezione */
 .props-section-title{
   font-family:var(--mono);font-size:9px;font-weight:800;
   color:var(--gray);letter-spacing:.12em;text-transform:uppercase;
-  margin-bottom:6px;padding-bottom:3px;
+  margin-bottom:6px;padding-bottom:3px;padding-left:8px;
   border-bottom:1px solid var(--border);
+  border-left:3px solid var(--mario-yellow);
+  border-bottom-left-radius:0;
 }
+/* Sezioni successive prendono un colore diverso, ciclando */
+.props-section:nth-of-type(1) .props-section-title{ border-left-color:var(--mario-yellow); }
+.props-section:nth-of-type(2) .props-section-title{ border-left-color:var(--mario-green); }
+.props-section:nth-of-type(3) .props-section-title{ border-left-color:var(--mario-orange); }
+.props-section:nth-of-type(4) .props-section-title{ border-left-color:var(--mario-purple); }
+.props-section:nth-of-type(5) .props-section-title{ border-left-color:var(--mario-cyan); }
 .props-row{
   display:flex;align-items:center;justify-content:space-between;
   padding:5px 0;font-size:11px;gap:8px;
@@ -310,19 +328,19 @@ body{
 }
 .props-row-value.muted{color:var(--gray);font-style:italic}
 
-/* Slider opacità */
+/* Slider opacità: thumb verde Mario */
 .props-slider-row{
   display:flex;align-items:center;gap:8px;padding:5px 0;
 }
 .props-slider-row input[type=range]{
-  flex:1;accent-color:var(--blue);
+  flex:1;accent-color:var(--mario-green);
   height:4px;cursor:pointer;
 }
 .props-slider-row .props-row-value{
   min-width:38px;font-size:11px;
 }
 
-/* Toggle (occhio + lock) */
+/* Toggle (occhio + lock): verde Mario quando attivo */
 .props-toggle{
   width:30px;height:24px;
   display:flex;align-items:center;justify-content:center;
@@ -330,9 +348,9 @@ body{
   color:var(--gray);border-radius:5px;cursor:pointer;
   transition:all .12s;
 }
-.props-toggle:hover{border-color:var(--blue);color:var(--blue)}
+.props-toggle:hover{border-color:var(--mario-green);color:var(--mario-green)}
 .props-toggle.active{
-  background:var(--blue);color:var(--white);border-color:var(--blue);
+  background:var(--mario-green);color:var(--white);border-color:var(--mario-green);
 }
 
 /* Color swatches */
@@ -346,9 +364,9 @@ body{
   transition:transform .1s;
 }
 .props-color-swatch:hover{transform:scale(1.15)}
-.props-color-swatch.active{box-shadow:0 0 0 2px var(--blue)}
+.props-color-swatch.active{box-shadow:0 0 0 2px var(--mario-green)}
 
-/* Azioni in fondo */
+/* Azioni in fondo: ogni bottone ha il suo accent color */
 .props-actions{
   display:flex;flex-direction:column;gap:4px;
   margin-top:10px;
@@ -361,11 +379,15 @@ body{
   transition:all .12s;
   font-family:var(--font);
 }
-.props-action-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--light)}
-.props-action-btn.danger:hover{border-color:var(--red);color:var(--red);background:#FCEBEB}
+/* Ogni azione un colore diverso al hover */
+.props-action-btn[data-action="center"]:hover{border-color:var(--mario-orange);color:var(--mario-orange);background:#FFF6EE}
+.props-action-btn[data-action="isolate"]:hover{border-color:var(--mario-purple);color:var(--mario-purple);background:#F5EBFF}
+.props-action-btn[data-action="restore-defaults"]:hover{border-color:var(--mario-cyan);color:var(--mario-cyan);background:#E6F4F8}
+.props-action-btn:hover{border-color:var(--mario-green);color:var(--mario-green);background:var(--light)}
+.props-action-btn.danger:hover{border-color:var(--mario-red);color:var(--mario-red);background:#FCEBEB}
 .props-action-btn svg{flex-shrink:0;color:inherit}
 
-/* Modalita' rendering: 3 bottoni in fila */
+/* Modalita' rendering: 3 bottoni in fila, attivo verde Mario */
 .props-render-modes{
   display:grid;
   grid-template-columns:1fr 1fr 1fr;
@@ -384,12 +406,12 @@ body{
   transition:all .12s;
 }
 .props-render-btn:hover{
-  border-color:var(--blue);color:var(--blue);
+  border-color:var(--mario-green);color:var(--mario-green);
   background:var(--light);
 }
 .props-render-btn.active{
-  background:var(--blue);
-  border-color:var(--blue);
+  background:var(--mario-green);
+  border-color:var(--mario-green);
   color:var(--white);
 }
 
@@ -467,7 +489,7 @@ body{
 }
 .slp-item:last-child{border-bottom:none}
 .slp-item:hover{background:var(--light)}
-.slp-item.selected{background:rgba(0,101,179,.08);box-shadow:inset 3px 0 0 var(--blue)}
+.slp-item.selected{background:rgba(232,144,66,.10);box-shadow:inset 3px 0 0 var(--mario-orange)}
 .slp-item.child{padding-left:30px}
 .slp-item.child:before{
   content:'';
@@ -531,7 +553,7 @@ body{
 }
 .layer-item:last-child{border-bottom:none}
 .layer-item:hover{background:var(--light)}
-.layer-item.selected{background:rgba(0,101,179,.08);box-shadow:inset 3px 0 0 var(--blue)}
+.layer-item.selected{background:rgba(232,144,66,.10);box-shadow:inset 3px 0 0 var(--mario-orange)}
 .layer-color-btn{
   width:14px;height:14px;border-radius:50%;
   border:2px solid var(--white);
@@ -592,8 +614,8 @@ body{
   font-size:13px;transition:all .12s;
   box-shadow:0 2px 6px rgba(15,25,35,.1);
 }
-.vp-btn:hover{border-color:var(--blue);color:var(--blue)}
-.vp-btn.active{background:var(--blue);color:var(--white);border-color:var(--blue)}
+.vp-btn:hover{border-color:var(--mario-green);color:var(--mario-green)}
+.vp-btn.active{background:var(--mario-green);color:var(--white);border-color:var(--mario-green)}
 .vp-btn:disabled{opacity:.35;cursor:not-allowed}
 
 /* Controllo inline gomma (slider diametro) */
@@ -1770,19 +1792,21 @@ const SWATCH_COLORS = [
   '#0891B2','#DB2777','#F59E0B','#7C3AED','#059669',
   '#0F1923','#7A90A4','#FFFFFF','#FF6B35','#FFD166'
 ];
-// Palette dedicata alle misure (Blocco 5e): ogni nuova misura prende il
-// colore successivo della lista, ciclando. Sono colori caldi e contrastanti
-// per distinguere a colpo d'occhio piu' misure sulla stessa scansione.
-// Le linee 3D dei segmenti restano sempre nere; questa palette colora
-// label, marker dei punti, archi e quote tecniche.
+// Palette dedicata alle misure (Blocco 5i): ispirata Mario Bros, 10 colori
+// in ordine narrativo (gialli caldi → rossi → verde → ciano → blu profondo).
+// Le prime misure prendono i colori piu' visibili (gialli/oro), le successive
+// scorrono attraverso lo spettro fino al blu navy.
 const MEASURE_PALETTE = [
-  '#FF6B35',  // arancione brillante
-  '#DC2626',  // rosso
-  '#0D9E6E',  // verde foresta
-  '#D97706',  // ambra/zafferano
-  '#A855F7',  // viola
-  '#0891B2',  // ciano
-  '#DB2777',  // magenta
+  '#F2DE7E',  // 1. giallo crema
+  '#F5C518',  // 2. giallo oro
+  '#FF6B35',  // 3. arancione brillante
+  '#DC2626',  // 4. rosso
+  '#5BB04C',  // 5. verde Mario
+  '#D97706',  // 6. ambra/zafferano
+  '#A855F7',  // 7. viola
+  '#0891B2',  // 8. ciano
+  '#DB2777',  // 9. magenta
+  '#2C3275',  // 10. blu navy profondo
 ];
 const POINT_SIZE = 0.4;
 const HIGHLIGHT_OPACITY = 0.45;
