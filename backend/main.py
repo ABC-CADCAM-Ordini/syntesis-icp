@@ -127,9 +127,11 @@ _NO_STORE_HEADERS = {"Cache-Control": "no-store, must-revalidate"}
 
 @app.get("/", include_in_schema=False)
 async def serve_frontend():
-    if _INDEX.exists():
-        return FileResponse(str(_INDEX), headers=_NO_STORE_HEADERS)
-    return JSONResponse({"status": "ok", "message": "Syntesis-ICP API"})
+    # Redirect 302 a /vedere (Blocco 5j: il workflow Vedere e' il default).
+    # Manteniamo il fallback all'index.html storico se esiste, ma di norma
+    # /vedere e' la prima esperienza utente. Status 302 = temporaneo, cosi'
+    # se in futuro vogliamo cambiare default e' facile.
+    return RedirectResponse(url="/vedere", status_code=302)
 
 # ── Rate limiting semplice in memoria ────────────────────────────────────────
 _rate_store: dict[str, list[float]] = {}
