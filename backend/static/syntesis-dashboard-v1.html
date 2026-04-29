@@ -235,6 +235,53 @@ body{
   border:1px solid var(--mario-orange);
   padding:6px 12px;border-radius:5px;
 }
+
+/* === BLOCCO 5t Fix 3: banner stato Drive ============================ */
+.drive-banner{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 18px;border-radius:10px;
+  margin-bottom:18px;
+  border:1.5px solid var(--border);
+  background:var(--white);
+  font-family:var(--font);
+}
+.drive-banner-loading{
+  background:var(--pearl);border-color:var(--border);
+}
+.drive-banner-ok{
+  background:rgba(91,176,76,0.08);
+  border-color:var(--mario-green);
+}
+.drive-banner-warn{
+  background:rgba(232,144,66,0.08);
+  border-color:var(--mario-orange);
+}
+.drive-banner-ico{
+  font-size:22px;flex-shrink:0;line-height:1;
+}
+.drive-banner-ok .drive-banner-ico{color:var(--mario-green)}
+.drive-banner-warn .drive-banner-ico{color:var(--mario-orange)}
+.drive-banner-content{flex:1;min-width:0}
+.drive-banner-title{
+  font-size:13px;font-weight:800;color:var(--dark);
+  margin-bottom:2px;
+}
+.drive-banner-sub{
+  font-size:11px;color:var(--gray);font-family:var(--mono);
+  letter-spacing:.02em;
+}
+.drive-banner-action{
+  flex-shrink:0;
+}
+.drive-banner-action button{
+  padding:8px 14px;background:var(--mario-orange);color:#fff;
+  border:none;border-radius:7px;font-size:12px;font-weight:800;
+  cursor:pointer;font-family:var(--font);
+  transition:.15s;
+}
+.drive-banner-action button:hover{
+  background:#C77A2D;
+}
 .tab{
   padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;
   cursor:pointer;color:var(--gray);border:none;background:transparent;
@@ -1029,21 +1076,30 @@ body{
 
     <!-- TAB: FILE (file browser Drive - v7.3.9.080) -->
     <div class="tab-content" id="tabFiles">
+      <!-- Blocco 5t Fix 3: banner stato Drive sempre visibile in cima -->
+      <div id="driveStatusBanner" class="drive-banner drive-banner-loading">
+        <div class="drive-banner-ico"><span class="spinner"></span></div>
+        <div class="drive-banner-content">
+          <div class="drive-banner-title">Verifica connessione Google Drive...</div>
+        </div>
+      </div>
+
       <div id="sharedFoldersSection" style="margin-bottom:24px">
         <div class="sf-header">
           <div class="sf-title-block">
-            <div class="sf-title" id="sfMainTitle">Le tue cartelle</div>
-            <div class="sf-subtitle" id="sfSubtitle">Carica per iniziare</div>
+            <div class="sf-title" id="sfMainTitle">Le tue cartelle condivise</div>
+            <div class="sf-subtitle" id="sfSubtitle">Scorciatoie alle cartelle che condividi con i tuoi contatti</div>
           </div>
-          <button class="btn-cta" onclick="openCreateSharedFolder()" style="background:var(--blue);color:#fff;font-weight:800">+ Nuova cartella</button>
+          <button class="btn-cta" onclick="openCreateSharedFolder()" style="background:var(--mario-green);color:#fff;font-weight:800">+ Nuova cartella</button>
         </div>
         <div id="sharedFoldersList" class="sf-grid">
           <div class="loading"><span class="spinner"></span>Caricamento cartelle...</div>
         </div>
       </div>
       <div style="margin-top:16px;padding-top:18px;border-top:1px solid var(--border)">
-        <div class="sf-section-title">Browse cartella Drive raw</div>
-        <div class="sf-section-sub">Sfoglia la struttura di Syntesis-ICP nel tuo Drive. Utile per recuperi o organizzazione manuale.</div>
+        <!-- Blocco 5t Fix 2: titolo e descrizione piu' amichevoli (era "Browse cartella Drive raw") -->
+        <div class="sf-section-title">Tutto il tuo Drive Synthesis-ICP</div>
+        <div class="sf-section-sub">Naviga tutte le cartelle e i file. Da qui puoi creare nuove cartelle, caricare file, e condividere singole cartelle con i tuoi contatti.</div>
         <div id="filesContainer">
           <div class="loading"><span class="spinner"></span>Caricamento file...</div>
         </div>
@@ -1483,6 +1539,7 @@ function renderArchivio(){
     box.appendChild(tabCloud.cloneNode(true));
   }
   // Triggers di caricamento dati (usano le funzioni esistenti)
+  try { updateDriveBanner(); } catch(_){}  // Blocco 5t Fix 3
   try { loadFiles(); } catch(_){}
   try { loadCloudStatus(); } catch(_){}
 }
@@ -2091,6 +2148,58 @@ document.addEventListener('click', function(e){
   var sw = e.target.closest('.color-swatch');
   if(sw){ selectProjectColor(sw.dataset.c); }
 });
+
+// Blocco 5t Fix 3: aggiorna il banner stato Drive in cima ad Archivio.
+// Usa lo stesso endpoint di loadCloudStatus, mostra banner verde se connesso,
+// arancione con bottone "Connetti adesso" se no.
+async function updateDriveBanner(){
+  var banner = document.getElementById('driveStatusBanner');
+  if(!banner) return;
+  try {
+    var r = await fetch('/api/me/gdrive/status', { headers: authHeaders() });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    if(!data.configured){
+      banner.className = 'drive-banner drive-banner-warn';
+      banner.innerHTML =
+        '<div class="drive-banner-ico">&#9888;</div>' +
+        '<div class="drive-banner-content">' +
+          '<div class="drive-banner-title">Server Drive non configurato</div>' +
+          '<div class="drive-banner-sub">Contatta il supporto: mancano le env vars OAuth.</div>' +
+        '</div>';
+      return;
+    }
+    if(!data.connected){
+      banner.className = 'drive-banner drive-banner-warn';
+      banner.innerHTML =
+        '<div class="drive-banner-ico">&#9729;</div>' +
+        '<div class="drive-banner-content">' +
+          '<div class="drive-banner-title">Google Drive non connesso</div>' +
+          '<div class="drive-banner-sub">Connetti il tuo Drive per iniziare a creare cartelle e condividere file con i contatti.</div>' +
+        '</div>' +
+        '<div class="drive-banner-action">' +
+          '<button onclick="connectGdrive()">Connetti adesso</button>' +
+        '</div>';
+      return;
+    }
+    // Connesso
+    banner.className = 'drive-banner drive-banner-ok';
+    banner.innerHTML =
+      '<div class="drive-banner-ico">&#10003;</div>' +
+      '<div class="drive-banner-content">' +
+        '<div class="drive-banner-title">Google Drive connesso</div>' +
+        '<div class="drive-banner-sub">' + escapeHtml(data.email || '') + ' &middot; Synthesis vede solo la cartella <code>Syntesis-ICP</code>.</div>' +
+      '</div>';
+  } catch(e){
+    banner.className = 'drive-banner drive-banner-warn';
+    banner.innerHTML =
+      '<div class="drive-banner-ico">&#9888;</div>' +
+      '<div class="drive-banner-content">' +
+        '<div class="drive-banner-title">Stato Drive non disponibile</div>' +
+        '<div class="drive-banner-sub">Errore: ' + escapeHtml(e.message) + '</div>' +
+      '</div>';
+  }
+}
 
 // ── Cloud (Fase C - Drive OAuth funzionante) ────────────────────────────────
 async function loadCloudStatus(){
@@ -2731,14 +2840,15 @@ function onSharedFolderClick(el){
 }
 
 function openCreateSharedFolder(){
-  showToast('Crea una cartella nel browser Drive qui sotto, poi clicca Condividi sulla cartella', false);
-  setTimeout(function(){
-    var fc = document.getElementById('filesContainer');
-    if(fc) fc.scrollIntoView({behavior:'smooth', block:'start'});
-  }, 100);
+  // Blocco 5t Fix 1: bottone "+ Nuova cartella" ora crea davvero la cartella
+  // (prima mostrava solo un toast confuso e faceva scroll). Riusa la modale
+  // di creazione cartella esistente, parent=root del Drive Synthesis-ICP.
+  openCreateFolder('');
 }
 
 async function loadFiles(folderId){
+  // Blocco 5t Fix 3: aggiorna banner stato Drive in cima
+  updateDriveBanner();
   var box = document.getElementById('filesContainer');
   if(!box) return;
   box.innerHTML = '<div class="loading"><span class="spinner"></span>Caricamento file Drive...</div>';
@@ -2974,6 +3084,8 @@ async function submitCreateFolder(){
     showToast('Cartella creata!');
     // Ricarica file browser
     loadFiles(parentId || null);
+    // Blocco 5t Fix 1: ricarica anche le cartelle in vetrina (top di Archivio)
+    try { loadSharedFolders(); } catch(_){}
   } catch(e){
     showToast('Errore: ' + e.message, true);
   } finally {
