@@ -8,7 +8,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Syntesis-ICP - Area personale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.080 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 /* v7.3.9.080 - Cornice nera sobria, una sola, niente animazione */
@@ -71,8 +71,18 @@ body{scrollbar-width:thin;scrollbar-color:rgba(122,144,164,.35) transparent}
   --pearl:#F0F5FA; --light:#F7F9FC; --border:#D6E4F0;
   --white:#FFFFFF; --green:#0D9E6E; --red:#DC2626; --gold:#F59E0B;
   --radius:14px;
-  --font:'Plus Jakarta Sans',sans-serif;
-  --mono:'DM Mono',monospace;
+  --font:'Source Sans 3','Source Sans Pro',sans-serif;
+  --mono:'Source Sans 3','Source Sans Pro',sans-serif;
+  /* Palette Mario Bros (Blocco 5q): tonalita' calde e giocose per accenti UI.
+     Allineata a Vedere v8 e Synthesis Core. */
+  --mario-green:#5BB04C;
+  --mario-red:#D13A35;
+  --mario-orange:#E89042;
+  --mario-yellow:#F5C518;
+  --mario-cream:#F2DE7E;
+  --mario-purple:#A855F7;
+  --mario-cyan:#0891B2;
+  --mario-navy:#2C3275;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none!important}
@@ -107,6 +117,8 @@ body{
   display:inline-flex;align-items:center;gap:6px;
 }
 .btn-outline:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+/* Logout: hover rosso Mario per indicare azione "uscita" (Blocco 5q) */
+#btnLogout:hover{border-color:var(--mario-red);color:var(--mario-red);background:#FFF5F5}
 .btn-cta{
   padding:8px 14px;background:linear-gradient(135deg,#0077CC,#0050A0);color:#fff;
   border:none;border-radius:9px;font-size:12px;font-weight:800;cursor:pointer;
@@ -114,11 +126,11 @@ body{
 }
 .btn-cta:hover{opacity:.92;transform:translateY(-1px)}
 .btn-danger{
-  padding:6px 12px;background:#FFF5F5;border:1.5px solid #FCA5A5;
-  border-radius:7px;color:var(--red);font-size:11px;font-weight:700;cursor:pointer;
+  padding:6px 12px;background:#FFF5F5;border:1.5px solid var(--mario-red);
+  border-radius:7px;color:var(--mario-red);font-size:11px;font-weight:700;cursor:pointer;
   font-family:var(--font);
 }
-.btn-danger:hover{background:#FEE2E2}
+.btn-danger:hover{background:#FEE2E2;border-color:#A32D2D;color:#A32D2D}
 
 /* Tabs */
 .tabs{
@@ -254,7 +266,8 @@ body{
   transition:.3s;z-index:999;white-space:nowrap;max-width:90vw;
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.toast.error{background:var(--red)}
+.toast.success{background:var(--mario-green)}
+.toast.error{background:var(--mario-red)}
 
 /* Loading */
 .spinner{
@@ -600,7 +613,10 @@ body{
   transform:translateX(-50%) translateY(0);opacity:1;
 }
 .toast.error{
-  background:#dc2626;
+  background:var(--mario-red);
+}
+.toast.success{
+  background:var(--mario-green);
 }
 
 /* Split-pane file browser (v7.3.9.080) */
