@@ -713,16 +713,22 @@ body{
 [data-tooltip]:hover::before{opacity:1}
 
 /* Posizione: sopra (per bottoni in basso) */
-[data-tooltip][data-tooltip-pos="top"]::after{
+[data-tooltip][data-tooltip-pos="top"]::after,
+.vp-tools [data-tooltip]:not([data-tooltip-pos])::after,
+.vp-tools [data-tooltip][data-tooltip-pos=""]::after{
   top:auto;bottom:calc(100% + 8px);
   transform:translateX(-50%) translateY(2px);
 }
-[data-tooltip][data-tooltip-pos="top"]::before{
+[data-tooltip][data-tooltip-pos="top"]::before,
+.vp-tools [data-tooltip]:not([data-tooltip-pos])::before,
+.vp-tools [data-tooltip][data-tooltip-pos=""]::before{
   top:auto;bottom:calc(100% + 1px);
   border-bottom:none;
   border-top:7px solid var(--border);
 }
-[data-tooltip][data-tooltip-pos="top"]:hover::after{
+[data-tooltip][data-tooltip-pos="top"]:hover::after,
+.vp-tools [data-tooltip]:not([data-tooltip-pos]):hover::after,
+.vp-tools [data-tooltip][data-tooltip-pos=""]:hover::after{
   transform:translateX(-50%) translateY(0);
 }
 
