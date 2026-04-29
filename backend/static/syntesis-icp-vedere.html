@@ -930,8 +930,8 @@ input[type="file"]{display:none}
       <!-- Slider diametro gomma: visibile solo quando la gomma e' attiva -->
       <div id="eraserDiameterCtrl" class="vp-inline-ctrl" style="display:none">
         <span class="vp-inline-label">Ø</span>
-        <input type="range" id="eraserDiameterSlider" min="0.5" max="10" step="0.1" value="2.0" class="vp-inline-slider">
-        <span id="eraserDiameterValue" class="vp-inline-value">2.0 mm</span>
+        <input type="range" id="eraserDiameterSlider" min="10" max="150" step="2" value="40" class="vp-inline-slider">
+        <span id="eraserDiameterValue" class="vp-inline-value">40 px</span>
       </div>
       <button class="vp-btn" id="btnRulerClear" title="Pulisci misure" disabled>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h10M6 3h4M5 5v8a1 1 0 001 1h4a1 1 0 001-1V5" stroke-linecap="round"/></svg>
@@ -1828,7 +1828,7 @@ const state = {
   measureColorIdx: 0,         // contatore palette misure (Blocco 5e)
   // Gomma topologica (Blocco 5f)
   eraserActive: false,
-  eraserDiameter: 2.0,        // mm, slider 0.5–10
+  eraserDiameter: 40,         // px sullo schermo, slider 10-150 (Blocco 5j: cursore costante in pixel)
   eraserStrokes: [],          // history undo, max 20 entry. Ogni entry = { layerId, deletedTriangles: [{idx, ax,ay,az,bx,by,bz,cx,cy,cz}] }
   eraserCurrentStroke: null,  // stroke in corso durante drag
   eraserDragging: false,
@@ -3316,9 +3316,25 @@ function eraserPaint(e) {
   const localPoint = hit.point.clone();
   hit.object.worldToLocal(localPoint);
   const cxL = localPoint.x, cyL = localPoint.y, czL = localPoint.z;
-  const radius = state.eraserDiameter / 2;
 
-  const tris = _bfsTopological(layer, seedTri, cxL, cyL, czL, radius);
+  // CONVERSIONE PIXEL → MM (Blocco 5j):
+  // state.eraserDiameter e' in pixel sullo schermo. Per il BFS topologico
+  // serve il raggio in MM nel mondo 3D. Converto sapendo:
+  //   - profondita' del punto di hit in coordinate camera
+  //   - dimensione del viewport in pixel
+  //   - FOV verticale della camera prospettica
+  // A profondita' 'd' dalla camera, 1 pixel = (2 * d * tan(fov/2)) / viewportHeightPx
+  const vp = document.getElementById('viewport');
+  const vpHeight = vp.getBoundingClientRect().height || 1;
+  // Distanza camera-punto (lungo la viewing direction)
+  const camPos = camera.position;
+  const dx = hit.point.x - camPos.x, dy = hit.point.y - camPos.y, dz = hit.point.z - camPos.z;
+  const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  const fovRad = camera.fov * Math.PI / 180;
+  const mmPerPixel = (2 * dist * Math.tan(fovRad / 2)) / vpHeight;
+  const radiusMm = (state.eraserDiameter / 2) * mmPerPixel;
+
+  const tris = _bfsTopological(layer, seedTri, cxL, cyL, czL, radiusMm);
   if (tris.length === 0) return;
 
   // Inizializzo lo stroke se non esiste
@@ -3379,6 +3395,9 @@ function eraserUndo() {
 }
 
 // Aggiorna la posizione e la dimensione del cursore visivo
+// Posiziona il cursore visivo della gomma sotto al mouse.
+// Dimensione FISSA in pixel (Blocco 5j: niente piu' raycast per ricalcolare
+// il diametro a ogni movimento, niente piu' jitter del cursore).
 function updateEraserCursor(e) {
   if (!state.eraserActive) return;
   const cursor = document.getElementById('eraserCursor');
@@ -3388,34 +3407,10 @@ function updateEraserCursor(e) {
   const y = e.clientY - rect.top;
   cursor.style.left = x + 'px';
   cursor.style.top = y + 'px';
-
-  // Diametro visivo: converto i mm del diametro in pixel proiettando un segmento
-  // di quella lunghezza al depth della mesh sotto il mouse.
-  // Per semplicita' uso un raycast: se trovo un punto di hit, calcolo quanti pixel
-  // corrispondono a `eraserDiameter` mm a quella profondita'.
-  eventToNDC(e);
-  raycaster.setFromCamera(mouseNDC, camera);
-  const targets = state.layers.filter(l => l.visible && !l.isPoints).map(l => l.object);
-  let pxDiameter = 30;  // default se niente sotto il mouse
-  if (targets.length > 0) {
-    const hits = raycaster.intersectObjects(targets, false);
-    if (hits.length > 0) {
-      const hp = hits[0].point;
-      // Punto offsettato di eraserDiameter mm in direzione perpendicolare alla camera
-      const camDir = new THREE.Vector3();
-      camera.getWorldDirection(camDir);
-      const right = new THREE.Vector3().crossVectors(camDir, new THREE.Vector3(0, 1, 0)).normalize();
-      if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
-      const offset = hp.clone().add(right.multiplyScalar(state.eraserDiameter));
-      const a = hp.clone().project(camera);
-      const b = offset.project(camera);
-      const dxNdc = (b.x - a.x);
-      pxDiameter = Math.abs(dxNdc) * rect.width;
-      pxDiameter = Math.max(8, Math.min(300, pxDiameter));
-    }
-  }
-  cursor.style.width = pxDiameter + 'px';
-  cursor.style.height = pxDiameter + 'px';
+  // Dimensione costante in pixel = state.eraserDiameter (settato dallo slider)
+  const px = state.eraserDiameter;
+  cursor.style.width = px + 'px';
+  cursor.style.height = px + 'px';
 }
 
 function rulerOnPointerMove(e) {
@@ -5349,8 +5344,8 @@ document.getElementById('btnEraser').addEventListener('click', () => {
 const _eraserSlider = document.getElementById('eraserDiameterSlider');
 const _eraserValue = document.getElementById('eraserDiameterValue');
 _eraserSlider.addEventListener('input', (ev) => {
-  state.eraserDiameter = parseFloat(ev.target.value);
-  _eraserValue.textContent = state.eraserDiameter.toFixed(1) + ' mm';
+  state.eraserDiameter = parseInt(ev.target.value, 10);
+  _eraserValue.textContent = state.eraserDiameter + ' px';
 });
 // Cursor + paint events
 canvas.addEventListener('pointermove', (e) => {
