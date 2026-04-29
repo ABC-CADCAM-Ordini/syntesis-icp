@@ -656,10 +656,11 @@ input[type="file"]{display:none}
   white-space:nowrap;
   box-shadow:0 2px 6px rgba(15,25,35,.25);
   transform:translate(-50%,-100%) translateY(-6px);
+  --label-bg:var(--blue);
 }
 .measure-label::after{
   content:'';position:absolute;left:50%;top:100%;
-  margin-left:-4px;border:4px solid transparent;border-top-color:var(--blue);
+  margin-left:-4px;border:4px solid transparent;border-top-color:var(--label-bg);
 }
 /* Forme parametrabili: la label e' cliccabile (doppio click apre editing) */
 .measure-label.editable{
@@ -1721,9 +1722,30 @@ const SWATCH_COLORS = [
   '#0891B2','#DB2777','#F59E0B','#7C3AED','#059669',
   '#0F1923','#7A90A4','#FFFFFF','#FF6B35','#FFD166'
 ];
+// Palette dedicata alle misure (Blocco 5e): ogni nuova misura prende il
+// colore successivo della lista, ciclando. Sono colori caldi e contrastanti
+// per distinguere a colpo d'occhio piu' misure sulla stessa scansione.
+// Le linee 3D dei segmenti restano sempre nere; questa palette colora
+// label, marker dei punti, archi e quote tecniche.
+const MEASURE_PALETTE = [
+  '#FF6B35',  // arancione brillante
+  '#DC2626',  // rosso
+  '#0D9E6E',  // verde foresta
+  '#D97706',  // ambra/zafferano
+  '#A855F7',  // viola
+  '#0891B2',  // ciano
+  '#DB2777',  // magenta
+];
 const POINT_SIZE = 0.4;
 const HIGHLIGHT_OPACITY = 0.45;
 const HIGHLIGHT_SCALE = 1.005;
+
+// Helper: ritorna il prossimo colore della palette misure e avanza il contatore
+function nextMeasureColor() {
+  const idx = state.measureColorIdx % MEASURE_PALETTE.length;
+  state.measureColorIdx++;
+  return MEASURE_PALETTE[idx];
+}
 
 const state = {
   layers: [], nextId: 1,
@@ -1731,6 +1753,7 @@ const state = {
   rulerActive: false,
   rulerFirstPoint: null,
   measures: [],
+  measureColorIdx: 0,         // contatore palette misure (Blocco 5e)
   // Angolo tra 2 linee (Blocco 5c)
   angleActive: false,
   anglePoints: [],          // accumula 4 punti: [p1l1, p2l1, p1l2, p2l2]
@@ -2530,22 +2553,36 @@ function angleOnClick(e) {
   const pick = pickTriangleCentroid(e);
   if (!pick) return;
 
+  // Al primo click di una nuova misura, scelgo il colore della palette.
+  // I marker prendono questo colore; le LINEE 3D restano nere (regola Blocco 5e).
+  if (state.anglePoints.length === 0) {
+    state.anglePendingColor = nextMeasureColor();
+  }
+  const accentColor = state.anglePendingColor;
+
   state.anglePoints.push(pick.point.clone());
-  // Marker visivo del punto cliccato
+  // Marker visivo del punto cliccato (palette colorata)
   const markerGeom = new THREE.SphereGeometry(0.35, 12, 12);
-  const markerMat = new THREE.MeshBasicMaterial({ color: 0x0065B3, depthTest: false, transparent: true, opacity: 0.95 });
+  const markerMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(accentColor).getHex(),
+    depthTest: false, transparent: true, opacity: 0.95
+  });
   const marker = new THREE.Mesh(markerGeom, markerMat);
   marker.position.copy(pick.point);
   marker.renderOrder = 999;
   scene.add(marker);
   state.anglePendingObjs.push(marker);
 
-  // Se ho 2 punti completi (fine linea 1 o fine linea 2), disegno la linea
+  // Se ho 2 punti completi (fine linea 1 o fine linea 2), disegno la linea NERA
+  // (le linee 3D non sono colorate - Blocco 5e)
   if (state.anglePoints.length === 2 || state.anglePoints.length === 4) {
     const idx = state.anglePoints.length - 2;
     const a = state.anglePoints[idx], b = state.anglePoints[idx + 1];
     const lineGeom = new THREE.BufferGeometry().setFromPoints([a, b]);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x0065B3, depthTest: false, transparent: true, opacity: 0.95 });
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0x0F1923,   // nero/dark (var --dark)
+      depthTest: false, transparent: true, opacity: 0.95
+    });
     const line = new THREE.Line(lineGeom, lineMat);
     line.renderOrder = 998;
     scene.add(line);
@@ -2558,6 +2595,7 @@ function angleOnClick(e) {
     // Reset per misura successiva (resta in modalità angolo)
     state.anglePendingObjs = [];  // gli oggetti sono ora di proprieta' della misura, non dei pending
     state.anglePoints = [];
+    state.anglePendingColor = null;
   }
   toggleAngleHint(true);
 }
@@ -2638,37 +2676,41 @@ function commitAngleMeasure() {
   const len2DAvg = (l1 + l2) / 2;
   const arcRadiusPx = Math.max(30, Math.min(120, len2DAvg * 0.30));
 
-  // LABEL HTML
+  // LABEL HTML (colore della palette per questa misura)
+  const accentColor = state.anglePendingColor || '#FF6B35';
   const labelEl = document.createElement('div');
   labelEl.className = 'measure-label';
-  labelEl.style.background = '#0065B3';
+  labelEl.style.background = accentColor;
   labelEl.textContent = angleDeg.toFixed(2) + '°';
   document.getElementById('viewport').appendChild(labelEl);
+  // Aggiorno la freccia ::after via CSS variable inline (per matchare il bg)
+  labelEl.style.setProperty('--label-bg', accentColor);
 
   // Creo i nodi SVG dell'arco nell'overlay angleArcsOverlay
   const overlay = document.getElementById('angleArcsOverlay');
   const SVGNS = 'http://www.w3.org/2000/svg';
   const arcGroup = document.createElementNS(SVGNS, 'g');
   arcGroup.setAttribute('class', 'angle-arc');
-  // Path dell'arco
+  // Path dell'arco: nel colore della palette per questa misura
   const arcPath = document.createElementNS(SVGNS, 'path');
   arcPath.setAttribute('fill', 'none');
-  arcPath.setAttribute('stroke', '#0F1923');
-  arcPath.setAttribute('stroke-width', '1.5');
+  arcPath.setAttribute('stroke', accentColor);
+  arcPath.setAttribute('stroke-width', '2');
+  arcPath.setAttribute('stroke-linecap', 'round');
   arcGroup.appendChild(arcPath);
-  // Linee di estensione (tratteggiate, dal vertice ai punti A1/A2 se le linee
-  // non passano per il vertice — utile in caso di linee proiettate sghembe)
+  // Linee di estensione: in dark/nero (sono linee tecniche di costruzione,
+  // restano sobrie come quelle delle quote dei disegni meccanici)
   const ext1 = document.createElementNS(SVGNS, 'line');
   ext1.setAttribute('stroke', '#0F1923');
   ext1.setAttribute('stroke-width', '0.8');
   ext1.setAttribute('stroke-dasharray', '3 2');
-  ext1.setAttribute('opacity', '0.6');
+  ext1.setAttribute('opacity', '0.55');
   arcGroup.appendChild(ext1);
   const ext2 = document.createElementNS(SVGNS, 'line');
   ext2.setAttribute('stroke', '#0F1923');
   ext2.setAttribute('stroke-width', '0.8');
   ext2.setAttribute('stroke-dasharray', '3 2');
-  ext2.setAttribute('opacity', '0.6');
+  ext2.setAttribute('opacity', '0.55');
   arcGroup.appendChild(ext2);
   overlay.appendChild(arcGroup);
 
@@ -2677,6 +2719,7 @@ function commitAngleMeasure() {
     id: state.nextId++,
     visible: true,
     kind: 'angle-measure',
+    color: accentColor,
     p1l1: a1.clone(), p2l1: b1.clone(),
     p1l2: a2.clone(), p2l2: b2.clone(),
     center: center3D,
@@ -2702,7 +2745,7 @@ function commitAngleMeasure() {
         { x: a2.x, y: a2.y, z: a2.z },
         { x: b2.x, y: b2.y, z: b2.z },
       ],
-      visual: { visible: true, color: '#0065B3' },
+      visual: { visible: true, color: accentColor },
     }).id;
   }
 
@@ -2876,23 +2919,29 @@ function rulerOnPointerMove(e) {
     if (state.rulerFirstPoint) {
       const p1 = state.rulerFirstPoint.point;
       const p2 = pick.point;
+      const measureColor = state.rulerFirstPoint.color || '#FF6B35';
       if (pendingLine) {
         scene.remove(pendingLine);
         pendingLine.geometry.dispose();
         pendingLine.material.dispose();
       }
-      pendingLine = buildMeasureLine(p1, p2, '#0065B3');
+      // Pendente: linea NERA (come la finale, regola Blocco 5e)
+      pendingLine = buildMeasureLine(p1, p2, '#0F1923');
       scene.add(pendingLine);
 
-      // Label distanza temporanea
+      // Label distanza temporanea (colore palette per coerenza visiva)
       const dist = p1.distanceTo(p2);
       const mid = p1.clone().add(p2).multiplyScalar(0.5);
       const screenPos = worldToScreen(mid);
       if (!pendingDistLabel) {
         pendingDistLabel = document.createElement('div');
         pendingDistLabel.className = 'measure-label';
-        pendingDistLabel.style.background = '#0065B3';
+        pendingDistLabel.style.background = measureColor;
+        pendingDistLabel.style.setProperty('--label-bg', measureColor);
         document.getElementById('viewport').appendChild(pendingDistLabel);
+      } else {
+        pendingDistLabel.style.background = measureColor;
+        pendingDistLabel.style.setProperty('--label-bg', measureColor);
       }
       pendingDistLabel.textContent = formatDistance(dist);
       pendingDistLabel.style.left = screenPos.x + 'px';
@@ -2912,16 +2961,19 @@ function rulerOnClick(e) {
   if (!pick) return;
 
   if (!state.rulerFirstPoint) {
-    // Primo punto: piazzo marker, salvo
-    const marker = buildPointMarker(0x0065B3);
+    // Primo punto: scelgo il colore della palette per questa misura, piazzo marker, salvo
+    const measureColor = nextMeasureColor();
+    const colorHex = parseInt(measureColor.slice(1), 16);
+    const marker = buildPointMarker(colorHex);
     marker.position.copy(pick.point);
     scene.add(marker);
-    state.rulerFirstPoint = { point: pick.point.clone(), marker, layerId: pick.layerId };
+    state.rulerFirstPoint = { point: pick.point.clone(), marker, layerId: pick.layerId, color: measureColor };
     toggleMeasureHint(true);
   } else {
     // Secondo punto: finalizzo misura
     const p1 = state.rulerFirstPoint.point;
     const p2 = pick.point.clone();
+    const measureColor = state.rulerFirstPoint.color || '#FF6B35';
 
     // Pulisco temporanei
     if (pendingLine) {
@@ -2941,14 +2993,16 @@ function rulerOnClick(e) {
       state.rulerFirstPoint.marker.material.dispose();
     }
 
-    // Creo la linea della misura
-    const line = buildMeasureLine(p1, p2, '#0065B3');
+    // Linea della misura: NERA (regola Blocco 5e: linee 3D non colorate)
+    const line = buildMeasureLine(p1, p2, '#0F1923');
     scene.add(line);
 
     const dist = p1.distanceTo(p2);
     const labelEl = document.createElement('div');
     labelEl.className = 'measure-label';
     labelEl.textContent = formatDistance(dist);
+    labelEl.style.background = measureColor;
+    labelEl.style.setProperty('--label-bg', measureColor);
     document.getElementById('viewport').appendChild(labelEl);
 
     // 3 gizmi handle: P1, P2, C. Tutti riusano lo stesso pattern delle forme.
@@ -2991,6 +3045,7 @@ function rulerOnClick(e) {
       id: state.nextId++,
       visible: true,
       kind: 'measure',
+      color: measureColor,
       p1: p1.clone(),
       p2: p2.clone(),
       axis, Vmeas, normal: measureNormal,
@@ -3013,7 +3068,7 @@ function rulerOnClick(e) {
         { x: p1.x, y: p1.y, z: p1.z },
         { x: p2.x, y: p2.y, z: p2.z }
       ],
-      visual: { visible: true, color: '#0065B3' },
+      visual: { visible: true, color: measureColor },
     }).id;
     updateMeasureLabels();
 
@@ -3292,6 +3347,7 @@ function clearAllMeasures() {
     if (m.synId) window.SynRegistry.remove(m.synId);
   });
   state.measures = [];
+  state.measureColorIdx = 0;  // Reset palette quando pulisco tutto (Blocco 5e)
   state.rulerFirstPoint = null;
   clearPending();
   if (state.measures.length === 0 && state.circles.length === 0) {
