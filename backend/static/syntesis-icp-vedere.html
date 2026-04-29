@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Syntesis-ICP - Vedere v7.4.0.001 (prototipo locale)
+<!-- Syntesis-ICP - Vedere v8.0.0-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Vedere v7.4.0.001</title>
+<title>Syntesis-ICP - Vedere v8.0.0-refactor</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 html{background:#000;margin:0;padding:0}
@@ -219,6 +219,180 @@ body{
 }
 .section-pip.maxi .section-pip-resize{display:none}
 
+/* === Properties Panel (destra) === */
+.props-panel{
+  position:absolute;top:14px;right:14px;
+  width:280px;max-height:calc(100% - 28px);
+  background:rgba(255,255,255,0.97);
+  backdrop-filter:blur(8px);
+  border:1px solid var(--border);
+  border-radius:10px;
+  box-shadow:0 4px 16px rgba(15,25,35,.18);
+  overflow:hidden;
+  z-index:7;
+  font-family:var(--font);
+  display:flex;flex-direction:column;
+  transform:translateX(calc(100% + 28px));
+  opacity:0;
+  pointer-events:none;
+  transition:transform .25s ease, opacity .2s ease;
+}
+.props-panel.open{
+  transform:translateX(0);
+  opacity:1;
+  pointer-events:auto;
+}
+.props-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;
+  background:var(--light);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.props-title{
+  font-family:var(--mono);
+  font-size:10px;font-weight:800;letter-spacing:.12em;
+  color:var(--dark);
+}
+.props-close{
+  width:22px;height:22px;
+  border:none;background:transparent;color:var(--gray);
+  border-radius:4px;cursor:pointer;
+  font-size:18px;font-weight:400;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .12s;
+}
+.props-close:hover{background:rgba(0,101,179,0.08);color:var(--dark)}
+.props-body{
+  padding:12px;overflow-y:auto;flex:1;font-size:12px;
+}
+
+/* Header dell'oggetto selezionato (badge tipo + nome grande) */
+.props-obj-head{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:14px;padding-bottom:12px;
+  border-bottom:1px solid var(--border);
+}
+.props-obj-icon{
+  width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--light);border-radius:8px;
+  color:var(--blue);flex-shrink:0;
+}
+.props-obj-info{flex:1;min-width:0}
+.props-obj-name{
+  font-size:13px;font-weight:700;color:var(--dark);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.props-obj-type{
+  font-family:var(--mono);font-size:10px;
+  color:var(--gray);margin-top:2px;
+  letter-spacing:.05em;text-transform:uppercase;
+}
+
+/* Sezione di proprietà (titolo + righe key-value) */
+.props-section{margin-bottom:14px}
+.props-section-title{
+  font-family:var(--mono);font-size:9px;font-weight:800;
+  color:var(--gray);letter-spacing:.12em;text-transform:uppercase;
+  margin-bottom:6px;padding-bottom:3px;
+  border-bottom:1px solid var(--border);
+}
+.props-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:5px 0;font-size:11px;gap:8px;
+}
+.props-row-key{color:var(--gray);font-weight:600;flex-shrink:0}
+.props-row-value{
+  font-family:var(--mono);color:var(--dark);
+  font-weight:600;text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.props-row-value.muted{color:var(--gray);font-style:italic}
+
+/* Slider opacità */
+.props-slider-row{
+  display:flex;align-items:center;gap:8px;padding:5px 0;
+}
+.props-slider-row input[type=range]{
+  flex:1;accent-color:var(--blue);
+  height:4px;cursor:pointer;
+}
+.props-slider-row .props-row-value{
+  min-width:38px;font-size:11px;
+}
+
+/* Toggle (occhio + lock) */
+.props-toggle{
+  width:30px;height:24px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border);background:var(--white);
+  color:var(--gray);border-radius:5px;cursor:pointer;
+  transition:all .12s;
+}
+.props-toggle:hover{border-color:var(--blue);color:var(--blue)}
+.props-toggle.active{
+  background:var(--blue);color:var(--white);border-color:var(--blue);
+}
+
+/* Color swatches */
+.props-colors{
+  display:grid;grid-template-columns:repeat(8,1fr);gap:4px;
+}
+.props-color-swatch{
+  aspect-ratio:1;border-radius:4px;cursor:pointer;
+  border:1.5px solid var(--white);
+  box-shadow:0 0 0 1px var(--border);
+  transition:transform .1s;
+}
+.props-color-swatch:hover{transform:scale(1.15)}
+.props-color-swatch.active{box-shadow:0 0 0 2px var(--blue)}
+
+/* Azioni in fondo */
+.props-actions{
+  display:flex;flex-direction:column;gap:4px;
+  margin-top:10px;
+}
+.props-action-btn{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;font-size:11px;font-weight:600;
+  border:1px solid var(--border);background:var(--white);color:var(--dark);
+  border-radius:5px;cursor:pointer;
+  transition:all .12s;
+  font-family:var(--font);
+}
+.props-action-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--light)}
+.props-action-btn.danger:hover{border-color:var(--red);color:var(--red);background:#FCEBEB}
+.props-action-btn svg{flex-shrink:0;color:inherit}
+
+/* Modalita' rendering: 3 bottoni in fila */
+.props-render-modes{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:4px;
+}
+.props-render-btn{
+  padding:6px 4px;
+  font-family:var(--font);
+  font-size:10px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;
+  border:1px solid var(--border);
+  background:var(--white);
+  color:var(--dark);
+  border-radius:4px;
+  cursor:pointer;
+  transition:all .12s;
+}
+.props-render-btn:hover{
+  border-color:var(--blue);color:var(--blue);
+  background:var(--light);
+}
+.props-render-btn.active{
+  background:var(--blue);
+  border-color:var(--blue);
+  color:var(--white);
+}
+
 .layer-panel{
   position:absolute;top:14px;left:14px;
   width:280px;max-height:calc(100% - 28px);
@@ -247,6 +421,101 @@ body{
 .lp-add-btn:hover{background:#004F8C;border-color:#004F8C}
 .lp-body{flex:1;overflow-y:auto;min-height:0;max-height:50vh}
 .lp-empty{padding:18px 14px;text-align:center;color:var(--gray);font-size:11px;font-style:italic}
+/* ===========================================
+   SynLayerPanel - tree view sul SynRegistry
+   ===========================================*/
+.slp-group{
+  border-bottom:1px solid var(--border);
+}
+.slp-group:last-child{border-bottom:none}
+.slp-group-header{
+  display:flex;align-items:center;gap:6px;
+  padding:8px 10px 7px;
+  background:var(--light);
+  cursor:pointer;
+  user-select:none;
+  transition:background .12s;
+}
+.slp-group-header:hover{background:#EEF2F8}
+.slp-chevron{
+  width:14px;height:14px;display:flex;align-items:center;justify-content:center;
+  color:var(--gray);transition:transform .15s;flex-shrink:0;
+}
+.slp-group.collapsed .slp-chevron{transform:rotate(-90deg)}
+.slp-group-icon{width:14px;height:14px;color:var(--blue);flex-shrink:0}
+.slp-group-label{
+  flex:1;font-family:var(--mono);font-size:10px;font-weight:800;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--dark);
+}
+.slp-group-badge{
+  background:var(--white);color:var(--gray);
+  padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;
+  border:1px solid var(--border);font-family:var(--mono);
+}
+.slp-group.collapsed .slp-items{display:none}
+.slp-items{}
+.slp-empty{
+  padding:8px 12px;font-size:11px;color:var(--gray);font-style:italic;
+}
+
+.slp-item{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 10px 6px 14px;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .12s;
+  position:relative;
+}
+.slp-item:last-child{border-bottom:none}
+.slp-item:hover{background:var(--light)}
+.slp-item.selected{background:rgba(0,101,179,.08);box-shadow:inset 3px 0 0 var(--blue)}
+.slp-item.child{padding-left:30px}
+.slp-item.child:before{
+  content:'';
+  position:absolute;left:18px;top:0;bottom:0;
+  width:1px;background:var(--border);
+}
+
+.slp-eye{
+  width:18px;height:18px;display:flex;align-items:center;justify-content:center;
+  border:none;background:transparent;color:var(--gray);
+  border-radius:3px;cursor:pointer;flex-shrink:0;
+  transition:all .12s;
+}
+.slp-eye:hover{background:rgba(0,101,179,.1);color:var(--blue)}
+.slp-eye.hidden{color:#C0CCD8}
+.slp-color-dot{
+  width:11px;height:11px;border-radius:50%;
+  border:1.5px solid var(--white);
+  box-shadow:0 0 0 1px var(--border);
+  flex-shrink:0;cursor:pointer;
+  transition:transform .1s;
+}
+.slp-color-dot:hover{transform:scale(1.2)}
+.slp-name{
+  flex:1;min-width:0;
+  font-size:12px;font-weight:600;color:var(--dark);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.slp-item.hidden .slp-name{color:var(--gray);font-style:italic}
+.slp-meta{
+  font-family:var(--mono);font-size:10px;color:var(--gray);
+  white-space:nowrap;
+}
+.slp-item-actions{
+  display:flex;gap:2px;
+  opacity:0;transition:opacity .12s;
+}
+.slp-item:hover .slp-item-actions,
+.slp-item.selected .slp-item-actions{opacity:1}
+.slp-action-btn{
+  width:18px;height:18px;display:flex;align-items:center;justify-content:center;
+  border:none;background:transparent;color:var(--gray);
+  border-radius:3px;cursor:pointer;
+  transition:all .12s;
+}
+.slp-action-btn:hover{background:rgba(0,101,179,.1);color:var(--blue)}
+.slp-action-btn.danger:hover{background:rgba(220,38,38,.1);color:var(--red)}
+
 .lp-section-title{
   padding:8px 12px 4px;
   font-family:var(--mono);font-size:10px;font-weight:800;
@@ -392,6 +661,51 @@ input[type="file"]{display:none}
   content:'';position:absolute;left:50%;top:100%;
   margin-left:-4px;border:4px solid transparent;border-top-color:var(--blue);
 }
+/* Forme parametrabili: la label e' cliccabile (doppio click apre editing) */
+.measure-label.editable{
+  pointer-events:auto;
+  cursor:pointer;
+  transition:transform .12s, box-shadow .12s;
+}
+.measure-label.editable:hover{
+  transform:translate(-50%,-100%) translateY(-7px) scale(1.05);
+  box-shadow:0 3px 10px rgba(15,25,35,.35);
+}
+/* Stato durante editing: l'etichetta ospita un input numerico */
+.measure-label.editing{
+  pointer-events:auto;
+  background:var(--white);
+  color:var(--dark);
+  border:2px solid var(--blue);
+  padding:1px 2px;
+  box-shadow:0 4px 14px rgba(0,101,179,.4);
+}
+.measure-label.editing::after{
+  border-top-color:var(--white);
+}
+.measure-label-input{
+  font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.04em;
+  border:none;
+  outline:none;
+  background:transparent;
+  color:var(--dark);
+  width:60px;
+  text-align:center;
+  padding:2px 4px;
+}
+.measure-label-input::-webkit-outer-spin-button,
+.measure-label-input::-webkit-inner-spin-button{
+  -webkit-appearance:none;
+  margin:0;
+}
+
+/* Stato edit per la quota tecnica dell'esagono (DOM diverso da measure-label) */
+.tech-dim-value.editing-tech{
+  background:var(--white);
+  border:2px solid var(--blue);
+  padding:0 4px;
+  box-shadow:0 4px 14px rgba(0,101,179,.4);
+}
 .measure-hint{
   position:absolute;top:14px;left:50%;transform:translateX(-50%);
   background:rgba(0,101,179,.95);color:var(--white);
@@ -425,7 +739,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v7.4.0.001</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.0-refactor</span>
     </div>
   </div>
   <div class="file-menu-wrapper">
@@ -556,6 +870,15 @@ input[type="file"]{display:none}
       <div class="drop-overlay-inner">RILASCIA PER CARICARE</div>
     </div>
 
+    <!-- Properties Panel: si apre a destra quando un oggetto è selezionato nel registry -->
+    <div class="props-panel" id="propsPanel">
+      <div class="props-header">
+        <span class="props-title" id="propsTitle">PROPRIETÀ</span>
+        <button class="props-close" id="propsClose" title="Chiudi">×</button>
+      </div>
+      <div class="props-body" id="propsBody"></div>
+    </div>
+
     <!-- PIP Sezione: finestra fluttuante con la cut view 2D -->
     <div class="section-pip" id="sectionPip" style="display:none">
       <div class="section-pip-header">
@@ -630,6 +953,743 @@ input[type="file"]{display:none}
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/PLYLoader.js"></script>
+
+<!-- ================================================================
+     SYNTHESIS CORE - Modulo fondazionale (inline)
+     Quando il progetto adottera' un build system, questo blocco
+     diventera' un file /core/syn-*.js separato. La struttura interna
+     non cambiera'.
+     ================================================================ -->
+<script>
+"use strict";
+
+// ----------------------------------------------------------------
+// SCENE REGISTRY (singleton globale window.SynRegistry)
+// ----------------------------------------------------------------
+(function(){
+  const _state = {
+    objects: new Map(),
+    selection: new Set(),
+    nextId: 1,
+    listeners: new Map(),
+  };
+  const EVENTS = {
+    ADD: 'add', REMOVE: 'remove', UPDATE: 'update',
+    SELECT: 'select', CLEAR: 'clear', CHANGE: 'change',
+  };
+  function _genId(prefix) {
+    return (prefix || 'obj') + '_' + (_state.nextId++).toString().padStart(4, '0');
+  }
+  function _emit(event, payload) {
+    const listeners = _state.listeners.get(event);
+    if (listeners) {
+      for (const cb of listeners) {
+        try { cb(payload); } catch (e) { console.error('SynRegistry ' + event + ':', e); }
+      }
+    }
+    if (event !== EVENTS.CHANGE) {
+      const change = _state.listeners.get(EVENTS.CHANGE);
+      if (change) for (const cb of change) {
+        try { cb(Object.assign({event}, payload)); } catch(e){}
+      }
+    }
+  }
+  function _defaultGroupForType(type) {
+    if (type === 'mesh' || type === 'pointcloud') return 'files';
+    if (type === 'marker' || type === 'template') return 'markers';
+    if (type === 'measure') return 'measures';
+    if (type === 'shape') return 'shapes';
+    if (type === 'section') return 'sections';
+    if (type === 'axis' || type === 'helper') return 'helpers';
+    if (type === 'analysis') return 'analysis';
+    return 'misc';
+  }
+  function _normalize(spec) {
+    const id = spec.id || _genId(spec.role || spec.type || 'obj');
+    return {
+      id,
+      type: spec.type || 'unknown',
+      role: spec.role || null,
+      name: spec.name || id,
+      group: spec.group || _defaultGroupForType(spec.type, spec.role),
+      parentId: spec.parentId || null,
+      module: spec.module || 'vedere',
+      three: spec.three || { group: null, meshes: [], labels: [], helpers: [] },
+      visual: Object.assign({
+        visible: true, opacity: 1.0, color: null,
+        vertexColors: false, transparent: false,
+        locked: false, selected: false,
+      }, spec.visual || {}),
+      meta: spec.meta || {},
+      analysis: spec.analysis || {},
+      measurements: spec.measurements || [],
+      createdAt: Date.now(),
+    };
+  }
+  function _setPath(obj, path, value) {
+    const parts = path.split('.');
+    let cur = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (cur[parts[i]] == null) cur[parts[i]] = {};
+      cur = cur[parts[i]];
+    }
+    cur[parts[parts.length - 1]] = value;
+  }
+  window.SynRegistry = {
+    EVENTS,
+    add(spec) {
+      const obj = _normalize(spec);
+      _state.objects.set(obj.id, obj);
+      _emit(EVENTS.ADD, { id: obj.id, object: obj });
+      return obj;
+    },
+    remove(id) {
+      const obj = _state.objects.get(id);
+      if (!obj) return false;
+      const children = this.query({ parentId: id });
+      for (const child of children) this.remove(child.id);
+      _state.objects.delete(id);
+      _state.selection.delete(id);
+      _emit(EVENTS.REMOVE, { id, object: obj });
+      return true;
+    },
+    update(id, changes) {
+      const obj = _state.objects.get(id);
+      if (!obj) return false;
+      const patch = {};
+      for (const key in changes) {
+        const value = changes[key];
+        if (key.indexOf('.') >= 0) {
+          _setPath(obj, key, value); patch[key] = value;
+        } else if (typeof value === 'object' && value !== null && !Array.isArray(value) && obj[key] && typeof obj[key] === 'object') {
+          Object.assign(obj[key], value); patch[key] = obj[key];
+        } else {
+          obj[key] = value; patch[key] = value;
+        }
+      }
+      _emit(EVENTS.UPDATE, { id, object: obj, patch });
+      return true;
+    },
+    get(id) { return _state.objects.get(id) || null; },
+    getAll() { return Array.from(_state.objects.values()); },
+    query(filter) {
+      filter = filter || {};
+      const r = [];
+      for (const obj of _state.objects.values()) {
+        let match = true;
+        for (const k in filter) {
+          if (k.indexOf('.') >= 0) {
+            const parts = k.split('.');
+            let cur = obj;
+            for (const p of parts) if (cur != null) cur = cur[p];
+            if (cur !== filter[k]) { match = false; break; }
+          } else if (obj[k] !== filter[k]) { match = false; break; }
+        }
+        if (match) r.push(obj);
+      }
+      return r;
+    },
+    byGroup() {
+      const g = new Map();
+      for (const obj of _state.objects.values()) {
+        const k = obj.group || 'misc';
+        if (!g.has(k)) g.set(k, []);
+        g.get(k).push(obj);
+      }
+      return g;
+    },
+    select(ids) {
+      const arr = Array.isArray(ids) ? ids : (ids ? [ids] : []);
+      for (const obj of _state.objects.values()) {
+        const want = arr.indexOf(obj.id) >= 0;
+        if (obj.visual.selected !== want) obj.visual.selected = want;
+      }
+      _state.selection = new Set(arr);
+      _emit(EVENTS.SELECT, { ids: arr });
+    },
+    selectAdd(id) {
+      if (!_state.objects.has(id)) return;
+      _state.selection.add(id);
+      _state.objects.get(id).visual.selected = true;
+      _emit(EVENTS.SELECT, { ids: Array.from(_state.selection) });
+    },
+    selectRemove(id) {
+      if (!_state.selection.has(id)) return;
+      _state.selection.delete(id);
+      const o = _state.objects.get(id);
+      if (o) o.visual.selected = false;
+      _emit(EVENTS.SELECT, { ids: Array.from(_state.selection) });
+    },
+    getSelection() { return Array.from(_state.selection); },
+    getSelected() {
+      if (_state.selection.size !== 1) return null;
+      const id = _state.selection.values().next().value;
+      return _state.objects.get(id) || null;
+    },
+    clear() {
+      _state.objects.clear();
+      _state.selection.clear();
+      _emit(EVENTS.CLEAR, {});
+    },
+    subscribe(event, cb) {
+      if (!_state.listeners.has(event)) _state.listeners.set(event, new Set());
+      _state.listeners.get(event).add(cb);
+      return () => _state.listeners.get(event).delete(cb);
+    },
+    countByGroup() {
+      const c = {};
+      for (const o of _state.objects.values()) {
+        c[o.group || 'misc'] = (c[o.group || 'misc'] || 0) + 1;
+      }
+      return c;
+    },
+    snapshot() {
+      const objects = [];
+      for (const o of _state.objects.values()) {
+        const c = Object.assign({}, o);
+        delete c.three;
+        objects.push(c);
+      }
+      return { version: 1, timestamp: Date.now(), objects, selection: Array.from(_state.selection) };
+    },
+    _state,
+  };
+})();
+
+// ----------------------------------------------------------------
+// SYN ICONS (window.SynIcons)
+// Libreria SVG centralizzata, generata via funzioni.
+// ----------------------------------------------------------------
+(function(){
+  function svg(content, opts) {
+    opts = opts || {};
+    const size = opts.size || 16;
+    const vb = opts.viewBox || '0 0 16 16';
+    const stroke = opts.stroke || 'currentColor';
+    const sw = opts.strokeWidth || 1.5;
+    return '<svg width="'+size+'" height="'+size+'" viewBox="'+vb+'" fill="none" stroke="'+stroke+'" stroke-width="'+sw+'">'+content+'</svg>';
+  }
+  function svgBlue(content, opts) {
+    opts = opts || {};
+    const size = opts.size || 13;
+    return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 28 28" fill="none">'+content+'</svg>';
+  }
+  window.SynIcons = {
+    eye:        function(o){ return svg('<path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/>', o); },
+    eyeOff:     function(o){ return svg('<path d="M2 2l12 12" stroke-linecap="round"/><path d="M5 5C3 6 1 8 1 8s2.5 5 7 5c1.6 0 2.9-.5 4-1.2M11.5 11.5C13 10.5 15 8 15 8s-2.5-5-7-5c-.7 0-1.4.1-2 .3"/><path d="M6.5 6.5a2 2 0 002.8 2.8"/>', o); },
+    lock:       function(o){ return svg('<rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 016 0v2"/>', o); },
+    unlock:     function(o){ return svg('<rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 015.5-1.5"/>', o); },
+    isolate:    function(o){ return svg('<circle cx="8" cy="8" r="3.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2" stroke-linecap="round"/>', o); },
+    centerView: function(o){ return svg('<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><line x1="8" y1="2" x2="8" y2="4" stroke-linecap="round"/><line x1="8" y1="12" x2="8" y2="14" stroke-linecap="round"/><line x1="2" y1="8" x2="4" y2="8" stroke-linecap="round"/><line x1="12" y1="8" x2="14" y2="8" stroke-linecap="round"/>', o); },
+    trash:      function(o){ return svg('<path d="M3 4h10M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M5.5 4l.5 9a1 1 0 001 1h2a1 1 0 001-1l.5-9" stroke-linecap="round" stroke-linejoin="round"/>', o); },
+    chevronRight: function(o){ return svg('<path d="M6 4l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/>', o); },
+    chevronDown:  function(o){ return svg('<path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>', o); },
+    dots3:      function(o){ return svg('<circle cx="3.5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12.5" cy="8" r="1" fill="currentColor"/>', o); },
+    plus:       function(o){ return svg('<path d="M8 3v10M3 8h10" stroke-linecap="round"/>', o); },
+    minus:      function(o){ return svg('<path d="M3 8h10" stroke-linecap="round"/>', o); },
+    folder:     function(o){ return svg('<path d="M1.5 4h4l1.5 1.5h7.5v8.5H1.5z" stroke-linejoin="round"/>', o); },
+    meshIcon:   function(o){ return svg('<path d="M2 6l6-3 6 3v6l-6 3-6-3z" stroke-linejoin="round"/><path d="M2 6l6 3 6-3M8 9v6"/>', o); },
+    measureIcon:function(o){ return svg('<path d="M2 8l12 0" stroke-linecap="round"/><path d="M2 6v4M14 6v4" stroke-linecap="round"/>', o); },
+    shapeIcon:  function(o){ return svg('<circle cx="5" cy="5" r="2.5"/><rect x="8.5" y="8.5" width="5" height="5"/>', o); },
+    sectionIcon:function(o){ return svg('<rect x="2" y="2" width="12" height="12" stroke-dasharray="1.5 1"/><line x1="2" y1="8" x2="14" y2="8"/>', o); },
+    markerIcon: function(o){ return svg('<path d="M8 1L13 5v6L8 15L3 11V5L8 1Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/>', o); },
+  };
+})();
+
+// ----------------------------------------------------------------
+// SYN THEME (variabili CSS)
+// Iniettate dinamicamente nel <head>. Definiscono palette semantica
+// usata da Vedere e dai futuri moduli.
+// ----------------------------------------------------------------
+(function(){
+  const css = `:root{
+    --syn-blue:#0065B3;--syn-dark:#0F1923;--syn-gray:#7A90A4;
+    --syn-pearl:#F0F5FA;--syn-light:#F7F9FC;--syn-border:#D6E4F0;
+    --syn-white:#FFFFFF;--syn-green:#0D9E6E;--syn-red:#DC2626;
+    --syn-gold:#F59E0B;--syn-purple:#A855F7;--syn-orange:#F97316;
+    --syn-tol-ottimo:#639922;--syn-tol-accettabile:#D97706;
+    --syn-tol-rischioso:#F97316;--syn-tol-tensione:#EF4444;
+    --syn-tol-fuori-posto:#A855F7;
+    --syn-marker-os:#0D9E6E;--syn-marker-sr:#0065B3;
+    --syn-marker-1t3:#F59E0B;--syn-marker-mua:#A855F7;
+    --syn-marker-scan:#b8a090;
+    --syn-ref-a:#F97316;--syn-ref-b:#0065B3;
+    --syn-gizmo-u:#DC2626;--syn-gizmo-v:#0D9E6E;
+    --syn-gizmo-n:#0065B3;--syn-gizmo-center:#F59E0B;
+  }`;
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+})();
+
+// ----------------------------------------------------------------
+// SYN MEASURE MANAGER (window.SynMeasureManager)
+// API specializzata per misure metrologiche. Internamente usa
+// SynRegistry come storage, ma offre interfaccia tipata e centralizza
+// la creazione/aggiornamento/format delle misure.
+//
+// Tipi supportati (struttura completa, implementazione progressiva):
+//   linear-3d              distanza tra 2 punti 3D
+//   linear-2d-section      distanza tra 2 punti su un piano sezione
+//   angle                  angolo tra 3 punti (vertice + 2 estremi)
+//   angle-axes             angolo tra 2 assi (vettori direzione)
+//   angle-normals          angolo tra 2 normali superficiali
+//   diameter               diametro (forma circolare/cilindrica)
+//   radius                 raggio
+//   point-to-plane         distanza punto - piano
+//   axis-to-axis           distanza tra 2 assi (skew lines)
+//   centroid-deviation     deviazione centroide (vettore + magnitudo)
+//
+// In v8.0.0-refactor sono creabili da viewport solo linear-3d e
+// linear-2d-section. Gli altri tipi sono pre-definiti come schema
+// e accettano misure create programmaticamente da bridge altri moduli.
+// ----------------------------------------------------------------
+(function(){
+  // === Definizione tipi di misura ===
+  // Ogni tipo dichiara: label IT, unita' default, n. punti richiesti,
+  // formattazione del valore, icona suggerita, dimensione semantica.
+  const MEASURE_TYPES = {
+    'linear-3d': {
+      label: 'Distanza lineare',
+      unit: 'mm',
+      points: 2,
+      dimension: 'length',
+      format: function(v, u) { return v.toFixed(3) + ' ' + (u || 'mm'); },
+      icon: 'measureIcon'
+    },
+    'linear-2d-section': {
+      label: 'Distanza lineare 2D (sezione)',
+      unit: 'mm',
+      points: 2,
+      dimension: 'length',
+      format: function(v, u) { return v.toFixed(3) + ' ' + (u || 'mm'); },
+      icon: 'measureIcon'
+    },
+    'angle': {
+      label: 'Angolo',
+      unit: '°',
+      points: 3,
+      dimension: 'angle',
+      format: function(v, u) { return v.toFixed(2) + ' ' + (u || '°'); },
+      icon: 'measureIcon'
+    },
+    'angle-axes': {
+      label: 'Angolo tra assi',
+      unit: '°',
+      points: 0,            // usa due vettori, non punti
+      dimension: 'angle',
+      format: function(v, u) { return v.toFixed(2) + ' ' + (u || '°'); },
+      icon: 'measureIcon'
+    },
+    'angle-normals': {
+      label: 'Angolo tra normali',
+      unit: '°',
+      points: 0,
+      dimension: 'angle',
+      format: function(v, u) { return v.toFixed(2) + ' ' + (u || '°'); },
+      icon: 'measureIcon'
+    },
+    'diameter': {
+      label: 'Diametro',
+      unit: 'mm',
+      points: 0,
+      dimension: 'length',
+      format: function(v, u) { return 'D ' + v.toFixed(3) + ' ' + (u || 'mm'); },
+      icon: 'shapeIcon'
+    },
+    'radius': {
+      label: 'Raggio',
+      unit: 'mm',
+      points: 0,
+      dimension: 'length',
+      format: function(v, u) { return 'R ' + v.toFixed(3) + ' ' + (u || 'mm'); },
+      icon: 'shapeIcon'
+    },
+    'point-to-plane': {
+      label: 'Distanza punto-piano',
+      unit: 'mm',
+      points: 1,
+      dimension: 'length',
+      format: function(v, u) { return v.toFixed(3) + ' ' + (u || 'mm'); },
+      icon: 'measureIcon'
+    },
+    'axis-to-axis': {
+      label: 'Distanza tra assi',
+      unit: 'mm',
+      points: 0,
+      dimension: 'length',
+      format: function(v, u) { return v.toFixed(3) + ' ' + (u || 'mm'); },
+      icon: 'measureIcon'
+    },
+    'centroid-deviation': {
+      label: 'Deviazione centroide',
+      unit: 'mm',
+      points: 0,
+      dimension: 'length',
+      format: function(v, u) { return v.toFixed(3) + ' ' + (u || 'mm'); },
+      icon: 'measureIcon'
+    },
+  };
+
+  function _hasType(t) {
+    return Object.prototype.hasOwnProperty.call(MEASURE_TYPES, t);
+  }
+
+  /**
+   * Aggiunge una misura al registry tramite il manager.
+   * @param {Object} spec - { type, value, points?, refs?, name?, unit?, parentId?, module?, tolerance?, ... }
+   * @returns {Object} oggetto SynRegistry creato
+   */
+  function add(spec) {
+    if (!spec || !spec.type) {
+      console.warn('SynMeasureManager.add: type richiesto');
+      return null;
+    }
+    if (!_hasType(spec.type)) {
+      console.warn('SynMeasureManager.add: type sconosciuto "' + spec.type + '" (sara\' aggiunto comunque)');
+    }
+    const def = MEASURE_TYPES[spec.type] || { label: 'Misura', unit: '', format: function(v){return String(v);} };
+    const value = (spec.value != null) ? Number(spec.value) : null;
+    const unit = spec.unit || def.unit || '';
+    const valueText = (value != null) ? def.format(value, unit) : '—';
+
+    return window.SynRegistry.add({
+      type: 'measure',
+      role: spec.type,
+      name: spec.name || (def.label + (value != null ? ' ' + valueText : '')),
+      module: spec.module || 'vedere',
+      parentId: spec.parentId || null,
+      visual: Object.assign({ visible: true, color: '#0065B3' }, spec.visual || {}),
+      meta: Object.assign({
+        value: value,
+        valueText: valueText,
+        unit: unit,
+        dimension: def.dimension || 'length',
+        points: spec.points || null,       // array di {x,y,z}
+        refs: spec.refs || [],             // ID di altri oggetti collegati
+        tolerance: spec.tolerance || null, // futuro: { ottimo, accettabile, ... }
+      }, spec.meta || {}),
+    });
+  }
+
+  /**
+   * Aggiorna value e meta di una misura (riformatta valueText automaticamente).
+   */
+  function update(id, changes) {
+    const obj = window.SynRegistry.get(id);
+    if (!obj || obj.type !== 'measure') return false;
+    const def = MEASURE_TYPES[obj.role] || { format: function(v){return String(v);} };
+    const patch = Object.assign({}, changes);
+    // Se cambia il value, rigenero anche valueText
+    if (changes && changes.value !== undefined) {
+      const newValue = Number(changes.value);
+      const unit = (changes.unit != null) ? changes.unit : (obj.meta && obj.meta.unit) || def.unit || '';
+      patch['meta.value'] = newValue;
+      patch['meta.valueText'] = def.format(newValue, unit);
+      delete patch.value;
+    }
+    return window.SynRegistry.update(id, patch);
+  }
+
+  /**
+   * Rimuove una misura dal registro.
+   */
+  function remove(id) {
+    return window.SynRegistry.remove(id);
+  }
+
+  /**
+   * Tutte le misure (di qualsiasi tipo).
+   */
+  function getAll() {
+    return window.SynRegistry.query({ type: 'measure' });
+  }
+
+  /**
+   * Misure di un tipo specifico (role).
+   */
+  function forType(type) {
+    return window.SynRegistry.query({ type: 'measure', role: type });
+  }
+
+  /**
+   * Conta misure (eventualmente filtrate per tipo).
+   */
+  function count(type) {
+    if (type) return forType(type).length;
+    return getAll().length;
+  }
+
+  /**
+   * Misure figlie di un oggetto (es. misure 2D di una sezione).
+   */
+  function forParent(parentId) {
+    return window.SynRegistry.query({ type: 'measure', parentId: parentId });
+  }
+
+  /**
+   * Esporta tutte le misure come JSON serializzabile.
+   * Output: array di { id, type, name, value, unit, valueText, points?, refs?, meta }
+   */
+  function exportAll() {
+    return getAll().map(function(m) {
+      return {
+        id: m.id,
+        type: m.role,
+        name: m.name,
+        value: m.meta && m.meta.value,
+        unit: m.meta && m.meta.unit,
+        valueText: m.meta && m.meta.valueText,
+        dimension: m.meta && m.meta.dimension,
+        points: m.meta && m.meta.points,
+        refs: m.meta && m.meta.refs,
+        tolerance: m.meta && m.meta.tolerance,
+        parentId: m.parentId,
+        module: m.module,
+        visible: m.visual && m.visual.visible,
+        createdAt: m.createdAt,
+      };
+    });
+  }
+
+  /**
+   * Formatta un valore secondo le regole del tipo (utile per UI esterne).
+   */
+  function format(type, value, unit) {
+    const def = MEASURE_TYPES[type];
+    if (!def) return String(value);
+    return def.format(Number(value), unit || def.unit);
+  }
+
+  /**
+   * Definizione di un tipo (label, unita', icona, ecc.).
+   */
+  function getTypeDef(type) {
+    return MEASURE_TYPES[type] || null;
+  }
+
+  /**
+   * Lista di tutti i tipi conosciuti.
+   */
+  function getTypes() {
+    return Object.keys(MEASURE_TYPES);
+  }
+
+  window.SynMeasureManager = {
+    TYPES: MEASURE_TYPES,
+    add: add,
+    update: update,
+    remove: remove,
+    getAll: getAll,
+    forType: forType,
+    forParent: forParent,
+    count: count,
+    exportAll: exportAll,
+    format: format,
+    getTypeDef: getTypeDef,
+    getTypes: getTypes,
+  };
+})();
+
+// ----------------------------------------------------------------
+// SYN CUT VIEW MANAGER (window.SynCutViewManager)
+// API uniforme per gestire le sezioni di taglio (cut planes).
+// Wrapper Facade sul codice esistente di Vedere: stesso comportamento,
+// ma con interfaccia tipata e indipendente dal modulo che la usa.
+// Le sezioni vivono nel SynRegistry come type:'section', role:'cut-plane'.
+//
+// Stato attuale: gestisce UNA sola sezione attiva (limite del codice
+// esistente). API predisposta per multi-sezione futura.
+//
+// In v8.0.0-refactor il manager incapsula la cutview di Vedere; quando
+// porteremo Analizza/Misurare/Sostituire alla v8 (Blocco 6), ognuno
+// potra' usare lo stesso manager - oppure passare un adapter custom.
+// ----------------------------------------------------------------
+(function(){
+  // Listener registrati per eventi del manager (in aggiunta a quelli del registry)
+  const _listeners = new Map();
+
+  function _emit(event, payload) {
+    const ls = _listeners.get(event);
+    if (ls) for (const cb of ls) {
+      try { cb(payload); } catch(e) { console.error('SynCutViewManager '+event+':', e); }
+    }
+  }
+
+  // Adapter pattern: il manager chiama queste funzioni per fare il lavoro vero.
+  // Sono iniettate dal modulo che usa il manager (Vedere, in futuro Analizza, ecc.).
+  // L'adapter di Vedere viene installato in fondo al file da bindCutViewToVedere().
+  let _adapter = null;
+
+  function _requireAdapter() {
+    if (!_adapter) {
+      console.warn('SynCutViewManager: nessun adapter installato. Chiama bindAdapter() prima.');
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Crea una nuova sezione passando per due punti 3D.
+   * In Vedere v8 i due punti sono i risultati dei click utente sul viewport.
+   * @param {Object} spec - { p1: Vector3, p2: Vector3, options? }
+   * @returns {string|null} l'id SynRegistry della sezione creata, null se fallimento
+   */
+  function create(spec) {
+    if (!_requireAdapter()) return null;
+    if (!spec || !spec.p1 || !spec.p2) {
+      console.warn('SynCutViewManager.create: p1 e p2 richiesti');
+      return null;
+    }
+    // Se esiste gia' una sezione attiva, l'adapter di Vedere la rimuove prima
+    // (limite del codice esistente: solo una sezione alla volta).
+    const result = _adapter.create(spec.p1, spec.p2, spec.options || {});
+    if (result && result.synId) {
+      _emit('create', { id: result.synId, section: result });
+      return result.synId;
+    }
+    return null;
+  }
+
+  /**
+   * Rimuove la sezione attiva (o quella specifica se id passato).
+   * @param {string} [id] - id SynRegistry (opzionale, default: sezione attiva)
+   */
+  function remove(id) {
+    if (!_requireAdapter()) return false;
+    const active = _adapter.getActive();
+    if (id && active && active.synId !== id) {
+      console.warn('SynCutViewManager.remove: id non corrisponde alla sezione attiva (multi-section non supportato)');
+      return false;
+    }
+    if (!active) return false;
+    const removedId = active.synId;
+    _adapter.remove();
+    _emit('remove', { id: removedId });
+    return true;
+  }
+
+  /**
+   * Restituisce l'oggetto del registry della sezione attiva, o null.
+   */
+  function getActive() {
+    if (!_requireAdapter()) return null;
+    const active = _adapter.getActive();
+    if (!active || !active.synId) return null;
+    return window.SynRegistry.get(active.synId);
+  }
+
+  /**
+   * C'e' una sezione attiva?
+   */
+  function exists() {
+    if (!_requireAdapter()) return false;
+    return _adapter.getActive() != null;
+  }
+
+  /**
+   * Auto-fit della PIP sul cluster di intersezione piu' rilevante.
+   * @param {string} [id] - id SynRegistry (opzionale)
+   */
+  function fitToContent(id) {
+    if (!_requireAdapter()) return false;
+    _adapter.fitToContent(id);
+    return true;
+  }
+
+  /**
+   * Aggiorna proprieta' della sezione (delegato all'adapter).
+   * @param {string} id - id SynRegistry
+   * @param {Object} changes - { center?, normal?, U?, V?, width?, height?, visible? }
+   */
+  function update(id, changes) {
+    if (!_requireAdapter()) return false;
+    const active = _adapter.getActive();
+    if (!active || active.synId !== id) return false;
+    if (_adapter.update) _adapter.update(changes);
+    _emit('update', { id, changes });
+    return true;
+  }
+
+  /**
+   * Tutte le misure 2D figlie della sezione (via SynMeasureManager).
+   * @param {string} id - id SynRegistry
+   */
+  function getMeasures(id) {
+    const active = _adapter ? _adapter.getActive() : null;
+    const targetId = id || (active && active.synId);
+    if (!targetId) return [];
+    if (window.SynMeasureManager) {
+      return window.SynMeasureManager.forParent(targetId);
+    }
+    return window.SynRegistry.query({ type: 'measure', parentId: targetId });
+  }
+
+  /**
+   * Serializza la sezione attiva per future save/load di progetti.
+   * @returns {Object} { id, center, normal, U, V, width, height, measures }
+   */
+  function exportData(id) {
+    const obj = id ? window.SynRegistry.get(id) : getActive();
+    if (!obj) return null;
+    const active = _adapter ? _adapter.getActive() : null;
+    const measures = getMeasures(obj.id);
+    const out = {
+      id: obj.id,
+      name: obj.name,
+      type: obj.type,
+      role: obj.role,
+      module: obj.module,
+      visible: obj.visual && obj.visual.visible,
+      meta: obj.meta,
+      measures: measures.map(m => ({
+        id: m.id, type: m.role, value: m.meta && m.meta.value,
+        unit: m.meta && m.meta.unit, valueText: m.meta && m.meta.valueText,
+        points: m.meta && m.meta.points
+      })),
+    };
+    if (active) {
+      out.geometry = {
+        center: { x: active.center.x, y: active.center.y, z: active.center.z },
+        normal: { x: active.normal.x, y: active.normal.y, z: active.normal.z },
+        U:      { x: active.U.x, y: active.U.y, z: active.U.z },
+        V:      { x: active.V.x, y: active.V.y, z: active.V.z },
+        width:  active.width,
+        height: active.height,
+      };
+    }
+    return out;
+  }
+
+  /**
+   * Sottoscrizione agli eventi del manager.
+   * Eventi: 'create', 'remove', 'update'.
+   * Ritorna una funzione di unsubscribe.
+   */
+  function subscribe(event, cb) {
+    if (!_listeners.has(event)) _listeners.set(event, new Set());
+    _listeners.get(event).add(cb);
+    return function() { _listeners.get(event).delete(cb); };
+  }
+
+  /**
+   * Installa un adapter (chiamato dal modulo che usa il manager).
+   * Adapter deve fornire: create(p1, p2, options), remove(), getActive(),
+   * fitToContent(), [update(changes)].
+   */
+  function bindAdapter(adapter) {
+    _adapter = adapter;
+  }
+
+  window.SynCutViewManager = {
+    create, remove, update, getActive, exists,
+    fitToContent, getMeasures, exportData,
+    subscribe, bindAdapter,
+  };
+})();
+
+console.log('[Syntesis Core] v8.0.0-refactor caricato. SynRegistry, SynIcons, theme, SynLayerPanel, SynMeasureManager, SynCutViewManager attivi.');
+</script>
 
 <script>
 "use strict";
@@ -979,8 +2039,29 @@ function addLayer(name, type, parsed) {
   const size = bb ? bb.getSize(new THREE.Vector3()) : new THREE.Vector3();
   const count = isPoints ? geometry.attributes.position.count : (geometry.index ? geometry.index.count / 3 : geometry.attributes.position.count / 3);
 
+  // Registra nel SynRegistry: la fonte di verita' centralizzata
+  const synObj = window.SynRegistry.add({
+    type: isPoints ? 'pointcloud' : 'mesh',
+    role: 'scan',
+    name,
+    module: 'vedere',
+    three: { group, meshes: [object3d], labels: [], helpers: [] },
+    visual: { visible: true, opacity: 0.85, color: colorHex, transparent: false, renderMode: 'solid' },
+    meta: {
+      fileName: name, format: type,
+      triangles: Math.round(count), bbox: size, unit: 'mm',
+      // Memorizzo i default per il bottone "Ripristina"
+      original: {
+        opacity: 0.85,
+        color: colorHex,
+        visible: true,
+        renderMode: 'solid',
+      }
+    }
+  });
+
   state.layers.push({
-    id, name, type, group, object: object3d, material,
+    id, synId: synObj.id, name, type, group, object: object3d, material,
     geometry, hasColor, isPoints, color: colorHex,
     visible: true, transparent: false, showColor: hasColor,
     highlight: null, bbox: size, count: Math.round(count)
@@ -999,6 +2080,8 @@ function removeLayer(id) {
   if (l.object.geometry) l.object.geometry.dispose();
   if (l.material) l.material.dispose();
   if (l.highlight && l.highlight.material) l.highlight.material.dispose();
+  // Bridge: rimuovi dal registry
+  if (l.synId) window.SynRegistry.remove(l.synId);
   state.layers.splice(idx, 1);
   renderLayerList();
   if (state.layers.length > 0) fitCameraToScene();
@@ -1053,12 +2136,8 @@ function selectLayer(id) {
   if (state.selectedId !== null) deselectLayer();
   const l = state.layers.find(x => x.id === id);
   if (!l || !l.visible) return;
-  if (!l.highlight) {
-    l.highlight = buildHighlight(l.geometry, l.isPoints, l.color);
-    l.group.add(l.highlight);
-  } else {
-    l.highlight.visible = true;
-  }
+  // Niente piu' highlight wireframe (v8 Blocco 4b): la selezione si vede da
+  // Properties Panel aperto, riga evidenziata nel pannello layer, transformControls.
   transformControls.attach(l.group);
   transformControls.setMode(state.transformMode);
   state.selectedId = id;
@@ -1070,8 +2149,7 @@ function selectLayer(id) {
 }
 function deselectLayer() {
   if (state.selectedId === null) return;
-  const l = state.layers.find(x => x.id === state.selectedId);
-  if (l && l.highlight) l.highlight.visible = false;
+  // Nessun highlight da nascondere
   transformControls.detach();
   state.selectedId = null;
   document.getElementById('btnMoveMode').disabled = true;
@@ -1090,101 +2168,10 @@ function updateModeButtons() {
 }
 
 function renderLayerList() {
-  const list = document.getElementById('layerBody');
-  const empty = state.layers.length === 0 && state.measures.length === 0 && state.circles.length === 0;
-  if (empty) {
-    list.innerHTML = '<div class="lp-empty">Nessun file caricato</div>';
-    return;
+  // Sostituita da SynLayerPanel. Wrapper che chiama il render del nuovo pannello.
+  if (window.SynLayerPanel && window.SynLayerPanel.render) {
+    window.SynLayerPanel.render();
   }
-
-  let html = '';
-
-  // === Sezione File ===
-  if (state.layers.length > 0) {
-    html += state.layers.map(l => {
-      const sizeStr = l.bbox.x.toFixed(1) + '×' + l.bbox.y.toFixed(1) + '×' + l.bbox.z.toFixed(1);
-      const countStr = l.isPoints ? (formatCount(l.count) + ' pt') : (formatCount(l.count) + ' tri');
-      const sel = state.selectedId === l.id ? ' selected' : '';
-      return `<div class="layer-item${sel}" data-kind="file" data-id="${l.id}">
-        <button class="layer-color-btn" data-act="color" data-id="${l.id}" style="background:${l.color}" title="Cambia colore"></button>
-        <div class="layer-info" data-act="select" data-id="${l.id}">
-          <div class="layer-name" title="${l.name}">${l.name}</div>
-          <div class="layer-meta">${l.type.toUpperCase()} &middot; ${countStr} &middot; ${sizeStr}mm</div>
-        </div>
-        <div class="layer-controls">
-          <button class="lc-btn ${l.visible?'active':''}" data-act="vis" data-id="${l.id}" title="Visibile">${eyeIcon(l.visible)}</button>
-          <button class="lc-btn ${l.transparent?'active':''}" data-act="trn" data-id="${l.id}" title="Trasparente">${transpIcon()}</button>
-          <button class="lc-btn ${l.showColor?'active':''}" data-act="col" data-id="${l.id}" ${l.hasColor?'':'disabled'} title="${l.hasColor?'Colore vertex':'Colore non disponibile'}">${paletteIcon()}</button>
-          <button class="lc-btn remove" data-act="rm" data-id="${l.id}" title="Rimuovi">${trashIcon()}</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  // === Sezione Misure ===
-  if (state.measures.length > 0) {
-    html += '<div class="lp-section-title">MISURE</div>';
-    html += state.measures.map((m, idx) => {
-      const visible = m.visible !== false;
-      return `<div class="layer-item" data-kind="measure" data-id="${m.id}">
-        <span class="layer-color-btn" style="background:#0065B3;cursor:default"></span>
-        <div class="layer-info">
-          <div class="layer-name">Misura ${idx + 1}</div>
-          <div class="layer-meta">${formatDistance(m.distance)}</div>
-        </div>
-        <div class="layer-controls">
-          <button class="lc-btn ${visible?'active':''}" data-act="m-vis" data-id="${m.id}" title="Visibile">${eyeIcon(visible)}</button>
-          <button class="lc-btn remove" data-act="m-rm" data-id="${m.id}" title="Rimuovi">${trashIcon()}</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  // === Sezione Forme (cerchi/quadrati/...) ===
-  if (state.circles.length > 0) {
-    html += '<div class="lp-section-title">FORME</div>';
-    const shapeNames = { circle:'Cerchio', square:'Quadrato', hex:'Esagono', oct:'Ottagono', torx:'Torx' };
-    html += state.circles.map((c, idx) => {
-      const visible = c.visible !== false;
-      const name = shapeNames[c.shape] || 'Forma';
-      const lbl = formatShapeLabel(c.shape, c.radius);
-      return `<div class="layer-item" data-kind="circle" data-id="${c.id}">
-        <span class="layer-color-btn" style="background:#5A6E82;cursor:default"></span>
-        <div class="layer-info">
-          <div class="layer-name">${name} ${idx + 1}</div>
-          <div class="layer-meta">${lbl}</div>
-        </div>
-        <div class="layer-controls">
-          <button class="lc-btn ${visible?'active':''}" data-act="c-vis" data-id="${c.id}" title="Visibile">${eyeIcon(visible)}</button>
-          <button class="lc-btn remove" data-act="c-rm" data-id="${c.id}" title="Rimuovi">${trashIcon()}</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  list.innerHTML = html;
-
-  // Bind gestori
-  list.querySelectorAll('[data-act]').forEach(el => {
-    el.addEventListener('click', e => {
-      e.stopPropagation();
-      const id = parseInt(el.dataset.id);
-      const act = el.dataset.act;
-      // File
-      if (act === 'vis') toggleVisible(id);
-      else if (act === 'trn') toggleTransparent(id);
-      else if (act === 'col') toggleColor(id);
-      else if (act === 'rm') removeLayer(id);
-      else if (act === 'select') selectLayer(id);
-      else if (act === 'color') openColorPop(id, el);
-      // Misure
-      else if (act === 'm-vis') toggleMeasureVisibility(id);
-      else if (act === 'm-rm') removeMeasure(id);
-      // Forme
-      else if (act === 'c-vis') toggleCircleVisibility(id);
-      else if (act === 'c-rm') removeCircle(id);
-    });
-  });
 }
 
 function formatCount(n) {
@@ -1626,6 +2613,19 @@ function rulerOnClick(e) {
       ]
     };
     state.measures.push(measure);
+    // Bridge: registra misura tramite SynMeasureManager (Blocco 4)
+    measure.synId = window.SynMeasureManager.add({
+      type: 'linear-3d',
+      name: 'Misura ' + measure.id,
+      value: dist,
+      unit: 'mm',
+      module: 'vedere',
+      points: [
+        { x: p1.x, y: p1.y, z: p1.z },
+        { x: p2.x, y: p2.y, z: p2.z }
+      ],
+      visual: { visible: true, color: '#0065B3' },
+    }).id;
     updateMeasureLabels();
 
     // Reset per misura successiva
@@ -1697,6 +2697,146 @@ function formatShapeLabel(shape, radius) {
   return formatDistance(diameter);
 }
 
+// =====================================================================
+// Edit parametrico delle forme (Blocco 4c)
+// Doppio click sulla label di una forma → input numerico in-place →
+// Invio applica il nuovo valore (la forma cresce/decresce dal centro),
+// ESC annulla.
+// =====================================================================
+
+// Conversione: dato un valore "metrico" leggibile (diametro, lato, A/F),
+// restituisce il raggio interno della forma.
+function shapeValueToRadius(shape, value) {
+  if (shape === 'circle' || shape === 'torx') return value / 2;
+  if (shape === 'square') return value / Math.SQRT2;
+  if (shape === 'hex')    return value / 2;
+  if (shape === 'oct')    return value / (2 * Math.cos(Math.PI / 8));
+  return value / 2;
+}
+
+// Conversione inversa: dato il raggio, restituisce il valore metrico
+// e l'unità di misura mostrata nell'etichetta (Ø, L, A/F).
+function radiusToShapeValue(shape, radius) {
+  if (shape === 'circle' || shape === 'torx') return { value: radius * 2, prefix: 'Ø', unit: 'mm' };
+  if (shape === 'square') return { value: radius * Math.SQRT2, prefix: 'L', unit: 'mm' };
+  if (shape === 'hex')    return { value: radius * 2, prefix: '', unit: 'mm' };
+  if (shape === 'oct')    return { value: radius * 2 * Math.cos(Math.PI / 8), prefix: 'A/F', unit: 'mm' };
+  return { value: radius * 2, prefix: 'Ø', unit: 'mm' };
+}
+
+// Stato edit corrente (al massimo 1 forma in edit alla volta)
+let _shapeEditActive = null; // { circle, labelEl, originalText, input, prefixSpan, unitSpan }
+
+function startShapeValueEdit(circle) {
+  // Se sto gia' editando un'altra forma, prima committo
+  if (_shapeEditActive) {
+    finishShapeValueEdit(true); // confirm
+  }
+  const labelEl = circle.labelEl;
+  if (!labelEl) return;
+  const originalText = labelEl.textContent;
+
+  const info = radiusToShapeValue(circle.shape, circle.radius);
+  // Costruisco contenuto editabile: prefisso + input + unita'
+  labelEl.classList.remove('editable');
+  labelEl.classList.add('editing');
+  labelEl.textContent = '';
+
+  const prefixSpan = document.createElement('span');
+  if (info.prefix) {
+    prefixSpan.textContent = info.prefix + ' ';
+    prefixSpan.style.opacity = '0.7';
+  }
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.step = '0.01';
+  input.min = '0.1';
+  input.max = '999';
+  input.className = 'measure-label-input';
+  input.value = info.value.toFixed(2);
+
+  const unitSpan = document.createElement('span');
+  unitSpan.textContent = ' ' + info.unit;
+  unitSpan.style.opacity = '0.7';
+
+  labelEl.appendChild(prefixSpan);
+  labelEl.appendChild(input);
+  labelEl.appendChild(unitSpan);
+
+  _shapeEditActive = { circle, labelEl, originalText, input, prefixSpan, unitSpan };
+
+  // Focus + select all
+  setTimeout(function() { input.focus(); input.select(); }, 0);
+
+  // Handler tastiera
+  input.addEventListener('keydown', _onShapeEditKeydown);
+  // Click fuori = conferma (delay per non auto-cancellarsi sul click che ha aperto)
+  setTimeout(function() {
+    document.addEventListener('mousedown', _onShapeEditDocumentClick, { capture: true });
+  }, 50);
+}
+
+function _onShapeEditKeydown(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    finishShapeValueEdit(true);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    finishShapeValueEdit(false);
+  }
+}
+
+function _onShapeEditDocumentClick(e) {
+  if (!_shapeEditActive) return;
+  // Se ho cliccato dentro l'input o sulla label corrente, ignoro
+  if (_shapeEditActive.labelEl.contains(e.target)) return;
+  finishShapeValueEdit(true); // commit on click outside
+}
+
+function finishShapeValueEdit(commit) {
+  if (!_shapeEditActive) return;
+  const { circle, labelEl, originalText, input, isTech, originalCursor } = _shapeEditActive;
+
+  // Smonto handler
+  input.removeEventListener('keydown', _onShapeEditKeydown);
+  document.removeEventListener('mousedown', _onShapeEditDocumentClick, { capture: true });
+
+  if (commit) {
+    const raw = parseFloat(input.value);
+    if (!isNaN(raw) && raw > 0) {
+      const newValue = Math.min(999, Math.max(0.1, raw));
+      const newRadius = shapeValueToRadius(circle.shape, newValue);
+      circle.radius = newRadius;
+      updateCircleVisuals(circle);
+
+      if (circle.synId && window.SynRegistry) {
+        window.SynRegistry.update(circle.synId, {
+          'meta.radius': newRadius,
+          'meta.label': formatShapeLabel(circle.shape, newRadius),
+        });
+      }
+      setStatus('Forma ridimensionata: ' + formatShapeLabel(circle.shape, newRadius));
+    } else {
+      labelEl.textContent = originalText;
+    }
+  } else {
+    labelEl.textContent = originalText;
+  }
+
+  // Pulisco stato edit (diverso per measure-label vs tech-dim)
+  if (isTech) {
+    labelEl.classList.remove('editing-tech');
+    if (originalCursor !== undefined) labelEl.style.cursor = originalCursor || 'pointer';
+  } else {
+    labelEl.classList.remove('editing');
+    labelEl.classList.add('editable');
+  }
+  _shapeEditActive = null;
+
+  updateCircleLabels();
+}
+
 function worldToScreen(v) {
   const projected = v.clone().project(camera);
   const rect = canvas.getBoundingClientRect();
@@ -1739,6 +2879,8 @@ function clearAllMeasures() {
       });
     });
     m.labelEl.remove();
+    // Bridge: rimuovo dal registry
+    if (m.synId) window.SynRegistry.remove(m.synId);
   });
   state.measures = [];
   state.rulerFirstPoint = null;
@@ -2205,9 +3347,10 @@ function circleOnClick(e) {
   handles.push({ mesh: centerHandle, axis: 'C', sign: 0 });
 
   const labelEl = document.createElement('div');
-  labelEl.className = 'measure-label';
+  labelEl.className = 'measure-label editable';
   labelEl.style.background = '#5A6E82';
   labelEl.textContent = formatShapeLabel(shape, radius);
+  labelEl.title = 'Doppio click per modificare la dimensione';
   document.getElementById('viewport').appendChild(labelEl);
 
   const circle = {
@@ -2223,13 +3366,28 @@ function circleOnClick(e) {
     labelEl
   };
   state.circles.push(circle);
+  // Doppio click sulla label apre l'editor parametrico (Blocco 4c)
+  labelEl.addEventListener('dblclick', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    startShapeValueEdit(circle);
+  });
+  // Bridge: registra forma nel SynRegistry
+  const shapeName = { circle:'Cerchio', square:'Quadrato', hex:'Esagono', oct:'Ottagono', torx:'Torx' }[shape] || 'Forma';
+  circle.synId = window.SynRegistry.add({
+    type: 'shape',
+    role: shape,
+    name: shapeName + ' ' + circle.id,
+    module: 'vedere',
+    visual: { visible: true, color: '#5A6E82' },
+    meta: { radius, label: formatShapeLabel(shape, radius) }
+  }).id;
   updateCircleVisuals(circle);
   updateCircleLabels();
 
   // Modalità si spegne automaticamente: per una nuova forma bisogna riattivare il bottone
   setCircleActive(false);
   document.getElementById('btnRulerClear').disabled = false;
-  const shapeName = { circle:'Cerchio', square:'Quadrato', hex:'Esagono', oct:'Ottagono', torx:'Torx' }[shape] || 'Forma';
   setStatus(shapeName + ': ' + formatShapeLabel(shape, radius));
   renderLayerList();
 }
@@ -2342,6 +3500,51 @@ function updateTechDimension() {
   techDimValue.textContent = formatDistance(2 * apothem);
   techDimValue.style.left = ((lineAx + lineBx) / 2) + 'px';
   techDimValue.style.top = ((lineAy + lineBy) / 2) + 'px';
+  // Edit parametrico (Blocco 4c): rendo cliccabile la quota tecnica per l'esagono
+  if (!techDimValue._editBound) {
+    techDimValue._editBound = true;
+    techDimValue.style.cursor = 'pointer';
+    techDimValue.style.pointerEvents = 'auto';
+    techDimValue.title = 'Doppio click per modificare la dimensione';
+    techDimValue.addEventListener('dblclick', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const hexNow = state.circles.find(c => c.shape === 'hex');
+      if (hexNow) startTechDimEdit(hexNow, techDimValue);
+    });
+  }
+}
+
+// Edit parametrico per la quota tecnica dell'esagono (DOM diverso da measure-label)
+function startTechDimEdit(circle, techValueEl) {
+  if (_shapeEditActive) finishShapeValueEdit(true);
+  const originalText = techValueEl.textContent;
+  const originalCursor = techValueEl.style.cursor;
+  const info = radiusToShapeValue(circle.shape, circle.radius);
+
+  techValueEl.classList.add('editing-tech');
+  techValueEl.textContent = '';
+  techValueEl.style.cursor = 'text';
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.step = '0.01';
+  input.min = '0.1';
+  input.max = '999';
+  input.className = 'measure-label-input';
+  input.value = info.value.toFixed(2);
+  input.style.width = '54px';
+  techValueEl.appendChild(input);
+
+  _shapeEditActive = {
+    circle, labelEl: techValueEl, originalText, input,
+    isTech: true, originalCursor
+  };
+  setTimeout(function() { input.focus(); input.select(); }, 0);
+  input.addEventListener('keydown', _onShapeEditKeydown);
+  setTimeout(function() {
+    document.addEventListener('mousedown', _onShapeEditDocumentClick, { capture: true });
+  }, 50);
 }
 
 // Layer dedicato per i control point e il cerchio di misura.
@@ -3076,6 +4279,7 @@ function clearAllCircles() {
       });
     });
     c.labelEl.remove();
+    if (c.synId) window.SynRegistry.remove(c.synId);
   });
   state.circles = [];
   state.circleFirstEdge = null;
@@ -3434,14 +4638,37 @@ function buildSectionRectMesh(center, U, V, width, height, colorHex) {
 }
 
 function createSection(p1, p2) {
-  // Stesso calcolo del pending, ma definitivo
+  // === BLOCCO 4c: piano perpendicolare alla camera (lama di coltello) ===
+  // I due click definiscono la TRACCIA del taglio sullo schermo.
+  // Il piano deve estendersi DENTRO lo schermo (lungo viewDir),
+  // quindi la sua normale e' perpendicolare sia alla camera che alla traccia.
+  //
+  // Costruzione:
+  //   camDir   = direzione dentro lo schermo (camera -> target)
+  //   AB       = p2 - p1 (vettore tra i due click in 3D)
+  //   U        = componente di AB sul piano dello schermo (l'asse "orizzontale" della PIP)
+  //   V        = camDir normalizzato (l'asse "verticale" che entra nello schermo)
+  //   N        = U x V (normale, giace nel piano dello schermo, perpendicolare alla traccia)
   const camDir = new THREE.Vector3();
   camera.getWorldDirection(camDir);
-  const N = camDir.clone().negate().normalize();
+  camDir.normalize();
+
+  // U = AB proiettato sul piano dello schermo (rimuovo la componente lungo camDir)
   let U = p2.clone().sub(p1);
-  U.sub(N.clone().multiplyScalar(U.dot(N))).normalize();
-  if (U.lengthSq() < 1e-6) U.set(1,0,0);
-  const V = new THREE.Vector3().crossVectors(N, U).normalize();
+  U.sub(camDir.clone().multiplyScalar(U.dot(camDir))).normalize();
+  if (U.lengthSq() < 1e-6) {
+    // Fallback: i due punti sono praticamente sovrapposti o entrambi sull'asse della camera
+    U.set(1, 0, 0);
+    U.sub(camDir.clone().multiplyScalar(U.dot(camDir))).normalize();
+    if (U.lengthSq() < 1e-6) U.set(0, 1, 0);
+  }
+
+  // V = direzione "dentro lo schermo" (asse verticale del piano sezione)
+  const V = camDir.clone().normalize();
+
+  // N = normale del piano (perpendicolare alla traccia E perpendicolare a camDir)
+  const N = new THREE.Vector3().crossVectors(U, V).normalize();
+
   const center = p1.clone().add(p2).multiplyScalar(0.5);
   // Quadrato 1:1: lato = distanza tra i due click
   const side = Math.max(p1.distanceTo(p2), 1.0);
@@ -3500,6 +4727,15 @@ function createSection(p1, p2) {
     measures2D: [],            // misure dentro la sezione 2D
     sectionLines: []           // mesh delle linee di intersezione (calcolate ogni frame)
   };
+  // Bridge: registra sezione nel SynRegistry
+  state.section.synId = window.SynRegistry.add({
+    type: 'section',
+    role: 'cut-plane',
+    name: 'Sezione ' + state.section.id,
+    module: 'vedere',
+    visual: { visible: true, color: '#0065B3' },
+    meta: { width, height }
+  }).id;
 
   // Mostra PIP e applica clipping
   applySectionClipping(true);
@@ -3507,8 +4743,158 @@ function createSection(p1, p2) {
   updateSectionVisuals();
   rebuildSectionLines();
 
+  // Auto-fit della PIP sui segmenti di intersezione effettivi (Blocco 4e).
+  // Il rettangolo handle e' piccolo (lato = distanza primo-secondo click),
+  // ma le linee di intersezione possono essere molto piu' estese: senza
+  // questo fit si vede una PIP nera (camera centrata nel rettangolo, mesh fuori).
+  fitSectionCameraToContent();
+
   setStatus('Sezione attiva. Trascina i control point per orientarla.');
   renderLayerList();
+}
+
+// (Funzione lasciata definita ma non chiamata - utile come reference)
+function centerPipOnFirstIntersection() {
+  if (!state.section) return;
+  const s = state.section;
+  let firstPoint3D = null;
+  for (const layer of state.layers) {
+    if (!layer.visible || !layer.object || !layer.object.isMesh) continue;
+    const segments = computeMeshPlaneIntersection(layer.object.geometry, s.plane);
+    if (segments && segments.length >= 2) {
+      firstPoint3D = segments[0].clone();
+      break;
+    }
+  }
+  if (!firstPoint3D) {
+    s.panU = 0; s.panV = 0; fitSectionCamera(); return;
+  }
+  const d = firstPoint3D.clone().sub(s.center);
+  const u = d.dot(s.U);
+  const v = d.dot(s.V);
+  s.panU = u;
+  s.panV = v;
+  fitSectionCamera();
+}
+
+// Auto-fit della camera sezione ai segmenti di intersezione effettivamente
+// presenti, scegliendo il cluster piu' vicino al centro del piano.
+//
+// Algoritmo:
+// 1. Raccoglie tutti i punti UV dei segmenti di intersezione di tutte le mesh visibili
+// 2. Cluster spaziale: raggruppa punti vicini (entro 5mm) in cluster connessi
+// 3. Sceglie il cluster con il centroide piu' vicino al centro del piano (0,0 in UV)
+// 4. Calcola il bounding box di quel cluster e adatta la camera con padding 15%
+// Se non trova niente, lascia il pan a (0,0) e fa fit normale del rettangolo.
+function fitSectionCameraToContent() {
+  if (!state.section) return;
+  const s = state.section;
+
+  // Raccolgo tutti i punti UV
+  const allPoints = [];
+  for (const lineSeg of s.sectionLines) {
+    if (!lineSeg.geometry || !lineSeg.geometry.attributes || !lineSeg.geometry.attributes.position) continue;
+    const pos = lineSeg.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      allPoints.push({ u: pos.getX(i), v: pos.getY(i) });
+    }
+  }
+
+  if (allPoints.length === 0) {
+    // Nessuna intersezione: fit normale (centro rettangolo handle)
+    s.panU = 0; s.panV = 0; s.zoom = 1;
+    fitSectionCamera();
+    return;
+  }
+
+  // Cluster spaziale: union-find su punti vicini entro `clusterRadius` mm
+  // Su un'arcata dentale tipica, i denti sono separati da gengive di 1-3mm,
+  // 5mm e' un raggio ragionevole per raggruppare segmenti dello stesso "oggetto".
+  const clusterRadius = 5.0;
+  const r2 = clusterRadius * clusterRadius;
+  const parent = allPoints.map((_, i) => i);
+  function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+  function union(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; }
+
+  // O(n^2) - per scansioni dentali tipiche, allPoints ha ~500-3000 elementi
+  // 9M operazioni nel worst case, ~50-200ms. Accettabile per un'azione one-shot.
+  for (let i = 0; i < allPoints.length; i++) {
+    for (let j = i + 1; j < allPoints.length; j++) {
+      const du = allPoints[i].u - allPoints[j].u;
+      const dv = allPoints[i].v - allPoints[j].v;
+      if (du*du + dv*dv <= r2) union(i, j);
+    }
+  }
+
+  // Raggruppo per root
+  const clusters = new Map();
+  for (let i = 0; i < allPoints.length; i++) {
+    const r = find(i);
+    if (!clusters.has(r)) clusters.set(r, []);
+    clusters.get(r).push(allPoints[i]);
+  }
+
+  // Per ogni cluster: centroide e bbox
+  const clusterInfo = [];
+  for (const pts of clusters.values()) {
+    let sumU = 0, sumV = 0;
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (const p of pts) {
+      sumU += p.u; sumV += p.v;
+      if (p.u < minU) minU = p.u; if (p.u > maxU) maxU = p.u;
+      if (p.v < minV) minV = p.v; if (p.v > maxV) maxV = p.v;
+    }
+    const cu = sumU / pts.length, cv = sumV / pts.length;
+    clusterInfo.push({
+      pts, cu, cv, minU, maxU, minV, maxV,
+      size: pts.length,
+      distFromOrigin: Math.sqrt(cu*cu + cv*cv)
+    });
+  }
+
+  // Scelgo il cluster con centroide piu' vicino all'origine (0,0 = centro piano,
+  // che e' la mezzeria tra i due click utente)
+  clusterInfo.sort((a, b) => a.distFromOrigin - b.distFromOrigin);
+  const chosen = clusterInfo[0];
+
+  // Calcolo bbox del cluster scelto e adatto la camera
+  const bboxW = chosen.maxU - chosen.minU;
+  const bboxH = chosen.maxV - chosen.minV;
+  const bboxCu = (chosen.minU + chosen.maxU) * 0.5;
+  const bboxCv = (chosen.minV + chosen.maxV) * 0.5;
+
+  // Pan = centro del bbox del cluster (in UV)
+  s.panU = bboxCu;
+  s.panV = bboxCv;
+
+  // Zoom = quanto stringere per inquadrare il bbox con padding 15%
+  // Calcolo basato sul fitSectionCamera: il base inquadra il rettangolo handle (s.width × s.height).
+  // Per inquadrare bboxW × bboxH con padding, devo zoom = baseSize / (bboxSize * (1+padding))
+  const padding = 1.30;  // 30% di margine attorno al cluster
+  const cw = sectionCanvas.clientWidth || 1;
+  const ch = sectionCanvas.clientHeight || 1;
+  const aspect = cw / ch;
+  const padBase = Math.max(s.width, s.height) * 0.06;
+  const baseHalfW = s.width * 0.5 + padBase;
+  const baseHalfH = s.height * 0.5 + padBase;
+  let baseFitW, baseFitH;
+  if (aspect > baseHalfW / baseHalfH) {
+    baseFitH = baseHalfH; baseFitW = baseHalfH * aspect;
+  } else {
+    baseFitW = baseHalfW; baseFitH = baseHalfW / aspect;
+  }
+  // Quanto zoom serve per fare in modo che il cluster (bboxW × bboxH) entri in vista
+  const targetHalfW = (bboxW * 0.5) * padding;
+  const targetHalfH = (bboxH * 0.5) * padding;
+  // Devo trovare zoom tale che baseFitW / zoom >= targetHalfW e baseFitH / zoom >= targetHalfH
+  const zoomU = baseFitW / Math.max(targetHalfW, 0.5);  // 0.5mm minimo per evitare zoom infinito
+  const zoomV = baseFitH / Math.max(targetHalfH, 0.5);
+  let zoom = Math.min(zoomU, zoomV);
+  // Limito il range
+  zoom = Math.max(0.2, Math.min(20, zoom));
+  s.zoom = zoom;
+
+  fitSectionCamera();
 }
 
 function removeSection() {
@@ -3536,6 +4922,8 @@ function removeSection() {
     m.line.geometry.dispose(); m.line.material.dispose();
     if (m.labelEl) m.labelEl.remove();
   });
+  // Bridge: rimuovo dal registry (rimuove anche le misure 2D figlie via cascata)
+  if (s.synId) window.SynRegistry.remove(s.synId);
   state.section = null;
   applySectionClipping(false);
   showSectionPip(false);
@@ -4086,10 +5474,25 @@ function sectionCanvasClick(e) {
   labelEl.textContent = formatDistance(dist);
   document.getElementById('sectionPip').appendChild(labelEl);
 
-  state.section.measures2D.push({
+  const meas2D = {
     a: a.clone(), b: b.clone(),
     line, sphere1: s1, sphere2: s2, labelEl, distance: dist
-  });
+  };
+  // Bridge: la misura 2D e' figlia della sezione - via SynMeasureManager (Blocco 4)
+  meas2D.synId = window.SynMeasureManager.add({
+    type: 'linear-2d-section',
+    name: 'Misura 2D ' + (state.section.measures2D.length + 1),
+    value: dist,
+    unit: 'mm',
+    module: 'vedere',
+    parentId: state.section.synId,
+    points: [
+      { x: a.x, y: a.y, z: 0 },  // 2D: z=0 nel piano sezione
+      { x: b.x, y: b.y, z: 0 }
+    ],
+    visual: { visible: true, color: '#0065B3' },
+  }).id;
+  state.section.measures2D.push(meas2D);
 
   // Reset per altra misura
   state.sectionRulerFirstPoint = null;
@@ -4137,7 +5540,7 @@ document.getElementById('secRulerBtn').addEventListener('click', () => {
   setSectionRulerActive(!state.sectionRulerActive);
 });
 document.getElementById('secFitBtn').addEventListener('click', () => {
-  if (state.section) fitSectionCamera(true);
+  if (state.section) fitSectionCameraToContent();
 });
 
 // === Drag della PIP per riposizionarla (solo se non è in maxi) ===
@@ -4325,6 +5728,859 @@ document.addEventListener('keydown', e => {
 
 setStatus('Pronto');
 
+// ================================================================
+// SYN LAYER PANEL - tree view a sinistra, fonte di verita' = SynRegistry
+// Sostituisce il vecchio renderLayerList(). Si sottoscrive agli eventi
+// del registry e si aggiorna automaticamente.
+// ================================================================
+(function() {
+  const body = document.getElementById('layerBody');
+  if (!body) return;
+
+  // Stato collassamento gruppi (persistito in memoria della sessione)
+  const collapsed = new Set();
+
+  const GROUP_DEFS = [
+    { key: 'files',     label: 'FILE / SCANSIONI', icon: 'meshIcon'    },
+    { key: 'measures',  label: 'MISURE',           icon: 'measureIcon' },
+    { key: 'measures2d',label: 'MISURE 2D',        icon: 'measureIcon' },
+    { key: 'shapes',    label: 'FORME',            icon: 'shapeIcon'   },
+    { key: 'sections',  label: 'SEZIONI',          icon: 'sectionIcon' },
+  ];
+
+  function escapeHtml(s) {
+    return String(s).replace(/[<>&"']/g, c => ({
+      '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  function colorForObj(obj) {
+    if (obj.visual && obj.visual.color) return obj.visual.color;
+    if (obj.role === 'os')  return '#0D9E6E';
+    if (obj.role === 'sr')  return '#0065B3';
+    if (obj.role === '1t3') return '#F59E0B';
+    if (obj.role === 'mua') return '#A855F7';
+    if (obj.type === 'measure') return '#0065B3';
+    if (obj.type === 'shape')   return '#5A6E82';
+    if (obj.type === 'section') return '#0065B3';
+    return '#7A90A4';
+  }
+
+  function metaForObj(obj) {
+    // testo meta a destra del nome (es. valore misura, raggio forma, ...)
+    if (obj.meta) {
+      if (obj.meta.valueText) return obj.meta.valueText;
+      if (obj.meta.label) return obj.meta.label;
+      if (obj.meta.format) return obj.meta.format;
+    }
+    return '';
+  }
+
+  function renderItem(obj, isChild) {
+    const sel = obj.visual.selected ? ' selected' : '';
+    const hidden = !obj.visual.visible ? ' hidden' : '';
+    const child = isChild ? ' child' : '';
+    const meta = metaForObj(obj);
+    const eyeIcon = obj.visual.visible ? window.SynIcons.eye({size:13}) : window.SynIcons.eyeOff({size:13});
+    const eyeClass = obj.visual.visible ? '' : ' hidden';
+    const color = colorForObj(obj);
+    return `<div class="slp-item${sel}${hidden}${child}" data-id="${obj.id}">
+      <button class="slp-eye${eyeClass}" data-action="toggle-visible" title="Mostra/nascondi">${eyeIcon}</button>
+      <span class="slp-color-dot" style="background:${color}" data-action="color"></span>
+      <span class="slp-name">${escapeHtml(obj.name)}</span>
+      ${meta ? `<span class="slp-meta">${escapeHtml(meta)}</span>` : ''}
+      <span class="slp-item-actions">
+        <button class="slp-action-btn" data-action="center" title="Centra vista">${window.SynIcons.centerView({size:12})}</button>
+        <button class="slp-action-btn" data-action="isolate" title="Isola">${window.SynIcons.isolate({size:12})}</button>
+        <button class="slp-action-btn danger" data-action="delete" title="Rimuovi">${window.SynIcons.trash({size:12})}</button>
+      </span>
+    </div>`;
+  }
+
+  function buildTreeForGroup(groupKey) {
+    let items = [];
+    if (groupKey === 'measures2d') {
+      // Misure 2D = quelle con role 'linear-2d-section'
+      items = window.SynRegistry.query({ type: 'measure', role: 'linear-2d-section' });
+    } else if (groupKey === 'measures') {
+      // Solo misure 3D top-level (non figlie di sezione)
+      items = window.SynRegistry.getAll().filter(o => o.type === 'measure' && o.role !== 'linear-2d-section');
+    } else {
+      const gMap = window.SynRegistry.byGroup();
+      items = (gMap.get(groupKey) || []).filter(o => !o.parentId);
+    }
+    return items;
+  }
+
+  function renderPanel() {
+    const all = window.SynRegistry.getAll();
+    if (all.length === 0) {
+      body.innerHTML = '<div class="lp-empty">Nessun file caricato</div>';
+      return;
+    }
+    let html = '';
+    for (const def of GROUP_DEFS) {
+      const items = buildTreeForGroup(def.key);
+      if (items.length === 0) continue;
+      const isCollapsed = collapsed.has(def.key);
+      const chevIcon = window.SynIcons.chevronDown({size:12});
+      const groupIcon = window.SynIcons[def.icon] ? window.SynIcons[def.icon]({size:12}) : '';
+      html += `<div class="slp-group${isCollapsed ? ' collapsed' : ''}" data-group="${def.key}">
+        <div class="slp-group-header" data-action="toggle-group">
+          <span class="slp-chevron">${chevIcon}</span>
+          <span class="slp-group-icon">${groupIcon}</span>
+          <span class="slp-group-label">${def.label}</span>
+          <span class="slp-group-badge">${items.length}</span>
+        </div>
+        <div class="slp-items">`;
+      for (const obj of items) {
+        html += renderItem(obj, false);
+        // Per le sezioni: mostro le misure 2D figlie annidate
+        if (def.key === 'sections') {
+          const children = window.SynRegistry.query({ parentId: obj.id });
+          for (const ch of children) html += renderItem(ch, true);
+        }
+      }
+      html += `</div></div>`;
+    }
+    body.innerHTML = html || '<div class="lp-empty">Nessun file caricato</div>';
+  }
+
+  // === Gestione click ===
+  body.addEventListener('click', (e) => {
+    // Toggle gruppo
+    const groupHeader = e.target.closest('[data-action="toggle-group"]');
+    if (groupHeader) {
+      const grp = groupHeader.closest('.slp-group');
+      if (grp) {
+        const key = grp.dataset.group;
+        if (collapsed.has(key)) collapsed.delete(key); else collapsed.add(key);
+        renderPanel();
+      }
+      return;
+    }
+    const item = e.target.closest('.slp-item');
+    if (!item) return;
+    const id = item.dataset.id;
+    const obj = window.SynRegistry.get(id);
+    if (!obj) return;
+
+    const actionBtn = e.target.closest('[data-action]');
+    const action = actionBtn ? actionBtn.dataset.action : null;
+
+    if (action === 'toggle-visible') {
+      e.stopPropagation();
+      toggleObjectVisibility(obj);
+      return;
+    }
+    if (action === 'color') {
+      e.stopPropagation();
+      changeObjectColor(obj);
+      return;
+    }
+    if (action === 'center') {
+      e.stopPropagation();
+      centerOnObject(obj);
+      return;
+    }
+    if (action === 'isolate') {
+      e.stopPropagation();
+      isolateObject(obj);
+      return;
+    }
+    if (action === 'delete') {
+      e.stopPropagation();
+      deleteObject(obj);
+      return;
+    }
+    // Click sull'item: seleziona
+    selectObjectInRegistry(obj);
+  });
+
+  // === Azioni ===
+  function toggleObjectVisibility(obj) {
+    const newVisible = !obj.visual.visible;
+    window.SynRegistry.update(obj.id, { 'visual.visible': newVisible });
+    // Bridge: applico il cambio anche al Three.js
+    if (obj.type === 'mesh' || obj.type === 'pointcloud') {
+      const layer = state.layers.find(l => l.synId === obj.id);
+      if (layer) {
+        layer.visible = newVisible;
+        layer.group.visible = newVisible;
+      }
+    } else if (obj.type === 'measure' && obj.role !== 'linear-2d-section') {
+      const m = state.measures.find(x => x.synId === obj.id);
+      if (m) {
+        m.visible = newVisible;
+        m.line.visible = newVisible;
+        m.handles.forEach(h => h.mesh.visible = newVisible);
+        if (m.labelEl) m.labelEl.style.display = newVisible ? '' : 'none';
+      }
+    } else if (obj.type === 'shape') {
+      const c = state.circles.find(x => x.synId === obj.id);
+      if (c) {
+        c.visible = newVisible;
+        c.ring.visible = newVisible;
+        c.handles.forEach(h => h.mesh.visible = newVisible);
+        if (c.labelEl) c.labelEl.style.display = newVisible ? '' : 'none';
+      }
+    } else if (obj.type === 'section') {
+      if (state.section && state.section.synId === obj.id) {
+        state.section.visible = newVisible;
+        state.section.rect.visible = newVisible;
+        state.section.handles.forEach(h => h.mesh.visible = newVisible);
+        applySectionClipping(newVisible);
+      }
+    } else if (obj.role === 'linear-2d-section') {
+      // Misura 2D dentro la sezione
+      if (state.section) {
+        const m2d = state.section.measures2D.find(x => x.synId === obj.id);
+        if (m2d) {
+          m2d.line.visible = newVisible;
+          m2d.sphere1.visible = newVisible;
+          m2d.sphere2.visible = newVisible;
+          if (m2d.labelEl) m2d.labelEl.style.display = newVisible ? '' : 'none';
+        }
+      }
+    }
+  }
+
+  function changeObjectColor(obj) {
+    // Solo per layer mesh: apre color picker (da implementare in v8.1)
+    if (obj.type !== 'mesh' && obj.type !== 'pointcloud') return;
+    const layer = state.layers.find(l => l.synId === obj.id);
+    if (!layer) return;
+    // Cicla nei colori della SWATCH_COLORS
+    const idx = SWATCH_COLORS.indexOf(layer.color);
+    const next = SWATCH_COLORS[(idx + 1) % SWATCH_COLORS.length];
+    layer.color = next;
+    if (layer.material && layer.material.color) {
+      layer.material.color.set(next);
+      layer.material.needsUpdate = true;
+    }
+    window.SynRegistry.update(obj.id, { 'visual.color': next });
+  }
+
+  function centerOnObject(obj) {
+    if (obj.type === 'mesh' || obj.type === 'pointcloud') {
+      const layer = state.layers.find(l => l.synId === obj.id);
+      if (layer && layer.geometry) {
+        layer.geometry.computeBoundingBox();
+        const bb = layer.geometry.boundingBox;
+        if (bb) {
+          const center = bb.getCenter(new THREE.Vector3());
+          const size = bb.getSize(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const dist = maxDim / (2 * Math.tan(camera.fov * Math.PI / 360)) * 1.5;
+          camera.position.copy(center).add(new THREE.Vector3(dist*0.5, dist*0.5, dist*0.7));
+          controls.target.copy(center);
+          controls.update();
+        }
+      }
+    }
+  }
+
+  function isolateObject(obj) {
+    // Isola = rendi visibile solo questo, nascondi tutti gli altri dello stesso tipo
+    const all = window.SynRegistry.query({ type: obj.type });
+    for (const o of all) {
+      const want = (o.id === obj.id);
+      window.SynRegistry.update(o.id, { 'visual.visible': want });
+      // bridge
+      if (o.type === 'mesh' || o.type === 'pointcloud') {
+        const layer = state.layers.find(l => l.synId === o.id);
+        if (layer) { layer.visible = want; layer.group.visible = want; }
+      }
+    }
+  }
+
+  function deleteObject(obj) {
+    if (obj.type === 'mesh' || obj.type === 'pointcloud') {
+      const layer = state.layers.find(l => l.synId === obj.id);
+      if (layer) removeLayer(layer.id);
+    } else if (obj.type === 'measure' && obj.role !== 'linear-2d-section') {
+      // Rimuovo la singola misura 3D
+      const idx = state.measures.findIndex(m => m.synId === obj.id);
+      if (idx >= 0) {
+        const m = state.measures[idx];
+        scene.remove(m.line);
+        m.line.geometry.dispose(); m.line.material.dispose();
+        m.handles.forEach(h => {
+          scene.remove(h.mesh);
+          h.mesh.traverse(o => { if (o.isMesh) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); } });
+        });
+        if (m.labelEl) m.labelEl.remove();
+        state.measures.splice(idx, 1);
+        window.SynRegistry.remove(obj.id);
+      }
+    } else if (obj.type === 'shape') {
+      const idx = state.circles.findIndex(c => c.synId === obj.id);
+      if (idx >= 0) {
+        const c = state.circles[idx];
+        scene.remove(c.ring);
+        c.ring.geometry.dispose(); c.ring.material.dispose();
+        c.handles.forEach(h => {
+          scene.remove(h.mesh);
+          h.mesh.traverse(o => { if (o.isMesh) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); } });
+        });
+        if (c.labelEl) c.labelEl.remove();
+        state.circles.splice(idx, 1);
+        window.SynRegistry.remove(obj.id);
+      }
+    } else if (obj.type === 'section') {
+      removeSection();
+    }
+  }
+
+  function selectObjectInRegistry(obj) {
+    window.SynRegistry.select([obj.id]);
+    // Bridge: per i layer mesh, attivo il transform controls come prima
+    if (obj.type === 'mesh' || obj.type === 'pointcloud') {
+      const layer = state.layers.find(l => l.synId === obj.id);
+      if (layer) selectLayer(layer.id);
+    }
+  }
+
+  // Sottoscrivo gli eventi del registry per aggiornare il pannello
+  window.SynRegistry.subscribe('change', renderPanel);
+  renderPanel();
+
+  // Esposizione globale per il bridge (la vecchia renderLayerList la rendiamo no-op alla fine)
+  window.SynLayerPanel = { render: renderPanel };
+})();
+
+// La vecchia renderLayerList() viene sostituita dal SynLayerPanel.
+// La rendo un no-op per non rompere le chiamate sparse nel codice.
+window.renderLayerList = function() { /* sostituita da SynLayerPanel */ };
+
+// ================================================================
+// ADAPTER VEDERE → SynCutViewManager (Blocco 5)
+// Connette il manager all'implementazione esistente. Wrapper Facade:
+// stesso comportamento, solo una facciata pulita sopra.
+// ================================================================
+if (window.SynCutViewManager) {
+  window.SynCutViewManager.bindAdapter({
+    create: function(p1, p2, options) {
+      // Se c'e' una sezione attiva, la rimuovo (il codice esistente accetta solo una)
+      if (state.section) removeSection();
+      createSection(p1, p2);
+      return state.section;  // ritorna l'oggetto state.section (con synId)
+    },
+    remove: function() {
+      if (state.section) removeSection();
+    },
+    getActive: function() {
+      return state.section || null;
+    },
+    fitToContent: function() {
+      if (typeof fitSectionCameraToContent === 'function') {
+        fitSectionCameraToContent();
+      }
+    },
+    update: function(changes) {
+      if (!state.section) return;
+      const s = state.section;
+      // Per ora solo visibility supportata. Le altre proprieta' (center,
+      // normal, ecc.) richiederebbero rebuild della geometria del piano.
+      if (changes.visible != null) {
+        s.visible = changes.visible;
+        if (s.rect) s.rect.visible = changes.visible;
+        if (s.handles) s.handles.forEach(h => h.mesh.visible = changes.visible);
+        if (typeof applySectionClipping === 'function') {
+          applySectionClipping(changes.visible);
+        }
+        // Aggiorno anche il registry
+        if (s.synId && window.SynRegistry) {
+          window.SynRegistry.update(s.synId, { 'visual.visible': changes.visible });
+        }
+      }
+    },
+  });
+  console.log('[SynCutViewManager] adapter Vedere installato');
+}
+
+// ================================================================
+// SYN PROPERTIES PANEL - pannello a destra
+// Si apre con animazione quando un oggetto e' selezionato nel registry.
+// Si chiude quando la selezione viene rimossa o quando l'utente preme X.
+// Mostra proprieta' coerenti per ogni tipo di oggetto.
+// ================================================================
+(function() {
+  const panel = document.getElementById('propsPanel');
+  const titleEl = document.getElementById('propsTitle');
+  const bodyEl = document.getElementById('propsBody');
+  const closeBtn = document.getElementById('propsClose');
+  if (!panel || !titleEl || !bodyEl || !closeBtn) return;
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[<>&"']/g, c => ({
+      '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  function fmt(num, decimals) {
+    if (num == null || isNaN(num)) return '—';
+    return Number(num).toFixed(decimals == null ? 2 : decimals);
+  }
+
+  function fmtVec(v, decimals) {
+    if (!v) return '—';
+    const a = Array.isArray(v) ? v : [v.x, v.y, v.z];
+    return a.map(x => fmt(x, decimals == null ? 2 : decimals)).join(', ');
+  }
+
+  function iconForObj(obj) {
+    if (obj.type === 'mesh' || obj.type === 'pointcloud') return window.SynIcons.meshIcon({size:18});
+    if (obj.type === 'measure') return window.SynIcons.measureIcon({size:18});
+    if (obj.type === 'shape')   return window.SynIcons.shapeIcon({size:18});
+    if (obj.type === 'section') return window.SynIcons.sectionIcon({size:18});
+    if (obj.type === 'marker')  return window.SynIcons.markerIcon({size:18});
+    return window.SynIcons.folder({size:18});
+  }
+
+  function typeBadge(obj) {
+    const map = {
+      mesh: 'MESH', pointcloud: 'POINTCLOUD',
+      measure: obj.role === 'linear-2d-section' ? 'MISURA 2D' : 'MISURA 3D',
+      shape: 'FORMA', section: 'SEZIONE',
+      marker: 'MARKER', helper: 'HELPER',
+    };
+    return map[obj.type] || (obj.type ? obj.type.toUpperCase() : 'OGGETTO');
+  }
+
+  // === Render specifico per tipo ===
+
+  function renderMesh(obj) {
+    const layer = state.layers.find(l => l.synId === obj.id);
+    const tris = obj.meta && obj.meta.triangles;
+    const bbox = obj.meta && obj.meta.bbox;
+    const fmt2 = n => (n == null ? '—' : Number(n).toFixed(2));
+    const opacity = obj.visual.opacity != null ? Math.round(obj.visual.opacity * 100) : 85;
+    const isVisible = obj.visual.visible;
+    const renderMode = (obj.visual && obj.visual.renderMode) || 'solid';
+    const isPoints = obj.type === 'pointcloud';
+
+    // Modalita' rendering: solo per mesh, non per pointcloud
+    const renderingSection = isPoints ? '' : `
+      <div class="props-section">
+        <div class="props-section-title">Rendering</div>
+        <div class="props-render-modes">
+          <button class="props-render-btn ${renderMode === 'solid' ? 'active' : ''}" data-action="render-mode" data-mode="solid" title="Mesh piena, no wireframe">Solido</button>
+          <button class="props-render-btn ${renderMode === 'wireframe' ? 'active' : ''}" data-action="render-mode" data-mode="wireframe" title="Solo reticolo dei triangoli">Wireframe</button>
+          <button class="props-render-btn ${renderMode === 'both' ? 'active' : ''}" data-action="render-mode" data-mode="both" title="Mesh piena con reticolo sopra">Entrambi</button>
+        </div>
+      </div>
+    `;
+
+    return `
+      <div class="props-section">
+        <div class="props-section-title">Informazioni</div>
+        <div class="props-row"><span class="props-row-key">Formato</span><span class="props-row-value">${escapeHtml(obj.meta.format || '—')}</span></div>
+        <div class="props-row"><span class="props-row-key">Triangoli</span><span class="props-row-value">${tris != null ? Number(tris).toLocaleString('it-IT') : '—'}</span></div>
+        <div class="props-row"><span class="props-row-key">Dim. X</span><span class="props-row-value">${fmt2(bbox && bbox.x)} mm</span></div>
+        <div class="props-row"><span class="props-row-key">Dim. Y</span><span class="props-row-value">${fmt2(bbox && bbox.y)} mm</span></div>
+        <div class="props-row"><span class="props-row-key">Dim. Z</span><span class="props-row-value">${fmt2(bbox && bbox.z)} mm</span></div>
+      </div>
+
+      <div class="props-section">
+        <div class="props-section-title">Visualizzazione</div>
+        <div class="props-row">
+          <span class="props-row-key">Visibile</span>
+          <button class="props-toggle ${isVisible ? 'active' : ''}" data-action="toggle-visible" title="Mostra/nascondi">
+            ${isVisible ? window.SynIcons.eye({size:13}) : window.SynIcons.eyeOff({size:13})}
+          </button>
+        </div>
+        <div class="props-slider-row">
+          <span class="props-row-key">Opacità</span>
+          <input type="range" min="10" max="100" step="5" value="${opacity}" data-action="opacity">
+          <span class="props-row-value" id="opacityValue">${opacity}%</span>
+        </div>
+      </div>
+
+      ${renderingSection}
+
+      <div class="props-section">
+        <div class="props-section-title">Colore</div>
+        <div class="props-colors">
+          ${SWATCH_COLORS.map(c => `<div class="props-color-swatch ${(obj.visual.color || (layer && layer.color)) === c ? 'active' : ''}" style="background:${c}" data-action="color" data-color="${c}"></div>`).join('')}
+        </div>
+      </div>
+
+      <div class="props-actions">
+        <button class="props-action-btn" data-action="center">${window.SynIcons.centerView({size:13})} Centra vista</button>
+        <button class="props-action-btn" data-action="isolate">${window.SynIcons.isolate({size:13})} Isola</button>
+        <button class="props-action-btn" data-action="restore-defaults">${window.SynIcons.chevronDown({size:13})} Ripristina default</button>
+        <button class="props-action-btn danger" data-action="delete">${window.SynIcons.trash({size:13})} Rimuovi layer</button>
+      </div>
+    `;
+  }
+
+  function renderMeasure(obj) {
+    const meas = state.measures.find(m => m.synId === obj.id);
+    const value = obj.meta && obj.meta.value;
+    const valueText = obj.meta && obj.meta.valueText;
+    const isVisible = obj.visual.visible;
+    // Preferisco i punti dal registry (Blocco 4), fallback su state locale
+    let p1 = null, p2 = null;
+    if (obj.meta && Array.isArray(obj.meta.points) && obj.meta.points.length >= 2) {
+      p1 = obj.meta.points[0]; p2 = obj.meta.points[1];
+    } else if (meas) {
+      p1 = meas.p1; p2 = meas.p2;
+    }
+    const typeDef = window.SynMeasureManager ? window.SynMeasureManager.getTypeDef(obj.role) : null;
+    const typeLabel = typeDef ? typeDef.label : 'Misura lineare 3D';
+    return `
+      <div class="props-section">
+        <div class="props-section-title">${escapeHtml(typeLabel)}</div>
+        <div class="props-row"><span class="props-row-key">Valore</span><span class="props-row-value">${escapeHtml(valueText || (value != null ? value.toFixed(3) + ' mm' : '—'))}</span></div>
+        <div class="props-row"><span class="props-row-key">Unità</span><span class="props-row-value">${escapeHtml(obj.meta.unit || 'mm')}</span></div>
+      </div>
+      <div class="props-section">
+        <div class="props-section-title">Punti</div>
+        <div class="props-row"><span class="props-row-key">P1</span><span class="props-row-value">${p1 ? fmtVec(p1, 2) : '—'}</span></div>
+        <div class="props-row"><span class="props-row-key">P2</span><span class="props-row-value">${p2 ? fmtVec(p2, 2) : '—'}</span></div>
+      </div>
+      <div class="props-section">
+        <div class="props-section-title">Visualizzazione</div>
+        <div class="props-row">
+          <span class="props-row-key">Visibile</span>
+          <button class="props-toggle ${isVisible ? 'active' : ''}" data-action="toggle-visible">${isVisible ? window.SynIcons.eye({size:13}) : window.SynIcons.eyeOff({size:13})}</button>
+        </div>
+      </div>
+      <div class="props-actions">
+        <button class="props-action-btn danger" data-action="delete">${window.SynIcons.trash({size:13})} Rimuovi misura</button>
+      </div>
+    `;
+  }
+
+  function renderMeasure2D(obj) {
+    const parent = obj.parentId ? window.SynRegistry.get(obj.parentId) : null;
+    const m2d = (state.section && state.section.measures2D) ? state.section.measures2D.find(m => m.synId === obj.id) : null;
+    const value = obj.meta && obj.meta.value;
+    const valueText = obj.meta && obj.meta.valueText;
+    // Preferisco i punti dal registry, fallback su state locale
+    let pointA = null, pointB = null;
+    if (obj.meta && Array.isArray(obj.meta.points) && obj.meta.points.length >= 2) {
+      pointA = obj.meta.points[0]; pointB = obj.meta.points[1];
+    } else if (m2d) {
+      pointA = { x: m2d.a.x, y: m2d.a.y, z: m2d.a.z || 0 };
+      pointB = { x: m2d.b.x, y: m2d.b.y, z: m2d.b.z || 0 };
+    }
+    return `
+      <div class="props-section">
+        <div class="props-section-title">Misura 2D in sezione</div>
+        <div class="props-row"><span class="props-row-key">Valore</span><span class="props-row-value">${escapeHtml(valueText || (value != null ? value.toFixed(3) + ' mm' : '—'))}</span></div>
+        <div class="props-row"><span class="props-row-key">Sezione</span><span class="props-row-value">${parent ? escapeHtml(parent.name) : '—'}</span></div>
+      </div>
+      <div class="props-section">
+        <div class="props-section-title">Punti 2D (piano sezione)</div>
+        <div class="props-row"><span class="props-row-key">A</span><span class="props-row-value">${pointA ? fmtVec(pointA, 2) : '—'}</span></div>
+        <div class="props-row"><span class="props-row-key">B</span><span class="props-row-value">${pointB ? fmtVec(pointB, 2) : '—'}</span></div>
+      </div>
+    `;
+  }
+
+  function renderShape(obj) {
+    const circle = state.circles.find(c => c.synId === obj.id);
+    const isVisible = obj.visual.visible;
+    const shapeNames = { circle:'Cerchio', square:'Quadrato', hex:'Esagono', oct:'Ottagono', torx:'Torx' };
+    return `
+      <div class="props-section">
+        <div class="props-section-title">Forma tecnica</div>
+        <div class="props-row"><span class="props-row-key">Tipo</span><span class="props-row-value">${escapeHtml(shapeNames[obj.role] || obj.role || '—')}</span></div>
+        <div class="props-row"><span class="props-row-key">Etichetta</span><span class="props-row-value">${escapeHtml(obj.meta && obj.meta.label || '—')}</span></div>
+        <div class="props-row"><span class="props-row-key">Raggio</span><span class="props-row-value">${obj.meta && obj.meta.radius != null ? obj.meta.radius.toFixed(3) + ' mm' : '—'}</span></div>
+        ${circle ? `<div class="props-row"><span class="props-row-key">Centro</span><span class="props-row-value">${fmtVec(circle.center, 2)}</span></div>` : ''}
+      </div>
+      <div class="props-section">
+        <div class="props-section-title">Visualizzazione</div>
+        <div class="props-row">
+          <span class="props-row-key">Visibile</span>
+          <button class="props-toggle ${isVisible ? 'active' : ''}" data-action="toggle-visible">${isVisible ? window.SynIcons.eye({size:13}) : window.SynIcons.eyeOff({size:13})}</button>
+        </div>
+      </div>
+      <div class="props-actions">
+        <button class="props-action-btn danger" data-action="delete">${window.SynIcons.trash({size:13})} Rimuovi forma</button>
+      </div>
+    `;
+  }
+
+  function renderSection(obj) {
+    const sec = state.section && state.section.synId === obj.id ? state.section : null;
+    const children = window.SynRegistry.query({ parentId: obj.id });
+    const isVisible = obj.visual.visible;
+    return `
+      <div class="props-section">
+        <div class="props-section-title">Piano di sezione</div>
+        <div class="props-row"><span class="props-row-key">Larghezza</span><span class="props-row-value">${obj.meta && obj.meta.width != null ? obj.meta.width.toFixed(2) + ' mm' : '—'}</span></div>
+        <div class="props-row"><span class="props-row-key">Altezza</span><span class="props-row-value">${obj.meta && obj.meta.height != null ? obj.meta.height.toFixed(2) + ' mm' : '—'}</span></div>
+        ${sec ? `<div class="props-row"><span class="props-row-key">Centro</span><span class="props-row-value">${fmtVec(sec.center, 2)}</span></div>` : ''}
+        ${sec ? `<div class="props-row"><span class="props-row-key">Normale</span><span class="props-row-value">${fmtVec(sec.normal, 2)}</span></div>` : ''}
+        <div class="props-row"><span class="props-row-key">Misure 2D</span><span class="props-row-value">${children.length}</span></div>
+      </div>
+      <div class="props-section">
+        <div class="props-section-title">Visualizzazione</div>
+        <div class="props-row">
+          <span class="props-row-key">Clipping attivo</span>
+          <button class="props-toggle ${isVisible ? 'active' : ''}" data-action="toggle-visible">${isVisible ? window.SynIcons.eye({size:13}) : window.SynIcons.eyeOff({size:13})}</button>
+        </div>
+      </div>
+      <div class="props-actions">
+        <button class="props-action-btn danger" data-action="delete">${window.SynIcons.trash({size:13})} Rimuovi sezione</button>
+      </div>
+    `;
+  }
+
+  function render(obj) {
+    titleEl.textContent = typeBadge(obj);
+    let html = `
+      <div class="props-obj-head">
+        <div class="props-obj-icon">${iconForObj(obj)}</div>
+        <div class="props-obj-info">
+          <div class="props-obj-name">${escapeHtml(obj.name)}</div>
+          <div class="props-obj-type">${typeBadge(obj)} · ${escapeHtml(obj.id)}</div>
+        </div>
+      </div>
+    `;
+    if (obj.type === 'mesh' || obj.type === 'pointcloud') html += renderMesh(obj);
+    else if (obj.type === 'measure' && obj.role === 'linear-2d-section') html += renderMeasure2D(obj);
+    else if (obj.type === 'measure') html += renderMeasure(obj);
+    else if (obj.type === 'shape') html += renderShape(obj);
+    else if (obj.type === 'section') html += renderSection(obj);
+    else html += `<div class="props-section"><div class="props-row-value muted">Nessuna proprietà disponibile per questo tipo</div></div>`;
+    bodyEl.innerHTML = html;
+  }
+
+  // === Apertura/chiusura ===
+  function open() { panel.classList.add('open'); }
+  function close() {
+    panel.classList.remove('open');
+    // Rimuovo anche la selezione del registry (cosi' il pannello layer si deselezionia)
+    window.SynRegistry.select([]);
+  }
+
+  closeBtn.addEventListener('click', close);
+
+  // === Click delegate per le azioni del pannello ===
+  bodyEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const sel = window.SynRegistry.getSelected();
+    if (!sel) return;
+    const action = btn.dataset.action;
+
+    if (action === 'toggle-visible') {
+      // Riuso la funzione del SynLayerPanel se disponibile
+      const newVisible = !sel.visual.visible;
+      window.SynRegistry.update(sel.id, { 'visual.visible': newVisible });
+      // Bridge Three.js (replicato qui per sicurezza)
+      if (sel.type === 'mesh' || sel.type === 'pointcloud') {
+        const layer = state.layers.find(l => l.synId === sel.id);
+        if (layer) { layer.visible = newVisible; layer.group.visible = newVisible; }
+      } else if (sel.type === 'measure' && sel.role !== 'linear-2d-section') {
+        const m = state.measures.find(x => x.synId === sel.id);
+        if (m) { m.visible = newVisible; m.line.visible = newVisible; m.handles.forEach(h => h.mesh.visible = newVisible); if (m.labelEl) m.labelEl.style.display = newVisible ? '' : 'none'; }
+      } else if (sel.type === 'shape') {
+        const c = state.circles.find(x => x.synId === sel.id);
+        if (c) { c.visible = newVisible; c.ring.visible = newVisible; c.handles.forEach(h => h.mesh.visible = newVisible); if (c.labelEl) c.labelEl.style.display = newVisible ? '' : 'none'; }
+      } else if (sel.type === 'section') {
+        if (state.section && state.section.synId === sel.id) { state.section.visible = newVisible; state.section.rect.visible = newVisible; state.section.handles.forEach(h => h.mesh.visible = newVisible); applySectionClipping(newVisible); }
+      }
+      render(sel);
+    }
+    else if (action === 'opacity') {
+      // Slider opacità (solo mesh)
+      const v = parseInt(btn.value, 10) / 100;
+      window.SynRegistry.update(sel.id, { 'visual.opacity': v });
+      const layer = state.layers.find(l => l.synId === sel.id);
+      if (layer && layer.material) {
+        layer.material.transparent = (v < 1.0);
+        layer.material.opacity = v;
+        layer.material.depthWrite = (v >= 1.0);
+        layer.material.needsUpdate = true;
+        layer.transparent = (v < 1.0);
+      }
+      const valueEl = document.getElementById('opacityValue');
+      if (valueEl) valueEl.textContent = Math.round(v * 100) + '%';
+    }
+    else if (action === 'color') {
+      const newColor = btn.dataset.color;
+      window.SynRegistry.update(sel.id, { 'visual.color': newColor });
+      const layer = state.layers.find(l => l.synId === sel.id);
+      if (layer) {
+        layer.color = newColor;
+        if (layer.material && layer.material.color) {
+          layer.material.color.set(newColor);
+          layer.material.needsUpdate = true;
+        }
+      }
+      render(sel);
+    }
+    else if (action === 'center') {
+      // Centra camera sull'oggetto
+      if (sel.type === 'mesh' || sel.type === 'pointcloud') {
+        const layer = state.layers.find(l => l.synId === sel.id);
+        if (layer && layer.geometry) {
+          layer.geometry.computeBoundingBox();
+          const bb = layer.geometry.boundingBox;
+          if (bb) {
+            const center = bb.getCenter(new THREE.Vector3());
+            const size = bb.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const dist = maxDim / (2 * Math.tan(camera.fov * Math.PI / 360)) * 1.5;
+            camera.position.copy(center).add(new THREE.Vector3(dist*0.5, dist*0.5, dist*0.7));
+            controls.target.copy(center);
+            controls.update();
+          }
+        }
+      }
+    }
+    else if (action === 'isolate') {
+      const all = window.SynRegistry.query({ type: sel.type });
+      for (const o of all) {
+        const want = (o.id === sel.id);
+        window.SynRegistry.update(o.id, { 'visual.visible': want });
+        if (o.type === 'mesh' || o.type === 'pointcloud') {
+          const layer = state.layers.find(l => l.synId === o.id);
+          if (layer) { layer.visible = want; layer.group.visible = want; }
+        }
+      }
+    }
+    else if (action === 'render-mode') {
+      // Cambia modalita' rendering della mesh: solid / wireframe / both
+      const newMode = btn.dataset.mode;
+      window.SynRegistry.update(sel.id, { 'visual.renderMode': newMode });
+      const layer = state.layers.find(l => l.synId === sel.id);
+      if (layer && layer.material) {
+        if (newMode === 'solid') {
+          // Mesh piena, niente reticolo
+          layer.material.wireframe = false;
+          // Rimuovo eventuale overlay wireframe creato in modalita' "both"
+          if (layer.wireframeOverlay) {
+            layer.group.remove(layer.wireframeOverlay);
+            if (layer.wireframeOverlay.material) layer.wireframeOverlay.material.dispose();
+            layer.wireframeOverlay = null;
+          }
+        } else if (newMode === 'wireframe') {
+          // Solo reticolo, mesh piena off
+          layer.material.wireframe = true;
+          if (layer.wireframeOverlay) {
+            layer.group.remove(layer.wireframeOverlay);
+            if (layer.wireframeOverlay.material) layer.wireframeOverlay.material.dispose();
+            layer.wireframeOverlay = null;
+          }
+        } else if (newMode === 'both') {
+          // Mesh piena con reticolo sopra (overlay)
+          layer.material.wireframe = false;
+          if (!layer.wireframeOverlay) {
+            const overlayMat = new THREE.MeshBasicMaterial({
+              color: 0x1a3550,        // blu scuro discreto, non aggressivo
+              wireframe: true,
+              transparent: true,
+              opacity: 0.35,
+              depthTest: true,
+              depthWrite: false,
+            });
+            const overlay = new THREE.Mesh(layer.geometry, overlayMat);
+            overlay.renderOrder = 1;
+            layer.group.add(overlay);
+            layer.wireframeOverlay = overlay;
+          }
+        }
+        layer.material.needsUpdate = true;
+      }
+      render(sel);  // ridisegno il pannello per aggiornare i bottoni active
+    }
+    else if (action === 'restore-defaults') {
+      // Ripristina tutti i valori visuali ai default memorizzati in meta.original
+      const orig = sel.meta && sel.meta.original;
+      if (orig) {
+        // Rimuovo eventuale overlay wireframe esistente
+        const layer = state.layers.find(l => l.synId === sel.id);
+        if (layer && layer.wireframeOverlay) {
+          layer.group.remove(layer.wireframeOverlay);
+          if (layer.wireframeOverlay.material) layer.wireframeOverlay.material.dispose();
+          layer.wireframeOverlay = null;
+        }
+        // Aggiorno il registry
+        window.SynRegistry.update(sel.id, {
+          'visual.opacity': orig.opacity,
+          'visual.color': orig.color,
+          'visual.visible': orig.visible,
+          'visual.renderMode': orig.renderMode || 'solid',
+        });
+        // Applico al Three.js
+        if (layer) {
+          layer.visible = orig.visible;
+          layer.group.visible = orig.visible;
+          layer.color = orig.color;
+          if (layer.material) {
+            layer.material.color.set(orig.color);
+            layer.material.transparent = (orig.opacity < 1.0);
+            layer.material.opacity = orig.opacity;
+            layer.material.depthWrite = (orig.opacity >= 1.0);
+            layer.material.wireframe = false;
+            layer.material.needsUpdate = true;
+          }
+        }
+        render(sel);
+        setStatus('Valori di default ripristinati per "' + sel.name + '"');
+      }
+    }
+    else if (action === 'delete') {
+      // Riuso il bridge "delete" del layer panel
+      if (sel.type === 'mesh' || sel.type === 'pointcloud') {
+        const layer = state.layers.find(l => l.synId === sel.id);
+        if (layer) removeLayer(layer.id);
+      } else if (sel.type === 'measure' && sel.role !== 'linear-2d-section') {
+        const idx = state.measures.findIndex(m => m.synId === sel.id);
+        if (idx >= 0) {
+          const m = state.measures[idx];
+          scene.remove(m.line);
+          m.line.geometry.dispose(); m.line.material.dispose();
+          m.handles.forEach(h => { scene.remove(h.mesh); h.mesh.traverse(o => { if (o.isMesh) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); } }); });
+          if (m.labelEl) m.labelEl.remove();
+          state.measures.splice(idx, 1);
+          window.SynRegistry.remove(sel.id);
+        }
+      } else if (sel.type === 'shape') {
+        const idx = state.circles.findIndex(c => c.synId === sel.id);
+        if (idx >= 0) {
+          const c = state.circles[idx];
+          scene.remove(c.ring);
+          c.ring.geometry.dispose(); c.ring.material.dispose();
+          c.handles.forEach(h => { scene.remove(h.mesh); h.mesh.traverse(o => { if (o.isMesh) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); } }); });
+          if (c.labelEl) c.labelEl.remove();
+          state.circles.splice(idx, 1);
+          window.SynRegistry.remove(sel.id);
+        }
+      } else if (sel.type === 'section') {
+        removeSection();
+      }
+      close();
+    }
+  });
+
+  // === Sottoscrizione agli eventi del registry ===
+  window.SynRegistry.subscribe('select', () => {
+    const sel = window.SynRegistry.getSelected();
+    if (sel) { render(sel); open(); }
+    else { panel.classList.remove('open'); }
+  });
+
+  // Quando un oggetto selezionato viene rimosso o aggiornato, aggiorno il pannello
+  window.SynRegistry.subscribe('remove', (e) => {
+    const sel = window.SynRegistry.getSelected();
+    if (!sel) panel.classList.remove('open');
+  });
+  window.SynRegistry.subscribe('update', (e) => {
+    const sel = window.SynRegistry.getSelected();
+    if (sel && sel.id === e.id) render(sel);
+  });
+
+  window.SynPropertiesPanel = { render, open, close };
+})();
+
 // === Menu File / WorkFlow ===
 function toggleFileMenu(e) {
   if (e) e.stopPropagation();
@@ -4360,12 +6616,22 @@ document.addEventListener('click', (e) => {
 
 // Routing tra workflow di Synthesis. Vedere è il workflow attivo.
 // Gli altri rimandano alle relative pagine /analizzare e /replacer (legacy) sul backend.
+// Se il file è aperto in locale (file://), rimanda al sito live invece di rotte relative
+// che fallirebbero (file:///analizzare non esiste).
 function selectWorkflow(wf) {
   closeWorkflowMenu();
   if (wf === 'vedere') return; // gia' attivo
-  // Tutti gli altri workflow vivono dentro la pagina /analizzare di Synthesis,
-  // che internamente seleziona il workflow attivo.
   if (wf === 'analizza' || wf === 'accoppia' || wf === 'misurare' || wf === 'sostituire') {
+    const isLocalFile = (window.location.protocol === 'file:');
+    if (isLocalFile) {
+      // In locale: avviso l'utente e apro il sito live in nuova scheda
+      const ok = confirm(
+        'Il modulo "' + wf.toUpperCase() + '" non è disponibile in modalità locale.\n\n' +
+        'Vuoi aprire il sito live (app.syntesis-icp.com) in una nuova scheda?'
+      );
+      if (ok) window.open('https://syntesis-icp-production.up.railway.app/analizzare', '_blank');
+      return;
+    }
     window.location.href = '/analizzare';
     return;
   }
