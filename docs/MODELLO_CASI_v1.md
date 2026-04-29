@@ -536,6 +536,34 @@ Per chiarezza, questi temi sono **esplicitamente fuori MVP**:
 - ❌ **Permessi granulari** (es. "solo questo utente vede questo file"): MVP ha permessi a livello caso, tutti i partecipanti vedono tutto.
 - ❌ **Mobile-specific UX**: MVP responsive base, non app nativa.
 - ❌ **Pazienti come attori**: solo medici + tecnici + admin.
+- ❌ **PWA (Progressive Web App) con push notifications**: rinviata a fase 2 post-MVP. Vedi nota 13.1.
+
+### 13.1. Nota su PWA e push notifications (fase 2)
+
+Decisione del 29 apr 2026 (sera, dopo aver chiuso il piano MVP):
+
+Le notifiche push tramite PWA installabile su iPhone/Android sono una feature WOW desiderata, ma sono state esplicitamente **rinviate a fase 2** per i seguenti motivi:
+
+1. **Costo aggiuntivo**: 7-10 giorni di lavoro pieno (manifest, service worker, VAPID keys, backend push, UI permessi). Aggiungerle all'MVP avrebbe portato la stima da 19-27 giorni a 26-37 giorni.
+2. **Costruire le notifiche prima del sistema che le genera è un anti-pattern**: il modello Casi (eventi timeline) DEVE essere funzionante prima di poter inviare notifiche su quegli eventi.
+3. **iOS richiede installazione PWA prima**: il flusso "installa la PWA, accetta notifiche, ricevi push" su iPhone ha tasso di abbandono significativo. Non sappiamo a priori se gli utenti lo completeranno.
+4. **Principio del software medicale**: prima far funzionare con utenti pilota, poi aggiungere feature WOW.
+
+**Quando si farà** (fase 2, indicativamente 1-2 mesi dopo MVP):
+- Manifest PWA + service worker
+- Web Push protocol con chiavi VAPID
+- Tabella `push_subscriptions` lato backend
+- API per registrare/revocare subscription
+- Logica server-side: ogni `case_event` rilevante genera push agli utenti interessati
+- UI in dashboard: bottone "Abilita notifiche", gestione permessi
+
+**Modello combinato** (deciso 29 apr 2026):
+- Badge in-app sempre presente (parte dell'MVP)
+- Push come **aggiunta opzionale** per utenti che installano PWA
+- Niente esclude niente: chi ha PWA riceve sia badge (quando apre dashboard) sia push (sul telefono)
+- Granularità futura: l'utente potrà scegliere per quali eventi ricevere push (in fase 2 o 3)
+
+**Stima fase 2 PWA**: 7-10 giorni di lavoro.
 
 ---
 
@@ -579,6 +607,8 @@ Modifiche successive a questo documento devono essere annotate qui sotto con dat
 
 ```
 2026-04-29 v1.0 - Documento iniziale, tutte le decisioni di Blocco 1-4
+2026-04-29 v1.1 - Aggiunta sezione 13.1: PWA con push notifications rinviate a fase 2.
+                  Modello combinato badge+push deciso (badge in-app sempre, push opzionale via PWA).
 ```
 
 ---
