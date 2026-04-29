@@ -596,6 +596,30 @@ body{
 .vp-btn.active{background:var(--blue);color:var(--white);border-color:var(--blue)}
 .vp-btn:disabled{opacity:.35;cursor:not-allowed}
 
+/* Slider diametro gomma (Blocco 6) */
+.vp-eraser-slider{
+  display:flex;align-items:center;gap:6px;
+  padding:0 8px;height:32px;
+  background:rgba(255,255,255,0.95);
+  border:1px solid var(--border);
+  border-radius:6px;
+  box-shadow:0 2px 6px rgba(15,25,35,.1);
+  font-family:var(--mono);
+}
+.vp-eraser-label{font-size:11px;font-weight:800;color:var(--dark)}
+.vp-eraser-slider input[type=range]{
+  width:90px;height:18px;
+  accent-color:var(--blue);
+}
+.vp-eraser-value{
+  font-size:10px;font-weight:700;color:var(--gray);
+  min-width:42px;text-align:right;
+  letter-spacing:.04em;
+}
+
+/* Cursore gomma sul viewport */
+.viewport.eraser-active{cursor:crosshair}
+
 .drop-overlay{
   position:absolute;inset:0;z-index:50;display:none;
   align-items:center;justify-content:center;
@@ -865,6 +889,18 @@ input[type="file"]{display:none}
       <button class="vp-btn" id="btnSection" title="Sezione (S)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" stroke-linejoin="round"/><line x1="2" y1="8" x2="14" y2="8" stroke-dasharray="1.5 1"/></svg>
       </button>
+      <button class="vp-btn" id="btnEraser" title="Gomma (E)">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9.5 2.5 L13.5 6.5 L7 13 L3 9 Z" stroke-linejoin="round"/>
+          <line x1="3" y1="13" x2="13" y2="13" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <!-- Slider diametro gomma: visibile solo quando la gomma è attiva -->
+      <div class="vp-eraser-slider" id="eraserSliderWrap" style="display:none">
+        <span class="vp-eraser-label">Ø</span>
+        <input type="range" id="eraserDiameter" min="0.5" max="10" step="0.1" value="2.0">
+        <span class="vp-eraser-value" id="eraserDiameterValue">2.0 mm</span>
+      </div>
       <button class="vp-btn" id="btnRulerClear" title="Pulisci misure" disabled>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h10M6 3h4M5 5v8a1 1 0 001 1h4a1 1 0 001-1V5" stroke-linecap="round"/></svg>
       </button>
@@ -948,6 +984,12 @@ input[type="file"]{display:none}
 
     <!-- Archi delle misure angolo (Blocco 5d): SVG overlay 2D piatto, sempre frontale -->
     <svg class="angle-arcs-overlay" id="angleArcsOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5"></svg>
+
+    <!-- Cursore gomma (Blocco 6): cerchio che segue il mouse quando la gomma e' attiva -->
+    <svg id="eraserCursor" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:6;display:none">
+      <circle id="eraserCursorCircle" cx="0" cy="0" r="20" fill="rgba(220,38,38,0.10)" stroke="#DC2626" stroke-width="1.5"/>
+      <circle id="eraserCursorDot" cx="0" cy="0" r="2" fill="#DC2626"/>
+    </svg>
   </div>
 </div>
 
@@ -1758,6 +1800,13 @@ const state = {
   angleActive: false,
   anglePoints: [],          // accumula 4 punti: [p1l1, p2l1, p1l2, p2l2]
   anglePendingObjs: [],     // oggetti grafici temporanei da rimuovere a reset
+  anglePendingColor: null,  // colore palette scelto al primo click
+  // Gomma (Blocco 6)
+  eraserActive: false,
+  eraserDiameterMm: 2.0,    // diametro corrente, valore fra 0.5 e 10
+  eraserDragging: false,    // true durante un click&drag
+  eraserCurrentStroke: null,// accumula triangoli cancellati nello stroke corrente, per undo
+  eraserHistory: [],        // array di stroke (ognuno = { layerId, removedTris: [...] }), max 20
   circleActive: false,
   activeShape: 'circle',
   circleFirstEdge: null,
@@ -2867,6 +2916,317 @@ function updateAngleMeasureLabel(m) {
   m.labelEl.style.left = labelX + 'px';
   m.labelEl.style.top = labelY + 'px';
   m.labelEl.style.display = '';
+}
+
+// =====================================================================
+// GOMMA TOPOLOGICA (Blocco 6)
+// Algoritmo:
+//   1. Raycast singolo dal centro del cursore → trovo il TRIANGOLO frontale
+//   2. BFS sui triangoli adiacenti (condividono 2+ vertici), entro il raggio
+//      della gomma misurato in superficie
+//   3. Marco i triangoli per cancellazione (impostando indici a un triangolo
+//      degenerato: 3 vertici uguali → triangolo invisibile, ma niente realloca)
+//   4. Salvo lo stroke nell'history per l'undo
+//
+// Caching: pre-calcolo l'adiacenza tra triangoli alla prima cancellazione su
+// una mesh, poi la riuso. Vale la pena per drag continuo.
+// =====================================================================
+
+function setEraserActive(on) {
+  state.eraserActive = on;
+  document.getElementById('btnEraser').classList.toggle('active', on);
+  document.getElementById('viewport').classList.toggle('eraser-active', on);
+  document.getElementById('eraserSliderWrap').style.display = on ? 'flex' : 'none';
+  document.getElementById('eraserCursor').style.display = on ? '' : 'none';
+  hoverMarker.visible = false;
+  // Disabilita OrbitControls cosi' click&drag della gomma non ruota la camera
+  if (typeof controls !== 'undefined') controls.enabled = !on;
+  if (on) {
+    deselectLayer();
+    if (state.rulerActive) setRulerActive(false);
+    if (state.angleActive) setAngleActive(false);
+    if (state.circleActive) setCircleActive(false);
+    if (state.sectionPlaceMode) cancelSectionPlacement();
+  }
+  // Resetta drag in corso
+  state.eraserDragging = false;
+  state.eraserCurrentStroke = null;
+}
+
+// Cache adiacenza triangoli: per ogni layer, mappa tri-index → array di tri-index adiacenti
+const _triAdjacencyCache = new WeakMap();
+
+function buildTriangleAdjacency(geometry) {
+  // Costruisce per ogni triangolo (indice) la lista dei triangoli adiacenti
+  // (che condividono almeno 2 vertici).
+  // O(N) tempo, O(N) memoria con hash dei lati.
+  const indexAttr = geometry.index;
+  const triCount = (indexAttr ? indexAttr.count : geometry.attributes.position.count) / 3;
+  const adjacency = new Array(triCount);
+  for (let i = 0; i < triCount; i++) adjacency[i] = [];
+
+  // Per ogni lato (a,b) con a<b, mappa lato → lista triangoli che lo contengono
+  // Uso una Map con chiavi stringa "a-b"
+  const edgeMap = new Map();
+  function addEdge(a, b, tri) {
+    if (a > b) { const t = a; a = b; b = t; }
+    const key = a + '-' + b;
+    let list = edgeMap.get(key);
+    if (!list) { list = []; edgeMap.set(key, list); }
+    list.push(tri);
+  }
+
+  if (indexAttr) {
+    const arr = indexAttr.array;
+    for (let t = 0; t < triCount; t++) {
+      const a = arr[t*3], b = arr[t*3+1], c = arr[t*3+2];
+      addEdge(a, b, t);
+      addEdge(b, c, t);
+      addEdge(c, a, t);
+    }
+  } else {
+    // Geometria non indicizzata: ogni triangolo ha vertici "individuali",
+    // l'adiacenza per indice non funziona. Devo dedupplicare per posizione.
+    // Caso comune per STL non ottimizzati. Per ora: niente adiacenza, gomma
+    // cancella solo il triangolo singolo ogni raycast.
+    return adjacency;  // tutto vuoto, nessun vicino
+  }
+
+  // Ora per ogni triangolo, raccolgo i vicini dai suoi 3 lati
+  for (const list of edgeMap.values()) {
+    if (list.length < 2) continue;
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        if (!adjacency[a].includes(b)) adjacency[a].push(b);
+        if (!adjacency[b].includes(a)) adjacency[b].push(a);
+      }
+    }
+  }
+  return adjacency;
+}
+
+function getOrBuildAdjacency(geometry) {
+  let adj = _triAdjacencyCache.get(geometry);
+  if (!adj) {
+    adj = buildTriangleAdjacency(geometry);
+    _triAdjacencyCache.set(geometry, adj);
+  }
+  return adj;
+}
+
+// Calcola il centroide di un triangolo dato indice (per misurare distanza in superficie)
+function _triCentroid(geometry, triIdx, out) {
+  const indexAttr = geometry.index;
+  const pos = geometry.attributes.position;
+  const a = indexAttr.array[triIdx*3];
+  const b = indexAttr.array[triIdx*3+1];
+  const c = indexAttr.array[triIdx*3+2];
+  out.x = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3;
+  out.y = (pos.getY(a) + pos.getY(b) + pos.getY(c)) / 3;
+  out.z = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3;
+  return out;
+}
+
+// Cancella un triangolo: impone i suoi 3 indici al primo vertice, lo rende
+// degenerato (area zero, invisibile). Vantaggio: niente realloca buffer.
+function _markTriangleDeleted(geometry, triIdx) {
+  const indexAttr = geometry.index;
+  const arr = indexAttr.array;
+  const a = arr[triIdx*3];
+  arr[triIdx*3+1] = a;
+  arr[triIdx*3+2] = a;
+}
+
+// Esegue una cancellazione "stroke step": dato un evento mouse, raycast la mesh,
+// se trova un triangolo applica BFS topologica entro il raggio.
+function eraserApply(e) {
+  // Setup raycaster (usa pickTriangleCentroid? No: ho bisogno dell'indice del triangolo)
+  const rect = canvas.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+
+  // Cerco intersezione con TUTTE le mesh visibili
+  const meshes = state.layers
+    .filter(l => l.visible && l.object && l.object.isMesh && !l.isPoints)
+    .map(l => l.object);
+  if (meshes.length === 0) return;
+  const hits = raycaster.intersectObjects(meshes, false);
+  if (hits.length === 0) return;
+  const hit = hits[0];
+
+  // Trovo il layer corrispondente al mesh colpito
+  const layer = state.layers.find(l => l.object === hit.object);
+  if (!layer) return;
+  const geometry = hit.object.geometry;
+  if (!geometry.index) {
+    // Geometrie non indicizzate non supportate (no adiacenza)
+    setStatus('Mesh non supportata dalla gomma topologica (no index)');
+    return;
+  }
+
+  const triIdx = hit.faceIndex;
+  if (triIdx == null) return;
+
+  // BFS sui triangoli adiacenti, entro il raggio
+  const radius = state.eraserDiameterMm * 0.5;
+  const r2 = radius * radius;
+  const adjacency = getOrBuildAdjacency(geometry);
+
+  const startCentroid = _triCentroid(geometry, triIdx, new THREE.Vector3());
+  const tmp = new THREE.Vector3();
+  const visited = new Set([triIdx]);
+  const toDelete = [triIdx];
+  const queue = [triIdx];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const neighbors = adjacency[current];
+    if (!neighbors) continue;
+    for (const n of neighbors) {
+      if (visited.has(n)) continue;
+      visited.add(n);
+      _triCentroid(geometry, n, tmp);
+      // Distanza euclidea dal centroide di partenza (approssima la distanza in superficie
+      // per piccole zone come la gomma; per zone grandi sarebbe necessaria geodesica).
+      const dx = tmp.x - startCentroid.x;
+      const dy = tmp.y - startCentroid.y;
+      const dz = tmp.z - startCentroid.z;
+      if (dx*dx + dy*dy + dz*dz <= r2) {
+        toDelete.push(n);
+        queue.push(n);
+      }
+    }
+  }
+
+  // Salvo per l'undo: copia dei 3 indici originali di ogni triangolo cancellato
+  const indexArr = geometry.index.array;
+  const removedRecord = [];
+  for (const t of toDelete) {
+    removedRecord.push({
+      tri: t,
+      i0: indexArr[t*3],
+      i1: indexArr[t*3+1],
+      i2: indexArr[t*3+2],
+    });
+    _markTriangleDeleted(geometry, t);
+  }
+
+  // Forza il geometry update
+  geometry.index.needsUpdate = true;
+
+  // Aggiungo allo stroke corrente (creato al click iniziale)
+  if (!state.eraserCurrentStroke) {
+    state.eraserCurrentStroke = { layerId: layer.id, geometry, removedTris: [] };
+  }
+  // Evito duplicati: se il triangolo era già stato cancellato in questo stroke, skip
+  for (const rec of removedRecord) {
+    state.eraserCurrentStroke.removedTris.push(rec);
+  }
+}
+
+function eraserCommitStroke() {
+  if (state.eraserCurrentStroke && state.eraserCurrentStroke.removedTris.length > 0) {
+    state.eraserHistory.push(state.eraserCurrentStroke);
+    // Cap a 20 stroke
+    if (state.eraserHistory.length > 20) state.eraserHistory.shift();
+    setStatus('Cancellati ' + state.eraserCurrentStroke.removedTris.length + ' triangoli (Ctrl+Z per annullare)');
+  }
+  state.eraserCurrentStroke = null;
+  state.eraserDragging = false;
+}
+
+function eraserUndo() {
+  if (state.eraserHistory.length === 0) {
+    setStatus('Niente da annullare');
+    return;
+  }
+  const stroke = state.eraserHistory.pop();
+  const indexArr = stroke.geometry.index.array;
+  // Ripristino i 3 indici originali per ogni triangolo
+  for (const rec of stroke.removedTris) {
+    indexArr[rec.tri*3]   = rec.i0;
+    indexArr[rec.tri*3+1] = rec.i1;
+    indexArr[rec.tri*3+2] = rec.i2;
+  }
+  stroke.geometry.index.needsUpdate = true;
+  setStatus('Annullata cancellazione di ' + stroke.removedTris.length + ' triangoli');
+}
+
+// Handler eventi gomma
+function eraserOnPointerMove(e) {
+  if (!state.eraserActive) return;
+  // Aggiorno cursore SVG
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  // Calcolo raggio in pixel: proietto un punto a "raggio mm" dal centro nello spazio mondo,
+  // poi misuro sullo schermo. Approssimo usando la mesh sotto il mouse.
+  const radiusPx = _eraserRadiusPx(x, y);
+  const circle = document.getElementById('eraserCursorCircle');
+  const dot = document.getElementById('eraserCursorDot');
+  circle.setAttribute('cx', x);
+  circle.setAttribute('cy', y);
+  circle.setAttribute('r', radiusPx);
+  dot.setAttribute('cx', x);
+  dot.setAttribute('cy', y);
+
+  // Se sto trascinando, applico la gomma
+  if (state.eraserDragging) {
+    eraserApply(e);
+  }
+}
+
+function eraserOnPointerDown(e) {
+  if (!state.eraserActive) return;
+  if (e.button !== 0) return;
+  state.eraserDragging = true;
+  state.eraserCurrentStroke = null;
+  // Click immediato: prima applicazione
+  eraserApply(e);
+}
+
+function eraserOnPointerUp(e) {
+  if (!state.eraserActive) return;
+  if (state.eraserDragging) eraserCommitStroke();
+}
+
+// Stima il raggio in pixel del cerchio della gomma (raggio_mm in scena → pixel sullo schermo).
+// Uso un raycast al centro per trovare il punto sulla mesh, poi proietto un secondo punto
+// spostato di raggio_mm in direzione della camera-up per misurare la lunghezza in pixel.
+function _eraserRadiusPx(mouseX, mouseY) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (mouseX / rect.width) * 2 - 1;
+  const y = -(mouseY / rect.height) * 2 + 1;
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+  const meshes = state.layers
+    .filter(l => l.visible && l.object && l.object.isMesh && !l.isPoints)
+    .map(l => l.object);
+  if (meshes.length === 0) return 30;  // fallback
+  const hits = raycaster.intersectObjects(meshes, false);
+  if (hits.length === 0) return 30;
+
+  // Prendo il punto colpito + un secondo punto a raggio_mm in direzione "up" del world
+  const p = hits[0].point;
+  const up = new THREE.Vector3();
+  camera.up.copy(new THREE.Vector3(0, 1, 0));
+  // Direzione "right" della camera, perpendicolare a viewDir e camera.up
+  const viewDir = new THREE.Vector3();
+  camera.getWorldDirection(viewDir);
+  const right = new THREE.Vector3().crossVectors(viewDir, camera.up).normalize();
+  const pOffset = p.clone().add(right.multiplyScalar(state.eraserDiameterMm * 0.5));
+
+  // Proietto entrambi sullo schermo
+  const sp = p.clone().project(camera);
+  const spOff = pOffset.clone().project(camera);
+  const dx = (spOff.x - sp.x) * rect.width * 0.5;
+  const dy = (spOff.y - sp.y) * rect.height * 0.5;
+  const radiusPx = Math.sqrt(dx*dx + dy*dy);
+  // Limito tra 8 e 200 px per sicurezza
+  return Math.max(8, Math.min(200, radiusPx));
 }
 
 function toggleMeasureHint(on) {
@@ -4826,6 +5186,26 @@ document.getElementById('btnAngle').addEventListener('click', () => {
 canvas.addEventListener('pointermove', angleOnPointerMove);
 canvas.addEventListener('click', angleOnClick);
 
+// Bottone gomma (Blocco 6)
+document.getElementById('btnEraser').addEventListener('click', () => {
+  setEraserActive(!state.eraserActive);
+});
+// Slider diametro
+const _eraserSlider = document.getElementById('eraserDiameter');
+const _eraserValueLabel = document.getElementById('eraserDiameterValue');
+_eraserSlider.addEventListener('input', () => {
+  state.eraserDiameterMm = parseFloat(_eraserSlider.value);
+  _eraserValueLabel.textContent = state.eraserDiameterMm.toFixed(1) + ' mm';
+});
+// Bind eventi gomma sul canvas
+canvas.addEventListener('pointermove', eraserOnPointerMove);
+canvas.addEventListener('pointerdown', eraserOnPointerDown);
+canvas.addEventListener('pointerup', eraserOnPointerUp);
+// Quando il puntatore esce dal canvas durante un drag, committo lo stroke
+canvas.addEventListener('pointerleave', () => {
+  if (state.eraserActive && state.eraserDragging) eraserCommitStroke();
+});
+
 document.getElementById('btnRulerClear').addEventListener('click', () => {
   clearAllMeasures();
   clearAllCircles();
@@ -4938,18 +5318,35 @@ document.addEventListener('keydown', e => {
         setAngleActive(false);
       }
       e.stopPropagation();
+    } else if (state.eraserActive) {
+      // ESC: esci dalla gomma
+      setEraserActive(false);
+      e.stopPropagation();
+    }
+  } else if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)) {
+    // Ctrl+Z / Cmd+Z: undo della gomma (Blocco 6)
+    if (state.eraserHistory.length > 0) {
+      eraserUndo();
+      e.preventDefault();
+      e.stopPropagation();
     }
   } else if (e.key === 'm' || e.key === 'M') {
     if (state.circleActive) setCircleActive(false);
     if (state.angleActive) setAngleActive(false);
+    if (state.eraserActive) setEraserActive(false);
     setRulerActive(!state.rulerActive);
   } else if (e.key === 'g' || e.key === 'G') {
     if (state.rulerActive) setRulerActive(false);
     if (state.circleActive) setCircleActive(false);
+    if (state.eraserActive) setEraserActive(false);
     setAngleActive(!state.angleActive);
+  } else if (e.key === 'e' || e.key === 'E') {
+    // Shortcut gomma
+    setEraserActive(!state.eraserActive);
   } else if (e.key === 'c' || e.key === 'C') {
     if (state.rulerActive) setRulerActive(false);
     if (state.angleActive) setAngleActive(false);
+    if (state.eraserActive) setEraserActive(false);
     const same = state.circleActive && state.activeShape === 'circle';
     setCircleActive(!same, 'circle');
   } else if (e.key === 'q' || e.key === 'Q') {
