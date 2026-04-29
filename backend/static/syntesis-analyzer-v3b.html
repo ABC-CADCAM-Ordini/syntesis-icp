@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v7.3.9.107</title>
+<title>Syntesis-ICP - Analizzare v8.0.0-fase3e</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -85,7 +85,106 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .empty-state .title{font-size:18px;font-weight:800;color:var(--white);opacity:.6;margin-bottom:8px}
 .empty-state .sub{font-size:14px;font-family:var(--mono);opacity:.4;color:var(--white)}
 .empty-state.hidden{display:none}
-.panel{width:320px;min-width:240px;max-width:320px;background:var(--white);border-left:1px solid var(--border);overflow-y:auto;overflow-x:hidden;flex-shrink:1;padding:14px;display:flex;flex-direction:column;gap:10px;height:100%;min-height:0;box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--gray) transparent}
+.panel{width:320px;min-width:240px;max-width:320px;background:var(--white);border-left:1px solid var(--border);overflow-y:auto;overflow-x:hidden;flex-shrink:1;padding:14px;display:flex;flex-direction:column;gap:10px;height:100%;min-height:0;box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--gray) transparent;transition:width .25s ease, min-width .25s ease, max-width .25s ease, padding .25s ease}
+
+/* === Colonna destra collassabile (rail mode) === */
+.panel.panel-rail-collapsed{
+  width:34px;
+  min-width:34px;
+  max-width:34px;
+  padding:14px 0;
+  overflow:hidden;
+  background:var(--light);
+  cursor:pointer;
+}
+/* Quando in rail, nascondo i pannelli "normali" e mostro solo le strisce verticali */
+.panel.panel-rail-collapsed > .panel-section{ display:none }
+.panel.panel-rail-collapsed > .panel-rail-icons{ display:flex }
+
+/* Strisce con icone (visibili solo in rail mode) */
+.panel-rail-icons{
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  height:100%;
+  padding:8px 0;
+}
+.panel-rail-icon{
+  width:32px;
+  height:32px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--gray);
+  border-radius:6px;
+  cursor:pointer;
+  transition:all .15s ease;
+  flex-shrink:0;
+  position:relative;
+}
+.panel-rail-icon:hover{
+  background:var(--white);
+  color:var(--blue);
+  box-shadow:0 1px 3px rgba(15,25,35,0.08);
+}
+.panel-rail-icon.warn{
+  color:var(--gold);
+}
+.panel-rail-icon.warn:hover{
+  background:rgba(245,158,11,0.1);
+  color:var(--gold);
+}
+.panel-rail-icon.crit{
+  color:var(--red);
+}
+.panel-rail-icon.crit:hover{
+  background:rgba(220,38,38,0.1);
+  color:var(--red);
+}
+.panel-rail-icon.crit::after{
+  content:'';
+  position:absolute;
+  top:3px;
+  right:3px;
+  width:6px;
+  height:6px;
+  background:var(--red);
+  border-radius:50%;
+  box-shadow:0 0 0 1.5px var(--white);
+  animation:railCritPulse 1.4s ease-in-out infinite;
+}
+@keyframes railCritPulse{
+  0%, 100%{ transform:scale(1); opacity:1 }
+  50%{ transform:scale(1.3); opacity:0.7 }
+}
+.panel-rail-icon.hidden-rail{ display:none }
+/* Hint hover sul rail */
+.panel.panel-rail-collapsed:hover{
+  background:#EEF2F8;
+}
+
+/* Bottone toggle colonna nella header */
+.panel-toggle-btn{
+  width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border);
+  background:var(--white);
+  border-radius:7px;
+  cursor:pointer;
+  transition:all .12s;
+  color:var(--blue);
+}
+.panel-toggle-btn:hover{
+  background:var(--light);
+  border-color:var(--blue);
+}
+.panel-toggle-btn.active{
+  background:var(--light);
+  color:var(--gray);
+}
+
+
 @media (max-width:1400px){.panel{width:300px;padding:13px}}
 @media (max-width:1200px){.panel{width:280px;padding:12px}}
 @media (max-width:1000px){.panel{width:260px;padding:11px;font-size:13px}}
@@ -688,6 +787,282 @@ body .panel {
   opacity: 0;
   margin-top: 0;
 }
+
+/* === Pannelli destri Fase 3b: X chiusura, header actions, hidden === */
+.panel-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.panel-close-btn {
+  width: 18px; height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--gray);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .12s;
+}
+.panel-close-btn:hover {
+  background: rgba(220,38,38,0.10);
+  color: var(--red, #DC2626);
+}
+.panel-section.panel-hidden { display: none !important; }
+
+/* Menu Vista (in header) */
+.view-menu-wrapper { position: relative; }
+.view-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-shadow: 0 4px 14px rgba(15,25,35,0.12);
+  z-index: 200;
+  display: none;
+  padding: 4px 0;
+}
+.view-menu.open { display: block; }
+.view-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--dark);
+  cursor: pointer;
+  transition: background .12s;
+  user-select: none;
+}
+.view-menu-item:hover { background: var(--light); }
+.view-menu-item .vmi-check {
+  width: 14px; height: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  color: var(--blue);
+  font-size: 13px;
+}
+.view-menu-item.hidden-state .vmi-check { color: transparent; }
+.view-menu-item.hidden-state { color: var(--gray); }
+.view-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+.view-menu-title {
+  padding: 6px 14px 4px;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  color: var(--gray);
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   SYN LAYER PANEL (Fase 2 - sola lettura)
+   Pannello fluttuante in alto a destra del viewport che mostra
+   lo stato del SynRegistry centralizzato. Non interferisce con
+   i pannelli esistenti.
+   ============================================================ */
+.syn-layer-panel{
+  position:absolute;
+  top:14px; right:14px;
+  width:260px;
+  max-height:calc(100% - 28px);
+  background:rgba(15,25,35,0.94);
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(214,228,240,0.2);
+  border-radius:10px;
+  box-shadow:0 4px 16px rgba(15,25,35,0.30);
+  overflow:hidden;
+  z-index:11;
+  display:flex;flex-direction:column;
+  transition:max-height .25s ease;
+}
+.syn-layer-panel.collapsed{ max-height:36px }
+.syn-layer-panel.collapsed .slp-body{ display:none }
+.slp-header{
+  display:flex;align-items:center;gap:6px;
+  padding:9px 10px;
+  background:rgba(0,101,179,0.18);
+  border-bottom:1px solid rgba(214,228,240,0.15);
+  flex-shrink:0;
+}
+.slp-badge{
+  font-size:8px;font-weight:800;letter-spacing:.1em;
+  padding:2px 5px;border-radius:3px;
+  background:#F59E0B;color:#0F1923;
+  font-family:'Source Sans 3', sans-serif;
+}
+.slp-title{
+  font-size:10px;font-weight:800;letter-spacing:.12em;
+  color:#e8f0f7;
+  flex:1;
+  font-family:'Source Sans 3', sans-serif;
+}
+.slp-count{
+  font-size:10px;font-weight:700;
+  background:rgba(255,255,255,0.1);
+  color:#a0b4c8;
+  padding:2px 7px;border-radius:9px;
+  font-family:'Source Sans 3', sans-serif;
+}
+.slp-toggle{
+  width:20px;height:20px;
+  border:none;background:transparent;color:#a0b4c8;
+  border-radius:4px;cursor:pointer;
+  font-size:14px;font-weight:700;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+}
+.slp-toggle:hover{ background:rgba(255,255,255,0.1);color:#fff }
+.slp-body{
+  padding:8px;
+  overflow-y:auto;
+  flex:1;
+  font-size:11px;
+}
+.slp-empty{
+  color:#7A90A4;font-style:italic;text-align:center;padding:14px 8px;font-size:11px;
+}
+.slp-group-header{
+  font-size:9px;font-weight:800;letter-spacing:.12em;
+  color:#7A90A4;text-transform:uppercase;
+  padding:8px 4px 4px;
+  display:flex;align-items:center;gap:6px;
+  font-family:'Source Sans 3', sans-serif;
+}
+.slp-group-badge{
+  background:rgba(0,101,179,0.25);color:#a0b4c8;
+  padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;
+}
+.slp-item{
+  display:flex;align-items:center;gap:7px;
+  padding:5px 6px;border-radius:4px;
+  margin-bottom:1px;
+  color:#c8d6e5;
+  font-family:'Source Sans 3', sans-serif;
+}
+.slp-item-icon{
+  width:12px;height:12px;color:#7A90A4;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.slp-item-color{
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  box-shadow:0 0 0 1px rgba(255,255,255,0.2);
+}
+.slp-item-name{
+  flex:1;font-weight:600;font-size:11px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.slp-item-meta{
+  color:#5A6E82;font-size:10px;
+  font-family:'Source Sans 3', sans-serif;
+}
+
+/* === Fase 3: bottoni e slider opacità === */
+.slp-item.opaque-row{
+  display:flex;flex-direction:column;align-items:stretch;gap:0;
+  padding:6px 7px 7px;
+  background:rgba(255,255,255,0.02);
+  border-bottom:1px solid rgba(214,228,240,0.06);
+}
+.slp-item.opaque-row:last-child{ border-bottom:none }
+.slp-item-row1{
+  display:flex;align-items:center;gap:7px;
+}
+.slp-item-row2{
+  display:flex;align-items:center;gap:6px;
+  margin-top:5px;
+  padding-left:18px;  /* allinea con il nome (icona + dot di sopra) */
+}
+.slp-eye-btn{
+  width:18px;height:18px;
+  display:flex;align-items:center;justify-content:center;
+  border:none;background:transparent;color:#7A90A4;
+  border-radius:3px;cursor:pointer;flex-shrink:0;
+  transition:color .12s, background .12s;
+}
+.slp-eye-btn:hover{ background:rgba(255,255,255,0.08); color:#e8f0f7 }
+.slp-eye-btn.hidden{ color:#3a4a5c }
+.slp-trash-btn{
+  width:18px;height:18px;
+  display:flex;align-items:center;justify-content:center;
+  border:none;background:transparent;color:#7A90A4;
+  border-radius:3px;cursor:pointer;flex-shrink:0;
+  transition:color .12s, background .12s;
+  opacity:0;
+}
+.slp-item.opaque-row:hover .slp-trash-btn{ opacity:1 }
+.slp-trash-btn:hover{ background:rgba(220,38,38,0.18); color:#ff8888 }
+.slp-opacity-slider{
+  flex:1;
+  height:4px;
+  -webkit-appearance:none;
+  appearance:none;
+  background:rgba(214,228,240,0.18);
+  border-radius:2px;
+  cursor:pointer;
+  outline:none;
+}
+.slp-opacity-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  appearance:none;
+  width:11px;height:11px;border-radius:50%;
+  background:#0065B3;
+  cursor:pointer;
+  border:1.5px solid #fff;
+  box-shadow:0 0 0 1px rgba(0,101,179,0.3);
+}
+.slp-opacity-slider::-moz-range-thumb{
+  width:11px;height:11px;border-radius:50%;
+  background:#0065B3;
+  cursor:pointer;
+  border:1.5px solid #fff;
+}
+.slp-opacity-value{
+  font-family:'Source Sans 3', sans-serif;
+  font-size:9px;font-weight:700;
+  color:#7A90A4;
+  min-width:30px;text-align:right;
+}
+.slp-item.opaque-row.hidden .slp-item-name{
+  color:#5A6E82; font-style:italic;
+}
+
+/* Bottoni globali in fondo al body */
+.slp-globals{
+  display:flex;gap:5px;
+  padding:8px 4px 2px;
+  margin-top:6px;
+  border-top:1px solid rgba(214,228,240,0.1);
+}
+.slp-global-btn{
+  flex:1;
+  font-family:'Source Sans 3', sans-serif;
+  font-size:9px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;
+  background:rgba(0,101,179,0.18);
+  border:1px solid rgba(0,101,179,0.35);
+  color:#a0b4c8;
+  padding:6px 4px;
+  border-radius:4px;cursor:pointer;
+  transition:all .12s;
+}
+.slp-global-btn:hover{
+  background:rgba(0,101,179,0.32);
+  color:#e8f0f7;
+}
 </style>
 </head>
 <body>
@@ -781,6 +1156,36 @@ body .panel {
           <svg width="12" height="12" viewBox="0 0 28 28" fill="none"><path d="M5 10 L14 5 L23 10 L14 15 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M5 15 L14 20 L23 15" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M18 19 L22 23 M22 19 L18 23" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/></svg>
         </span>
         <span class="wf-label"><span class="wf-name">Sostituire</span><span class="wf-desc">Sostituzione scan body con ICP</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="view-menu-wrapper">
+    <button class="btn" onclick="toggleViewMenu(event)" title="Pannelli visibili">
+      Vista <span style="font-size:10px;margin-left:-1px">▾</span>
+    </button>
+    <div class="view-menu" id="viewMenu">
+      <div class="view-menu-title">Pannelli a destra</div>
+      <div class="view-menu-item" data-vmi-target="panelScanLoad" onclick="toggleViewPanel('panelScanLoad')">
+        <span class="vmi-check">✓</span><span>Scansione intraorale</span>
+      </div>
+      <div class="view-menu-item" data-vmi-target="panelClinicalStatus" onclick="toggleViewPanel('panelClinicalStatus')">
+        <span class="vmi-check">✓</span><span>Stato clinico</span>
+      </div>
+      <div class="view-menu-item" data-vmi-target="panelMuaList" onclick="toggleViewPanel('panelMuaList')">
+        <span class="vmi-check">✓</span><span>MUA posizionati</span>
+      </div>
+      <div class="view-menu-item" data-vmi-target="panelAngleList" onclick="toggleViewPanel('panelAngleList')">
+        <span class="vmi-check">✓</span><span>Analisi angolare (coppie)</span>
+      </div>
+      <div class="view-menu-item" data-vmi-target="panelAxisInfo" onclick="toggleViewPanel('panelAxisInfo')">
+        <span class="vmi-check">✓</span><span>Asse medio e divergenze</span>
+      </div>
+      <div class="view-menu-divider"></div>
+      <div class="view-menu-item" id="viewMenuRailToggle" onclick="toggleRightColumnRail()">
+        <span class="vmi-check">▦</span><span>Collassa colonna destra</span>
+      </div>
+      <div class="view-menu-item" onclick="resetViewPanels()">
+        <span class="vmi-check">↻</span><span>Mostra tutti</span>
       </div>
     </div>
   </div>
@@ -913,6 +1318,24 @@ body .panel {
 </div>
 
 <div class="viewport" id="viewport">
+    <!-- ============================================================
+         SYN LAYER PANEL (Fase 2 - sola lettura)
+         Anteprima in alto a destra del refactor Synthesis Core.
+         Mostra in tempo reale lo stato del SynRegistry (registro
+         centralizzato). Non interagisce con il codice esistente.
+         ============================================================ -->
+    <div class="syn-layer-panel" id="synLayerPanel">
+      <div class="slp-header" id="slpHeader">
+        <span class="slp-badge">PREVIEW v8</span>
+        <span class="slp-title">SCENE REGISTRY</span>
+        <span class="slp-count" id="slpCount">0</span>
+        <button class="slp-toggle" id="slpToggle" title="Mostra/nascondi">−</button>
+      </div>
+      <div class="slp-body" id="slpBody">
+        <div class="slp-empty">Registro vuoto</div>
+      </div>
+    </div>
+
     <div class="empty-state" id="emptyState">
       <div class="title">Carica una scansione intraorale</div>
       <div class="sub">Trascina un file .stl oppure usa il pannello a destra</div>
@@ -1053,31 +1476,100 @@ body .panel {
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-section clinical-section" id="panelClinicalStatus">
-      <div class="panel-label">Stato clinico</div>
-      <div id="clinicalInfo"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
+  <div class="panel" id="rightPanel">
+    <!-- Strisce con icone visibili solo quando la colonna e' collassata in rail mode -->
+    <div class="panel-rail-icons" id="panelRailTitles">
+      <div class="panel-rail-icon" data-rail-target="panelScanLoad" title="Scansione intraorale">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="9" y1="13" x2="15" y2="13"/>
+          <line x1="9" y1="17" x2="13" y2="17"/>
+        </svg>
+      </div>
+      <div class="panel-rail-icon" data-rail-target="panelClinicalStatus" title="Stato clinico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+      <div class="panel-rail-icon" data-rail-target="panelMuaList" title="MUA posizionati">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <circle cx="12" cy="12" r="9"/>
+          <line x1="12" y1="2" x2="12" y2="5"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="2" y1="12" x2="5" y2="12"/>
+          <line x1="19" y1="12" x2="22" y2="12"/>
+        </svg>
+      </div>
+      <div class="panel-rail-icon" data-rail-target="panelAngleList" title="Analisi angolare (coppie)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 21 L21 21"/>
+          <path d="M3 21 L21 3"/>
+          <path d="M9 21 A6 6 0 0 0 14.2 16.5" />
+        </svg>
+      </div>
+      <div class="panel-rail-icon" data-rail-target="panelAxisInfo" title="Asse medio e divergenze">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="3" x2="12" y2="21"/>
+          <polyline points="8 7 12 3 16 7"/>
+          <polyline points="8 17 12 21 16 17"/>
+        </svg>
+      </div>
     </div>
 
-    <div class="panel-section" id="panelMuaList">
-      <div class="panel-label">MUA posizionati</div>
-      <div id="muaList"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Nessun MUA. Clicca "+ Posiziona"</div></div>
+    <div class="panel-section panel-collapsible collapsed clinical-section" id="panelClinicalStatus" data-pview="clinical">
+      <div class="panel-label panel-collapsible-head">
+        <span>Stato clinico</span>
+        <span class="panel-head-actions">
+          <span class="panel-chevron">▾</span>
+          <button class="panel-close-btn" data-pclose="panelClinicalStatus" title="Nascondi pannello">×</button>
+        </span>
+      </div>
+      <div class="panel-collapsible-body">
+        <div id="clinicalInfo"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
+      </div>
     </div>
 
-    <div class="panel-section panel-collapsible collapsed" id="panelAngleList">
-      <div class="panel-label panel-collapsible-head" onclick="toggleAngleListPanel()">
+    <div class="panel-section panel-collapsible collapsed" id="panelMuaList" data-pview="mualist">
+      <div class="panel-label panel-collapsible-head">
+        <span>MUA posizionati</span>
+        <span class="panel-head-actions">
+          <span class="panel-chevron">▾</span>
+          <button class="panel-close-btn" data-pclose="panelMuaList" title="Nascondi pannello">×</button>
+        </span>
+      </div>
+      <div class="panel-collapsible-body">
+        <div id="muaList"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Nessun MUA. Clicca "+ Posiziona"</div></div>
+      </div>
+    </div>
+
+    <div class="panel-section panel-collapsible collapsed" id="panelAngleList" data-pview="anglelist">
+      <div class="panel-label panel-collapsible-head">
         <span>Analisi angolare (coppie)</span>
-        <span class="panel-chevron">▾</span>
+        <span class="panel-head-actions">
+          <span class="panel-chevron">▾</span>
+          <button class="panel-close-btn" data-pclose="panelAngleList" title="Nascondi pannello">×</button>
+        </span>
       </div>
       <div class="panel-collapsible-body">
         <div id="angleList"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Posiziona almeno 2 MUA</div></div>
       </div>
     </div>
 
-    <div class="panel-section" id="panelAxisInfo">
-      <div class="panel-label">Asse medio e divergenze</div>
-      <div id="axisInfo"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
-      <button id="btnOpenFresability" onclick="openFresability()" disabled style="margin-top:10px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:1.5px solid var(--blue);border-radius:7px;background:var(--white);color:var(--blue);cursor:pointer;transition:all .15s">Fresatura avanzata &rarr;</button>
+    <div class="panel-section panel-collapsible collapsed" id="panelAxisInfo" data-pview="axisinfo">
+      <div class="panel-label panel-collapsible-head">
+        <span>Asse medio e divergenze</span>
+        <span class="panel-head-actions">
+          <span class="panel-chevron">▾</span>
+          <button class="panel-close-btn" data-pclose="panelAxisInfo" title="Nascondi pannello">×</button>
+        </span>
+      </div>
+      <div class="panel-collapsible-body">
+        <div id="axisInfo"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
+        <button id="btnOpenFresability" onclick="openFresability()" disabled style="margin-top:10px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:1.5px solid var(--blue);border-radius:7px;background:var(--white);color:var(--blue);cursor:pointer;transition:all .15s">Fresatura avanzata &rarr;</button>
+      </div>
     </div>
 
     <!-- ===== PANNELLO FRESABILITA' (sostituisce Misura quando attivo) ===== -->
@@ -1094,18 +1586,13 @@ body .panel {
           <span id="fresMachineName">VHF S5</span>
           <span style="color:var(--gray)">&alpha;<sub>max</sub> = <b id="fresMachineAlpha" style="color:var(--blue);font-size:15px">30&deg;</b></span>
         </div>
-        <div style="display:flex;gap:5px;margin-top:6px">
-          <button onclick="fresAddCustom()" style="flex:1;padding:5px;font-family:var(--mono);font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--white);color:var(--dark);cursor:pointer">+ Custom</button>
-          <button id="fresBtnRemove" onclick="fresRemoveCustom()" style="flex:1;padding:5px;font-family:var(--mono);font-size:11px;border:1px solid var(--red);border-radius:4px;background:var(--white);color:var(--red);cursor:pointer;display:none">Elimina</button>
-        </div>
       </div>
 
       <div style="margin-bottom:14px">
         <div style="font-family:var(--mono);font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Asse di setup</div>
         <label style="display:flex;align-items:center;gap:6px;padding:5px;border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:13px"><input type="radio" name="fresMode" value="mean" checked onchange="fresOnModeChange('mean')"><span>Asse medio</span></label>
         <label style="display:flex;align-items:center;gap:6px;padding:5px;border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:13px"><input type="radio" name="fresMode" value="minimax" onchange="fresOnModeChange('minimax')"><span>Ottimizzato (minimax)</span></label>
-        <label style="display:flex;align-items:center;gap:6px;padding:5px;border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:13px"><input type="radio" name="fresMode" value="custom" onchange="fresOnModeChange('custom')"><span>Custom (trascina nella scena)</span></label>
-        <div id="fresCustomInfo" style="font-family:var(--mono);font-size:11px;color:var(--gray);padding:0 5px;margin-top:2px"></div>
+        <div id="fresCustomInfo" style="font-family:var(--mono);font-size:11px;color:var(--gray);padding:0 5px;margin-top:2px;display:none"></div>
       </div>
 
       <div style="margin-bottom:14px">
@@ -1269,12 +1756,20 @@ body .panel {
       <div id="sostStatus" style="display:none;font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:6px;padding:4px 6px;background:var(--light);border-radius:4px;line-height:1.45"></div>
     </div>
 
-    <div class="panel-section" id="panelScanLoad">
-      <div class="panel-label">Scansione intraorale</div>
-      <div class="file-slot" id="slotScan" onclick="document.getElementById('inputScan').click()">
-        <div class="fplaceholder">Clicca o trascina .stl</div>
+    <div class="panel-section panel-collapsible collapsed" id="panelScanLoad" data-pview="scanload">
+      <div class="panel-label panel-collapsible-head">
+        <span>Scansione intraorale</span>
+        <span class="panel-head-actions">
+          <span class="panel-chevron">▾</span>
+          <button class="panel-close-btn" data-pclose="panelScanLoad" title="Nascondi pannello">×</button>
+        </span>
       </div>
-      <input type="file" id="inputScan" accept=".stl,.STL" style="display:none" onchange="loadScan(this)">
+      <div class="panel-collapsible-body">
+        <div class="file-slot" id="slotScan" onclick="document.getElementById('inputScan').click()">
+          <div class="fplaceholder">Clicca o trascina .stl</div>
+        </div>
+        <input type="file" id="inputScan" accept=".stl,.STL" style="display:none" onchange="loadScan(this)">
+      </div>
     </div>
   </div>
 </div>
@@ -1296,6 +1791,265 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- ================================================================
+     SYNTHESIS CORE - iniezione Fase 1 (28 aprile 2026)
+     Aggiunge SynRegistry/SynIcons/theme senza modificare il codice
+     esistente. Bridge non-invasivi registreranno scan/marker/misure
+     nel registro centralizzato. Tutto il codice attuale continua a
+     funzionare identicamente.
+     ================================================================ -->
+<script>
+"use strict";
+
+// ----------------------------------------------------------------
+// SCENE REGISTRY (window.SynRegistry)
+// ----------------------------------------------------------------
+(function(){
+  const _state = {
+    objects: new Map(),
+    selection: new Set(),
+    nextId: 1,
+    listeners: new Map(),
+  };
+  const EVENTS = {
+    ADD: 'add', REMOVE: 'remove', UPDATE: 'update',
+    SELECT: 'select', CLEAR: 'clear', CHANGE: 'change',
+  };
+  function _genId(prefix) {
+    return (prefix || 'obj') + '_' + (_state.nextId++).toString().padStart(4, '0');
+  }
+  function _emit(event, payload) {
+    const listeners = _state.listeners.get(event);
+    if (listeners) for (const cb of listeners) {
+      try { cb(payload); } catch (e) { console.error('SynRegistry ' + event + ':', e); }
+    }
+    if (event !== EVENTS.CHANGE) {
+      const change = _state.listeners.get(EVENTS.CHANGE);
+      if (change) for (const cb of change) {
+        try { cb(Object.assign({event}, payload)); } catch(e){}
+      }
+    }
+  }
+  function _defaultGroupForType(type) {
+    if (type === 'mesh' || type === 'pointcloud') return 'files';
+    if (type === 'marker' || type === 'template') return 'markers';
+    if (type === 'measure') return 'measures';
+    if (type === 'shape') return 'shapes';
+    if (type === 'section') return 'sections';
+    if (type === 'axis' || type === 'helper') return 'helpers';
+    if (type === 'analysis') return 'analysis';
+    return 'misc';
+  }
+  function _normalize(spec) {
+    const id = spec.id || _genId(spec.role || spec.type || 'obj');
+    return {
+      id,
+      type: spec.type || 'unknown',
+      role: spec.role || null,
+      name: spec.name || id,
+      group: spec.group || _defaultGroupForType(spec.type, spec.role),
+      parentId: spec.parentId || null,
+      module: spec.module || 'analizza',
+      three: spec.three || { group: null, meshes: [], labels: [], helpers: [] },
+      visual: Object.assign({
+        visible: true, opacity: 1.0, color: null,
+        vertexColors: false, transparent: false,
+        locked: false, selected: false,
+      }, spec.visual || {}),
+      meta: spec.meta || {},
+      analysis: spec.analysis || {},
+      measurements: spec.measurements || [],
+      createdAt: Date.now(),
+    };
+  }
+  function _setPath(obj, path, value) {
+    const parts = path.split('.');
+    let cur = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (cur[parts[i]] == null) cur[parts[i]] = {};
+      cur = cur[parts[i]];
+    }
+    cur[parts[parts.length - 1]] = value;
+  }
+  window.SynRegistry = {
+    EVENTS,
+    add(spec) {
+      const obj = _normalize(spec);
+      _state.objects.set(obj.id, obj);
+      _emit(EVENTS.ADD, { id: obj.id, object: obj });
+      return obj;
+    },
+    remove(id) {
+      const obj = _state.objects.get(id);
+      if (!obj) return false;
+      const children = this.query({ parentId: id });
+      for (const child of children) this.remove(child.id);
+      _state.objects.delete(id);
+      _state.selection.delete(id);
+      _emit(EVENTS.REMOVE, { id, object: obj });
+      return true;
+    },
+    update(id, changes) {
+      const obj = _state.objects.get(id);
+      if (!obj) return false;
+      const patch = {};
+      for (const key in changes) {
+        const value = changes[key];
+        if (key.indexOf('.') >= 0) { _setPath(obj, key, value); patch[key] = value; }
+        else if (typeof value === 'object' && value !== null && !Array.isArray(value) && obj[key] && typeof obj[key] === 'object') {
+          Object.assign(obj[key], value); patch[key] = obj[key];
+        } else { obj[key] = value; patch[key] = value; }
+      }
+      _emit(EVENTS.UPDATE, { id, object: obj, patch });
+      return true;
+    },
+    get(id) { return _state.objects.get(id) || null; },
+    getAll() { return Array.from(_state.objects.values()); },
+    query(filter) {
+      filter = filter || {};
+      const r = [];
+      for (const obj of _state.objects.values()) {
+        let match = true;
+        for (const k in filter) {
+          if (k.indexOf('.') >= 0) {
+            const parts = k.split('.');
+            let cur = obj;
+            for (const p of parts) if (cur != null) cur = cur[p];
+            if (cur !== filter[k]) { match = false; break; }
+          } else if (obj[k] !== filter[k]) { match = false; break; }
+        }
+        if (match) r.push(obj);
+      }
+      return r;
+    },
+    byGroup() {
+      const g = new Map();
+      for (const obj of _state.objects.values()) {
+        const k = obj.group || 'misc';
+        if (!g.has(k)) g.set(k, []);
+        g.get(k).push(obj);
+      }
+      return g;
+    },
+    select(ids) {
+      const arr = Array.isArray(ids) ? ids : (ids ? [ids] : []);
+      for (const obj of _state.objects.values()) {
+        const want = arr.indexOf(obj.id) >= 0;
+        if (obj.visual.selected !== want) obj.visual.selected = want;
+      }
+      _state.selection = new Set(arr);
+      _emit(EVENTS.SELECT, { ids: arr });
+    },
+    selectAdd(id) {
+      if (!_state.objects.has(id)) return;
+      _state.selection.add(id);
+      _state.objects.get(id).visual.selected = true;
+      _emit(EVENTS.SELECT, { ids: Array.from(_state.selection) });
+    },
+    selectRemove(id) {
+      if (!_state.selection.has(id)) return;
+      _state.selection.delete(id);
+      const o = _state.objects.get(id);
+      if (o) o.visual.selected = false;
+      _emit(EVENTS.SELECT, { ids: Array.from(_state.selection) });
+    },
+    getSelection() { return Array.from(_state.selection); },
+    getSelected() {
+      if (_state.selection.size !== 1) return null;
+      const id = _state.selection.values().next().value;
+      return _state.objects.get(id) || null;
+    },
+    clear() {
+      _state.objects.clear();
+      _state.selection.clear();
+      _emit(EVENTS.CLEAR, {});
+    },
+    subscribe(event, cb) {
+      if (!_state.listeners.has(event)) _state.listeners.set(event, new Set());
+      _state.listeners.get(event).add(cb);
+      return () => _state.listeners.get(event).delete(cb);
+    },
+    countByGroup() {
+      const c = {};
+      for (const o of _state.objects.values()) {
+        c[o.group || 'misc'] = (c[o.group || 'misc'] || 0) + 1;
+      }
+      return c;
+    },
+    snapshot() {
+      const objects = [];
+      for (const o of _state.objects.values()) {
+        const c = Object.assign({}, o);
+        delete c.three;
+        objects.push(c);
+      }
+      return { version: 1, timestamp: Date.now(), objects, selection: Array.from(_state.selection) };
+    },
+    _state,
+  };
+})();
+
+// ----------------------------------------------------------------
+// SYN ICONS (window.SynIcons)
+// ----------------------------------------------------------------
+(function(){
+  function svg(content, opts) {
+    opts = opts || {};
+    const size = opts.size || 16;
+    const vb = opts.viewBox || '0 0 16 16';
+    const stroke = opts.stroke || 'currentColor';
+    const sw = opts.strokeWidth || 1.5;
+    return '<svg width="'+size+'" height="'+size+'" viewBox="'+vb+'" fill="none" stroke="'+stroke+'" stroke-width="'+sw+'">'+content+'</svg>';
+  }
+  window.SynIcons = {
+    eye:        function(o){ return svg('<path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/>', o); },
+    eyeOff:     function(o){ return svg('<path d="M2 2l12 12" stroke-linecap="round"/><path d="M5 5C3 6 1 8 1 8s2.5 5 7 5c1.6 0 2.9-.5 4-1.2M11.5 11.5C13 10.5 15 8 15 8s-2.5-5-7-5c-.7 0-1.4.1-2 .3"/><path d="M6.5 6.5a2 2 0 002.8 2.8"/>', o); },
+    lock:       function(o){ return svg('<rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 016 0v2"/>', o); },
+    unlock:     function(o){ return svg('<rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 015.5-1.5"/>', o); },
+    isolate:    function(o){ return svg('<circle cx="8" cy="8" r="3.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2" stroke-linecap="round"/>', o); },
+    centerView: function(o){ return svg('<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><line x1="8" y1="2" x2="8" y2="4" stroke-linecap="round"/><line x1="8" y1="12" x2="8" y2="14" stroke-linecap="round"/><line x1="2" y1="8" x2="4" y2="8" stroke-linecap="round"/><line x1="12" y1="8" x2="14" y2="8" stroke-linecap="round"/>', o); },
+    trash:      function(o){ return svg('<path d="M3 4h10M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M5.5 4l.5 9a1 1 0 001 1h2a1 1 0 001-1l.5-9" stroke-linecap="round" stroke-linejoin="round"/>', o); },
+    chevronRight: function(o){ return svg('<path d="M6 4l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/>', o); },
+    chevronDown:  function(o){ return svg('<path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>', o); },
+    folder:     function(o){ return svg('<path d="M1.5 4h4l1.5 1.5h7.5v8.5H1.5z" stroke-linejoin="round"/>', o); },
+    meshIcon:   function(o){ return svg('<path d="M2 6l6-3 6 3v6l-6 3-6-3z" stroke-linejoin="round"/><path d="M2 6l6 3 6-3M8 9v6"/>', o); },
+    measureIcon:function(o){ return svg('<path d="M2 8l12 0" stroke-linecap="round"/><path d="M2 6v4M14 6v4" stroke-linecap="round"/>', o); },
+    shapeIcon:  function(o){ return svg('<circle cx="5" cy="5" r="2.5"/><rect x="8.5" y="8.5" width="5" height="5"/>', o); },
+    sectionIcon:function(o){ return svg('<rect x="2" y="2" width="12" height="12" stroke-dasharray="1.5 1"/><line x1="2" y1="8" x2="14" y2="8"/>', o); },
+    markerIcon: function(o){ return svg('<path d="M8 1L13 5v6L8 15L3 11V5L8 1Z" stroke-linejoin="round"/><circle cx="8" cy="8" r="2"/>', o); },
+  };
+})();
+
+// ----------------------------------------------------------------
+// SYN THEME (variabili CSS --syn-*)
+// Iniettate dinamicamente nel <head>. Convivono con le variabili
+// esistenti del file Analizza senza interferire.
+// ----------------------------------------------------------------
+(function(){
+  const css = `:root{
+    --syn-blue:#0065B3;--syn-dark:#0F1923;--syn-gray:#7A90A4;
+    --syn-pearl:#F0F5FA;--syn-light:#F7F9FC;--syn-border:#D6E4F0;
+    --syn-white:#FFFFFF;--syn-green:#0D9E6E;--syn-red:#DC2626;
+    --syn-gold:#F59E0B;--syn-purple:#A855F7;--syn-orange:#F97316;
+    --syn-tol-ottimo:#639922;--syn-tol-accettabile:#D97706;
+    --syn-tol-rischioso:#F97316;--syn-tol-tensione:#EF4444;
+    --syn-tol-fuori-posto:#A855F7;
+    --syn-marker-os:#0D9E6E;--syn-marker-sr:#0065B3;
+    --syn-marker-1t3:#F59E0B;--syn-marker-mua:#A855F7;
+    --syn-marker-scan:#b8a090;
+    --syn-ref-a:#F97316;--syn-ref-b:#0065B3;
+    --syn-gizmo-u:#DC2626;--syn-gizmo-v:#0D9E6E;
+    --syn-gizmo-n:#0065B3;--syn-gizmo-center:#F59E0B;
+  }`;
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+})();
+
+console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, theme attivi (Fase 1).');
+</script>
+
 <script>
 
 // ╔══════════════════════════════════════════════════════════════════╗
@@ -1313,8 +2067,8 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '7.3.9.092';
-window.ANALIZZA_BUILD_DATE = '2026-04-25';
+window.ANALIZZA_BUILD = '8.0.0-fase3e';
+window.ANALIZZA_BUILD_DATE = '2026-04-29';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -1544,7 +2298,24 @@ function animate(){requestAnimationFrame(animate);controls.update();updateDiverg
 function loadScan(input){if(input.files.length>0)loadScanFile(input.files[0])}
 function loadScanFile(file){var reader=new FileReader();reader.onload=function(e){if(scanMesh){scene.remove(scanMesh)}var r=parseSTL(e.target.result);r.geometry.computeBoundingSphere();var mat=new THREE.MeshPhongMaterial({color:new THREE.Color(envSettings.scanColor),specular:0x111111,shininess:30,transparent:true,opacity:0.85,side:THREE.DoubleSide});scanMesh=new THREE.Mesh(r.geometry,mat);
   scanOriginalGeo = scanMesh.geometry.clone(); // backup per ricostruzione con cilindri
-  scene.add(scanMesh);if(typeof applyRenderModeToMesh === 'function') applyRenderModeToMesh(scanMesh);var c=r.geometry.boundingSphere.center,rad=r.geometry.boundingSphere.radius;controls.target.copy(c);camera.position.set(c.x+rad*1.5,c.y+rad,c.z+rad*1.5);document.getElementById('emptyState').classList.add('hidden');var slot=document.getElementById('slotScan');slot.classList.add('loaded');slot.innerHTML='<div class="fname">'+file.name+'</div><div class="finfo">'+r.triangles.toLocaleString()+' triangoli</div>';document.getElementById('triScan').textContent=r.triangles.toLocaleString();rebuildTree();updateRaffinaButtonState();showStatus('Scansione caricata. Clicca + Posiziona.')};reader.readAsArrayBuffer(file)}
+  scene.add(scanMesh);if(typeof applyRenderModeToMesh === 'function') applyRenderModeToMesh(scanMesh);var c=r.geometry.boundingSphere.center,rad=r.geometry.boundingSphere.radius;controls.target.copy(c);camera.position.set(c.x+rad*1.5,c.y+rad,c.z+rad*1.5);document.getElementById('emptyState').classList.add('hidden');var slot=document.getElementById('slotScan');slot.classList.add('loaded');slot.innerHTML='<div class="fname">'+file.name+'</div><div class="finfo">'+r.triangles.toLocaleString()+' triangoli</div>';document.getElementById('triScan').textContent=r.triangles.toLocaleString();
+  // ── BRIDGE Synthesis Core (Fase 1, non-invasivo): registro la scansione ───
+  try {
+    if (window.SynRegistry) {
+      // Rimuovo eventuale scan precedente dal registro (sostituzione)
+      window.SynRegistry.query({type:'mesh', role:'scan', module:'analizza'}).forEach(o => window.SynRegistry.remove(o.id));
+      var bb = r.geometry.boundingBox || (function(){r.geometry.computeBoundingBox(); return r.geometry.boundingBox;})();
+      var size = bb ? bb.getSize(new THREE.Vector3()) : new THREE.Vector3();
+      scanMesh._synId = window.SynRegistry.add({
+        type: 'mesh', role: 'scan', name: file.name, module: 'analizza',
+        three: { group: null, meshes: [scanMesh], labels: [], helpers: [] },
+        visual: { visible: true, opacity: 0.85, color: '#'+(new THREE.Color(envSettings.scanColor)).getHexString() },
+        meta: { fileName: file.name, format: 'STL', triangles: r.triangles, bbox: {x:size.x, y:size.y, z:size.z}, unit: 'mm' }
+      }).id;
+    }
+  } catch(e) { console.warn('[SynRegistry bridge] loadScan:', e); }
+  // ── fine bridge ───────────────────────────────────────────────────────────
+  rebuildTree();updateRaffinaButtonState();showStatus('Scansione caricata. Clicca + Posiziona.')};reader.readAsArrayBuffer(file)}
 
 // Placement
 function startPlacement(){if(!scanMesh){showStatus('Carica prima una scansione.');return}placementMode=true;renderer.domElement.style.cursor='crosshair';showStatus('Clicca sullo scanbody nella scansione')}
@@ -1803,6 +2574,23 @@ function placeMUA(rawPoint,rawNormal){
   var axisLine=new THREE.Line(axisGeo,axisMat);axisLine.visible=axesVisible;scene.add(axisLine);
 
   muaObjects.push({id:id,num:muaCounter,group:group,scanbodyGeo:sbResult.geometry,scanbodyMesh:sbMesh,anMesh:anMesh,mtMesh:matMesh,color:color,axisLine:axisLine,position:point.clone(),clickPoint:point.clone(),clickNormal:n.clone(),axisDir:n.clone(),aligned:false,rmsd:null,sbVisible:true});
+  // ── BRIDGE Synthesis Core (Fase 1): MUA = marker nel registro ───
+  try {
+    if (window.SynRegistry) {
+      var lastMua = muaObjects[muaObjects.length-1];
+      // groupId numerico (0 = default, 1+ = gruppi MUA). NON usare 'group' che e' un THREE.Group.
+      var muaGroupId = (lastMua.groupId != null) ? lastMua.groupId : 0;
+      lastMua._synId = window.SynRegistry.add({
+        type: 'marker', role: 'mua',
+        name: 'MUA #' + muaCounter + (muaGroupId > 0 ? ' (gruppo '+muaGroupId+')' : ''),
+        module: 'analizza',
+        three: { group: null, meshes: [sbMesh, anMesh, matMesh], helpers: [axisLine], labels: [] },
+        visual: { visible: true, color: '#'+color.toString(16).padStart(6,'0') },
+        meta: { num: muaCounter, groupId: muaGroupId, position: {x:point.x, y:point.y, z:point.z}, axis: {x:n.x, y:n.y, z:n.z} }
+      }).id;
+    }
+  } catch(e) { console.warn('[SynRegistry bridge] placeMUA:', e); }
+  // ── fine bridge ───────────────────────────────────────────────
   // Applico render mode corrente alle nuove mesh
   if(typeof applyRenderModeToMesh === 'function'){
     applyRenderModeToMesh(sbMesh);
@@ -2756,6 +3544,9 @@ function removeMUA(idx){
   if(m.scanbodyScanMesh) scene.remove(m.scanbodyScanMesh);
   // Rimuovo dall'array
   muaObjects.splice(idx, 1);
+  // ── BRIDGE Synthesis Core (Fase 1): rimuovo MUA dal registro ───
+  try { if (window.SynRegistry && m && m._synId) window.SynRegistry.remove(m._synId); } catch(e) {}
+  // ── fine bridge ───
   // Ricalcolo tutto
   if(meanAxisLine){scene.remove(meanAxisLine); meanAxisLine = null}
   clearDivergenceCones();
@@ -2791,6 +3582,13 @@ function clearAllMUA(){
     if(m.group) scene.remove(m.group);
     if(m.axisLine) scene.remove(m.axisLine);
   });
+  // ── BRIDGE Synthesis Core (Fase 1): pulisco i MUA dal registro ───
+  try {
+    if (window.SynRegistry) {
+      muaObjects.forEach(function(m){ if(m._synId) window.SynRegistry.remove(m._synId); });
+    }
+  } catch(e) {}
+  // ── fine bridge ───
   muaObjects = [];
   muaCounter = 0;
   if(meanAxisLine){scene.remove(meanAxisLine); meanAxisLine = null}
@@ -3597,53 +4395,81 @@ function fresBuildArrow(gid, origin){
   var shaftR   = 0.7;
   var shaftLen = totalLen - coneLen;
   var liftOff  = 5;
-  var pickerR  = 2.4;
+  var pickerR  = 1.6;  // ridotto: prima era 2.4 (palla troppo grossa)
 
   var dir = new THREE.Vector3(0, 0, 1);
   var colorInt = getGroupArrowColorInt(gid);
 
+  // === Materiale "plastica opaca Mario Bros" ===
+  // MeshPhongMaterial con specular alto e shininess elevata = look giocattolo
+  // saturato e leggibile, con highlight tondi e ombre morbide.
   function plasticMat(){
-    return new THREE.MeshBasicMaterial({
+    return new THREE.MeshPhongMaterial({
       color: colorInt,
-      depthTest: false,
-      depthWrite: false,
+      specular: 0x444444,         // riflesso grigio medio (no bianco "lattiginoso")
+      shininess: 80,              // spot lucido stretto
+      depthTest: true,
+      depthWrite: false,          // permette di vedere la freccia sopra la mesh
       transparent: true,
-      opacity: 1.0
+      opacity: 0.96,
+      side: THREE.FrontSide
     });
   }
 
-  var shaftGeo = new THREE.CylinderGeometry(shaftR, shaftR, shaftLen, 24);
+  // Materiale per il picker (la sfera in cima): leggermente piu' chiara
+  // per fare da "punto di presa" senza essere invadente.
+  function pickerMat(){
+    var c = new THREE.Color(colorInt);
+    // Schiarisco del 18% mantenendo saturazione (look caramella)
+    var hsl = {}; c.getHSL(hsl);
+    c.setHSL(hsl.h, hsl.s, Math.min(0.72, hsl.l + 0.12));
+    return new THREE.MeshPhongMaterial({
+      color: c,
+      specular: 0x666666,
+      shininess: 100,
+      depthTest: true,
+      depthWrite: false,
+      transparent: true,
+      opacity: 0.96
+    });
+  }
+
+  // SHAFT: cilindro principale (corpo della freccia)
+  var shaftGeo = new THREE.CylinderGeometry(shaftR, shaftR, shaftLen, 32);
   var shaft = new THREE.Mesh(shaftGeo, plasticMat());
   shaft.userData.isFresShaft = true;
   shaft.userData.gid = gid;
   shaft.renderOrder = 9998;
 
-  var coneGeo = new THREE.CylinderGeometry(0, coneR, coneLen, 24);
+  // CONE: punta della freccia, leggermente piu' lunga e snella per look piu' aggraziato
+  var coneGeo = new THREE.CylinderGeometry(0, coneR, coneLen, 32);
   var cone = new THREE.Mesh(coneGeo, plasticMat());
   cone.userData.isFresCone = true;
   cone.userData.gid = gid;
   cone.renderOrder = 9999;
 
-  // Picker piu' grande e con renderOrder massimo
-  var pickGeo = new THREE.SphereGeometry(pickerR, 32, 32);
-  var picker = new THREE.Mesh(pickGeo, plasticMat());
+  // PICKER: piccola sfera in cima per drag (ridotta e meno appariscente)
+  var pickGeo = new THREE.SphereGeometry(pickerR, 24, 18);
+  var picker = new THREE.Mesh(pickGeo, pickerMat());
   picker.userData.isFresPicker = true;
   picker.userData.gid = gid;
   picker.renderOrder = 10000;
   picker.position.copy(origin).addScaledVector(dir, liftOff + totalLen + 2);
 
-  // Highlight glossy
-  var highlightGeo = new THREE.SphereGeometry(pickerR + 0.04, 24, 12, 0, Math.PI * 1.4, 0, Math.PI * 0.45);
+  // HIGHLIGHT: piccolo riflesso bianco sulla sfera (look lucido)
+  // Geometria piu' piccola, posizionato sul "polo" della sfera, opacita' bassa
+  var highlightGeo = new THREE.SphereGeometry(pickerR * 0.45, 16, 10);
   var highlightMat = new THREE.MeshBasicMaterial({
     color: 0xffffff,
     transparent: true,
-    opacity: 0.30,
+    opacity: 0.55,
     depthTest: false,
     depthWrite: false
   });
   var highlight = new THREE.Mesh(highlightGeo, highlightMat);
   highlight.renderOrder = 10001;
-  highlight.position.copy(picker.position);
+  // Offset il riflesso verso l'alto-sinistra (effetto "punto luce")
+  highlight.position.copy(picker.position).add(new THREE.Vector3(-pickerR*0.35, pickerR*0.35, pickerR*0.4));
 
   grp.add(shaft);
   grp.add(cone);
@@ -4244,8 +5070,9 @@ function openFresability(){
   analysisMode = 'fresabilita';
   fresState.isOpen = true;
 
-  // Restora modalità da storage
+  // Restora modalità da storage. 'custom' e' stata rimossa dalla UI in v8 → fallback su 'mean'.
   fresState.mode = fresState.db.lastMode || 'mean';
+  if(fresState.mode === 'custom') fresState.mode = 'mean';
   var radio = document.querySelector('input[name="fresMode"][value="' + fresState.mode + '"]');
   if(radio) radio.checked = true;
 
@@ -15965,10 +16792,298 @@ if(typeof window !== 'undefined'){
 
 
 // v7.3.9.082 toggle panel collassabile
-function toggleAngleListPanel(){
-  var p = document.getElementById('panelAngleList');
-  if(!p) return;
-  p.classList.toggle('collapsed');
+// === Pannelli destri Fase 3b: collapse + close + persistenza ===
+
+// Lista degli ID dei pannelli destri gestiti
+var COLLAPSIBLE_PANELS = ['panelScanLoad', 'panelClinicalStatus', 'panelMuaList', 'panelAngleList', 'panelAxisInfo'];
+
+function _viewStateKey(){ return 'syntesis_analizza_view'; }
+
+function _loadViewState(){
+  try {
+    var raw = localStorage.getItem(_viewStateKey());
+    if(!raw) return {};
+    return JSON.parse(raw) || {};
+  } catch(e) { return {}; }
+}
+function _saveViewState(state){
+  try { localStorage.setItem(_viewStateKey(), JSON.stringify(state)); } catch(e) {}
+}
+
+function applyViewState(){
+  // Migrazione: se lo schema in localStorage e' di una versione precedente
+  // (es. non conteneva panelScanLoad), lo aggiorno preservando solo le chiavi note
+  var state = _loadViewState();
+  var needsSave = false;
+  COLLAPSIBLE_PANELS.forEach(function(id){
+    if(state[id] === undefined){
+      state[id] = { collapsed: true, hidden: false };
+      needsSave = true;
+    }
+  });
+  if(needsSave) _saveViewState(state);
+
+  COLLAPSIBLE_PANELS.forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    var s = state[id] || {};
+    if(s.hidden) el.classList.add('panel-hidden');
+    else el.classList.remove('panel-hidden');
+    if(s.collapsed === false) el.classList.remove('collapsed');
+    else el.classList.add('collapsed');
+  });
+  _refreshViewMenu();
+}
+
+function toggleCollapsedPanel(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.classList.toggle('collapsed');
+  var state = _loadViewState();
+  state[id] = state[id] || {};
+  state[id].collapsed = el.classList.contains('collapsed');
+  _saveViewState(state);
+}
+
+function hidePanel(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.classList.add('panel-hidden');
+  var state = _loadViewState();
+  state[id] = state[id] || {};
+  state[id].hidden = true;
+  _saveViewState(state);
+  _refreshViewMenu();
+}
+
+function showPanel(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.classList.remove('panel-hidden');
+  var state = _loadViewState();
+  state[id] = state[id] || {};
+  state[id].hidden = false;
+  _saveViewState(state);
+  _refreshViewMenu();
+}
+
+function toggleViewPanel(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  if(el.classList.contains('panel-hidden')) showPanel(id);
+  else hidePanel(id);
+}
+
+function resetViewPanels(){
+  COLLAPSIBLE_PANELS.forEach(function(id){ showPanel(id); });
+  closeViewMenu();
+}
+
+// === Colonna destra: rail mode (collassata) ===
+function _railStateKey(){ return 'syntesis_analizza_rail'; }
+function _isRail(){
+  try { return localStorage.getItem(_railStateKey()) === '1'; } catch(e) { return false; }
+}
+function _setRail(v){
+  try { localStorage.setItem(_railStateKey(), v ? '1' : '0'); } catch(e) {}
+}
+
+function applyRightColumnRail(){
+  var col = document.getElementById('rightPanel');
+  if(!col) return;
+  if(_isRail()) col.classList.add('panel-rail-collapsed');
+  else col.classList.remove('panel-rail-collapsed');
+  _refreshRailTitles();
+  _refreshViewMenuRailItem();
+}
+
+function toggleRightColumnRail(){
+  _setRail(!_isRail());
+  applyRightColumnRail();
+  closeViewMenu();
+}
+
+// Click su una striscia verticale: espande la colonna E apre quel pannello
+function _onRailTitleClick(e){
+  var title = e.target.closest('.panel-rail-icon');
+  if(!title) return;
+  e.stopPropagation();
+  var target = title.dataset.railTarget;
+  // Espando la colonna
+  _setRail(false);
+  applyRightColumnRail();
+  // Apro il pannello target
+  if(target){
+    var panel = document.getElementById(target);
+    if(panel){
+      panel.classList.remove('collapsed');
+      panel.classList.remove('panel-hidden');
+      var state = _loadViewState();
+      state[target] = state[target] || {};
+      state[target].collapsed = false;
+      state[target].hidden = false;
+      _saveViewState(state);
+    }
+  }
+}
+
+// Click sulla colonna in rail mode (zona vuota): la espande
+function _onRailColClick(e){
+  var col = document.getElementById('rightPanel');
+  if(!col || !col.classList.contains('panel-rail-collapsed')) return;
+  // Se ho cliccato su una striscia, l'altro handler gestisce
+  if(e.target.closest('.panel-rail-icon')) return;
+  _setRail(false);
+  applyRightColumnRail();
+}
+
+// Aggiorna voce nel menu Vista
+function _refreshViewMenuRailItem(){
+  var item = document.getElementById('viewMenuRailToggle');
+  if(!item) return;
+  var label = item.querySelector('span:last-child');
+  if(label) label.textContent = _isRail() ? 'Espandi colonna destra' : 'Collassa colonna destra';
+}
+
+// Aggiorna stato (visibile/nascosto, warn/crit) delle strisce verticali
+function _refreshRailTitles(){
+  COLLAPSIBLE_PANELS.forEach(function(id){
+    var panel = document.getElementById(id);
+    var title = document.querySelector('.panel-rail-icon[data-rail-target="'+id+'"]');
+    if(!panel || !title) return;
+    // Se il pannello è hidden via menu Vista, nascondo anche la striscia
+    if(panel.classList.contains('panel-hidden')) title.classList.add('hidden-rail');
+    else title.classList.remove('hidden-rail');
+    // Stato critico/warning: leggo dalla classe 'crit' o 'warn' su panelClinicalStatus
+    title.classList.remove('crit', 'warn');
+    if(id === 'panelClinicalStatus'){
+      var clin = document.getElementById('panelClinicalStatus');
+      if(clin){
+        if(clin.classList.contains('crit')) title.classList.add('crit');
+        else if(clin.classList.contains('warn')) title.classList.add('warn');
+      }
+    }
+  });
+}
+
+// Auto-apertura colonna se viene rilevato uno stato clinico critico
+// (chiamabile dal codice esistente quando aggiorna la classe 'crit' sul pannello clinico)
+function autoOpenColumnOnWarning(){
+  var clin = document.getElementById('panelClinicalStatus');
+  if(!clin) return;
+  var isCrit = clin.classList.contains('crit');
+  if(!isCrit) return;
+  // Espando solo se l'utente non l'ha aperta gia' lui
+  if(_isRail()){
+    _setRail(false);
+    applyRightColumnRail();
+  }
+  // Espando il pannello clinico
+  clin.classList.remove('collapsed');
+  clin.classList.remove('panel-hidden');
+  var state = _loadViewState();
+  state.panelClinicalStatus = state.panelClinicalStatus || {};
+  state.panelClinicalStatus.collapsed = false;
+  state.panelClinicalStatus.hidden = false;
+  _saveViewState(state);
+}
+
+// Osservatore: ogni volta che le classi del pannello clinico cambiano, ricontrolla
+function _watchClinicalPanel(){
+  var clin = document.getElementById('panelClinicalStatus');
+  if(!clin || !window.MutationObserver) return;
+  var lastCrit = clin.classList.contains('crit');
+  var observer = new MutationObserver(function(){
+    var nowCrit = clin.classList.contains('crit');
+    _refreshRailTitles();
+    // Trigger auto-open solo sulla transizione false → true (critical appena emerso)
+    if(!lastCrit && nowCrit){
+      autoOpenColumnOnWarning();
+    }
+    lastCrit = nowCrit;
+  });
+  observer.observe(clin, { attributes: true, attributeFilter: ['class'] });
+}
+
+// Wire up
+document.addEventListener('click', function(e){
+  // Click su striscia verticale
+  if(e.target.closest('.panel-rail-icon')){ _onRailTitleClick(e); return; }
+  // Click sulla colonna in rail (zona vuota)
+  var col = document.getElementById('rightPanel');
+  if(col && col.classList.contains('panel-rail-collapsed') && col.contains(e.target)){
+    _onRailColClick(e); return;
+  }
+});
+
+// Apply rail state all'avvio
+function _initRail(){
+  applyRightColumnRail();
+  _watchClinicalPanel();
+}
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', _initRail);
+} else {
+  _initRail();
+}
+
+function _refreshViewMenu(){
+  COLLAPSIBLE_PANELS.forEach(function(id){
+    var item = document.querySelector('.view-menu-item[data-vmi-target="'+id+'"]');
+    if(!item) return;
+    var el = document.getElementById(id);
+    if(el && el.classList.contains('panel-hidden')) item.classList.add('hidden-state');
+    else item.classList.remove('hidden-state');
+  });
+  if(typeof _refreshRailTitles === 'function') _refreshRailTitles();
+}
+
+function toggleViewMenu(ev){
+  if(ev){ ev.stopPropagation(); }
+  var m = document.getElementById('viewMenu');
+  if(!m) return;
+  var open = m.classList.contains('open');
+  if(typeof closeFileMenu === 'function') closeFileMenu();
+  if(typeof closeWorkflowMenu === 'function') closeWorkflowMenu();
+  if(open) m.classList.remove('open');
+  else { _refreshViewMenu(); m.classList.add('open'); }
+}
+function closeViewMenu(){
+  var m = document.getElementById('viewMenu');
+  if(m) m.classList.remove('open');
+}
+
+// Compatibilita' con la vecchia funzione (era chiamata dall'header click esistente)
+function toggleAngleListPanel(){ toggleCollapsedPanel('panelAngleList'); }
+
+// Wire up all collapsible panel headers (click sul label) e X buttons
+document.addEventListener('click', function(e){
+  // Chiusura menu Vista click fuori
+  var inViewMenu = e.target.closest('.view-menu-wrapper');
+  if(!inViewMenu) closeViewMenu();
+
+  // Click sull'header di un pannello → collapse/expand
+  var head = e.target.closest('.panel-collapsible-head');
+  if(head && !e.target.closest('.panel-close-btn')){
+    var section = head.closest('.panel-collapsible');
+    if(section && section.id){ toggleCollapsedPanel(section.id); }
+    return;
+  }
+  // Click su X → nasconde pannello
+  var closeBtn = e.target.closest('.panel-close-btn');
+  if(closeBtn){
+    var pid = closeBtn.dataset.pclose;
+    if(pid) hidePanel(pid);
+    e.stopPropagation();
+    return;
+  }
+});
+
+// Applica lo stato salvato all'avvio
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', applyViewState);
+} else {
+  applyViewState();
 }
 
 </script>
@@ -16260,6 +17375,250 @@ function toggleAngleListPanel(){
   if(document.readyState !== 'loading'){
     setTimeout(function(){ window.syntAuthRefreshUI && window.syntAuthRefreshUI(); }, 100);
   }
+})();
+</script>
+
+<!-- ================================================================
+     SYN LAYER PANEL (Fase 3 - funzionale: visibilità + opacità + rimozione)
+     Pannello attivo. Ogni oggetto del SynRegistry e' controllabile:
+       - bottone occhio per visibilità (toggle)
+       - slider 0-100% per opacità (mesh, marker, sezioni - non misure/etichette)
+       - cestino al hover per rimuovere
+       - bottoni globali in fondo: opacizza tutto / ripristina
+     I cambi nel pannello applicano direttamente alle mesh Three.js esistenti
+     via riferimenti memorizzati nel registro (three.meshes, three.helpers).
+     I pannelli vecchi di Analizza continuano a funzionare in parallelo.
+     ================================================================ -->
+<script>
+"use strict";
+(function(){
+  if (!window.SynRegistry || !window.SynIcons) {
+    console.warn('[SynLayerPanel] SynRegistry o SynIcons non disponibili, skip');
+    return;
+  }
+
+  const panel  = document.getElementById('synLayerPanel');
+  const header = document.getElementById('slpHeader');
+  const toggle = document.getElementById('slpToggle');
+  const body   = document.getElementById('slpBody');
+  const countEl= document.getElementById('slpCount');
+  if (!panel || !body || !toggle || !countEl) return;
+
+  // Click sull'header (tranne il bottone toggle) collassa/espande
+  header.addEventListener('click', function(e){
+    if (e.target === toggle || toggle.contains(e.target)) return;
+    panel.classList.toggle('collapsed');
+    toggle.textContent = panel.classList.contains('collapsed') ? '+' : '−';
+  });
+  toggle.addEventListener('click', function(e){
+    e.stopPropagation();
+    panel.classList.toggle('collapsed');
+    toggle.textContent = panel.classList.contains('collapsed') ? '+' : '−';
+  });
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[<>&"']/g, function(c){
+      return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]);
+    });
+  }
+  function iconForObj(obj) {
+    var I = window.SynIcons;
+    if (obj.type === 'mesh' || obj.type === 'pointcloud') return I.meshIcon({size:11});
+    if (obj.type === 'marker')  return I.markerIcon({size:11});
+    if (obj.type === 'measure') return I.measureIcon({size:11});
+    if (obj.type === 'shape')   return I.shapeIcon({size:11});
+    if (obj.type === 'section') return I.sectionIcon({size:11});
+    return I.folder({size:11});
+  }
+  // Tipi che NON devono avere lo slider opacità (devono restare leggibili)
+  function supportsOpacity(obj) {
+    return obj.type === 'mesh' || obj.type === 'pointcloud' || obj.type === 'marker' || obj.type === 'section';
+  }
+
+  var GROUP_ORDER = ['files','markers','measures','shapes','sections','helpers','analysis','misc'];
+  var GROUP_LABELS = {
+    files:'FILE / SCANSIONI', markers:'MARKER', measures:'MISURE',
+    shapes:'FORME', sections:'SEZIONI', helpers:'HELPER',
+    analysis:'ANALISI', misc:'ALTRO'
+  };
+
+  function metaSummary(obj) {
+    if (obj.type === 'mesh' || obj.type === 'pointcloud') {
+      if (obj.meta && obj.meta.triangles) return Number(obj.meta.triangles).toLocaleString('it-IT')+' tri';
+      return obj.meta && obj.meta.format || '';
+    }
+    if (obj.type === 'marker') {
+      var n = obj.meta && obj.meta.num != null ? '#'+obj.meta.num : '';
+      var g = obj.meta && obj.meta.groupId ? ' g'+obj.meta.groupId : '';
+      return n + g;
+    }
+    if (obj.meta && obj.meta.valueText) return obj.meta.valueText;
+    if (obj.meta && obj.meta.label) return obj.meta.label;
+    return '';
+  }
+
+  // ── Applicazione visibilità/opacità a Three.js ──────────────────
+  function applyVisibilityToThree(obj, visible) {
+    var t = obj.three;
+    if (!t) return;
+    (t.meshes || []).forEach(function(m){ if (m) m.visible = visible; });
+    (t.helpers || []).forEach(function(h){ if (h) h.visible = visible; });
+    (t.labels  || []).forEach(function(l){ if (l && l.style) l.style.display = visible ? '' : 'none'; });
+  }
+  function applyOpacityToThree(obj, opacity) {
+    var t = obj.three;
+    if (!t) return;
+    (t.meshes || []).forEach(function(m){
+      if (!m || !m.material) return;
+      // Forzo il materiale a transparent quando opacity < 1, altrimenti restauro lo stato
+      var mats = Array.isArray(m.material) ? m.material : [m.material];
+      mats.forEach(function(mat){
+        if (opacity < 1.0) {
+          mat.transparent = true;
+          mat.depthWrite = false;
+        } else {
+          // ripristino: mantengo transparent solo se la mesh era originalmente trasparente
+          // (es. la scansione di Analizza ha opacity 0.85 di default)
+          mat.transparent = (mat._origTransparent != null) ? mat._origTransparent : (opacity < 1.0);
+          mat.depthWrite = true;
+        }
+        // Memorizzo lo stato originale alla prima volta
+        if (mat._origTransparent == null) {
+          mat._origTransparent = mat.transparent;
+          mat._origOpacity = mat.opacity != null ? mat.opacity : 1.0;
+        }
+        mat.opacity = opacity;
+        mat.needsUpdate = true;
+      });
+    });
+  }
+
+  // ── Render del pannello ─────────────────────────────────────────
+  function render() {
+    var all = window.SynRegistry.getAll();
+    countEl.textContent = all.length;
+    if (all.length === 0) {
+      body.innerHTML = '<div class="slp-empty">Registro vuoto<br><span style="font-size:9px;opacity:0.7">Carica una scansione o piazza un MUA</span></div>';
+      return;
+    }
+    var groups = window.SynRegistry.byGroup();
+    var html = '';
+    var ordered = [].concat([...groups.entries()]).sort(function(a,b){
+      var ai = GROUP_ORDER.indexOf(a[0]); var bi = GROUP_ORDER.indexOf(b[0]);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+    for (var i = 0; i < ordered.length; i++) {
+      var entry = ordered[i];
+      var groupKey = entry[0];
+      var items = entry[1];
+      html += '<div class="slp-group-header">'+
+        (GROUP_LABELS[groupKey] || groupKey.toUpperCase())+
+        '<span class="slp-group-badge">'+items.length+'</span>'+
+      '</div>';
+      for (var j = 0; j < items.length; j++) {
+        var obj = items[j];
+        var color = (obj.visual && obj.visual.color) || '#7A90A4';
+        var visible = obj.visual && obj.visual.visible !== false;
+        var opacity = (obj.visual && typeof obj.visual.opacity === 'number') ? obj.visual.opacity : 1.0;
+        var hiddenCls = visible ? '' : ' hidden';
+        var eyeIcon = visible ? window.SynIcons.eye({size:13}) : window.SynIcons.eyeOff({size:13});
+        var eyeCls = visible ? '' : ' hidden';
+
+        html +=
+          '<div class="slp-item opaque-row'+hiddenCls+'" data-id="'+obj.id+'">'+
+            '<div class="slp-item-row1">'+
+              '<button class="slp-eye-btn'+eyeCls+'" data-action="toggle-visible" title="Mostra/nascondi">'+eyeIcon+'</button>'+
+              '<span class="slp-item-color" style="background:'+color+'"></span>'+
+              '<span class="slp-item-name">'+escapeHtml(obj.name)+'</span>'+
+              '<span class="slp-item-meta">'+escapeHtml(metaSummary(obj))+'</span>'+
+              '<button class="slp-trash-btn" data-action="delete" title="Rimuovi">'+window.SynIcons.trash({size:11})+'</button>'+
+            '</div>';
+
+        if (supportsOpacity(obj)) {
+          html +=
+            '<div class="slp-item-row2">'+
+              '<input type="range" class="slp-opacity-slider" min="0" max="100" step="5" value="'+Math.round(opacity*100)+'" data-action="opacity">'+
+              '<span class="slp-opacity-value">'+Math.round(opacity*100)+'%</span>'+
+            '</div>';
+        }
+        html += '</div>';
+      }
+    }
+    // Bottoni globali in fondo
+    html +=
+      '<div class="slp-globals">'+
+        '<button class="slp-global-btn" data-global="ghost" title="Imposta tutte le mesh al 30% di opacita\'">Opacizza tutto</button>'+
+        '<button class="slp-global-btn" data-global="restore" title="Ripristina opacita\' originali">Ripristina</button>'+
+      '</div>';
+    body.innerHTML = html;
+  }
+
+  // ── Click delegate ──────────────────────────────────────────────
+  body.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-action]');
+    var globalBtn = e.target.closest('[data-global]');
+    if (globalBtn) {
+      var g = globalBtn.dataset.global;
+      window.SynRegistry.getAll().forEach(function(obj){
+        if (!supportsOpacity(obj)) return;
+        var newOp = (g === 'ghost') ? 0.30 : 1.0;
+        // Se 'restore' e l'oggetto aveva un'opacità originale memorizzata, uso quella
+        if (g === 'restore' && obj.three && obj.three.meshes && obj.three.meshes[0] && obj.three.meshes[0].material) {
+          var mat = Array.isArray(obj.three.meshes[0].material) ? obj.three.meshes[0].material[0] : obj.three.meshes[0].material;
+          if (mat && mat._origOpacity != null) newOp = mat._origOpacity;
+        }
+        window.SynRegistry.update(obj.id, { 'visual.opacity': newOp });
+        applyOpacityToThree(obj, newOp);
+      });
+      return;
+    }
+    if (!btn) return;
+    var item = btn.closest('[data-id]');
+    if (!item) return;
+    var id = item.dataset.id;
+    var obj = window.SynRegistry.get(id);
+    if (!obj) return;
+    var action = btn.dataset.action;
+
+    if (action === 'toggle-visible') {
+      var newVisible = !(obj.visual && obj.visual.visible !== false);
+      window.SynRegistry.update(id, { 'visual.visible': newVisible });
+      applyVisibilityToThree(obj, newVisible);
+    }
+    else if (action === 'delete') {
+      // Per ora: solo rimozione dal registro (la rimozione vera dalla scena
+      // resta gestita dai pannelli vecchi tramite removeMUA, clearAllMUA, ecc.)
+      // In Fase 4 collegheremo questo ai cestini del pannello vecchio.
+      if (confirm('Rimuovere "'+obj.name+'" dal registro?\n(Nota: l\'oggetto 3D resta in scena, va rimosso dai controlli vecchi)')) {
+        window.SynRegistry.remove(id);
+      }
+    }
+  });
+
+  // Slider opacity (event input per real-time)
+  body.addEventListener('input', function(e){
+    if (!e.target.classList.contains('slp-opacity-slider')) return;
+    var item = e.target.closest('[data-id]');
+    if (!item) return;
+    var id = item.dataset.id;
+    var obj = window.SynRegistry.get(id);
+    if (!obj) return;
+    var opacity = parseInt(e.target.value, 10) / 100;
+    window.SynRegistry.update(id, { 'visual.opacity': opacity });
+    applyOpacityToThree(obj, opacity);
+    // Aggiorno solo il valore % a fianco senza ri-renderizzare tutto
+    var valueEl = e.target.parentElement.querySelector('.slp-opacity-value');
+    if (valueEl) valueEl.textContent = Math.round(opacity*100)+'%';
+  });
+
+  // Sottoscrizione all'evento aggregato 'change'
+  // Render solo per add/remove (non per update, per non resettare lo slider mentre si trascina)
+  window.SynRegistry.subscribe('add', render);
+  window.SynRegistry.subscribe('remove', render);
+  window.SynRegistry.subscribe('clear', render);
+  render();
+
+  console.log('[SynLayerPanel] Fase 3 attiva (visibilita + opacita + rimozione)');
 })();
 </script>
 
