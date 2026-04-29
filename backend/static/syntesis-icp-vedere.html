@@ -651,6 +651,112 @@ body{
 }
 .eraser-cursor.active{display:block}
 
+/* ============================================================ */
+/* TOOLTIP STILE MARIO BROS (Blocco 5k)                          */
+/* Sostituisce i tooltip nativi del browser (title="...") con    */
+/* uno stile coerente: sfondo bianco, ombra, bordo Mario,        */
+/* tipografia Source Sans, freccetta che indica il bottone.      */
+/* Usa attributo data-tooltip="..." al posto di data-tooltip="..."      */
+/* Posizione default: sotto il bottone. Override con             */
+/* data-tooltip-pos="top|left|right".                            */
+/* ============================================================ */
+[data-tooltip]{position:relative}
+[data-tooltip]::after{
+  content:attr(data-tooltip);
+  position:absolute;
+  font-family:var(--font);
+  font-size:11px;font-weight:600;letter-spacing:.02em;
+  color:var(--dark);
+  background:var(--white);
+  border:1.5px solid var(--mario-yellow);
+  border-radius:6px;
+  padding:5px 9px;
+  white-space:nowrap;
+  box-shadow:0 4px 12px rgba(15,25,35,0.15);
+  pointer-events:none;
+  opacity:0;
+  transform:translateY(-2px);
+  transition:opacity .15s ease, transform .15s ease;
+  z-index:1000;
+  /* Default: sotto e centrato */
+  top:calc(100% + 8px);
+  left:50%;
+  transform:translateX(-50%) translateY(-2px);
+}
+[data-tooltip]::before{
+  content:'';
+  position:absolute;
+  width:0;height:0;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .15s ease;
+  z-index:1001;
+  /* Triangolino: default sotto = punta in su */
+  top:calc(100% + 1px);
+  left:50%;
+  transform:translateX(-50%);
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-bottom:7px solid var(--mario-yellow);
+}
+[data-tooltip]:hover::after{
+  opacity:1;
+  transform:translateX(-50%) translateY(0);
+}
+[data-tooltip]:hover::before{opacity:1}
+
+/* Posizione: sopra (per bottoni in basso) */
+[data-tooltip][data-tooltip-pos="top"]::after{
+  top:auto;bottom:calc(100% + 8px);
+  transform:translateX(-50%) translateY(2px);
+}
+[data-tooltip][data-tooltip-pos="top"]::before{
+  top:auto;bottom:calc(100% + 1px);
+  border-bottom:none;
+  border-top:7px solid var(--mario-yellow);
+}
+[data-tooltip][data-tooltip-pos="top"]:hover::after{
+  transform:translateX(-50%) translateY(0);
+}
+
+/* Posizione: a sinistra (per bottoni a destra) */
+[data-tooltip][data-tooltip-pos="left"]::after{
+  top:50%;bottom:auto;
+  left:auto;right:calc(100% + 8px);
+  transform:translateY(-50%) translateX(2px);
+}
+[data-tooltip][data-tooltip-pos="left"]::before{
+  top:50%;bottom:auto;
+  left:auto;right:calc(100% + 1px);
+  transform:translateY(-50%);
+  border-left:7px solid var(--mario-yellow);
+  border-right:none;
+  border-top:6px solid transparent;
+  border-bottom:6px solid transparent;
+}
+[data-tooltip][data-tooltip-pos="left"]:hover::after{
+  transform:translateY(-50%) translateX(0);
+}
+
+/* Posizione: a destra (per bottoni a sinistra) */
+[data-tooltip][data-tooltip-pos="right"]::after{
+  top:50%;bottom:auto;
+  left:calc(100% + 8px);
+  transform:translateY(-50%) translateX(-2px);
+}
+[data-tooltip][data-tooltip-pos="right"]::before{
+  top:50%;bottom:auto;
+  left:calc(100% + 1px);
+  transform:translateY(-50%);
+  border-right:7px solid var(--mario-yellow);
+  border-left:none;
+  border-top:6px solid transparent;
+  border-bottom:6px solid transparent;
+}
+[data-tooltip][data-tooltip-pos="right"]:hover::after{
+  transform:translateY(-50%) translateX(0);
+}
+
 .drop-overlay{
   position:absolute;inset:0;z-index:50;display:none;
   align-items:center;justify-content:center;
@@ -799,7 +905,7 @@ input[type="file"]{display:none}
     </div>
   </div>
   <div class="file-menu-wrapper">
-    <button class="btn" onclick="toggleFileMenu(event)" title="Menu file">
+    <button class="btn" onclick="toggleFileMenu(event)" data-tooltip="Menu file">
       File <span style="font-size:10px;margin-left:-1px">▾</span>
     </button>
     <div class="file-menu" id="fileMenu">
@@ -815,7 +921,7 @@ input[type="file"]{display:none}
     </div>
   </div>
   <div class="workflow-menu-wrapper">
-    <button class="btn" onclick="toggleWorkflowMenu(event)" title="Seleziona workflow">
+    <button class="btn" onclick="toggleWorkflowMenu(event)" data-tooltip="Seleziona workflow">
       WorkFlow <span style="font-size:10px;margin-left:-1px">▾</span>
     </button>
     <div class="workflow-menu" id="workflowMenu">
@@ -873,7 +979,7 @@ input[type="file"]{display:none}
     <div class="layer-panel">
       <div class="lp-header">
         <span class="lp-title">Layer</span>
-        <button class="lp-add-btn" id="btnAdd" title="Aggiungi file">+</button>
+        <button class="lp-add-btn" id="btnAdd" data-tooltip="Aggiungi file">+</button>
       </div>
       <div class="lp-body" id="layerBody">
         <div class="lp-empty">Nessun file caricato</div>
@@ -881,46 +987,46 @@ input[type="file"]{display:none}
     </div>
 
     <div class="vp-tools transform-tools">
-      <button class="vp-btn" id="btnMoveMode" title="Sposta (T)" disabled>
+      <button class="vp-btn" id="btnMoveMode" data-tooltip="Sposta (T)" disabled>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v14M1 8h14M5 4l3-3 3 3M5 12l3 3 3-3M4 5l-3 3 3 3M12 5l3 3-3 3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <button class="vp-btn" id="btnRotateMode" title="Ruota (R)" disabled>
+      <button class="vp-btn" id="btnRotateMode" data-tooltip="Ruota (R)" disabled>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 8a5 5 0 1 1-1.5-3.5M13 2v3h-3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <button class="vp-btn" id="btnDeselect" title="Deseleziona (Esc)" disabled>
+      <button class="vp-btn" id="btnDeselect" data-tooltip="Deseleziona (Esc)" disabled>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>
       </button>
       <div style="width:1px;height:20px;background:var(--border);margin:0 4px;align-self:center"></div>
-      <button class="vp-btn" id="btnRuler" title="Righello (M)">
+      <button class="vp-btn" id="btnRuler" data-tooltip="Righello (M)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 11l10-10 4 4-10 10z" stroke-linejoin="round"/><path d="M3 9l1 1M5 7l1.5 1.5M7 5l1 1M9 3l1.5 1.5" stroke-linecap="round"/></svg>
       </button>
-      <button class="vp-btn" id="btnAngle" title="Angolo tra 2 linee (G)">
+      <button class="vp-btn" id="btnAngle" data-tooltip="Angolo tra 2 linee (G)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M2 14 L14 2" stroke-linecap="round"/>
           <path d="M2 14 L14 14" stroke-linecap="round"/>
           <path d="M5.5 14 A 3.5 3.5 0 0 0 4.5 11.5" fill="none" stroke-width="1.2"/>
         </svg>
       </button>
-      <button class="vp-btn" id="btnCircle" title="Cerchio (C)">
+      <button class="vp-btn" id="btnCircle" data-tooltip="Cerchio (C)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="0.8" fill="currentColor"/><path d="M8 8L13 8" stroke-dasharray="1.5 1"/></svg>
       </button>
-      <button class="vp-btn" id="btnSquare" title="Quadrato (Q)">
+      <button class="vp-btn" id="btnSquare" data-tooltip="Quadrato (Q)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="2.5" width="11" height="11"/></svg>
       </button>
-      <button class="vp-btn" id="btnHex" title="Esagono (H)">
+      <button class="vp-btn" id="btnHex" data-tooltip="Esagono (H)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5l5.5 3.25v6.5L8 14.5l-5.5-3.25v-6.5z" stroke-linejoin="round"/></svg>
       </button>
-      <button class="vp-btn" id="btnOct" title="Ottagono (O)">
+      <button class="vp-btn" id="btnOct" data-tooltip="Ottagono (O)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1.5h6L14.5 5v6L11 14.5H5L1.5 11V5z" stroke-linejoin="round"/></svg>
       </button>
-      <button class="vp-btn" id="btnTorx" title="Torx (X)">
+      <button class="vp-btn" id="btnTorx" data-tooltip="Torx (X)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2 L9.5 5 L13 5.5 L11 8 L13 10.5 L9.5 11 L8 14 L6.5 11 L3 10.5 L5 8 L3 5.5 L6.5 5 Z" stroke-linejoin="round"/></svg>
       </button>
       <div style="width:1px;height:18px;background:var(--border);margin:0 4px;align-self:center"></div>
-      <button class="vp-btn" id="btnSection" title="Sezione (S)">
+      <button class="vp-btn" id="btnSection" data-tooltip="Sezione (S)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" stroke-linejoin="round"/><line x1="2" y1="8" x2="14" y2="8" stroke-dasharray="1.5 1"/></svg>
       </button>
-      <button class="vp-btn" id="btnEraser" title="Gomma (E)">
+      <button class="vp-btn" id="btnEraser" data-tooltip="Gomma (E)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M2 13.5 L9 6.5 L13 10.5 L8 13.5 Z" stroke-linejoin="round"/>
           <path d="M9 6.5 L11.5 4 L13.5 6 L11 8.5" stroke-linejoin="round"/>
@@ -933,13 +1039,13 @@ input[type="file"]{display:none}
         <input type="range" id="eraserDiameterSlider" min="10" max="150" step="2" value="40" class="vp-inline-slider">
         <span id="eraserDiameterValue" class="vp-inline-value">40 px</span>
       </div>
-      <button class="vp-btn" id="btnRulerClear" title="Pulisci misure" disabled>
+      <button class="vp-btn" id="btnRulerClear" data-tooltip="Pulisci misure" disabled>
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h10M6 3h4M5 5v8a1 1 0 001 1h4a1 1 0 001-1V5" stroke-linecap="round"/></svg>
       </button>
     </div>
 
     <div class="vp-tools">
-      <button class="vp-btn" id="btnHome" title="Centra vista">⌂</button>
+      <button class="vp-btn" id="btnHome" data-tooltip="Centra vista" data-tooltip-pos="top">⌂</button>
     </div>
 
     <div class="drop-overlay" id="dropOverlay">
@@ -952,7 +1058,7 @@ input[type="file"]{display:none}
     <div class="props-panel" id="propsPanel">
       <div class="props-header">
         <span class="props-title" id="propsTitle">PROPRIETÀ</span>
-        <button class="props-close" id="propsClose" title="Chiudi">×</button>
+        <button class="props-close" id="propsClose" data-tooltip="Chiudi">×</button>
       </div>
       <div class="props-body" id="propsBody"></div>
     </div>
@@ -964,28 +1070,28 @@ input[type="file"]{display:none}
         <div class="section-pip-actions">
           <!-- Tools della cut view (operano sul canvas 2D). Si spostano nel viewport quando swap è attivo. -->
           <div class="section-tools" id="secTools">
-            <button class="section-pip-btn" id="secRulerBtn" title="Misura nella sezione (M)">
+            <button class="section-pip-btn" id="secRulerBtn" data-tooltip="Misura nella sezione (M)">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 11l10-10 4 4-10 10z" stroke-linejoin="round"/><path d="M3 9l1 1M5 7l1.5 1.5M7 5l1 1M9 3l1.5 1.5" stroke-linecap="round"/></svg>
             </button>
-            <button class="section-pip-btn" id="secFitBtn" title="Adatta vista (F)">
+            <button class="section-pip-btn" id="secFitBtn" data-tooltip="Adatta vista (F)">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6V3h3M13 6V3h-3M3 10v3h3M13 10v3h-3" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
           <!-- Tools della finestra PIP (controllano la finestra). Restano sempre nell'header PIP. -->
-          <button class="section-pip-btn" id="secSwapBtn" title="Scambia con vista 3D">
+          <button class="section-pip-btn" id="secSwapBtn" data-tooltip="Scambia con vista 3D">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h10M11 3l2 2-2 2M13 11H3M5 9l-2 2 2 2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <button class="section-pip-btn" id="secMaxBtn" title="Ingrandisci/riduci">
+          <button class="section-pip-btn" id="secMaxBtn" data-tooltip="Ingrandisci/riduci">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6V2h4M14 10v4h-4M14 6V2h-4M2 10v4h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <button class="section-pip-btn" id="secCloseBtn" title="Chiudi sezione">
+          <button class="section-pip-btn" id="secCloseBtn" data-tooltip="Chiudi sezione">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>
           </button>
         </div>
       </div>
       <canvas id="sectionCanvas"></canvas>
       <div class="section-pip-hint" id="secHint" style="display:none"></div>
-      <div class="section-pip-resize" id="secResize" title="Ridimensiona"></div>
+      <div class="section-pip-resize" id="secResize" data-tooltip="Ridimensiona"></div>
     </div>
 
     <div class="empty-hint" id="emptyHint">
@@ -6902,14 +7008,14 @@ setStatus('Pronto');
     const eyeClass = obj.visual.visible ? '' : ' hidden';
     const color = colorForObj(obj);
     return `<div class="slp-item${sel}${hidden}${child}" data-id="${obj.id}">
-      <button class="slp-eye${eyeClass}" data-action="toggle-visible" title="Mostra/nascondi">${eyeIcon}</button>
+      <button class="slp-eye${eyeClass}" data-action="toggle-visible" data-tooltip="Mostra/nascondi">${eyeIcon}</button>
       <span class="slp-color-dot" style="background:${color}" data-action="color"></span>
       <span class="slp-name">${escapeHtml(obj.name)}</span>
       ${meta ? `<span class="slp-meta">${escapeHtml(meta)}</span>` : ''}
       <span class="slp-item-actions">
-        <button class="slp-action-btn" data-action="center" title="Centra vista">${window.SynIcons.centerView({size:12})}</button>
-        <button class="slp-action-btn" data-action="isolate" title="Isola">${window.SynIcons.isolate({size:12})}</button>
-        <button class="slp-action-btn danger" data-action="delete" title="Rimuovi">${window.SynIcons.trash({size:12})}</button>
+        <button class="slp-action-btn" data-action="center" data-tooltip="Centra vista">${window.SynIcons.centerView({size:12})}</button>
+        <button class="slp-action-btn" data-action="isolate" data-tooltip="Isola">${window.SynIcons.isolate({size:12})}</button>
+        <button class="slp-action-btn danger" data-action="delete" data-tooltip="Rimuovi">${window.SynIcons.trash({size:12})}</button>
       </span>
     </div>`;
   }
@@ -7282,9 +7388,9 @@ if (window.SynCutViewManager) {
       <div class="props-section">
         <div class="props-section-title">Rendering</div>
         <div class="props-render-modes">
-          <button class="props-render-btn ${renderMode === 'solid' ? 'active' : ''}" data-action="render-mode" data-mode="solid" title="Mesh piena, no wireframe">Solido</button>
-          <button class="props-render-btn ${renderMode === 'wireframe' ? 'active' : ''}" data-action="render-mode" data-mode="wireframe" title="Solo reticolo dei triangoli">Wireframe</button>
-          <button class="props-render-btn ${renderMode === 'both' ? 'active' : ''}" data-action="render-mode" data-mode="both" title="Mesh piena con reticolo sopra">Entrambi</button>
+          <button class="props-render-btn ${renderMode === 'solid' ? 'active' : ''}" data-action="render-mode" data-mode="solid" data-tooltip="Mesh piena, no wireframe">Solido</button>
+          <button class="props-render-btn ${renderMode === 'wireframe' ? 'active' : ''}" data-action="render-mode" data-mode="wireframe" data-tooltip="Solo reticolo dei triangoli">Wireframe</button>
+          <button class="props-render-btn ${renderMode === 'both' ? 'active' : ''}" data-action="render-mode" data-mode="both" data-tooltip="Mesh piena con reticolo sopra">Entrambi</button>
         </div>
       </div>
     `;
@@ -7303,7 +7409,7 @@ if (window.SynCutViewManager) {
         <div class="props-section-title">Visualizzazione</div>
         <div class="props-row">
           <span class="props-row-key">Visibile</span>
-          <button class="props-toggle ${isVisible ? 'active' : ''}" data-action="toggle-visible" title="Mostra/nascondi">
+          <button class="props-toggle ${isVisible ? 'active' : ''}" data-action="toggle-visible" data-tooltip="Mostra/nascondi">
             ${isVisible ? window.SynIcons.eye({size:13}) : window.SynIcons.eyeOff({size:13})}
           </button>
         </div>
