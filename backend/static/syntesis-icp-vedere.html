@@ -3003,25 +3003,6 @@ function setEraserActive(on) {
   }
 }
 
-// Pattern di campionamento del cerchio gomma (in coordinate UV relative al centro,
-// raggio in [0, 1]). 31 punti: 1 centrale + 6 ring interno + 12 ring medio + 12 ring esterno.
-// Coprono il cerchio uniformemente con buona densita'.
-const _ERASER_RAY_PATTERN = (() => {
-  const pts = [{ u: 0, v: 0 }];
-  const rings = [
-    { count: 6,  radius: 0.33 },
-    { count: 12, radius: 0.66 },
-    { count: 12, radius: 1.00 },
-  ];
-  for (const ring of rings) {
-    for (let i = 0; i < ring.count; i++) {
-      const angle = (i / ring.count) * Math.PI * 2;
-      pts.push({ u: Math.cos(angle) * ring.radius, v: Math.sin(angle) * ring.radius });
-    }
-  }
-  return pts;
-})();
-
 // Raycaster e Vector2 riusabili (no allocazioni nel hot path)
 const _eraserRaycaster = new THREE.Raycaster();
 const _eraserNDC = new THREE.Vector2();
@@ -3053,84 +3034,289 @@ function _collapseTriangle(geo, triIdx, savedSnap) {
   pos.array[i2*3] = ax;     pos.array[i2*3+1] = ay;     pos.array[i2*3+2] = az;
 }
 
-// Esegue una "pennellata" di gomma a una posizione di mouse usando il sistema a raggi:
-// per ogni punto del pattern (31 punti nel cerchio della gomma), lancia un raycast
-// e cancella il primo triangolo davanti. Niente BFS, niente adiacenza, niente overhead.
-// Risultato: fluido anche su drag veloce, su mesh dense, niente freeze iniziale.
-// Trade-off: piccoli "buchi" possibili sui bordi della gomma se il pattern non copre
-// uniformemente. Accettabile per uso pratico.
+// =====================================================================
+// ADIACENZA TOPOLOGICA per la gomma (Blocco 5h)
+//
+// Costruisce per ogni triangolo l'elenco dei triangoli vicini (che
+// condividono almeno un vertice). Calcolata UNA volta per layer, al primo
+// uso della gomma, e cachata. Su mesh grandi (~300k tri) richiede 1-2s
+// quindi viene mostrato un piccolo overlay "Preparo gomma..." durante.
+//
+// Storage compatto: invece di Array<Array<number>>, uso due Uint32Array:
+//   _adjOffsets[t]   = offset di inizio della lista vicini per il triangolo t
+//   _adjData[offset] = elenco compatto di tutti i vicini di tutti i triangoli
+// Cosi' niente allocazioni di Array, e il BFS scorre vicini con un loop semplice.
+// =====================================================================
+function buildAdjacencyOptimized(layer) {
+  if (layer._adjOffsets) return;  // gia' calcolata
+
+  const geo = layer.object.geometry;
+  const pos = geo.attributes.position;
+  const idx = geo.index;
+  const triCount = idx ? idx.count / 3 : pos.count / 3;
+  const posArr = pos.array;
+
+  // Step 1: vertice quantizzato → array di triangoli che lo toccano
+  // Quantizzo a 1e-3 mm per saldare vertici quasi-coincidenti (STL non sempre saldati).
+  const Q = 1000;
+  const vertToTris = new Map();
+
+  function getVi(t, c) {
+    return idx ? idx.array[t*3 + c] : t*3 + c;
+  }
+
+  for (let t = 0; t < triCount; t++) {
+    for (let c = 0; c < 3; c++) {
+      const vi = getVi(t, c);
+      const k = (Math.round(posArr[vi*3]*Q)) + ':' +
+                (Math.round(posArr[vi*3+1]*Q)) + ':' +
+                (Math.round(posArr[vi*3+2]*Q));
+      let arr = vertToTris.get(k);
+      if (!arr) { arr = []; vertToTris.set(k, arr); }
+      arr.push(t);
+    }
+  }
+
+  // Step 2: per ogni triangolo, raccogli i vicini unici
+  // Prima passata: conto quanti vicini ha ciascuno (per dimensionare l'array compatto)
+  const counts = new Uint32Array(triCount);
+  // Buffer riusabile per dedup, ottimizzato come Set ma con array sentinel
+  // (Map è troppo lento qui). Uso un Uint8 "visto" per ogni triangolo, resettato a ogni t.
+  const seenStamp = new Uint32Array(triCount);
+  let stamp = 0;
+
+  for (let t = 0; t < triCount; t++) {
+    stamp++;
+    seenStamp[t] = stamp; // se stesso non conta
+    let count = 0;
+    for (let c = 0; c < 3; c++) {
+      const vi = getVi(t, c);
+      const k = (Math.round(posArr[vi*3]*Q)) + ':' +
+                (Math.round(posArr[vi*3+1]*Q)) + ':' +
+                (Math.round(posArr[vi*3+2]*Q));
+      const arr = vertToTris.get(k);
+      if (!arr) continue;
+      for (let i = 0; i < arr.length; i++) {
+        const ot = arr[i];
+        if (seenStamp[ot] !== stamp) {
+          seenStamp[ot] = stamp;
+          count++;
+        }
+      }
+    }
+    counts[t] = count;
+  }
+
+  // Step 3: alloco array compatto e popolo
+  const offsets = new Uint32Array(triCount + 1);
+  let total = 0;
+  for (let t = 0; t < triCount; t++) {
+    offsets[t] = total;
+    total += counts[t];
+  }
+  offsets[triCount] = total;
+
+  const data = new Uint32Array(total);
+  // Reset stamp e ripopolo
+  stamp = 0;
+  // Riuso seenStamp pulito (era gia' allocato)
+  for (let t = 0; t < triCount; t++) seenStamp[t] = 0;
+
+  for (let t = 0; t < triCount; t++) {
+    stamp++;
+    seenStamp[t] = stamp;
+    let writePos = offsets[t];
+    for (let c = 0; c < 3; c++) {
+      const vi = getVi(t, c);
+      const k = (Math.round(posArr[vi*3]*Q)) + ':' +
+                (Math.round(posArr[vi*3+1]*Q)) + ':' +
+                (Math.round(posArr[vi*3+2]*Q));
+      const arr = vertToTris.get(k);
+      if (!arr) continue;
+      for (let i = 0; i < arr.length; i++) {
+        const ot = arr[i];
+        if (seenStamp[ot] !== stamp) {
+          seenStamp[ot] = stamp;
+          data[writePos++] = ot;
+        }
+      }
+    }
+  }
+
+  layer._adjOffsets = offsets;
+  layer._adjData = data;
+  layer._triCount = triCount;
+}
+
+// Mostra un piccolo overlay "Preparo gomma..." durante la build adiacenza
+function _showEraserPrep(show) {
+  let el = document.getElementById('eraserPrepHint');
+  if (show) {
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'eraserPrepHint';
+      el.className = 'measure-hint';
+      el.style.background = '#FF6B35';
+      document.getElementById('viewport').appendChild(el);
+    }
+    el.textContent = 'PREPARO GOMMA SUL LAYER...';
+    el.style.display = '';
+  } else if (el) {
+    el.style.display = 'none';
+  }
+}
+
+// BFS topologico ottimizzato: niente allocazioni Vector3 nel hot loop, niente
+// new Set(), uso Uint32Array tipizzati per la queue e seenStamp.
+// Calcolo distanza dal centro usando coordinate scalari direttamente da posArr.
+// Cap a 3000 triangoli per stroke per evitare stalli su mesh enormi (caso patologico).
+function _bfsTopological(layer, seedTri, cxL, cyL, czL, radius) {
+  const offsets = layer._adjOffsets;
+  const data = layer._adjData;
+  const triCount = layer._triCount;
+  const geo = layer.object.geometry;
+  const posArr = geo.attributes.position.array;
+  const idx = geo.index;
+  const idxArr = idx ? idx.array : null;
+  const r2 = radius * radius;
+  const HARD_CAP = 3000;
+
+  // Buffer riusabili: queue come Uint32Array circolare, seenStamp globale
+  if (!layer._eraserQueue || layer._eraserQueue.length < triCount) {
+    layer._eraserQueue = new Uint32Array(Math.max(8192, triCount));
+    layer._eraserSeen = new Uint32Array(triCount);
+    layer._eraserStamp = 0;
+  }
+  const queue = layer._eraserQueue;
+  const seen = layer._eraserSeen;
+  layer._eraserStamp++;
+  const stamp = layer._eraserStamp;
+  // Se overflow stamp (raro, dopo 4 miliardi di stroke), reset
+  if (stamp === 0) {
+    for (let i = 0; i < triCount; i++) seen[i] = 0;
+    layer._eraserStamp = 1;
+  }
+
+  let qHead = 0, qTail = 0;
+  queue[qTail++] = seedTri;
+  seen[seedTri] = stamp;
+
+  const result = [];
+  while (qHead < qTail && result.length < HARD_CAP) {
+    const t = queue[qHead++];
+
+    // Centroide direttamente da posArr (no Vector3)
+    const i0 = idxArr ? idxArr[t*3]   : t*3;
+    const i1 = idxArr ? idxArr[t*3+1] : t*3+1;
+    const i2 = idxArr ? idxArr[t*3+2] : t*3+2;
+    const ccx = (posArr[i0*3]   + posArr[i1*3]   + posArr[i2*3])   / 3;
+    const ccy = (posArr[i0*3+1] + posArr[i1*3+1] + posArr[i2*3+1]) / 3;
+    const ccz = (posArr[i0*3+2] + posArr[i1*3+2] + posArr[i2*3+2]) / 3;
+    const dx = ccx - cxL, dy = ccy - cyL, dz = ccz - czL;
+    const d2 = dx*dx + dy*dy + dz*dz;
+    if (d2 > r2) continue;
+
+    result.push(t);
+
+    // Espando ai vicini (lookup in array compatto offset+data)
+    const start = offsets[t];
+    const end = offsets[t+1];
+    for (let k = start; k < end; k++) {
+      const n = data[k];
+      if (seen[n] !== stamp) {
+        seen[n] = stamp;
+        // Auto-grow della queue se necessario (raro su mesh tipiche)
+        if (qTail >= queue.length) {
+          const bigger = new Uint32Array(queue.length * 2);
+          bigger.set(queue);
+          layer._eraserQueue = bigger;
+          // riusa locale (puntatore aggiornato a fine BFS)
+          // Sicurezza: rompi e riusciamo dopo
+          break;
+        }
+        queue[qTail++] = n;
+      }
+    }
+  }
+
+  return result;
+}
+
+// Throttling del paint: non eseguo paint piu' di 1 volta ogni THROTTLE_MS
+// La mano umana non muove cosi' velocemente da fare differenza.
+const ERASER_THROTTLE_MS = 25;  // ~40 paint/sec
+let _eraserLastPaintTime = 0;
+
+// Esegue una pennellata: raycast → BFS topologico → collasso.
+// Fluida (throttling + adiacenza precalcolata + buffer riusabili) e netta
+// (cancella TUTTI i triangoli sotto il cerchio, non li dirada).
 function eraserPaint(e) {
   if (!state.eraserActive) return;
-  const vp = document.getElementById('viewport');
-  const rect = vp.getBoundingClientRect();
-  const cw = rect.width || 1;
-  const ch = rect.height || 1;
 
-  // Centro della gomma in pixel (relativo al viewport)
-  const cx = e.clientX - rect.left;
-  const cy = e.clientY - rect.top;
+  // Throttling
+  const now = performance.now();
+  if (now - _eraserLastPaintTime < ERASER_THROTTLE_MS) return;
+  _eraserLastPaintTime = now;
 
-  // Diametro della gomma in pixel (calcolato in updateEraserCursor, salvato nel cursore)
-  // Lo prendo dal cursore visivo per evitare di rifare il raycast di profondita'
-  const cursorEl = document.getElementById('eraserCursor');
-  const cursorWpx = parseFloat(cursorEl.style.width) || 30;
-  const radiusPx = cursorWpx * 0.5;
-
-  // Layer target del raycast
+  // Raycast dal mouse per trovare il triangolo seed e il punto in mondo
+  eventToNDC(e);
+  _eraserRaycaster.setFromCamera(mouseNDC, camera);
   const targets = [];
   for (const l of state.layers) {
     if (l.visible && !l.isPoints) targets.push(l.object);
   }
   if (targets.length === 0) return;
+  const hits = _eraserRaycaster.intersectObjects(targets, false);
+  if (hits.length === 0) return;
+  const hit = hits[0];
+  const layer = state.layers.find(l => l.object === hit.object);
+  if (!layer) return;
 
-  // Inizializzo lo stroke se non esiste (primo paint del drag)
+  // Build adiacenza al primo uso del layer (lazy ma con feedback visivo)
+  if (!layer._adjOffsets) {
+    _showEraserPrep(true);
+    // Defer di 1 frame per far renderizzare l'overlay prima della build
+    setTimeout(() => {
+      try {
+        buildAdjacencyOptimized(layer);
+      } finally {
+        _showEraserPrep(false);
+      }
+    }, 0);
+    return;  // Skipo questo paint; il prossimo trovera' adiacenza pronta
+  }
+
+  const seedTri = hit.faceIndex != null ? hit.faceIndex : Math.floor(hit.face.a / 3);
+
+  // Centro raggio in coordinate locali della geometry (no Vector3 per il BFS)
+  const localPoint = hit.point.clone();
+  hit.object.worldToLocal(localPoint);
+  const cxL = localPoint.x, cyL = localPoint.y, czL = localPoint.z;
+  const radius = state.eraserDiameter / 2;
+
+  const tris = _bfsTopological(layer, seedTri, cxL, cyL, czL, radius);
+  if (tris.length === 0) return;
+
+  // Inizializzo lo stroke se non esiste
   if (!state.eraserCurrentStroke) {
     state.eraserCurrentStroke = {
-      layerId: null,         // verra' settato al primo hit utile
+      layerId: layer.id,
       deletedTriangles: [],
-      seenTris: new Set(),   // per evitare di cancellare lo stesso triangolo due volte nello stesso stroke
+      seenTris: new Set(),
     };
   }
   const stroke = state.eraserCurrentStroke;
   const snap = stroke.deletedTriangles;
+  const geo = layer.object.geometry;
 
-  // Lancio un raycast per ogni punto del pattern.
-  // Pattern in UV [-1,+1] scalato a radiusPx in pixel, poi convertito in NDC.
-  for (let p = 0; p < _ERASER_RAY_PATTERN.length; p++) {
-    const pt = _ERASER_RAY_PATTERN[p];
-    const px = cx + pt.u * radiusPx;
-    const py = cy + pt.v * radiusPx;
-    // NDC: [-1, +1]
-    _eraserNDC.x = (px / cw) * 2 - 1;
-    _eraserNDC.y = -((py / ch) * 2 - 1);
-
-    _eraserRaycaster.setFromCamera(_eraserNDC, camera);
-    const hits = _eraserRaycaster.intersectObjects(targets, false);
-    if (hits.length === 0) continue;
-    const hit = hits[0];
-    const layer = state.layers.find(l => l.object === hit.object);
-    if (!layer) continue;
-
-    // Indice del triangolo
-    const triIdx = hit.faceIndex != null ? hit.faceIndex : Math.floor(hit.face.a / 3);
-    const seenKey = layer.id + ':' + triIdx;
-    if (stroke.seenTris.has(seenKey)) continue;
-    stroke.seenTris.add(seenKey);
-
-    // Settaggio del layerId al primo hit (lo stroke e' "appartenente" al primo layer toccato)
-    if (stroke.layerId === null) stroke.layerId = layer.id;
-
-    _collapseTriangle(hit.object.geometry, triIdx, snap);
-
-    // Marca la geometria come "dirty" (lo facciamo una volta sola alla fine - vedi dopo)
-    if (!stroke._dirtyGeos) stroke._dirtyGeos = new Set();
-    stroke._dirtyGeos.add(hit.object.geometry);
+  for (let i = 0; i < tris.length; i++) {
+    const t = tris[i];
+    if (stroke.seenTris.has(t)) continue;
+    stroke.seenTris.add(t);
+    _collapseTriangle(geo, t, snap);
   }
 
-  // Aggiorno needsUpdate UNA volta per ciascuna geometria toccata, non per triangolo
-  if (stroke._dirtyGeos) {
-    for (const g of stroke._dirtyGeos) g.attributes.position.needsUpdate = true;
-  }
+  geo.attributes.position.needsUpdate = true;
 }
 
 function eraserStrokeEnd() {
