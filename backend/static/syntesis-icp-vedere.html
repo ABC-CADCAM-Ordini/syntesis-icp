@@ -838,6 +838,13 @@ input[type="file"]{display:none}
       <button class="vp-btn" id="btnRuler" title="Righello (M)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 11l10-10 4 4-10 10z" stroke-linejoin="round"/><path d="M3 9l1 1M5 7l1.5 1.5M7 5l1 1M9 3l1.5 1.5" stroke-linecap="round"/></svg>
       </button>
+      <button class="vp-btn" id="btnAngle" title="Angolo tra 2 linee (G)">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 14 L14 2" stroke-linecap="round"/>
+          <path d="M2 14 L14 14" stroke-linecap="round"/>
+          <path d="M5.5 14 A 3.5 3.5 0 0 0 4.5 11.5" fill="none" stroke-width="1.2"/>
+        </svg>
+      </button>
       <button class="vp-btn" id="btnCircle" title="Cerchio (C)">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="0.8" fill="currentColor"/><path d="M8 8L13 8" stroke-dasharray="1.5 1"/></svg>
       </button>
@@ -937,6 +944,9 @@ input[type="file"]{display:none}
       <line id="techDimExtB" stroke="#0F1923" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.7"/>
     </svg>
     <div class="tech-dim-value" id="techDimValue" style="display:none"></div>
+
+    <!-- Archi delle misure angolo (Blocco 5d): SVG overlay 2D piatto, sempre frontale -->
+    <svg class="angle-arcs-overlay" id="angleArcsOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5"></svg>
   </div>
 </div>
 
@@ -1285,6 +1295,14 @@ input[type="file"]{display:none}
       label: 'Angolo tra normali',
       unit: '°',
       points: 0,
+      dimension: 'angle',
+      format: function(v, u) { return v.toFixed(2) + ' ' + (u || '°'); },
+      icon: 'measureIcon'
+    },
+    'angle-2lines': {
+      label: 'Angolo tra due linee',
+      unit: '°',
+      points: 4,            // 2 punti per linea 1, 2 punti per linea 2
       dimension: 'angle',
       format: function(v, u) { return v.toFixed(2) + ' ' + (u || '°'); },
       icon: 'measureIcon'
@@ -1713,6 +1731,10 @@ const state = {
   rulerActive: false,
   rulerFirstPoint: null,
   measures: [],
+  // Angolo tra 2 linee (Blocco 5c)
+  angleActive: false,
+  anglePoints: [],          // accumula 4 punti: [p1l1, p2l1, p1l2, p2l2]
+  anglePendingObjs: [],     // oggetti grafici temporanei da rimuovere a reset
   circleActive: false,
   activeShape: 'circle',
   circleFirstEdge: null,
@@ -2434,7 +2456,374 @@ function setRulerActive(on) {
   if (on) {
     // Entrando in modalità righello, deseleziono eventuale layer
     deselectLayer();
+    // Esco da altre modalita' attive
+    if (state.angleActive) setAngleActive(false);
   }
+}
+
+// =====================================================================
+// MISURA ANGOLO TRA DUE LINEE (Blocco 5c)
+// 4 click consecutivi:
+//   click 1 → punto P1 della linea 1
+//   click 2 → punto P2 della linea 1 (linea 1 disegnata, attesa linea 2)
+//   click 3 → punto P1 della linea 2
+//   click 4 → punto P2 della linea 2 → calcolo angolo acuto e mostro label
+// Formula: theta = acos( |u . v| / (|u| |v|) ), sempre 0-90°
+// Le linee sono trattate come direzioni libere nello spazio (anche sghembe).
+// =====================================================================
+function setAngleActive(on) {
+  state.angleActive = on;
+  // Ripulisco oggetti temporanei
+  for (const obj of state.anglePendingObjs) {
+    if (obj.parent) obj.parent.remove(obj);
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) obj.material.dispose();
+    if (obj.remove && typeof obj.remove === 'function' && obj.classList) obj.remove();
+  }
+  state.anglePendingObjs = [];
+  state.anglePoints = [];
+  document.getElementById('btnAngle').classList.toggle('active', on);
+  document.getElementById('viewport').classList.toggle('ruler-active', on);  // riusa cursor crosshair
+  hoverMarker.visible = false;
+  toggleAngleHint(on);
+  if (on) {
+    deselectLayer();
+    if (state.rulerActive) setRulerActive(false);
+    if (state.circleActive) setCircleActive(false);
+    if (state.sectionPlaceMode) cancelSectionPlacement();
+  }
+}
+
+function toggleAngleHint(on) {
+  let hint = document.getElementById('angleHint');
+  if (on) {
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.id = 'angleHint';
+      hint.className = 'measure-hint';
+      document.getElementById('viewport').appendChild(hint);
+    }
+    const n = state.anglePoints.length;
+    if (n === 0)      hint.textContent = 'LINEA 1, PRIMO PUNTO  ·  ESC PER USCIRE';
+    else if (n === 1) hint.textContent = 'LINEA 1, SECONDO PUNTO  ·  ESC PER USCIRE';
+    else if (n === 2) hint.textContent = 'LINEA 2, PRIMO PUNTO  ·  ESC PER USCIRE';
+    else              hint.textContent = 'LINEA 2, SECONDO PUNTO  ·  ESC PER USCIRE';
+    hint.style.display = '';
+  } else if (hint) {
+    hint.style.display = 'none';
+  }
+}
+
+function angleOnPointerMove(e) {
+  if (!state.angleActive) return;
+  const pick = pickTriangleCentroid(e);
+  if (pick) {
+    hoverMarker.position.copy(pick.point);
+    hoverMarker.visible = true;
+  } else {
+    hoverMarker.visible = false;
+  }
+}
+
+function angleOnClick(e) {
+  if (!state.angleActive) return;
+  const pick = pickTriangleCentroid(e);
+  if (!pick) return;
+
+  state.anglePoints.push(pick.point.clone());
+  // Marker visivo del punto cliccato
+  const markerGeom = new THREE.SphereGeometry(0.35, 12, 12);
+  const markerMat = new THREE.MeshBasicMaterial({ color: 0x0065B3, depthTest: false, transparent: true, opacity: 0.95 });
+  const marker = new THREE.Mesh(markerGeom, markerMat);
+  marker.position.copy(pick.point);
+  marker.renderOrder = 999;
+  scene.add(marker);
+  state.anglePendingObjs.push(marker);
+
+  // Se ho 2 punti completi (fine linea 1 o fine linea 2), disegno la linea
+  if (state.anglePoints.length === 2 || state.anglePoints.length === 4) {
+    const idx = state.anglePoints.length - 2;
+    const a = state.anglePoints[idx], b = state.anglePoints[idx + 1];
+    const lineGeom = new THREE.BufferGeometry().setFromPoints([a, b]);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x0065B3, depthTest: false, transparent: true, opacity: 0.95 });
+    const line = new THREE.Line(lineGeom, lineMat);
+    line.renderOrder = 998;
+    scene.add(line);
+    state.anglePendingObjs.push(line);
+  }
+
+  // 4 punti raccolti → committo la misura
+  if (state.anglePoints.length === 4) {
+    commitAngleMeasure();
+    // Reset per misura successiva (resta in modalità angolo)
+    state.anglePendingObjs = [];  // gli oggetti sono ora di proprieta' della misura, non dei pending
+    state.anglePoints = [];
+  }
+  toggleAngleHint(true);
+}
+
+// Helper: proietta un punto 3D in coordinate pixel del viewport
+function _projectToScreen(point3D) {
+  const v3 = point3D.clone().project(camera);
+  const cw = renderer.domElement.clientWidth;
+  const ch = renderer.domElement.clientHeight;
+  return {
+    x: (v3.x * 0.5 + 0.5) * cw,
+    y: (-v3.y * 0.5 + 0.5) * ch,
+    behind: v3.z >= 1
+  };
+}
+
+function commitAngleMeasure() {
+  const [a1, b1, a2, b2] = state.anglePoints;
+  if (a1.distanceTo(b1) < 1e-6 || a2.distanceTo(b2) < 1e-6) {
+    setStatus('Linee troppo corte, misura annullata');
+    return;
+  }
+
+  // PROIETTAZIONE 2D dei 4 punti sullo schermo, usando la camera ATTUALE
+  // (stato camera al momento del 4° click, che e' adesso).
+  const A1 = _projectToScreen(a1);
+  const B1 = _projectToScreen(b1);
+  const A2 = _projectToScreen(a2);
+  const B2 = _projectToScreen(b2);
+
+  // Direzioni 2D delle due linee proiettate
+  const dx1 = B1.x - A1.x, dy1 = B1.y - A1.y;
+  const dx2 = B2.x - A2.x, dy2 = B2.y - A2.y;
+  const l1 = Math.hypot(dx1, dy1);
+  const l2 = Math.hypot(dx2, dy2);
+  if (l1 < 1 || l2 < 1) {
+    setStatus('Linee proiettate troppo corte, misura annullata');
+    return;
+  }
+  // Angolo acuto 2D: acos del valore assoluto del prodotto scalare normalizzato
+  const cos2D = Math.min(1, Math.max(0, Math.abs((dx1*dx2 + dy1*dy2) / (l1 * l2))));
+  const angleRad = Math.acos(cos2D);
+  const angleDeg = angleRad * 180 / Math.PI;
+
+  // Calcolo del VERTICE 2D (intersezione delle due linee proiettate sullo schermo).
+  // Risolvo: A1 + t*(B1-A1) = A2 + s*(B2-A2)
+  //   dx1*t - dx2*s = A2.x - A1.x
+  //   dy1*t - dy2*s = A2.y - A1.y
+  // det = -dx1*dy2 + dy1*dx2
+  let vertex2D = null;
+  const det = -dx1 * dy2 + dy1 * dx2;
+  if (Math.abs(det) > 1e-3) {
+    const ex = A2.x - A1.x, ey = A2.y - A1.y;
+    const t = (-ex * dy2 + ey * dx2) / det;
+    vertex2D = { x: A1.x + t * dx1, y: A1.y + t * dy1 };
+  } else {
+    // Linee parallele in 2D: niente vertice, uso il centro
+    vertex2D = {
+      x: (A1.x + B1.x + A2.x + B2.x) / 4,
+      y: (A1.y + B1.y + A2.y + B2.y) / 4
+    };
+  }
+
+  // PROFONDITA' del vertice in 3D: media dei depth dei 4 punti (per posizionare
+  // un placeholder nel mondo 3D, usato solo per il sort z e per la label).
+  // Non e' geometricamente preciso ma e' coerente con la natura "proiettata"
+  // della misura.
+  const center3D = new THREE.Vector3()
+    .add(a1).add(b1).add(a2).add(b2)
+    .multiplyScalar(0.25);
+
+  // Salvo le proiezioni 2D ORIGINALI per poter ridisegnare l'arco con
+  // raggio coerente al disegno tecnico (non bisogno di ricalcolarlo a ogni frame).
+  // Le linee 3D le tengo per disegnare i segmenti reali con raggio 30% lunghezza media.
+  const len3DAvg = (a1.distanceTo(b1) + a2.distanceTo(b2)) / 2;
+  // Raggio dell'arco in 2D: 30% della lunghezza media delle linee proiettate
+  // limitato fra 30 e 120 px per restare ragionevole
+  const len2DAvg = (l1 + l2) / 2;
+  const arcRadiusPx = Math.max(30, Math.min(120, len2DAvg * 0.30));
+
+  // LABEL HTML
+  const labelEl = document.createElement('div');
+  labelEl.className = 'measure-label';
+  labelEl.style.background = '#0065B3';
+  labelEl.textContent = angleDeg.toFixed(2) + '°';
+  document.getElementById('viewport').appendChild(labelEl);
+
+  // Creo i nodi SVG dell'arco nell'overlay angleArcsOverlay
+  const overlay = document.getElementById('angleArcsOverlay');
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const arcGroup = document.createElementNS(SVGNS, 'g');
+  arcGroup.setAttribute('class', 'angle-arc');
+  // Path dell'arco
+  const arcPath = document.createElementNS(SVGNS, 'path');
+  arcPath.setAttribute('fill', 'none');
+  arcPath.setAttribute('stroke', '#0F1923');
+  arcPath.setAttribute('stroke-width', '1.5');
+  arcGroup.appendChild(arcPath);
+  // Linee di estensione (tratteggiate, dal vertice ai punti A1/A2 se le linee
+  // non passano per il vertice — utile in caso di linee proiettate sghembe)
+  const ext1 = document.createElementNS(SVGNS, 'line');
+  ext1.setAttribute('stroke', '#0F1923');
+  ext1.setAttribute('stroke-width', '0.8');
+  ext1.setAttribute('stroke-dasharray', '3 2');
+  ext1.setAttribute('opacity', '0.6');
+  arcGroup.appendChild(ext1);
+  const ext2 = document.createElementNS(SVGNS, 'line');
+  ext2.setAttribute('stroke', '#0F1923');
+  ext2.setAttribute('stroke-width', '0.8');
+  ext2.setAttribute('stroke-dasharray', '3 2');
+  ext2.setAttribute('opacity', '0.6');
+  arcGroup.appendChild(ext2);
+  overlay.appendChild(arcGroup);
+
+  // Registro la misura come oggetto dedicato
+  const angleMeasure = {
+    id: state.nextId++,
+    visible: true,
+    kind: 'angle-measure',
+    p1l1: a1.clone(), p2l1: b1.clone(),
+    p1l2: a2.clone(), p2l2: b2.clone(),
+    center: center3D,
+    angle: angleDeg,
+    labelEl,
+    arcRadiusPx,
+    arcGroup, arcPath, ext1, ext2,
+    objects: state.anglePendingObjs.slice(),
+    handles: []
+  };
+  state.measures.push(angleMeasure);
+
+  if (window.SynMeasureManager) {
+    angleMeasure.synId = window.SynMeasureManager.add({
+      type: 'angle-2lines',
+      name: 'Angolo ' + angleMeasure.id,
+      value: angleDeg,
+      unit: '°',
+      module: 'vedere',
+      points: [
+        { x: a1.x, y: a1.y, z: a1.z },
+        { x: b1.x, y: b1.y, z: b1.z },
+        { x: a2.x, y: a2.y, z: a2.z },
+        { x: b2.x, y: b2.y, z: b2.z },
+      ],
+      visual: { visible: true, color: '#0065B3' },
+    }).id;
+  }
+
+  updateAngleMeasureLabel(angleMeasure);
+
+  document.getElementById('btnRulerClear').disabled = false;
+  setStatus('Angolo proiettato: ' + angleDeg.toFixed(2) + '°');
+}
+
+// Aggiorna posizione di label E arco SVG ad ogni frame.
+// L'arco si ridisegna sempre proiettando i 4 punti 3D sullo schermo: cosi'
+// se l'utente ruota la vista, l'arco resta "ancorato" ai punti 3D ma sempre
+// piatto sullo schermo (overlay 2D), come da specifica Blocco 5d.
+// IMPORTANTE: il VALORE dell'angolo NON cambia con la rotazione (e' congelato
+// dal commit). Solo il disegno dell'arco si adatta alla nuova proiezione.
+function updateAngleMeasureLabel(m) {
+  if (!m.labelEl) return;
+
+  // Proietto i 4 punti 3D
+  const A1 = _projectToScreen(m.p1l1);
+  const B1 = _projectToScreen(m.p2l1);
+  const A2 = _projectToScreen(m.p1l2);
+  const B2 = _projectToScreen(m.p2l2);
+
+  // Se uno dei punti chiave e' dietro la camera, nascondo label + arco
+  const anyBehind = A1.behind || B1.behind || A2.behind || B2.behind;
+  if (anyBehind || !m.visible) {
+    m.labelEl.style.display = 'none';
+    if (m.arcGroup) m.arcGroup.style.display = 'none';
+    return;
+  }
+  m.arcGroup.style.display = '';
+
+  // Vertice 2D delle due linee proiettate
+  const dx1 = B1.x - A1.x, dy1 = B1.y - A1.y;
+  const dx2 = B2.x - A2.x, dy2 = B2.y - A2.y;
+  const l1 = Math.hypot(dx1, dy1);
+  const l2 = Math.hypot(dx2, dy2);
+  if (l1 < 1 || l2 < 1) {
+    m.labelEl.style.display = 'none';
+    m.arcGroup.style.display = 'none';
+    return;
+  }
+  let vx, vy;
+  const det = -dx1 * dy2 + dy1 * dx2;
+  if (Math.abs(det) > 1e-3) {
+    const ex = A2.x - A1.x, ey = A2.y - A1.y;
+    const t = (-ex * dy2 + ey * dx2) / det;
+    vx = A1.x + t * dx1; vy = A1.y + t * dy1;
+  } else {
+    // Linee parallele in 2D: nascondo arco
+    m.labelEl.style.display = 'none';
+    m.arcGroup.style.display = 'none';
+    return;
+  }
+
+  // Versori dal vertice verso "fuori" sulle due linee.
+  // Scelgo come punto "esterno" su ciascuna linea il punto piu' lontano dal vertice.
+  function farPoint(P, Q) {
+    const dP = Math.hypot(P.x - vx, P.y - vy);
+    const dQ = Math.hypot(Q.x - vx, Q.y - vy);
+    return dP > dQ ? P : Q;
+  }
+  const p1far = farPoint(A1, B1);
+  const p2far = farPoint(A2, B2);
+  const u1x = p1far.x - vx, u1y = p1far.y - vy;
+  const u2x = p2far.x - vx, u2y = p2far.y - vy;
+  const u1l = Math.hypot(u1x, u1y) || 1;
+  const u2l = Math.hypot(u2x, u2y) || 1;
+  const n1x = u1x / u1l, n1y = u1y / u1l;
+  const n2x = u2x / u2l, n2y = u2y / u2l;
+
+  // Raggio in pixel: ricalcolo in base alla lunghezza proiettata corrente
+  const arcR = Math.max(30, Math.min(120, ((l1 + l2) / 2) * 0.30));
+
+  // Punti di inizio/fine arco
+  const startX = vx + n1x * arcR;
+  const startY = vy + n1y * arcR;
+  const endX = vx + n2x * arcR;
+  const endY = vy + n2y * arcR;
+
+  // Path SVG dell'arco. Uso A (elliptical arc) con rx=ry=arcR.
+  // sweep-flag = 0 per arco corto (acuto) - l'angolo piu' piccolo che vede l'utente
+  // large-arc-flag = 0 per arco minore di 180° (sempre, perche' acuto < 90° < 180°)
+  const arcD = `M ${startX.toFixed(2)} ${startY.toFixed(2)} A ${arcR.toFixed(2)} ${arcR.toFixed(2)} 0 0 1 ${endX.toFixed(2)} ${endY.toFixed(2)}`;
+  m.arcPath.setAttribute('d', arcD);
+
+  // Linee di estensione (tratteggiate) dal vertice ai punti "vicini" delle 2 linee
+  // (utili se le linee non passano esattamente per il vertice, caso comune
+  // perche' le linee sono finite mentre il vertice e' l'intersezione estesa)
+  const p1near = (p1far === A1) ? B1 : A1;
+  const p2near = (p2far === A2) ? B2 : A2;
+  // Disegno l'estensione SOLO se il vertice e' al di fuori del segmento
+  // (cioe' la distanza dal vertice al punto vicino è >> 0)
+  const d1 = Math.hypot(p1near.x - vx, p1near.y - vy);
+  const d2 = Math.hypot(p2near.x - vx, p2near.y - vy);
+  if (d1 > 5) {
+    m.ext1.setAttribute('x1', vx); m.ext1.setAttribute('y1', vy);
+    m.ext1.setAttribute('x2', p1near.x); m.ext1.setAttribute('y2', p1near.y);
+    m.ext1.style.display = '';
+  } else {
+    m.ext1.style.display = 'none';
+  }
+  if (d2 > 5) {
+    m.ext2.setAttribute('x1', vx); m.ext2.setAttribute('y1', vy);
+    m.ext2.setAttribute('x2', p2near.x); m.ext2.setAttribute('y2', p2near.y);
+    m.ext2.style.display = '';
+  } else {
+    m.ext2.style.display = 'none';
+  }
+
+  // Label posizionata sull'arco a meta' (bisettrice dell'angolo)
+  const bisX = (n1x + n2x) / 2;
+  const bisY = (n1y + n2y) / 2;
+  const bisL = Math.hypot(bisX, bisY) || 1;
+  const labelR = arcR + 14;  // un po' fuori dall'arco
+  const labelX = vx + (bisX / bisL) * labelR;
+  const labelY = vy + (bisY / bisL) * labelR;
+  m.labelEl.style.left = labelX + 'px';
+  m.labelEl.style.top = labelY + 'px';
+  m.labelEl.style.display = '';
 }
 
 function toggleMeasureHint(on) {
@@ -2848,6 +3237,12 @@ function worldToScreen(v) {
 
 function updateMeasureLabels() {
   state.measures.forEach(m => {
+    if (m.kind === 'angle-measure') {
+      // Misure angolo hanno labelEl ma non p1/p2 lineari. Delego.
+      updateAngleMeasureLabel(m);
+      return;
+    }
+    if (!m.p1 || !m.p2) return;  // safety
     const mid = m.p1.clone().add(m.p2).multiplyScalar(0.5);
     const sp = worldToScreen(mid);
     if (sp.behind) {
@@ -2867,6 +3262,21 @@ function updateMeasureLabels() {
 
 function clearAllMeasures() {
   state.measures.forEach(m => {
+    if (m.kind === 'angle-measure') {
+      // Angle-measure: niente m.line, niente handles. Solo objects + labelEl + arcGroup.
+      if (m.objects) {
+        for (const obj of m.objects) {
+          if (obj.parent) obj.parent.remove(obj);
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) obj.material.dispose();
+        }
+      }
+      if (m.labelEl) m.labelEl.remove();
+      if (m.arcGroup && m.arcGroup.parentNode) m.arcGroup.parentNode.removeChild(m.arcGroup);
+      if (m.synId) window.SynRegistry.remove(m.synId);
+      return;
+    }
+    // Misure lineari standard
     scene.remove(m.line);
     m.line.geometry.dispose(); m.line.material.dispose();
     m.handles.forEach(h => {
@@ -2879,7 +3289,6 @@ function clearAllMeasures() {
       });
     });
     m.labelEl.remove();
-    // Bridge: rimuovo dal registry
     if (m.synId) window.SynRegistry.remove(m.synId);
   });
   state.measures = [];
@@ -2897,9 +3306,15 @@ function toggleMeasureVisibility(id) {
   const m = state.measures.find(x => x.id === id);
   if (!m) return;
   m.visible = !m.visible;
-  m.line.visible = m.visible;
-  m.handles.forEach(h => h.mesh.visible = m.visible);
-  m.labelEl.style.display = m.visible ? '' : 'none';
+  if (m.kind === 'angle-measure') {
+    if (m.objects) m.objects.forEach(o => { if (o.visible !== undefined) o.visible = m.visible; });
+    m.labelEl.style.display = m.visible ? '' : 'none';
+    if (m.arcGroup) m.arcGroup.style.display = m.visible ? '' : 'none';
+  } else {
+    m.line.visible = m.visible;
+    m.handles.forEach(h => h.mesh.visible = m.visible);
+    m.labelEl.style.display = m.visible ? '' : 'none';
+  }
   renderLayerList();
 }
 
@@ -2907,18 +3322,33 @@ function removeMeasure(id) {
   const idx = state.measures.findIndex(x => x.id === id);
   if (idx < 0) return;
   const m = state.measures[idx];
-  scene.remove(m.line);
-  m.line.geometry.dispose(); m.line.material.dispose();
-  m.handles.forEach(h => {
-    scene.remove(h.mesh);
-    h.mesh.traverse(o => {
-      if (o.isMesh) {
-        if (o.geometry) o.geometry.dispose();
-        if (o.material) o.material.dispose();
+  if (m.kind === 'angle-measure') {
+    // Cleanup misura angolo
+    if (m.objects) {
+      for (const obj of m.objects) {
+        if (obj.parent) obj.parent.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
       }
+    }
+    if (m.labelEl) m.labelEl.remove();
+    if (m.arcGroup && m.arcGroup.parentNode) m.arcGroup.parentNode.removeChild(m.arcGroup);
+    if (m.synId) window.SynRegistry.remove(m.synId);
+  } else {
+    scene.remove(m.line);
+    m.line.geometry.dispose(); m.line.material.dispose();
+    m.handles.forEach(h => {
+      scene.remove(h.mesh);
+      h.mesh.traverse(o => {
+        if (o.isMesh) {
+          if (o.geometry) o.geometry.dispose();
+          if (o.material) o.material.dispose();
+        }
+      });
     });
-  });
-  m.labelEl.remove();
+    m.labelEl.remove();
+    if (m.synId) window.SynRegistry.remove(m.synId);
+  }
   state.measures.splice(idx, 1);
   if (state.measures.length === 0 && state.circles.length === 0) {
     document.getElementById('btnRulerClear').disabled = true;
@@ -4331,6 +4761,15 @@ document.getElementById('btnRuler').addEventListener('click', () => {
   if (state.circleActive) setCircleActive(false);
   setRulerActive(!state.rulerActive);
 });
+document.getElementById('btnAngle').addEventListener('click', () => {
+  if (state.circleActive) setCircleActive(false);
+  if (state.rulerActive) setRulerActive(false);
+  setAngleActive(!state.angleActive);
+});
+// Bind eventi angolo
+canvas.addEventListener('pointermove', angleOnPointerMove);
+canvas.addEventListener('click', angleOnClick);
+
 document.getElementById('btnRulerClear').addEventListener('click', () => {
   clearAllMeasures();
   clearAllCircles();
@@ -4426,12 +4865,35 @@ document.addEventListener('keydown', e => {
         setCircleActive(false);
       }
       e.stopPropagation();
+    } else if (state.angleActive) {
+      // ESC in modalita' angolo: se ho gia' iniziato a cliccare, annullo i punti
+      // (resto in modalita' per ricominciare). Se non ho cliccato nulla, esco.
+      if (state.anglePoints.length > 0) {
+        // Pulisco i pending e ricomincio
+        for (const obj of state.anglePendingObjs) {
+          if (obj.parent) obj.parent.remove(obj);
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) obj.material.dispose();
+        }
+        state.anglePendingObjs = [];
+        state.anglePoints = [];
+        toggleAngleHint(true);
+      } else {
+        setAngleActive(false);
+      }
+      e.stopPropagation();
     }
   } else if (e.key === 'm' || e.key === 'M') {
     if (state.circleActive) setCircleActive(false);
+    if (state.angleActive) setAngleActive(false);
     setRulerActive(!state.rulerActive);
+  } else if (e.key === 'g' || e.key === 'G') {
+    if (state.rulerActive) setRulerActive(false);
+    if (state.circleActive) setCircleActive(false);
+    setAngleActive(!state.angleActive);
   } else if (e.key === 'c' || e.key === 'C') {
     if (state.rulerActive) setRulerActive(false);
+    if (state.angleActive) setAngleActive(false);
     const same = state.circleActive && state.activeShape === 'circle';
     setCircleActive(!same, 'circle');
   } else if (e.key === 'q' || e.key === 'Q') {
