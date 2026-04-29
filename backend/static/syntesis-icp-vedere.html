@@ -916,14 +916,36 @@ input[type="file"]{display:none}
       File <span style="font-size:10px;margin-left:-1px">▾</span>
     </button>
     <div class="file-menu" id="fileMenu">
+      <!-- Nuovo: pulisce la scena (era "Svuota scena", rinominato per coerenza con Analizza) -->
+      <div class="file-menu-item" onclick="closeFileMenu();clearScene()">
+        <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><path d="M7 3 L17 3 L23 9 L23 25 L7 25 Z" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M17 3 L17 9 L23 9" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linejoin="round"/><line x1="15" y1="13" x2="15" y2="21" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/><line x1="11" y1="17" x2="19" y2="17" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Nuovo
+      </div>
+      <!-- Importa: apre file picker -->
       <div class="file-menu-item" onclick="closeFileMenu();document.getElementById('filePicker').click()">
         <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><path d="M5 20 L5 24 L23 24 L23 20" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 4 L14 18" stroke="#0065B3" stroke-width="1.8" stroke-linecap="round"/><polyline points="8,10 14,4 20,10" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Importa
       </div>
       <div class="file-menu-sep"></div>
-      <div class="file-menu-item" onclick="closeFileMenu();clearScene()">
-        <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><path d="M7 8 L21 8 L20 23 L8 23 Z M11 5 L17 5 L17 8 L11 8 Z" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linejoin="round"/></svg>
-        Svuota scena
+      <!-- Impostazioni: placeholder per ora, modale che mostra "in arrivo" -->
+      <div class="file-menu-item" onclick="closeFileMenu();openVedereSettings()">
+        <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><path d="M12 3 L16 3 L16.5 6 L19 7 L21.5 5 L23 7.5 L21 10 L22 12 L24.5 12.5 L24.5 16.5 L22 17 L21 19 L23 21.5 L21.5 23 L19 21 L16.5 22 L16 25 L12 25 L11.5 22 L9 21 L6.5 23 L5 21.5 L7 19 L6 17 L3.5 16.5 L3.5 12.5 L6 12 L7 10 L5 7.5 L6.5 5 L9 7 L11.5 6 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><circle cx="14" cy="14" r="3.5" stroke="#0065B3" stroke-width="1.6" fill="none"/></svg>
+        Impostazioni
+      </div>
+      <div class="file-menu-sep"></div>
+      <!-- Account: login/logout. Riusiamo lo stesso pattern di Analizza con syntAuthClick.
+           Se la funzione non e' definita in questo modulo, fallback su window.location='/dashboard'. -->
+      <div class="file-menu-item" id="fmAuthItem" onclick="closeFileMenu();vedereAuthClick()">
+        <svg width="13" height="13" viewBox="0 0 28 28" fill="none">
+          <path d="M11 4 L4 4 L4 24 L11 24 M16 9 L21 14 L16 19 M21 14 L9 14" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span id="fmAuthLabel">Accedi</span>
+        <span class="fm-key" id="fmAuthKey">LOGIN</span>
+      </div>
+      <div class="file-menu-item" id="fmDashboardItem" onclick="closeFileMenu();window.open('/dashboard','_blank')" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="10" r="4" stroke="#0065B3" stroke-width="1.8" fill="none"/><path d="M5 24 C5 18 9 16 14 16 C19 16 23 18 23 24" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+        Area personale
+        <span class="fm-key">DASHBOARD</span>
       </div>
     </div>
   </div>
@@ -7863,6 +7885,53 @@ function closeWorkflowMenu() {
   const m = document.getElementById('workflowMenu');
   if (m) m.classList.remove('open');
 }
+
+// =====================================================================
+// IMPOSTAZIONI VEDERE (Blocco 5o)
+// Modale placeholder. Verra' espansa in futuro con preferenze utente
+// (palette default, dimensione gomma default, comportamenti UI, ecc.)
+// =====================================================================
+function openVedereSettings() {
+  // Crea il modale on-demand se non esiste
+  let modal = document.getElementById('vedereSettingsModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'vedereSettingsModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,35,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:14px;padding:28px 32px;min-width:380px;max-width:520px;box-shadow:0 16px 48px rgba(15,25,35,0.25);position:relative">
+        <button id="vsmClose" style="position:absolute;top:14px;right:14px;width:28px;height:28px;border:none;background:transparent;font-size:22px;cursor:pointer;color:var(--gray);line-height:1">×</button>
+        <h2 style="font-family:var(--font);font-size:18px;font-weight:800;letter-spacing:.04em;color:var(--dark);margin:0 0 6px">Impostazioni</h2>
+        <p style="font-family:var(--font);font-size:12px;color:var(--gray);margin:0 0 22px">Vedere v8.0.0-refactor</p>
+        <div style="font-family:var(--font);font-size:13px;color:var(--dark);line-height:1.6;background:var(--light);padding:14px 16px;border-radius:8px;border-left:3px solid var(--mario-cyan)">
+          Le preferenze utente arrivano in una versione successiva. Quando saranno disponibili, qui potrai configurare la palette delle misure, la dimensione default della gomma e altre opzioni di visualizzazione.
+        </div>
+        <div style="margin-top:20px;text-align:right">
+          <button id="vsmOk" class="btn" style="background:var(--mario-green);color:#fff;border-color:var(--mario-green);font-weight:800;padding:8px 18px">OK</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    // Click esterno o X chiude
+    const close = () => modal.remove();
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    document.getElementById('vsmClose').addEventListener('click', close);
+    document.getElementById('vsmOk').addEventListener('click', close);
+  }
+}
+
+// =====================================================================
+// AUTH VEDERE (Blocco 5o)
+// Versione semplificata: apre la dashboard backend in nuova tab.
+// Quando integreremo il sistema auth completo (cookie session JWT condivisa
+// con Analizza), questa funzione fara' login/logout in linea senza redirect.
+// =====================================================================
+function vedereAuthClick() {
+  // Per ora, apre la dashboard. Lo backend vedra' se l'utente e' loggato e
+  // mostrera' login form o area personale di conseguenza.
+  window.open('/dashboard', '_blank');
+}
+
 // Chiudi menu su click esterno
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.file-menu-wrapper')) closeFileMenu();
