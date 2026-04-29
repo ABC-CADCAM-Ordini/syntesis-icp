@@ -4852,18 +4852,48 @@ function fitSectionCameraToContent() {
     });
   }
 
-  // Scelgo il cluster con centroide piu' vicino all'origine (0,0 = centro piano,
-  // che e' la mezzeria tra i due click utente)
+  // Scelgo TUTTI i cluster vicini all'origine (Blocco 5b):
+  // L'utente clicca due punti che definiscono una zona; vogliamo inquadrare
+  // tutti gli oggetti che cadono in quella zona, non solo il piu' vicino.
+  // Strategia: prendo i cluster ordinati per distanza, e includo quelli
+  // entro una soglia dinamica.
   clusterInfo.sort((a, b) => a.distFromOrigin - b.distFromOrigin);
-  const chosen = clusterInfo[0];
 
-  // Calcolo bbox del cluster scelto e adatto la camera
-  const bboxW = chosen.maxU - chosen.minU;
-  const bboxH = chosen.maxV - chosen.minV;
-  const bboxCu = (chosen.minU + chosen.maxU) * 0.5;
-  const bboxCv = (chosen.minV + chosen.maxV) * 0.5;
+  // Soglia di inclusione: il piu' generoso fra:
+  //   a) 2x la distanza del cluster piu' vicino (concettuale: "se altri cluster
+  //      sono altrettanto vicini, includili")
+  //   b) il lato del rettangolo handle (concettuale: "rimani nella zona del click")
+  // Cosi' su click vicini a 2 oggetti, entrambi entrano. Su click vicini a uno
+  // solo, l'altro lontano resta escluso.
+  const sideMm = Math.max(s.width, s.height);
+  const minDist = clusterInfo[0].distFromOrigin;
+  const threshold = Math.max(minDist * 2.0 + 1.0, sideMm * 1.5);
 
-  // Pan = centro del bbox del cluster (in UV)
+  // Tengo al massimo 4 cluster, ordinati per vicinanza, entro la soglia
+  const MAX_CLUSTERS = 4;
+  const selectedClusters = [];
+  for (const c of clusterInfo) {
+    if (selectedClusters.length >= MAX_CLUSTERS) break;
+    if (c.distFromOrigin <= threshold) selectedClusters.push(c);
+  }
+  // Almeno uno (il piu' vicino), sempre
+  if (selectedClusters.length === 0) selectedClusters.push(clusterInfo[0]);
+
+  // Bbox unione dei cluster selezionati
+  let unionMinU = Infinity, unionMaxU = -Infinity;
+  let unionMinV = Infinity, unionMaxV = -Infinity;
+  for (const c of selectedClusters) {
+    if (c.minU < unionMinU) unionMinU = c.minU;
+    if (c.maxU > unionMaxU) unionMaxU = c.maxU;
+    if (c.minV < unionMinV) unionMinV = c.minV;
+    if (c.maxV > unionMaxV) unionMaxV = c.maxV;
+  }
+  const bboxW = unionMaxU - unionMinU;
+  const bboxH = unionMaxV - unionMinV;
+  const bboxCu = (unionMinU + unionMaxU) * 0.5;
+  const bboxCv = (unionMinV + unionMaxV) * 0.5;
+
+  // Pan = centro del bbox unione (in UV)
   s.panU = bboxCu;
   s.panV = bboxCv;
 
@@ -6452,6 +6482,17 @@ if (window.SynCutViewManager) {
       window.SynRegistry.update(sel.id, { 'visual.renderMode': newMode });
       const layer = state.layers.find(l => l.synId === sel.id);
       if (layer && layer.material) {
+        // Conto i triangoli per scalare il rendering wireframe alla densita'.
+        // Mesh dense (> 50k tri) richiedono linee piu' sottili e trasparenti
+        // altrimenti il reticolo diventa una macchia illeggibile.
+        const triCount = layer.geometry && layer.geometry.index
+          ? layer.geometry.index.count / 3
+          : (layer.geometry && layer.geometry.attributes && layer.geometry.attributes.position
+              ? layer.geometry.attributes.position.count / 3
+              : 0);
+        const isDense = triCount > 50000;
+        const isVeryDense = triCount > 200000;
+
         if (newMode === 'solid') {
           // Mesh piena, niente reticolo
           layer.material.wireframe = false;
@@ -6463,21 +6504,41 @@ if (window.SynCutViewManager) {
           }
         } else if (newMode === 'wireframe') {
           // Solo reticolo, mesh piena off
+          // Per mesh dense rendiamo il materiale leggermente trasparente cosi'
+          // il reticolo si "diluisce" e non satura lo schermo
           layer.material.wireframe = true;
+          if (isVeryDense) {
+            layer.material.transparent = true;
+            layer.material.opacity = 0.45;
+          } else if (isDense) {
+            layer.material.transparent = true;
+            layer.material.opacity = 0.65;
+          }
           if (layer.wireframeOverlay) {
             layer.group.remove(layer.wireframeOverlay);
             if (layer.wireframeOverlay.material) layer.wireframeOverlay.material.dispose();
             layer.wireframeOverlay = null;
           }
         } else if (newMode === 'both') {
-          // Mesh piena con reticolo sopra (overlay)
+          // Mesh piena con reticolo sopra (overlay molto sottile)
           layer.material.wireframe = false;
+          // Ripristino opacity originale del materiale base (in caso fosse stata modificata da wireframe mode)
+          if (sel.meta && sel.meta.original && sel.meta.original.opacity != null) {
+            layer.material.opacity = sel.meta.original.opacity;
+            layer.material.transparent = (sel.meta.original.opacity < 1.0);
+          }
           if (!layer.wireframeOverlay) {
+            // Opacity dell'overlay scala con la densita' della mesh:
+            // scansioni dentali tipiche (300k+ tri) → overlay quasi invisibile
+            // ma comunque presente, per dare il "feel" del wireframe
+            let overlayOpacity = 0.18;
+            if (isVeryDense) overlayOpacity = 0.05;
+            else if (isDense) overlayOpacity = 0.10;
             const overlayMat = new THREE.MeshBasicMaterial({
-              color: 0x1a3550,        // blu scuro discreto, non aggressivo
+              color: 0x2a4060,
               wireframe: true,
               transparent: true,
-              opacity: 0.35,
+              opacity: overlayOpacity,
               depthTest: true,
               depthWrite: false,
             });
