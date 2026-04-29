@@ -2523,6 +2523,72 @@ filePicker.addEventListener('change', async e => {
   for (const f of files) await loadFile(f);
   filePicker.value = '';
 });
+
+// =====================================================================
+// Blocco 5r: AUTO-LOAD DA URL (file_id query param)
+//
+// Se Vedere viene aperto con ?file_id=X&file_name=Y (es. dalla dashboard
+// "Apri in Vedere"), scarica automaticamente il file da Google Drive
+// e lo carica come se l'utente lo avesse trascinato. Riusa la sessione
+// JWT salvata in localStorage da Dashboard ('syntesis_token').
+//
+// Se manca JWT o token Drive, mostra messaggio chiaro all'utente con
+// link per loggarsi nella dashboard.
+// =====================================================================
+(async function autoLoadFromURL(){
+  const urlParams = new URLSearchParams(window.location.search);
+  const fileId = urlParams.get('file_id');
+  const fileName = urlParams.get('file_name') || 'file.stl';
+  if (!fileId) return;  // nessun parametro, niente da fare
+
+  setStatus('Apertura file da Drive: ' + fileName + '...');
+  try {
+    // Step 1: prendo il JWT app dalla sessione condivisa (dashboard lo salva qui)
+    const jwt = (() => {
+      try { return localStorage.getItem('syntesis_token') || ''; }
+      catch(_) { return ''; }
+    })();
+    if (!jwt) {
+      setStatus('Errore: per aprire file da Drive devi essere loggato. Apri la dashboard prima.');
+      showToast('Non autenticato. Apri /dashboard, accedi, e riprova', 'error');
+      return;
+    }
+
+    // Step 2: chiedo al backend un access_token Drive
+    const tokRes = await fetch('/api/me/gdrive/access-token', {
+      headers: { 'Authorization': 'Bearer ' + jwt }
+    });
+    if (!tokRes.ok) {
+      setStatus('Errore: non posso ottenere token Drive (HTTP ' + tokRes.status + ')');
+      showToast('Token Drive non disponibile. Riconnetti Drive da dashboard', 'error');
+      return;
+    }
+    const tokData = await tokRes.json();
+    const driveToken = tokData.access_token;
+
+    // Step 3: scarico il file direttamente da Drive (browser → Google, no proxy)
+    const driveUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?alt=media&supportsAllDrives=true';
+    const fileRes = await fetch(driveUrl, {
+      headers: { 'Authorization': 'Bearer ' + driveToken }
+    });
+    if (!fileRes.ok) {
+      setStatus('Errore: file non scaricabile (Drive HTTP ' + fileRes.status + ')');
+      showToast('File non trovato o non accessibile su Drive', 'error');
+      return;
+    }
+    const blob = await fileRes.blob();
+
+    // Step 4: costruisco un File e lo passo a loadFile come se fosse stato trascinato
+    const fileObj = new File([blob], fileName, { type: blob.type || 'application/octet-stream' });
+    await loadFile(fileObj);
+    setStatus('File caricato da Drive: ' + fileName);
+  } catch (err) {
+    console.error('[autoLoad] errore:', err);
+    setStatus('Errore caricamento file da Drive: ' + err.message);
+    showToast('Errore: ' + err.message, 'error');
+  }
+})();
+
 document.getElementById('btnReset').addEventListener('click', () => {
   if (state.layers.length === 0 && state.measures.length === 0 && state.circles.length === 0) return;
   clearAllMeasures();
