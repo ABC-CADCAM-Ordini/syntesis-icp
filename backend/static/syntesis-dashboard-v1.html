@@ -134,8 +134,106 @@ body{
 
 /* Tabs */
 .tabs{
-  display:flex;gap:4px;background:var(--pearl);border-radius:10px;
-  padding:4px;margin:16px 24px 0;
+  display:none;
+  /* Tabs orizzontali rimossi nel Blocco 5s. Mantenuti solo come dead style
+     per retrocompatibilita' con eventuale fallback. La nuova navigazione e'
+     la sidebar verticale (vedi .ds-shell + .ds-sidebar sotto). */
+}
+
+/* === BLOCCO 5s: SIDEBAR DASHBOARD =================================== */
+/* Layout principale: sidebar (220px) + content (1fr) */
+.ds-shell{
+  display:grid;
+  grid-template-columns:220px 1fr;
+  gap:18px;
+  margin:18px 24px 0;
+}
+@media (max-width:760px){
+  .ds-shell{
+    grid-template-columns:1fr;
+    gap:12px;
+  }
+}
+.ds-sidebar{
+  background:var(--pearl);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:8px 6px;
+  height:fit-content;
+  position:sticky;top:18px;
+}
+.ds-sidebar-section{
+  font-family:var(--mono);font-size:9px;font-weight:800;
+  color:var(--gray);letter-spacing:.12em;text-transform:uppercase;
+  padding:10px 12px 6px;
+}
+.ds-sidebar-section + .ds-sidebar-section{margin-top:6px;border-top:1px solid var(--border);padding-top:14px}
+.ds-nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;border-radius:7px;
+  font-family:var(--font);font-size:13px;font-weight:600;
+  color:var(--dark);cursor:pointer;
+  transition:background .12s,color .12s;
+  background:transparent;border:none;width:100%;text-align:left;
+  position:relative;
+}
+.ds-nav-item:hover{background:var(--light);color:var(--mario-green)}
+.ds-nav-item.active{
+  background:rgba(91,176,76,0.10);
+  color:var(--mario-green);
+  font-weight:800;
+}
+.ds-nav-item.active::before{
+  content:'';
+  position:absolute;left:0;top:6px;bottom:6px;width:3px;
+  background:var(--mario-green);border-radius:0 2px 2px 0;
+}
+.ds-nav-item .ds-nav-icon{
+  width:18px;height:18px;flex-shrink:0;color:currentColor;
+}
+.ds-nav-item .ds-nav-icon svg{width:18px;height:18px;display:block}
+.ds-nav-item .ds-nav-badge{
+  margin-left:auto;font-family:var(--mono);font-size:10px;font-weight:700;
+  background:var(--pearl);color:var(--gray);
+  padding:2px 7px;border-radius:10px;
+  min-width:20px;text-align:center;
+}
+.ds-nav-item.placeholder{opacity:.55}
+.ds-nav-item.placeholder:hover{opacity:.8}
+.ds-nav-item.placeholder .ds-nav-badge{background:transparent;color:var(--mario-orange);font-style:italic}
+
+.ds-content{
+  background:transparent;
+  min-width:0;  /* permette al content di restringersi senza overflow */
+}
+/* Card placeholder per voci "in arrivo" */
+.ds-placeholder{
+  background:var(--white);
+  border:1.5px dashed var(--border);
+  border-radius:12px;
+  padding:48px 32px;
+  text-align:center;
+  margin-top:8px;
+}
+.ds-placeholder-ico{
+  font-size:42px;opacity:.35;margin-bottom:14px;
+}
+.ds-placeholder-title{
+  font-family:var(--font);font-size:18px;font-weight:800;color:var(--dark);
+  margin-bottom:6px;
+}
+.ds-placeholder-desc{
+  font-family:var(--font);font-size:13px;color:var(--gray);
+  line-height:1.55;max-width:420px;margin:0 auto;
+}
+.ds-placeholder-tag{
+  display:inline-block;margin-top:18px;
+  font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--mario-orange);
+  background:rgba(232,144,66,0.10);
+  border:1px solid var(--mario-orange);
+  padding:6px 12px;border-radius:5px;
 }
 .tab{
   padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;
@@ -819,8 +917,76 @@ body{
       <button class="btn-cta" onclick="location.href='/analizzare'">Vai al login</button>
     </div>
 
-    <!-- Tabs -->
-    <div class="tabs" id="tabsNav" hidden>
+    <!-- BLOCCO 5s: SIDEBAR DASHBOARD - sostituisce la striscia tabs orizzontali.
+         Le voci della sidebar pilotano lo stesso meccanismo switchTab() esistente,
+         con voci aggiuntive 'placeholder' per i workflow non ancora implementati. -->
+    <div class="ds-shell" id="dsShell" hidden>
+      <aside class="ds-sidebar">
+
+        <!-- Gruppo: WORKFLOW CASI -->
+        <div class="ds-sidebar-section">Workflow</div>
+        <button class="ds-nav-item placeholder" data-tab="casi-ricevuti" onclick="switchTab('casi-ricevuti')">
+          <span class="ds-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12 L12 4 L20 12 M6 10 L6 20 L18 20 L18 10" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span>Casi ricevuti</span>
+          <span class="ds-nav-badge">soon</span>
+        </button>
+        <button class="ds-nav-item" data-tab="casi-inviati" onclick="switchTab('casi-inviati')">
+          <span class="ds-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 12 L12 20 L4 12 M18 14 L18 4 L6 4 L6 14" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span>Casi inviati</span>
+          <span class="ds-nav-badge" id="navBadgeCasiInviati">--</span>
+        </button>
+        <button class="ds-nav-item placeholder" data-tab="da-completare" onclick="switchTab('da-completare')">
+          <span class="ds-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7 L12 12 L16 14" stroke-linecap="round"/></svg></span>
+          <span>Da completare</span>
+          <span class="ds-nav-badge">soon</span>
+        </button>
+        <button class="ds-nav-item placeholder" data-tab="in-attesa" onclick="switchTab('in-attesa')">
+          <span class="ds-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11 L11 13 L15 9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9"/></svg></span>
+          <span>In attesa</span>
+          <span class="ds-nav-badge">soon</span>
+        </button>
+        <button class="ds-nav-item placeholder" data-tab="in-lavorazione" onclick="switchTab('in-lavorazione')">
+          <span class="ds-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3 L12 6 M12 18 L12 21 M3 12 L6 12 M18 12 L21 12 M5.6 5.6 L7.7 7.7 M16.3 16.3 L18.4 18.4 M5.6 18.4 L7.7 16.3 M16.3 7.7 L18.4 5.6" stroke-linecap="round"/></svg></span>
+          <span>In lavorazione</span>
+          <span class="ds-nav-badge">soon</span>
+        </button>
+        <button class="ds-nav-item placeholder" data-tab="consegnati" onclick="switchTab('consegnati')">
+          <span class="ds-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12 L10 17 L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span>Consegnati</span>
+          <span class="ds-nav-badge">soon</span>
+        </button>
+
+        <!-- Gruppo: ARCHIVIO E DATI -->
+        <div class="ds-sidebar-section">Archivio</div>
+        <button class="ds-nav-item" data-tab="archivio" onclick="switchTab('archivio')">
+          <span class="ds-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8 L5 19 A1 1 0 0 0 6 20 L18 20 A1 1 0 0 0 19 19 L19 8" stroke-linejoin="round"/><line x1="10" y1="13" x2="14" y2="13" stroke-linecap="round"/></svg></span>
+          <span>Archivio</span>
+        </button>
+        <button class="ds-nav-item" data-tab="contatti" onclick="switchTab('contatti')">
+          <span class="ds-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="9" r="3.5"/><path d="M3 20 C3 16 5.5 14 9 14 C12.5 14 15 16 15 20" stroke-linecap="round"/><circle cx="17" cy="10" r="2.8"/><path d="M15 14.5 C18 14.5 21 16 21 19" stroke-linecap="round"/></svg></span>
+          <span>Contatti</span>
+          <span class="ds-nav-badge" id="navBadgeContatti">--</span>
+        </button>
+        <button class="ds-nav-item" data-tab="analisi" onclick="switchTab('analisi')">
+          <span class="ds-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 16 L9 11 L13 15 L20 8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="11" r="1.5" fill="currentColor"/><circle cx="13" cy="15" r="1.5" fill="currentColor"/><circle cx="20" cy="8" r="1.5" fill="currentColor"/></svg></span>
+          <span>Analisi</span>
+          <span class="ds-nav-badge" id="navBadgeAnalisi">--</span>
+        </button>
+
+        <!-- Gruppo: SISTEMA -->
+        <div class="ds-sidebar-section">Sistema</div>
+        <button class="ds-nav-item" data-tab="impostazioni" onclick="switchTab('impostazioni')">
+          <span class="ds-nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 3 L14 3 L14.5 5.6 L16.6 6.4 L18.8 5 L20.9 7.1 L19.4 9.2 L20.4 11.3 L23 11.8 L23 14.2 L20.4 14.7 L19.4 16.8 L20.9 18.9 L18.8 21 L16.6 19.6 L14.5 20.4 L14 23 L10 23 L9.5 20.4 L7.4 19.6 L5.2 21 L3.1 18.9 L4.6 16.8 L3.6 14.7 L1 14.2 L1 11.8 L3.6 11.3 L4.6 9.2 L3.1 7.1 L5.2 5 L7.4 6.4 L9.5 5.6 Z" stroke-linejoin="round"/><circle cx="12" cy="13" r="3"/></svg></span>
+          <span>Impostazioni</span>
+        </button>
+      </aside>
+
+      <div class="ds-content">
+
+    <!-- Vecchia striscia tab orizzontali: rimossa visivamente, mantenuta solo
+         come elemento DOM per compatibilita' con switchTab() che cerca .tab.
+         Le voci sopra (.ds-nav-item) replicano data-tab e onclick. -->
+    <div class="tabs" id="tabsNav" hidden style="display:none">
       <button class="tab active" data-tab="analyses" onclick="switchTab('analyses')"><svg class="tab-ico" width="14" height="14" viewBox="0 0 28 28" fill="none"><path d="M5 17 L12 10 L16 14 L23 7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="10" r="1.6" fill="currentColor"/><circle cx="16" cy="14" r="1.6" fill="currentColor"/><circle cx="23" cy="7" r="1.6" fill="currentColor"/></svg><span>Le mie analisi</span></button>
       <button class="tab" data-tab="projects" onclick="switchTab('projects')"><svg class="tab-ico" width="14" height="14" viewBox="0 0 28 28" fill="none"><path d="M5 10 L14 5 L23 10 L14 15 Z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M5 15 L14 20 L23 15" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M5 10 L5 18" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M23 10 L23 18" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg><span>I miei progetti</span></button>
       <button class="tab" data-tab="files" onclick="switchTab('files')"><svg class="tab-ico" width="14" height="14" viewBox="0 0 28 28" fill="none"><path d="M7 3 L17 3 L23 9 L23 25 L7 25 Z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M17 3 L17 9 L23 9" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><line x1="11" y1="14" x2="19" y2="14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="11" y1="18" x2="19" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>I miei file</span></button>
@@ -989,6 +1155,72 @@ body{
       </div>
     </div>
 
+    <!-- BLOCCO 5s: PLACEHOLDER per voci sidebar non ancora implementate.
+         Hanno class "tab-content" cosi' da essere gestiti da switchTab() esistente. -->
+    <div class="tab-content" id="tabCasiRicevuti">
+      <div class="ds-placeholder">
+        <div class="ds-placeholder-ico">📥</div>
+        <div class="ds-placeholder-title">Casi ricevuti</div>
+        <div class="ds-placeholder-desc">Qui troverai i casi che ricevi da medici o colleghi: scansioni intraorali, allegati e indicazioni cliniche, pronti per essere lavorati.</div>
+        <div class="ds-placeholder-tag">In arrivo</div>
+      </div>
+    </div>
+    <div class="tab-content" id="tabCasiInviati">
+      <div class="ds-placeholder">
+        <div class="ds-placeholder-ico">📤</div>
+        <div class="ds-placeholder-title">Casi inviati</div>
+        <div class="ds-placeholder-desc">Casi che hai inviato a tecnici o colleghi, con stato di lavorazione e cronologia delle revisioni. Per ora, i tuoi progetti attivi sono visibili qui sotto.</div>
+        <div class="ds-placeholder-tag">In arrivo (modello dati)</div>
+      </div>
+      <!-- Quando il modello "Casi" sara' pronto, qui andra' la lista filtrata.
+           Per ora mostro la lista progetti attuale come fallback transitorio. -->
+      <div id="dsProjectsFallback" style="margin-top:18px"></div>
+    </div>
+    <div class="tab-content" id="tabDaCompletare">
+      <div class="ds-placeholder">
+        <div class="ds-placeholder-ico">⏱</div>
+        <div class="ds-placeholder-title">Da completare</div>
+        <div class="ds-placeholder-desc">Bozze e casi su cui stai ancora lavorando, prima dell'invio. Conserva tutte le tue revisioni in un solo posto.</div>
+        <div class="ds-placeholder-tag">In arrivo</div>
+      </div>
+    </div>
+    <div class="tab-content" id="tabInAttesa">
+      <div class="ds-placeholder">
+        <div class="ds-placeholder-ico">⌛</div>
+        <div class="ds-placeholder-title">In attesa di approvazione</div>
+        <div class="ds-placeholder-desc">Casi inviati al medico per validazione clinica, prima della messa in produzione.</div>
+        <div class="ds-placeholder-tag">In arrivo</div>
+      </div>
+    </div>
+    <div class="tab-content" id="tabInLavorazione">
+      <div class="ds-placeholder">
+        <div class="ds-placeholder-ico">⚙</div>
+        <div class="ds-placeholder-title">In lavorazione</div>
+        <div class="ds-placeholder-desc">Casi attivi nel laboratorio: progettazione, fresatura, finitura. Stato e tempo medio di lavorazione.</div>
+        <div class="ds-placeholder-tag">In arrivo</div>
+      </div>
+    </div>
+    <div class="tab-content" id="tabConsegnati">
+      <div class="ds-placeholder">
+        <div class="ds-placeholder-ico">✓</div>
+        <div class="ds-placeholder-title">Consegnati</div>
+        <div class="ds-placeholder-desc">Casi chiusi e consegnati al medico: storico completo con dati di tracciabilita' e responsabilita'.</div>
+        <div class="ds-placeholder-tag">In arrivo</div>
+      </div>
+    </div>
+    <div class="tab-content" id="tabArchivio">
+      <!-- Archivio = unione di "I miei file" (Drive) + "Cloud" (status integrazioni).
+           Per ora mostriamo entrambi in sequenza. -->
+      <div id="archivioContainer"></div>
+    </div>
+    <div class="tab-content" id="tabImpostazioni">
+      <!-- Impostazioni = profilo + futuro: pro-role, notifiche, password, integrazioni -->
+      <div id="impostazioniContainer"></div>
+    </div>
+
+      </div><!-- /.ds-content -->
+    </div><!-- /.ds-shell -->
+
 
 
   
@@ -1140,13 +1372,24 @@ function checkAuth(){
   if(!state.token){
     document.getElementById('authGate').hidden = false;
     document.getElementById('tabsNav').hidden = true;
+    var sh = document.getElementById('dsShell');
+    if(sh) sh.hidden = true;  // Blocco 5s
     document.querySelectorAll('.tab-content').forEach(function(el){ el.hidden = true; });
     document.getElementById('btnLogout').hidden = true;
     return false;
   }
   document.getElementById('authGate').hidden = true;
   document.getElementById('tabsNav').hidden = false;
+  var sh2 = document.getElementById('dsShell');
+  if(sh2) sh2.hidden = false;  // Blocco 5s: mostra sidebar
   document.getElementById('tabAnalyses').hidden = false;
+  // Blocco 5s: ripristino l'ultimo tab scelto, default 'analisi'
+  setTimeout(function(){
+    var saved = null;
+    try { saved = localStorage.getItem('syntesis_dash_tab'); } catch(_){}
+    var initial = saved || 'analisi';
+    try { switchTab(initial); } catch(e){ console.warn('[switchTab init]', e); }
+  }, 50);
   // v.088 - controllo pro-role asincrono
   setTimeout(function(){ checkProRole(); }, 100);
   return true;
@@ -1160,20 +1403,101 @@ function doLogout(){
 
 // ── Tab switching ───────────────────────────────────────────────────────────
 function switchTab(name){
-  if(name === 'files'){ setTimeout(function(){ loadSharedFolders(); }, 50); }  // v.090 - carica shared
+  // Blocco 5s: salva l'ultimo tab scelto, cosi' al prossimo accesso si riapre li'
+  try { localStorage.setItem('syntesis_dash_tab', name); } catch(_){}
+
+  // Blocco 5s: alias italiano → ID storico inglese (per voci sidebar che usano
+  // nomi italiani ma il tab-content aveva l'id originale in inglese)
+  var tabContentIdAliases = {
+    'analisi': 'tabAnalyses',
+    'contatti': 'tabContacts'
+  };
+
+  // Mappa nuove voci sidebar → vecchi tab data dove possibile
+  // Le voci nuove (casi-*, archivio, impostazioni) hanno il proprio tab-content
+  if(name === 'files'){ setTimeout(function(){ loadSharedFolders(); }, 50); }  // legacy
+  document.querySelectorAll('.ds-nav-item').forEach(function(t){
+    t.classList.toggle('active', t.dataset.tab === name);
+  });
   document.querySelectorAll('.tab').forEach(function(t){
     t.classList.toggle('active', t.dataset.tab === name);
   });
+  // Calcola ID atteso del tab-content
+  var targetId;
+  if(tabContentIdAliases[name]){
+    targetId = tabContentIdAliases[name];
+  } else {
+    targetId = 'tab' + name.split('-').map(function(s){return s.charAt(0).toUpperCase()+s.slice(1)}).join('');
+  }
   document.querySelectorAll('.tab-content').forEach(function(c){
-    c.classList.toggle('active', c.id === 'tab' + name.charAt(0).toUpperCase() + name.slice(1));
+    var match = c.id === targetId;
+    c.classList.toggle('active', match);
+    c.hidden = !match;
   });
-  if(name === 'analyses'){ loadAnalyses(); loadStats(); }
+
+  // Carica dati per voci con backend (esistenti)
+  if(name === 'analyses' || name === 'analisi'){ loadAnalyses(); loadStats(); }
   else if(name === 'projects'){ loadProjects(); }
   else if(name === 'files'){ loadFiles(); }
-  else if(name === 'contacts'){ loadContacts(); }
+  else if(name === 'contacts' || name === 'contatti'){ loadContacts(); }
   else if(name === 'cloud'){ loadCloudStatus(); }
   else if(name === 'profile'){ loadProfile(); }
   else if(name === 'leaderboard'){ if(window.LBdash) LBdash.load(); }
+  // Voci nuove sidebar che riusano backend esistente
+  else if(name === 'archivio'){ renderArchivio(); }
+  else if(name === 'impostazioni'){ renderImpostazioni(); }
+  else if(name === 'casi-inviati'){
+    // Mostro la lista progetti come fallback transitorio
+    var fallback = document.getElementById('dsProjectsFallback');
+    if(fallback && !fallback.dataset.loaded){
+      fallback.dataset.loaded = '1';
+      // Cloning della UI esistente di progetti se presente
+      try { loadProjects(fallback); } catch(_){}
+    }
+  }
+  // Le altre voci sono placeholder puri, non c'e' nulla da caricare
+}
+
+// === Render voci nuove sidebar (Blocco 5s) ===
+// Archivio = unione contenuto di "I miei file" (Drive) + "Cloud" status
+function renderArchivio(){
+  var box = document.getElementById('archivioContainer');
+  if(!box) return;
+  // Riusiamo il contenuto del tab files + cloud spostandoli temporaneamente
+  // (puramente cosmetico, niente nuova logica)
+  var tabFiles = document.getElementById('tabFiles');
+  var tabCloud = document.getElementById('tabCloud');
+  box.innerHTML = '';
+  if(tabFiles){
+    var hdr1 = document.createElement('div');
+    hdr1.style.cssText = 'font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin:6px 0 12px';
+    hdr1.textContent = 'I miei file su Drive';
+    box.appendChild(hdr1);
+    box.appendChild(tabFiles.cloneNode(true));
+  }
+  if(tabCloud){
+    var hdr2 = document.createElement('div');
+    hdr2.style.cssText = 'font-family:var(--mono);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin:24px 0 12px;padding-top:18px;border-top:1px solid var(--border)';
+    hdr2.textContent = 'Stato integrazioni cloud';
+    box.appendChild(hdr2);
+    box.appendChild(tabCloud.cloneNode(true));
+  }
+  // Triggers di caricamento dati (usano le funzioni esistenti)
+  try { loadFiles(); } catch(_){}
+  try { loadCloudStatus(); } catch(_){}
+}
+
+// Impostazioni = profilo + (futuro: pro-role, notifiche, integrazioni)
+function renderImpostazioni(){
+  var box = document.getElementById('impostazioniContainer');
+  if(!box) return;
+  var tabProfile = document.getElementById('tabProfile');
+  box.innerHTML = '';
+  if(tabProfile){
+    box.appendChild(tabProfile.cloneNode(true));
+  }
+  // Trigger carica profilo
+  try { loadProfile(); } catch(_){}
 }
 
 function switchFilter(f){
