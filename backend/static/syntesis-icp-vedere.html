@@ -2046,12 +2046,132 @@ controls.minPolarAngle = -Infinity;
 controls.maxPolarAngle = Infinity;
 controls.minAzimuthAngle = -Infinity;
 controls.maxAzimuthAngle = Infinity;
+// Blocco 7c: Alt+click sinistro = imposta il punto cliccato come fulcro di rotazione.
+// Funzione definita pi&ugrave; sotto (installAltClickPivot).
 
 const transformControls = new THREE.TransformControls(camera, canvas);
 transformControls.setMode('translate');
 transformControls.setSize(0.85);
 transformControls.addEventListener('dragging-changed', e => { controls.enabled = !e.value; });
 scene.add(transformControls);
+
+// === Blocco 7c: Alt+click pivot (target rotation su punto cliccato) ===
+// Stessa logica di Analizza. Funzione + chiamata immediata.
+function installAltClickPivot(controls, camera, renderer, scene){
+  if(!controls || !camera || !renderer || !scene){
+    console.warn('[AltClickPivot] parametri mancanti, skip');
+    return;
+  }
+  const raycaster = new THREE.Raycaster();
+  const mouseNDC = new THREE.Vector2();
+  let pivotMarker = null;
+  let pivotMarkerTimer = null;
+  let animFrame = null;
+  
+  function ensurePivotMarker(){
+    if(pivotMarker) return pivotMarker;
+    const geo = new THREE.SphereGeometry(0.6, 16, 16);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x0065B3,
+      transparent: true,
+      opacity: 0.85,
+      depthTest: false,
+      depthWrite: false
+    });
+    pivotMarker = new THREE.Mesh(geo, mat);
+    pivotMarker.renderOrder = 9999;
+    pivotMarker.visible = false;
+    pivotMarker.userData.notClickable = true;
+    scene.add(pivotMarker);
+    return pivotMarker;
+  }
+  
+  function showPivotMarker(point){
+    const m = ensurePivotMarker();
+    m.position.copy(point);
+    m.visible = true;
+    m.material.opacity = 0.85;
+    if(pivotMarkerTimer) clearTimeout(pivotMarkerTimer);
+    pivotMarkerTimer = setTimeout(function(){
+      const fadeStart = performance.now();
+      function fade(){
+        const elapsed = performance.now() - fadeStart;
+        if(elapsed >= 200){
+          m.visible = false;
+          m.material.opacity = 0.85;
+          return;
+        }
+        m.material.opacity = 0.85 * (1 - elapsed/200);
+        requestAnimationFrame(fade);
+      }
+      fade();
+    }, 800);
+  }
+  
+  function animateTargetTo(newTarget){
+    if(animFrame) cancelAnimationFrame(animFrame);
+    const startTarget = controls.target.clone();
+    const startCamPos = camera.position.clone();
+    const deltaTarget = newTarget.clone().sub(startTarget);
+    const startTime = performance.now();
+    const DURATION = 200;
+    function step(){
+      let t = (performance.now() - startTime) / DURATION;
+      if(t >= 1) t = 1;
+      const eased = 1 - Math.pow(1 - t, 3);
+      controls.target.copy(startTarget).addScaledVector(deltaTarget, eased);
+      camera.position.copy(startCamPos).addScaledVector(deltaTarget, eased);
+      controls.update();
+      if(t < 1){
+        animFrame = requestAnimationFrame(step);
+      } else {
+        animFrame = null;
+      }
+    }
+    step();
+  }
+  
+  function collectClickableMeshes(){
+    const meshes = [];
+    scene.traverse(function(obj){
+      if(obj.isMesh && obj.visible && obj !== pivotMarker){
+        if(obj.userData && obj.userData.notClickable) return;
+        meshes.push(obj);
+      }
+    });
+    return meshes;
+  }
+  
+  renderer.domElement.addEventListener('pointerdown', function(ev){
+    if(!ev.altKey) return;
+    if(ev.button !== 0) return;
+    if(transformControls && transformControls.dragging) return;
+    
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouseNDC.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseNDC.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    raycaster.setFromCamera(mouseNDC, camera);
+    const meshes = collectClickableMeshes();
+    if(meshes.length === 0) return;
+    
+    const intersects = raycaster.intersectObjects(meshes, false);
+    if(intersects.length === 0) return;
+    
+    const hitPoint = intersects[0].point;
+    
+    ev.preventDefault();
+    ev.stopPropagation();
+    
+    animateTargetTo(hitPoint);
+    showPivotMarker(hitPoint);
+    
+    console.log('[AltClickPivot] nuovo fulcro:', hitPoint.x.toFixed(2), hitPoint.y.toFixed(2), hitPoint.z.toFixed(2));
+  }, true);
+  
+  console.log('[AltClickPivot] installato (Alt + click sinistro = sposta fulcro rotazione)');
+}
+installAltClickPivot(controls, camera, renderer, scene);
 
 // Illuminazione fissa sulla camera (ruota col punto di vista) - identica ad Analizzare
 const sceneAmbient = new THREE.AmbientLight(0xffffff, 0.4);
