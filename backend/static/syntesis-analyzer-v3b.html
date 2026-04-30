@@ -17633,6 +17633,83 @@ if(document.readyState === 'loading'){
 // ║  Sezioni con placeholder per dati non ancora calcolati.          ║
 // ║  Itera in sessioni successive per riempire ogni sezione.         ║
 // ╚══════════════════════════════════════════════════════════════════╝
+
+// Cattura snapshot del viewer Three.js da angolazioni multiple.
+// Restituisce {occlusale, vestibolare, linguale, prospettica} in dataURL PNG.
+// Salva e ripristina lo stato della camera.
+function analReport_captureViews(){
+  if(!scanMesh || !renderer || !scene || !camera){
+    return null;
+  }
+
+  // Salva stato camera attuale
+  var saved = {
+    pos: camera.position.clone(),
+    target: controls.target.clone(),
+    up: camera.up.clone()
+  };
+
+  // Bounding sphere della scansione per centrare le viste
+  var bs = scanMesh.geometry.boundingSphere;
+  var c = bs.center, r = bs.radius;
+
+  // Helper: imposta camera, renderizza, cattura PNG
+  function snap(eye, tgt, upVec){
+    camera.position.set(eye.x, eye.y, eye.z);
+    controls.target.set(tgt.x, tgt.y, tgt.z);
+    camera.up.set(upVec.x, upVec.y, upVec.z);
+    camera.lookAt(tgt);
+    controls.update();
+    renderer.render(scene, camera);
+    return renderer.domElement.toDataURL('image/png');
+  }
+
+  var views = {};
+  try {
+    // VISTA OCCLUSALE: camera sopra, guarda giu (asse Y negativo)
+    // up = -Z per avere "anteriore" in alto nellimmagine
+    views.occlusale = snap(
+      {x: c.x, y: c.y + r*3.5, z: c.z},
+      {x: c.x, y: c.y, z: c.z},
+      {x: 0, y: 0, z: -1}
+    );
+
+    // VISTA VESTIBOLARE: camera davanti (Z positivo), guarda dietro
+    // up = +Y standard
+    views.vestibolare = snap(
+      {x: c.x, y: c.y + r*0.3, z: c.z + r*3.0},
+      {x: c.x, y: c.y, z: c.z},
+      {x: 0, y: 1, z: 0}
+    );
+
+    // VISTA LINGUALE: camera dietro (Z negativo), guarda davanti
+    views.linguale = snap(
+      {x: c.x, y: c.y + r*0.3, z: c.z - r*3.0},
+      {x: c.x, y: c.y, z: c.z},
+      {x: 0, y: 1, z: 0}
+    );
+
+    // VISTA PROSPETTICA 3/4 (la stessa posizione di reset)
+    views.prospettica = snap(
+      {x: c.x + r*1.5, y: c.y + r, z: c.z + r*1.5},
+      {x: c.x, y: c.y, z: c.z},
+      {x: 0, y: 1, z: 0}
+    );
+  } catch(err){
+    console.error('[analReport] cattura viste fallita:', err);
+  } finally {
+    // Ripristina sempre stato camera
+    camera.position.copy(saved.pos);
+    controls.target.copy(saved.target);
+    camera.up.copy(saved.up);
+    camera.lookAt(saved.target);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  return views;
+}
+
 function analReport_generate(){
   // Verifica jsPDF caricato
   if(!window.jspdf || !window.jspdf.jsPDF){
@@ -17645,6 +17722,12 @@ function analReport_generate(){
     alert('Servono almeno 2 MUA accoppiati per generare il report.');
     return;
   }
+
+  // Cattura snapshot 3D dal viewer Three.js prima di generare il PDF
+  // (la cattura modifica temporaneamente la camera, poi la ripristina)
+  showStatus('Cattura viste 3D in corso...');
+  var views = analReport_captureViews();
+  showStatus('Generazione PDF...');
 
   // Raccolta dati
   var data = analReport_collectData();
@@ -17771,85 +17854,127 @@ function analReport_generate(){
   // ║ PAGINA 2: SPIEGAZIONE - ASSE MEDIO E SOTTOSQUADRI            ║
   // ╚══════════════════════════════════════════════════════════════╝
   doc.addPage();
-  text('COME LEGGERE QUESTO REPORT', MARGIN, 25, {size:16, style:'bold', color:BLUE});
+  text('METODO DI ANALISI', MARGIN, 25, {size:16, style:'bold', color:BLUE});
   doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.8); doc.line(MARGIN, 28, MARGIN+50, 28);
+  text('Come Synthesis-ICP calcola asse medio, sottosquadri e fresabilita', MARGIN, 34, {size:9, color:GRAY, style:'italic'});
 
-  y = 40;
-  text('ASSE MEDIO', MARGIN, y, {size:12, style:'bold'});
-  y += 6;
-  var p1 = 'Quando piu impianti devono ricevere una protesi unica (barra, ponte avvitato), gli ' +
-           'assi dei singoli MUA non sono mai perfettamente paralleli. Lasse medio e il vettore ' +
-           'che sintetizza al meglio le direzioni di tutti i MUA del gruppo: e la "via di mezzo" ' +
-           'lungo cui inserire ed estrarre la protesi.';
-  var lines1 = doc.splitTextToSize(p1, PAGE_W - 2*MARGIN);
-  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor.apply(doc, DARK);
-  doc.text(lines1, MARGIN, y);
-  y += lines1.length*5 + 6;
+  y = 44;
 
-  // Diagramma asse medio: 3 frecce + asse medio
-  // Coordinate del diagramma: centro a (MARGIN+50, y+25)
-  var dx = MARGIN+50, dy = y+25;
+  // ── Sezione 1: ASSE MEDIO ──
+  // Banda colorata + titolo
+  box(MARGIN, y, PAGE_W-2*MARGIN, 8, [230,241,251]);
+  text('1. ASSE MEDIO', MARGIN+3, y+5.5, {size:11, style:'bold', color:BLUE});
+  y += 12;
+
+  var p1a = 'Quando piu MUA devono ricevere una protesi unica (barra avvitata, ponte, full-arch), gli assi dei singoli ' +
+            'pilastri non sono mai perfettamente paralleli: lanatomia ossea, la posizione degli impianti e leventuale uso ' +
+            'di MUA angolati a 17 o 30 gradi producono sempre una certa divergenza tra gli assi.';
+  var lines1a = doc.splitTextToSize(p1a, PAGE_W - 2*MARGIN);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc, DARK);
+  doc.text(lines1a, MARGIN, y);
+  y += lines1a.length*4.5 + 3;
+
+  var p1b = 'Lasse medio e il vettore unitario che minimizza la somma degli scarti angolari tra se stesso e tutti gli assi ' +
+            'MUA del gruppo. E la "via di mezzo" geometrica lungo cui la protesi puo essere inserita ed estratta in modo ' +
+            'rettilineo. Ogni MUA viene poi caratterizzato dalla sua divergenza, ovvero langolo formato tra il suo asse ' +
+            'individuale e questo asse medio comune.';
+  var lines1b = doc.splitTextToSize(p1b, PAGE_W - 2*MARGIN);
+  doc.text(lines1b, MARGIN, y);
+  y += lines1b.length*4.5 + 5;
+
+  // Diagramma asse medio + box calcolo affiancato
+  var diagY = y;
+  var diagX = MARGIN + 25;
+  var diagH = 50;
+  // 3 MUA inclinati + asse medio
   doc.setDrawColor.apply(doc, GRAY); doc.setLineWidth(0.3);
-  // Linea base orizzontale (gengiva)
-  doc.line(dx-35, dy+15, dx+35, dy+15);
-  // 3 MUA inclinati
-  doc.setLineWidth(0.6);
+  doc.line(diagX-25, diagY+diagH-5, diagX+30, diagY+diagH-5);  // gengiva
+  doc.setLineWidth(0.7);
   doc.setDrawColor.apply(doc, [60,120,180]);
-  doc.line(dx-25, dy+15, dx-30, dy-15);  // MUA 1 inclinato sx
-  doc.line(dx, dy+15, dx-2, dy-15);       // MUA 2 verticale
-  doc.line(dx+25, dy+15, dx+30, dy-15);   // MUA 3 inclinato dx
-  // Asse medio (rosso tratteggiato)
-  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.8);
+  doc.line(diagX-20, diagY+diagH-5, diagX-25, diagY+8);  // MUA 1 inclinato sx
+  doc.line(diagX+5, diagY+diagH-5, diagX+3, diagY+5);    // MUA 2 quasi verticale
+  doc.line(diagX+25, diagY+diagH-5, diagX+30, diagY+8);  // MUA 3 inclinato dx
+  // Asse medio rosso tratteggiato verticale
+  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.9);
   doc.setLineDashPattern([1.5,1.5], 0);
-  doc.line(dx, dy+15, dx, dy-20);
+  doc.line(diagX+3, diagY+diagH-5, diagX+3, diagY-2);
   doc.setLineDashPattern([], 0);
   // Etichette
-  text('MUA 1', dx-32, dy-18, {size:7, color:[60,120,180]});
-  text('MUA 2', dx-2, dy-18, {size:7, color:[60,120,180]});
-  text('MUA 3', dx+28, dy-18, {size:7, color:[60,120,180]});
-  text('asse medio', dx+3, dy-22, {size:8, color:RED, style:'bold'});
-  text('gengiva', dx+38, dy+15, {size:7, color:GRAY});
+  text('1', diagX-27, diagY+5, {size:7, color:[60,120,180], style:'bold'});
+  text('2', diagX+5, diagY+2, {size:7, color:[60,120,180], style:'bold'});
+  text('3', diagX+32, diagY+5, {size:7, color:[60,120,180], style:'bold'});
+  text('asse medio', diagX+5, diagY-4, {size:8, color:RED, style:'bold'});
+  text('gengiva', diagX+34, diagY+diagH-2, {size:7, color:GRAY});
 
-  // Spiegazione a destra del diagramma
-  var explX = dx+45;
-  text('Calcolo:', explX, y, {size:9, style:'bold'});
-  text('media vettoriale degli', explX, y+5, {size:9});
-  text('assi MUA (con segno', explX, y+10, {size:9});
-  text('coerente), normalizzata.', explX, y+15, {size:9});
-  text('La divergenza e langolo', explX, y+22, {size:9});
-  text('tra ogni MUA e lasse medio.', explX, y+27, {size:9});
+  // Box "Calcolo" a destra del diagramma
+  var calcBoxX = MARGIN+85;
+  var calcBoxW = PAGE_W-MARGIN-calcBoxX;
+  box(calcBoxX, diagY-2, calcBoxW, diagH+5, LIGHT, BORDER);
+  text('CALCOLO', calcBoxX+3, diagY+3, {size:8, style:'bold', color:GRAY});
+  text('1. Per ogni MUA accoppiato si estrae lasse', calcBoxX+3, diagY+9, {size:8});
+  text('   normalizzato dalla sua geometria.', calcBoxX+3, diagY+13, {size:8});
+  text('2. Si correggono i versi (segno coerente),', calcBoxX+3, diagY+18, {size:8});
+  text('   poi si fa la media vettoriale.', calcBoxX+3, diagY+22, {size:8});
+  text('3. Lasse medio e questa media normalizzata.', calcBoxX+3, diagY+27, {size:8});
+  text('4. La divergenza di ogni MUA e arccos del', calcBoxX+3, diagY+32, {size:8});
+  text('   prodotto scalare con lasse medio.', calcBoxX+3, diagY+36, {size:8});
+  text('Se ci sono piu gruppi, ogni gruppo ha il suo.', calcBoxX+3, diagY+44, {size:8, color:BLUE, style:'italic'});
 
-  y += 50;
+  y = diagY + diagH + 10;
 
-  // Sottosquadri
-  text('SOTTOSQUADRI', MARGIN, y, {size:12, style:'bold'});
-  y += 6;
-  var p2 = 'Un sottosquadro e una zona dove la protesi non puo essere ne inserita ne estratta ' +
-           'lungo lasse di lavoro a causa di un sotto-rilievo. Nel nostro modello, due MUA ' +
-           'formano un sottosquadro reciproco quando la divergenza tra i loro assi supera ' + MAX_COUPLE_DIVERGENCE + ' gradi: ' +
-           'oltre questa soglia non esiste un cammino di inserimento comune.';
-  var lines2 = doc.splitTextToSize(p2, PAGE_W - 2*MARGIN);
-  doc.text(lines2, MARGIN, y);
-  y += lines2.length*5 + 6;
+  // ── Sezione 2: SOTTOSQUADRI ──
+  box(MARGIN, y, PAGE_W-2*MARGIN, 8, [253,236,229]);
+  text('2. SOTTOSQUADRI E DIREZIONE DI INSERIMENTO', MARGIN+3, y+5.5, {size:11, style:'bold', color:[170,80,40]});
+  y += 12;
 
-  // Diagramma sottosquadro: 2 MUA molto divergenti
-  var dx2 = MARGIN+50, dy2 = y+25;
+  var p2a = 'Un sottosquadro e una zona della protesi che impedisce linserimento o lestrazione lungo un asse comune. ' +
+            'Per due MUA, il sottosquadro reciproco si verifica quando la differenza angolare tra i loro assi supera ' + MAX_COUPLE_DIVERGENCE + ' gradi: ' +
+            'oltre questa soglia non esiste alcuna direzione lungo cui un manufatto unico possa scendere su entrambi i pilastri ' +
+            'simultaneamente senza forzature.';
+  var lines2a = doc.splitTextToSize(p2a, PAGE_W - 2*MARGIN);
+  doc.text(lines2a, MARGIN, y);
+  y += lines2a.length*4.5 + 4;
+
+  var p2b = 'In questo report ogni coppia di MUA viene confrontata; le coppie problematiche sono elencate nella sezione ' +
+            'criticita. Se anche una sola coppia supera la soglia, il gruppo non puo essere unito in protesi monolitica ' +
+            'e va scisso in piu segmenti.';
+  var lines2b = doc.splitTextToSize(p2b, PAGE_W - 2*MARGIN);
+  doc.text(lines2b, MARGIN, y);
+  y += lines2b.length*4.5 + 5;
+
+  // Diagramma sottosquadro
+  var diag2Y = y;
+  var diag2X = MARGIN + 25;
   doc.setDrawColor.apply(doc, GRAY); doc.setLineWidth(0.3);
-  doc.line(dx2-35, dy2+15, dx2+35, dy2+15);
-  doc.setLineWidth(0.6);
+  doc.line(diag2X-25, diag2Y+diagH-5, diag2X+30, diag2Y+diagH-5);
+  doc.setLineWidth(0.7);
   doc.setDrawColor.apply(doc, [60,120,180]);
-  doc.line(dx2-15, dy2+15, dx2-30, dy2-15);  // MUA molto inclinato
-  doc.line(dx2+15, dy2+15, dx2+30, dy2-15);  // MUA molto inclinato altro lato
-  // Zona problema (cerchio rosso)
-  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.6);
-  doc.circle(dx2, dy2-3, 6);
-  text('!', dx2, dy2-1, {size:14, style:'bold', color:RED, align:'center'});
-  text('sottosquadro', dx2, dy2+10, {size:7, color:RED, align:'center', style:'bold'});
+  doc.line(diag2X-12, diag2Y+diagH-5, diag2X-25, diag2Y+5);   // MUA molto inclinato sx
+  doc.line(diag2X+12, diag2Y+diagH-5, diag2X+25, diag2Y+5);   // MUA molto inclinato dx (divergenti)
+  // Cerchio rosso "X" zona impossibile
+  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.7);
+  doc.circle(diag2X, diag2Y+15, 6);
+  doc.line(diag2X-4, diag2Y+11, diag2X+4, diag2Y+19);
+  doc.line(diag2X+4, diag2Y+11, diag2X-4, diag2Y+19);
+  text('NO', diag2X+10, diag2Y+17, {size:7, color:RED, style:'bold'});
 
-  text('Soglie applicate:', explX, y+3, {size:9, style:'bold'});
-  text('- cono MUA: ' + MUA_CONE_HALF_ANGLE + ' deg semiangolo', explX, y+9, {size:9});
-  text('- max coppia: ' + MAX_COUPLE_DIVERGENCE + ' deg', explX, y+15, {size:9});
-  text('- max fresatura: ' + MAX_MILLING_ANGLE + ' deg', explX, y+21, {size:9});
+  // Box soglie
+  box(calcBoxX, diag2Y-2, calcBoxW, diagH+5, [253,247,235], BORDER);
+  text('SOGLIE APPLICATE', calcBoxX+3, diag2Y+3, {size:8, style:'bold', color:[170,100,15]});
+  text('Cono MUA IPD', calcBoxX+3, diag2Y+11, {size:8});
+  text(MUA_CONE_HALF_ANGLE + ' deg', calcBoxX+calcBoxW-3, diag2Y+11, {size:8, style:'bold', align:'right'});
+  text('Max coppia (sottosquadro)', calcBoxX+3, diag2Y+17, {size:8});
+  text(MAX_COUPLE_DIVERGENCE + ' deg', calcBoxX+calcBoxW-3, diag2Y+17, {size:8, style:'bold', align:'right'});
+  text('Max fresatura macchina', calcBoxX+3, diag2Y+23, {size:8});
+  text(MAX_MILLING_ANGLE + ' deg', calcBoxX+calcBoxW-3, diag2Y+23, {size:8, style:'bold', align:'right'});
+  text('Le soglie sono parametrizzabili dalla', calcBoxX+3, diag2Y+33, {size:7, color:GRAY, style:'italic'});
+  text('macchina selezionata e dalle costanti', calcBoxX+3, diag2Y+37, {size:7, color:GRAY, style:'italic'});
+  text('cliniche IPD.', calcBoxX+3, diag2Y+41, {size:7, color:GRAY, style:'italic'});
+
+  // Riferimento a pagine successive
+  y = diag2Y + diagH + 10;
+  text('Le prossime pagine mostrano la tabella numerica (pag. 3), la macchina e la mappa occlusale (pag. 4),', MARGIN, y, {size:8, color:GRAY, style:'italic'});
+  text('le viste 3D del caso (pag. 5) e le criticita rilevate con le raccomandazioni (pag. 6).', MARGIN, y+4, {size:8, color:GRAY, style:'italic'});
 
   addFooter(2, 6);
 
@@ -17913,65 +18038,27 @@ function analReport_generate(){
 
   y += 38;
 
-  // Mappa posizione MUA (vista dallalto)
-  text('MAPPA POSIZIONE MUA (vista occlusale)', MARGIN, y, {size:11, style:'bold'});
-  y += 6;
+  // Mappa posizione MUA: vista occlusale reale dal viewer Three.js
+  text('VISTA OCCLUSALE (dal viewer)', MARGIN, y, {size:11, style:'bold'});
+  text('Snapshot della scena 3D dallalto - mostra le posizioni reali dei MUA sullarcata', MARGIN, y+5, {size:8, color:GRAY});
+  y += 10;
 
   var mapX = MARGIN, mapY = y, mapW = PAGE_W-2*MARGIN, mapH = 110;
-  box(mapX, mapY, mapW, mapH, [252,253,254], BORDER);
-
-  // Disegno arcata semplice (semi-cerchio)
-  doc.setDrawColor.apply(doc, GRAY); doc.setLineWidth(0.4);
-  var cx = mapX + mapW/2, cy = mapY + mapH - 12;
-  // Calcolo bbox MUA per scaling
-  var positions = data.muaTable.map(function(r){ return r.posXY; });
-  if(positions.length > 0){
-    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    positions.forEach(function(p){
-      if(p[0] < minX) minX = p[0]; if(p[0] > maxX) maxX = p[0];
-      if(p[1] < minY) minY = p[1]; if(p[1] > maxY) maxY = p[1];
-    });
-    var dxRange = maxX - minX || 1;
-    var dyRange = maxY - minY || 1;
-    var availW = mapW - 30, availH = mapH - 30;
-    var scale = Math.min(availW/dxRange, availH/dyRange) * 0.85;
-    var ox = mapX + mapW/2;
-    var oy = mapY + mapH/2;
-
-    // Linea arcata indicativa
-    doc.setLineDashPattern([1,1], 0);
-    doc.line(mapX+15, mapY+mapH-15, mapX+mapW-15, mapY+mapH-15);
-    doc.setLineDashPattern([], 0);
-
-    // Plotto i MUA
-    data.muaTable.forEach(function(row){
-      var px = ox + (row.posXY[0] - (minX+maxX)/2) * scale;
-      var py = oy + (row.posXY[1] - (minY+maxY)/2) * scale;
-      // Cerchio MUA con colore gruppo
-      var col = row.group === 0 ? BLUE : (row.group === 1 ? ORANGE : GREEN);
-      doc.setFillColor.apply(doc, col);
-      doc.circle(px, py, 3, 'F');
-      // Numero MUA
-      doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','bold');
-      doc.text(String(row.num), px, py+1.2, {align:'center'});
-      // Stato fresabilita: anello rosso se non OK
-      if(!row.millingOK){
-        doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.6);
-        doc.circle(px, py, 4.5);
-      }
-    });
+  if(views && views.occlusale){
+    try {
+      doc.addImage(views.occlusale, 'PNG', mapX, mapY, mapW, mapH, undefined, 'FAST');
+      // Bordo intorno limmagine
+      doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.3);
+      doc.rect(mapX, mapY, mapW, mapH);
+    } catch(e){
+      console.error('[analReport] addImage occlusale fallito:', e);
+      box(mapX, mapY, mapW, mapH, [248,250,253], BORDER);
+      text('Cattura vista non riuscita', mapX+mapW/2, mapY+mapH/2, {size:11, color:GRAY, align:'center', style:'bold'});
+    }
+  } else {
+    box(mapX, mapY, mapW, mapH, [248,250,253], BORDER);
+    text('Vista occlusale non disponibile', mapX+mapW/2, mapY+mapH/2, {size:11, color:GRAY, align:'center', style:'bold'});
   }
-
-  // Legenda
-  var legY = mapY + mapH - 8;
-  doc.setFillColor.apply(doc, BLUE); doc.circle(mapX+10, legY, 2, 'F');
-  text('G0', mapX+14, legY+1, {size:8});
-  if(data.groupCount > 1){
-    doc.setFillColor.apply(doc, ORANGE); doc.circle(mapX+25, legY, 2, 'F');
-    text('G1', mapX+29, legY+1, {size:8});
-  }
-  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.6); doc.circle(mapX+45, legY, 3);
-  text('non fresabile', mapX+50, legY+1, {size:8});
 
   // Indicazione gruppi
   y = mapY + mapH + 8;
@@ -17988,38 +18075,53 @@ function analReport_generate(){
   addFooter(4, 6);
 
   // ╔══════════════════════════════════════════════════════════════╗
-  // ║ PAGINA 5: PREVIEW 3D (PLACEHOLDER)                           ║
+  // ║ PAGINA 5: VISTE 3D DAL VIEWER                                ║
   // ╚══════════════════════════════════════════════════════════════╝
   doc.addPage();
-  text('PREVIEW 3D MUA E CONNESSIONI', MARGIN, 25, {size:16, style:'bold', color:BLUE});
+  text('VISTE 3D MUA E ARCATA', MARGIN, 25, {size:16, style:'bold', color:BLUE});
   doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.8); doc.line(MARGIN, 28, MARGIN+50, 28);
 
-  text('Snapshot 3D dei MUA accoppiati e delle sezioni con sottosquadri.', MARGIN, 36, {size:9, color:GRAY});
+  text('Snapshot del viewer Three.js da angolazioni multiple per documentare il caso clinico.', MARGIN, 36, {size:9, color:GRAY});
 
-  // 4 placeholder grid 2x2
-  var pgX = MARGIN, pgY = 45, pgW = (PAGE_W-2*MARGIN-8)/2, pgH = 65;
-  var slots = [
-    {label:'Vista occlusale', sub:'tutti i MUA + assi'},
-    {label:'Vista vestibolare', sub:'profilo arcata'},
-    {label:'Sezione MUA-connessione', sub:'profilo verticale'},
-    {label:'Mappa sottosquadri', sub:'gradiente clinico'}
-  ];
-  slots.forEach(function(s, i){
-    var col = i % 2, row = Math.floor(i/2);
-    var sx = pgX + col*(pgW+8);
-    var sy = pgY + row*(pgH+8);
-    box(sx, sy, pgW, pgH, [248,250,253], BORDER);
-    // Testo placeholder
-    text(s.label, sx+pgW/2, sy+pgH/2-4, {size:11, style:'bold', color:GRAY, align:'center'});
-    text(s.sub, sx+pgW/2, sy+pgH/2+1, {size:8, color:GRAY, align:'center'});
-    text('[snapshot 3D - v2]', sx+pgW/2, sy+pgH/2+8, {size:8, color:ORANGE, align:'center', style:'bold'});
-  });
+  // Helper per inserire una vista con etichetta
+  function placeView(viewKey, label, sub, sx, sy, sw, sh){
+    if(views && views[viewKey]){
+      try {
+        doc.addImage(views[viewKey], 'PNG', sx, sy, sw, sh, undefined, 'FAST');
+        doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.3);
+        doc.rect(sx, sy, sw, sh);
+      } catch(e){
+        box(sx, sy, sw, sh, [248,250,253], BORDER);
+        text('Cattura non riuscita', sx+sw/2, sy+sh/2, {size:9, color:GRAY, align:'center'});
+      }
+    } else {
+      box(sx, sy, sw, sh, [248,250,253], BORDER);
+      text(label, sx+sw/2, sy+sh/2-3, {size:10, style:'bold', color:GRAY, align:'center'});
+      text('vista non disponibile', sx+sw/2, sy+sh/2+3, {size:8, color:GRAY, align:'center'});
+    }
+    // Etichetta sotto limmagine
+    text(label, sx, sy+sh+5, {size:9, style:'bold', color:DARK});
+    text(sub, sx, sy+sh+9, {size:7, color:GRAY});
+  }
 
-  y = pgY + 2*pgH + 16 + 6;
-  box(MARGIN, y, PAGE_W-2*MARGIN, 16, [255,248,235], BORDER);
-  text('Snapshot 3D - in arrivo nella prossima versione', MARGIN+3, y+6, {size:9, style:'bold', color:ORANGE});
-  text('Per ora questa pagina mostra solo i quadranti di posizionamento. Le immagini reali', MARGIN+3, y+11, {size:8});
-  text('verranno catturate dal viewer Three.js e iniettate nel PDF in v2.', MARGIN+3, y+14, {size:8});
+  // Vista prospettica grande in alto
+  var pgY = 45;
+  var bigW = PAGE_W - 2*MARGIN, bigH = 80;
+  placeView('prospettica', 'Vista prospettica 3/4', 'Tutti i MUA accoppiati con assi visibili', MARGIN, pgY, bigW, bigH);
+
+  // 3 viste piccole sotto in riga (occlusale, vestibolare, linguale)
+  pgY += bigH + 18;
+  var smallW = (PAGE_W - 2*MARGIN - 12) / 3, smallH = 55;
+  placeView('occlusale', 'Vista occlusale', 'Dallalto, vista del piano impianti', MARGIN, pgY, smallW, smallH);
+  placeView('vestibolare', 'Vista vestibolare', 'Profilo anteriore arcata', MARGIN+smallW+6, pgY, smallW, smallH);
+  placeView('linguale', 'Vista linguale', 'Profilo posteriore arcata', MARGIN+2*(smallW+6), pgY, smallW, smallH);
+
+  // Nota sezioni in arrivo
+  y = pgY + smallH + 18;
+  box(MARGIN, y, PAGE_W-2*MARGIN, 18, [255,248,235], BORDER);
+  text('SEZIONI MUA-CONNESSIONE - in arrivo', MARGIN+3, y+6, {size:9, style:'bold', color:ORANGE});
+  text('La sezione verticale per ogni gruppo (taglio sul piano dellasse medio) e la mappa', MARGIN+3, y+11, {size:8});
+  text('dei sottosquadri come gradiente clinico verranno aggiunte nella prossima iterazione.', MARGIN+3, y+15, {size:8});
 
   addFooter(5, 6);
 
