@@ -18157,34 +18157,64 @@ function analReport_generate(){
   text('Cattura del viewer 3D con asse medio e label divergenza vettoriali', z3X+11, z3Y+11, {size:7, color:GRAY});
   
   // Area mappa: lascio spazio a sx (titolo) e a dx (tabella riepilogo)
-  // Mappa: dal margine sx (dopo titolo) a 60mm prima del bordo dx
+  // Mappa: dal margine sx (dopo titolo) a 70mm prima del bordo dx
   var mapBoxX = z3X + 4;
   var mapBoxY = z3Y + 15;
   var mapBoxW = z3W - 75; // lascio 70mm per tabella riepilogo
   var mapBoxH = z3H - 19;
   
-  // Inserisco la cattura 3D occlusale come sfondo
+  // Calcolo dimensione effettiva immagine preservando aspect ratio del canvas Three.js.
+  // Senza questo correttivo limmagine viene schiacciata orizzontalmente in box landscape.
+  var imgX = mapBoxX, imgY = mapBoxY, imgW = mapBoxW, imgH = mapBoxH;
+  if(views && views.occlusale && renderer && renderer.domElement){
+    var canvasW = renderer.domElement.width;
+    var canvasH = renderer.domElement.height;
+    var canvasRatio = canvasW / canvasH;
+    var boxRatio = mapBoxW / mapBoxH;
+    if(canvasRatio > boxRatio){
+      // Canvas piu largo del box -> limito per larghezza, riduco altezza
+      imgW = mapBoxW;
+      imgH = mapBoxW / canvasRatio;
+      imgX = mapBoxX;
+      imgY = mapBoxY + (mapBoxH - imgH) / 2;
+    } else {
+      // Canvas piu alto del box -> limito per altezza, riduco larghezza, centro
+      imgH = mapBoxH;
+      imgW = mapBoxH * canvasRatio;
+      imgY = mapBoxY;
+      imgX = mapBoxX + (mapBoxW - imgW) / 2;
+    }
+  }
+  
+  // Sfondo grigio chiaro nel box vuoto (per visibilita ai lati)
+  doc.setFillColor(248, 250, 253);
+  doc.rect(mapBoxX, mapBoxY, mapBoxW, mapBoxH, 'F');
+  
+  // Inserisco la cattura 3D occlusale al centro del box, aspect ratio preservato
   if(views && views.occlusale){
     try {
-      doc.addImage(views.occlusale, 'PNG', mapBoxX, mapBoxY, mapBoxW, mapBoxH, undefined, 'FAST');
+      doc.addImage(views.occlusale, 'PNG', imgX, imgY, imgW, imgH, undefined, 'FAST');
       doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.3);
-      doc.rect(mapBoxX, mapBoxY, mapBoxW, mapBoxH);
+      doc.rect(imgX, imgY, imgW, imgH);
     } catch(e){
       console.error('[analReport] addImage occlusale fallito:', e);
-      box(mapBoxX, mapBoxY, mapBoxW, mapBoxH, [248,250,253], BORDER);
       text('Cattura occlusale non riuscita', mapBoxX+mapBoxW/2, mapBoxY+mapBoxH/2, {size:9, color:GRAY, align:'center'});
     }
   } else {
-    box(mapBoxX, mapBoxY, mapBoxW, mapBoxH, [248,250,253], BORDER);
     text('Vista occlusale non disponibile', mapBoxX+mapBoxW/2, mapBoxY+mapBoxH/2, {size:9, color:GRAY, align:'center'});
   }
   
-  // Overlay: label pillola vettoriali sopra la cattura, usando le proiezioni 2D
+  // Bordo esterno del box
+  doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.3);
+  doc.rect(mapBoxX, mapBoxY, mapBoxW, mapBoxH);
+  
+  // Overlay: label pillola vettoriali sopra la cattura, usando le proiezioni 2D.
+  // Importante: le proiezioni sono fx/fy frazioni del CANVAS, quindi devono mappare sullarea EFFETTIVA dellimmagine (imgX/imgY/imgW/imgH), non sullintero box.
   if(views && views.occlusalProjections && views.occlusalProjections.length > 0){
     views.occlusalProjections.forEach(function(p){
-      // Coordinate canvas-fraction (0..1) -> coordinate PDF (mm)
-      var px = mapBoxX + p.fx * mapBoxW;
-      var py = mapBoxY + p.fy * mapBoxH;
+      // Coordinate canvas-fraction (0..1) -> coordinate PDF (mm) sullimmagine effettiva
+      var px = imgX + p.fx * imgW;
+      var py = imgY + p.fy * imgH;
       
       // Color status semaforo
       var divDeg = p.divergence != null ? p.divergence : 0;
