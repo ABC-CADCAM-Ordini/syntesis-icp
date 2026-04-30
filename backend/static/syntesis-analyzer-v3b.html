@@ -2306,6 +2306,9 @@ function init(){
   controls.maxPolarAngle = Infinity;
   controls.minAzimuthAngle = -Infinity;
   controls.maxAzimuthAngle = Infinity;
+  // Blocco 7c: Alt+click sinistro = imposta il punto cliccato come fulcro di rotazione (target).
+  // Animazione fluida 200ms ease-out + sferina blu visibile per 1 sec.
+  installAltClickPivot(controls, camera, renderer, scene);
   // Illuminazione fissa sulla camera (ruota col punto di vista)
   scene.add(new THREE.AmbientLight(0xffffff,0.4));
   var camL1=new THREE.DirectionalLight(0xffffff,0.6);camL1.position.set(1,1,1);camera.add(camL1);
@@ -3331,6 +3334,140 @@ function showStatus(msg){var el=document.getElementById('statusMsg');el.textCont
 
 
 // ── LAYER TREE ──────────────────────────────────────────────────
+// === Blocco 7c: Alt+click pivot (target rotation su punto cliccato) ===
+// Funzione riusabile. Aggiunge listener pointerdown sul renderer.
+// - Alt + click sinistro: raycast contro le mesh visibili nella scena, prende il punto
+//   pi&ugrave; vicino, anima il controls.target dal valore corrente al nuovo punto in 200ms.
+// - Mostra una sferina blu sul nuovo fulcro che dura 1 secondo poi sparisce.
+// - Non interferisce con il drag normale (alt non premuto = comportamento standard).
+function installAltClickPivot(controls, camera, renderer, scene){
+  if(!controls || !camera || !renderer || !scene){
+    console.warn('[AltClickPivot] parametri mancanti, skip');
+    return;
+  }
+  var raycaster = new THREE.Raycaster();
+  var mouseNDC = new THREE.Vector2();
+  var pivotMarker = null;       // sferina blu, riusata
+  var pivotMarkerTimer = null;
+  var animFrame = null;
+  
+  // Sferina blu (solo quando serve)
+  function ensurePivotMarker(){
+    if(pivotMarker) return pivotMarker;
+    var geo = new THREE.SphereGeometry(0.6, 16, 16);
+    var mat = new THREE.MeshBasicMaterial({
+      color: 0x0065B3,
+      transparent: true,
+      opacity: 0.85,
+      depthTest: false,
+      depthWrite: false
+    });
+    pivotMarker = new THREE.Mesh(geo, mat);
+    pivotMarker.renderOrder = 9999;
+    pivotMarker.visible = false;
+    scene.add(pivotMarker);
+    return pivotMarker;
+  }
+  
+  function showPivotMarker(point){
+    var m = ensurePivotMarker();
+    m.position.copy(point);
+    m.visible = true;
+    m.material.opacity = 0.85;
+    if(pivotMarkerTimer) clearTimeout(pivotMarkerTimer);
+    // Fade out dopo 800ms, sparizione totale dopo 1000ms
+    pivotMarkerTimer = setTimeout(function(){
+      // Fade out animato
+      var fadeStart = performance.now();
+      function fade(){
+        var elapsed = performance.now() - fadeStart;
+        if(elapsed >= 200){
+          m.visible = false;
+          m.material.opacity = 0.85; // reset per la prossima volta
+          return;
+        }
+        m.material.opacity = 0.85 * (1 - elapsed/200);
+        requestAnimationFrame(fade);
+      }
+      fade();
+    }, 800);
+  }
+  
+  // Animazione fluida del target (200ms ease-out)
+  function animateTargetTo(newTarget){
+    if(animFrame) cancelAnimationFrame(animFrame);
+    var startTarget = controls.target.clone();
+    var startCamPos = camera.position.clone();
+    var deltaTarget = newTarget.clone().sub(startTarget);
+    // La camera trasla insieme al target per mantenere stessa "vista" relativa
+    var startTime = performance.now();
+    var DURATION = 200;
+    function step(){
+      var t = (performance.now() - startTime) / DURATION;
+      if(t >= 1) t = 1;
+      // ease-out cubic
+      var eased = 1 - Math.pow(1 - t, 3);
+      controls.target.copy(startTarget).addScaledVector(deltaTarget, eased);
+      camera.position.copy(startCamPos).addScaledVector(deltaTarget, eased);
+      controls.update();
+      if(t < 1){
+        animFrame = requestAnimationFrame(step);
+      } else {
+        animFrame = null;
+      }
+    }
+    step();
+  }
+  
+  // Raccolta mesh cliccabili dalla scena (tutto quello che ha geometria visibile)
+  function collectClickableMeshes(){
+    var meshes = [];
+    scene.traverse(function(obj){
+      if(obj.isMesh && obj.visible && obj !== pivotMarker){
+        // Escludi helper line/sprite/transform-gizmo
+        if(obj.userData && obj.userData.notClickable) return;
+        meshes.push(obj);
+      }
+    });
+    return meshes;
+  }
+  
+  // Listener pointerdown - solo Alt + tasto sinistro
+  renderer.domElement.addEventListener('pointerdown', function(ev){
+    if(!ev.altKey) return;
+    if(ev.button !== 0) return; // solo click sinistro
+    // Se c'&eacute; un transformControls in dragging, non interferire
+    if(typeof transformControls !== 'undefined' && transformControls && transformControls.dragging) return;
+    
+    // Calcolo NDC dal pointer
+    var rect = renderer.domElement.getBoundingClientRect();
+    mouseNDC.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseNDC.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    raycaster.setFromCamera(mouseNDC, camera);
+    var meshes = collectClickableMeshes();
+    if(meshes.length === 0) return;
+    
+    var intersects = raycaster.intersectObjects(meshes, false);
+    if(intersects.length === 0) return;
+    
+    var hitPoint = intersects[0].point;
+    
+    // Previeni che il click venga interpretato come drag inizio
+    ev.preventDefault();
+    ev.stopPropagation();
+    
+    // Animazione fluida del fulcro
+    animateTargetTo(hitPoint);
+    showPivotMarker(hitPoint);
+    
+    // Log per debug
+    console.log('[AltClickPivot] nuovo fulcro:', hitPoint.x.toFixed(2), hitPoint.y.toFixed(2), hitPoint.z.toFixed(2), 'su mesh:', intersects[0].object.name || intersects[0].object.uuid.substring(0, 8));
+  }, true); // capture phase per intercettare prima di OrbitControls
+  
+  console.log('[AltClickPivot] installato (Alt + click sinistro = sposta fulcro rotazione)');
+}
+
 function rebuildTree(){
   // In workflow Sostituire l'albero mostra sostMesh + i template posizionati
   if(typeof analysisMode !== 'undefined' && analysisMode === 'sostituire'){
