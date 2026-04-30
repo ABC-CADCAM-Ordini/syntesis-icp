@@ -17666,13 +17666,62 @@ function analReport_captureViews(){
 
   var views = {};
   try {
-    // VISTA OCCLUSALE: camera sopra, guarda giu (asse Y negativo)
-    // up = -Z per avere "anteriore" in alto nellimmagine
-    views.occlusale = snap(
-      {x: c.x, y: c.y + r*3.5, z: c.z},
-      {x: c.x, y: c.y, z: c.z},
-      {x: 0, y: 0, z: -1}
-    );
+    // Calcolo asse medio del gruppo principale (i MUA accoppiati).
+    // Stesso algoritmo del calcMeanAxis: media vettoriale degli axisDir con segno coerente, normalizzato.
+    var alignedMuasInit = muaObjects.filter(function(m){ return m.aligned; });
+    var meanAxis = null, meanCenter = null;
+    if(alignedMuasInit.length >= 2){
+      // Allineo segni rispetto al primo
+      var ref = alignedMuasInit[0].axisDir.clone();
+      var sumAxis = new THREE.Vector3(0,0,0);
+      var sumCenter = new THREE.Vector3(0,0,0);
+      alignedMuasInit.forEach(function(m){
+        var a = m.axisDir.clone();
+        if(a.dot(ref) < 0) a.negate();
+        sumAxis.add(a);
+        sumCenter.add(m.position);
+      });
+      meanAxis = sumAxis.divideScalar(alignedMuasInit.length).normalize();
+      meanCenter = sumCenter.divideScalar(alignedMuasInit.length);
+    }
+    
+    // VISTA OCCLUSALE: camera POSIZIONATA LUNGO LASSE MEDIO, guarda PERPENDICOLARMENTE al piano dei MUA.
+    // Camera = meanCenter + meanAxis * distanza, lookAt = meanCenter.
+    // Up vector: scelgo un vettore perpendicolare allasse medio per orientare anteriore/posteriore.
+    if(meanAxis && meanCenter){
+      var camDist = r * 3.5;
+      var camPos = {
+        x: meanCenter.x + meanAxis.x * camDist,
+        y: meanCenter.y + meanAxis.y * camDist,
+        z: meanCenter.z + meanAxis.z * camDist
+      };
+      var target = {x: meanCenter.x, y: meanCenter.y, z: meanCenter.z};
+      // Up: scelgo lasse globale piu perpendicolare allasse medio.
+      // Se lasse medio e quasi parallelo a Y, uso Z. Altrimenti uso Y.
+      var dotY = Math.abs(meanAxis.y);
+      var upVec;
+      if(dotY > 0.9){
+        // Asse medio quasi verticale: up = -Z (anteriore in alto come prima)
+        upVec = {x:0, y:0, z:-1};
+      } else {
+        // Asse medio inclinato: up = Y (standard)
+        upVec = {x:0, y:1, z:0};
+      }
+      // Rendo up perpendicolare allasse medio (proietto): up_perp = up - (up . meanAxis) * meanAxis
+      var upRaw = new THREE.Vector3(upVec.x, upVec.y, upVec.z);
+      var dot = upRaw.dot(meanAxis);
+      upRaw.sub(meanAxis.clone().multiplyScalar(dot)).normalize();
+      upVec = {x: upRaw.x, y: upRaw.y, z: upRaw.z};
+      
+      views.occlusale = snap(camPos, target, upVec);
+    } else {
+      // Fallback: occlusale Y-up come prima
+      views.occlusale = snap(
+        {x: c.x, y: c.y + r*3.5, z: c.z},
+        {x: c.x, y: c.y, z: c.z},
+        {x: 0, y: 0, z: -1}
+      );
+    }
 
     // Calcolo proiezioni 2D dei MUA in vista occlusale (per overlay label vettoriali nel PDF).
     // Position.project(camera) restituisce coordinate normalizzate (-1..1) sul canvas.
