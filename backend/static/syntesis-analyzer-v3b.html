@@ -1523,6 +1523,11 @@ body .panel {
       </div>
       <div class="panel-collapsible-body">
         <div id="clinicalInfo"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
+        <!-- Blocco 6a: Report MUA PDF dentro Stato clinico (richiesta Francesco 2026-04-30) -->
+        <button id="btnAnalReport" onclick="analReport_generate()" disabled style="margin-top:10px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:1.5px solid var(--blue);border-radius:7px;background:var(--blue);color:#fff;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
+          <span>Scarica Report MUA (PDF)</span>
+        </button>
       </div>
     </div>
 
@@ -1563,8 +1568,6 @@ body .panel {
       <div class="panel-collapsible-body">
         <div id="axisInfo"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
         <button id="btnOpenFresability" onclick="openFresability()" disabled style="margin-top:10px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:1.5px solid var(--blue);border-radius:7px;background:var(--white);color:var(--blue);cursor:pointer;transition:all .15s">Fresatura avanzata &rarr;</button>
-        <!-- Blocco 6a: Report MUA PDF - prima versione con placeholder -->
-        <button id="btnAnalReport" onclick="analReport_generate()" disabled style="margin-top:6px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:1.5px solid var(--blue);border-radius:7px;background:var(--blue);color:#fff;cursor:pointer;transition:all .15s">&#9783; Report MUA (PDF)</button>
       </div>
     </div>
 
