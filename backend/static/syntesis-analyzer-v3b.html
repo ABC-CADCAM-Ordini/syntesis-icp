@@ -1563,6 +1563,8 @@ body .panel {
       <div class="panel-collapsible-body">
         <div id="axisInfo"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
         <button id="btnOpenFresability" onclick="openFresability()" disabled style="margin-top:10px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:1.5px solid var(--blue);border-radius:7px;background:var(--white);color:var(--blue);cursor:pointer;transition:all .15s">Fresatura avanzata &rarr;</button>
+        <!-- Blocco 6a: Report MUA PDF - prima versione con placeholder -->
+        <button id="btnAnalReport" onclick="analReport_generate()" disabled style="margin-top:6px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:1.5px solid var(--blue);border-radius:7px;background:var(--blue);color:#fff;cursor:pointer;transition:all .15s">&#9783; Report MUA (PDF)</button>
       </div>
     </div>
 
@@ -5044,6 +5046,13 @@ function fresUpdateOpenButton(){
   btn.disabled = (aligned.length < 2);
   btn.style.opacity = btn.disabled ? '0.4' : '1';
   btn.style.cursor = btn.disabled ? 'not-allowed' : 'pointer';
+  // Blocco 6a: stessa logica per il bottone Report MUA PDF
+  var btnR = document.getElementById('btnAnalReport');
+  if(btnR){
+    btnR.disabled = (aligned.length < 2);
+    btnR.style.opacity = btnR.disabled ? '0.4' : '1';
+    btnR.style.cursor = btnR.disabled ? 'not-allowed' : 'pointer';
+  }
 }
 
 // ===== Apertura / chiusura pannello =====
@@ -17614,6 +17623,568 @@ if(document.readyState === 'loading'){
 
   console.log('[SynLayerPanel] Fase 3 attiva (visibilita + opacita + rimozione)');
 })();
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  REPORT MUA PDF - Blocco 6a (prima versione, fondamenta)         ║
+// ║  Genera un PDF strutturato con i dati MUA gia disponibili.       ║
+// ║  Sezioni con placeholder per dati non ancora calcolati.          ║
+// ║  Itera in sessioni successive per riempire ogni sezione.         ║
+// ╚══════════════════════════════════════════════════════════════════╝
+function analReport_generate(){
+  // Verifica jsPDF caricato
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Errore: libreria PDF non caricata. Ricarica la pagina e riprova.');
+    return;
+  }
+  // Verifica almeno 2 MUA accoppiati
+  var aligned = muaObjects.filter(function(m){ return m.aligned; });
+  if(aligned.length < 2){
+    alert('Servono almeno 2 MUA accoppiati per generare il report.');
+    return;
+  }
+
+  // Raccolta dati
+  var data = analReport_collectData();
+
+  // Crea PDF
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({unit:'mm', format:'a4', compress:true});
+
+  // ── Costanti grafiche ───────────────────────────────────────────
+  var BLUE = [0,101,179];           // var(--blue) #0065B3
+  var DARK = [15,25,35];            // var(--dark)
+  var GRAY = [122,144,164];         // var(--gray)
+  var GREEN = [91,176,76];          // mario-green
+  var RED = [209,58,53];            // mario-red
+  var ORANGE = [232,144,66];        // mario-orange
+  var GOLD = [245,158,11];          // gold
+  var LIGHT = [240,245,250];        // pearl
+  var BORDER = [214,228,240];       // border
+  var WHITE = [255,255,255];
+
+  var PAGE_W = 210, PAGE_H = 297;
+  var MARGIN = 15;
+
+  // Helper: rettangolo con bordo
+  function box(x,y,w,h,fill,stroke){
+    if(fill){doc.setFillColor.apply(doc,fill); doc.rect(x,y,w,h,'F');}
+    if(stroke){doc.setDrawColor.apply(doc,stroke); doc.setLineWidth(0.3); doc.rect(x,y,w,h);}
+  }
+  function text(s,x,y,opt){
+    opt = opt || {};
+    doc.setFont(opt.font || 'helvetica', opt.style || 'normal');
+    doc.setFontSize(opt.size || 10);
+    doc.setTextColor.apply(doc, opt.color || DARK);
+    doc.text(s, x, y, {align: opt.align || 'left'});
+  }
+  // Footer comune a tutte le pagine
+  function addFooter(pageNum, totalPages){
+    doc.setDrawColor.apply(doc, BORDER);
+    doc.setLineWidth(0.2);
+    doc.line(MARGIN, PAGE_H-12, PAGE_W-MARGIN, PAGE_H-12);
+    text('Synthesis-ICP - Report Analizza MUA', MARGIN, PAGE_H-7, {size:8, color:GRAY, font:'helvetica'});
+    text(data.caseCode + ' - ' + data.dateStr, PAGE_W/2, PAGE_H-7, {size:8, color:GRAY, align:'center'});
+    text('Pag. '+pageNum+' / '+totalPages, PAGE_W-MARGIN, PAGE_H-7, {size:8, color:GRAY, align:'right'});
+  }
+
+  // ╔══════════════════════════════════════════════════════════════╗
+  // ║ PAGINA 1: COPERTINA                                          ║
+  // ╚══════════════════════════════════════════════════════════════╝
+  // Banda blu in alto con titolo
+  box(0, 0, PAGE_W, 50, BLUE);
+  text('REPORT ANALIZZA MUA', PAGE_W/2, 25, {size:22, style:'bold', color:WHITE, align:'center'});
+  text('Analisi angolare e fresabilita protesica', PAGE_W/2, 35, {size:11, color:WHITE, align:'center'});
+  text('Synthesis-ICP', PAGE_W/2, 43, {size:9, color:WHITE, align:'center'});
+
+  // Box info caso
+  var y = 65;
+  text('CASO', MARGIN, y, {size:9, color:GRAY, style:'bold'});
+  text(data.caseCode, MARGIN, y+8, {size:18, style:'bold'});
+  text('DATA', PAGE_W/2+10, y, {size:9, color:GRAY, style:'bold'});
+  text(data.dateStr, PAGE_W/2+10, y+8, {size:14});
+  y += 20;
+
+  // Linea separatrice
+  doc.setDrawColor.apply(doc, BORDER);
+  doc.setLineWidth(0.4);
+  doc.line(MARGIN, y, PAGE_W-MARGIN, y);
+  y += 12;
+
+  // Score grandi: Fresabilita + Possibilita protesica
+  text('VALUTAZIONE COMPLESSIVA', MARGIN, y, {size:10, color:GRAY, style:'bold'});
+  y += 8;
+
+  // Box Fresabilita
+  var bw = (PAGE_W - 2*MARGIN - 8) / 2;
+  var bh = 55;
+  box(MARGIN, y, bw, bh, LIGHT, BORDER);
+  text('FRESABILITA', MARGIN+5, y+10, {size:10, style:'bold', color:GRAY});
+  // Score: % di MUA che rispettano millingOK
+  var fresValue = data.scores.fresabilita;
+  var fresColor = fresValue >= 80 ? GREEN : fresValue >= 60 ? GOLD : RED;
+  text(String(fresValue), MARGIN+bw/2, y+30, {size:32, style:'bold', color:fresColor, align:'center'});
+  text('/ 100', MARGIN+bw/2+18, y+30, {size:11, color:GRAY, align:'left'});
+  text(data.scores.fresabilitaLabel, MARGIN+bw/2, y+45, {size:9, color:fresColor, align:'center', style:'bold'});
+
+  // Box Possibilita protesica
+  box(MARGIN+bw+8, y, bw, bh, LIGHT, BORDER);
+  text('POSSIBILITA PROTESICA', MARGIN+bw+13, y+10, {size:10, style:'bold', color:GRAY});
+  var protValue = data.scores.protesica;
+  var protColor = protValue >= 80 ? GREEN : protValue >= 60 ? GOLD : RED;
+  text(String(protValue), MARGIN+bw+8+bw/2, y+30, {size:32, style:'bold', color:protColor, align:'center'});
+  text('/ 100', MARGIN+bw+8+bw/2+18, y+30, {size:11, color:GRAY, align:'left'});
+  text(data.scores.protesicaLabel, MARGIN+bw+8+bw/2, y+45, {size:9, color:protColor, align:'center', style:'bold'});
+
+  y += bh + 12;
+
+  // Riepilogo numerico
+  text('RIEPILOGO NUMERICO', MARGIN, y, {size:10, color:GRAY, style:'bold'});
+  y += 8;
+  var summaryRows = [
+    ['MUA totali', String(data.muaCount)],
+    ['Gruppi', String(data.groupCount) + (data.groupCount > 1 ? ' (multipli)' : ' (singolo)')],
+    ['Macchina selezionata', data.machineName || '--'],
+    ['Max divergenza vs asse medio', data.maxDiv != null ? data.maxDiv.toFixed(1) + ' deg' : '--'],
+    ['Media divergenza', data.avgDiv != null ? data.avgDiv.toFixed(1) + ' deg' : '--'],
+    ['MUA fuori cono 20 deg', String(data.criticita.coneOutCount)],
+    ['Coppie con sottosquadri', String(data.criticita.undercutPairs)],
+    ['MUA non fresabili', String(data.criticita.millingOutCount)]
+  ];
+  summaryRows.forEach(function(r, i){
+    var ry = y + i*7;
+    if(i % 2 === 0){ box(MARGIN, ry-4, PAGE_W-2*MARGIN, 7, LIGHT); }
+    text(r[0], MARGIN+3, ry, {size:10});
+    text(r[1], PAGE_W-MARGIN-3, ry, {size:10, style:'bold', align:'right'});
+  });
+  y += summaryRows.length * 7 + 8;
+
+  // Nota in fondo copertina
+  text('Nota: questo report e la prima versione (Blocco 6a). Sezioni con dati', MARGIN, PAGE_H-25, {size:8, color:GRAY});
+  text('parziali o placeholder verranno completate nelle iterazioni successive.', MARGIN, PAGE_H-21, {size:8, color:GRAY});
+
+  addFooter(1, 6);
+
+  // ╔══════════════════════════════════════════════════════════════╗
+  // ║ PAGINA 2: SPIEGAZIONE - ASSE MEDIO E SOTTOSQUADRI            ║
+  // ╚══════════════════════════════════════════════════════════════╝
+  doc.addPage();
+  text('COME LEGGERE QUESTO REPORT', MARGIN, 25, {size:16, style:'bold', color:BLUE});
+  doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.8); doc.line(MARGIN, 28, MARGIN+50, 28);
+
+  y = 40;
+  text('ASSE MEDIO', MARGIN, y, {size:12, style:'bold'});
+  y += 6;
+  var p1 = 'Quando piu impianti devono ricevere una protesi unica (barra, ponte avvitato), gli ' +
+           'assi dei singoli MUA non sono mai perfettamente paralleli. Lasse medio e il vettore ' +
+           'che sintetizza al meglio le direzioni di tutti i MUA del gruppo: e la "via di mezzo" ' +
+           'lungo cui inserire ed estrarre la protesi.';
+  var lines1 = doc.splitTextToSize(p1, PAGE_W - 2*MARGIN);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor.apply(doc, DARK);
+  doc.text(lines1, MARGIN, y);
+  y += lines1.length*5 + 6;
+
+  // Diagramma asse medio: 3 frecce + asse medio
+  // Coordinate del diagramma: centro a (MARGIN+50, y+25)
+  var dx = MARGIN+50, dy = y+25;
+  doc.setDrawColor.apply(doc, GRAY); doc.setLineWidth(0.3);
+  // Linea base orizzontale (gengiva)
+  doc.line(dx-35, dy+15, dx+35, dy+15);
+  // 3 MUA inclinati
+  doc.setLineWidth(0.6);
+  doc.setDrawColor.apply(doc, [60,120,180]);
+  doc.line(dx-25, dy+15, dx-30, dy-15);  // MUA 1 inclinato sx
+  doc.line(dx, dy+15, dx-2, dy-15);       // MUA 2 verticale
+  doc.line(dx+25, dy+15, dx+30, dy-15);   // MUA 3 inclinato dx
+  // Asse medio (rosso tratteggiato)
+  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.8);
+  doc.setLineDashPattern([1.5,1.5], 0);
+  doc.line(dx, dy+15, dx, dy-20);
+  doc.setLineDashPattern([], 0);
+  // Etichette
+  text('MUA 1', dx-32, dy-18, {size:7, color:[60,120,180]});
+  text('MUA 2', dx-2, dy-18, {size:7, color:[60,120,180]});
+  text('MUA 3', dx+28, dy-18, {size:7, color:[60,120,180]});
+  text('asse medio', dx+3, dy-22, {size:8, color:RED, style:'bold'});
+  text('gengiva', dx+38, dy+15, {size:7, color:GRAY});
+
+  // Spiegazione a destra del diagramma
+  var explX = dx+45;
+  text('Calcolo:', explX, y, {size:9, style:'bold'});
+  text('media vettoriale degli', explX, y+5, {size:9});
+  text('assi MUA (con segno', explX, y+10, {size:9});
+  text('coerente), normalizzata.', explX, y+15, {size:9});
+  text('La divergenza e langolo', explX, y+22, {size:9});
+  text('tra ogni MUA e lasse medio.', explX, y+27, {size:9});
+
+  y += 50;
+
+  // Sottosquadri
+  text('SOTTOSQUADRI', MARGIN, y, {size:12, style:'bold'});
+  y += 6;
+  var p2 = 'Un sottosquadro e una zona dove la protesi non puo essere ne inserita ne estratta ' +
+           'lungo lasse di lavoro a causa di un sotto-rilievo. Nel nostro modello, due MUA ' +
+           'formano un sottosquadro reciproco quando la divergenza tra i loro assi supera ' + MAX_COUPLE_DIVERGENCE + ' gradi: ' +
+           'oltre questa soglia non esiste un cammino di inserimento comune.';
+  var lines2 = doc.splitTextToSize(p2, PAGE_W - 2*MARGIN);
+  doc.text(lines2, MARGIN, y);
+  y += lines2.length*5 + 6;
+
+  // Diagramma sottosquadro: 2 MUA molto divergenti
+  var dx2 = MARGIN+50, dy2 = y+25;
+  doc.setDrawColor.apply(doc, GRAY); doc.setLineWidth(0.3);
+  doc.line(dx2-35, dy2+15, dx2+35, dy2+15);
+  doc.setLineWidth(0.6);
+  doc.setDrawColor.apply(doc, [60,120,180]);
+  doc.line(dx2-15, dy2+15, dx2-30, dy2-15);  // MUA molto inclinato
+  doc.line(dx2+15, dy2+15, dx2+30, dy2-15);  // MUA molto inclinato altro lato
+  // Zona problema (cerchio rosso)
+  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.6);
+  doc.circle(dx2, dy2-3, 6);
+  text('!', dx2, dy2-1, {size:14, style:'bold', color:RED, align:'center'});
+  text('sottosquadro', dx2, dy2+10, {size:7, color:RED, align:'center', style:'bold'});
+
+  text('Soglie applicate:', explX, y+3, {size:9, style:'bold'});
+  text('- cono MUA: ' + MUA_CONE_HALF_ANGLE + ' deg semiangolo', explX, y+9, {size:9});
+  text('- max coppia: ' + MAX_COUPLE_DIVERGENCE + ' deg', explX, y+15, {size:9});
+  text('- max fresatura: ' + MAX_MILLING_ANGLE + ' deg', explX, y+21, {size:9});
+
+  addFooter(2, 6);
+
+  // ╔══════════════════════════════════════════════════════════════╗
+  // ║ PAGINA 3: TABELLA ANGOLI                                     ║
+  // ╚══════════════════════════════════════════════════════════════╝
+  doc.addPage();
+  text('TABELLA ANGOLI', MARGIN, 25, {size:16, style:'bold', color:BLUE});
+  doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.8); doc.line(MARGIN, 28, MARGIN+50, 28);
+
+  text('Divergenza di ogni MUA rispetto allasse medio del proprio gruppo.', MARGIN, 36, {size:9, color:GRAY});
+
+  y = 46;
+  // Header tabella
+  var colX = [MARGIN, MARGIN+22, MARGIN+45, MARGIN+85, MARGIN+115, MARGIN+145];
+  box(MARGIN, y, PAGE_W-2*MARGIN, 8, BLUE);
+  text('MUA', colX[0]+2, y+5.5, {size:9, color:WHITE, style:'bold'});
+  text('Gruppo', colX[1]+2, y+5.5, {size:9, color:WHITE, style:'bold'});
+  text('Asse medio', colX[2]+2, y+5.5, {size:9, color:WHITE, style:'bold'});
+  text('Asse ottimizzato', colX[3]+2, y+5.5, {size:9, color:WHITE, style:'bold'});
+  text('Cono 20deg', colX[4]+2, y+5.5, {size:9, color:WHITE, style:'bold'});
+  text('Fres. 30deg', colX[5]+2, y+5.5, {size:9, color:WHITE, style:'bold'});
+  y += 8;
+
+  // Righe MUA
+  data.muaTable.forEach(function(row, i){
+    if(i % 2 === 0){ box(MARGIN, y, PAGE_W-2*MARGIN, 7, LIGHT); }
+    text('#'+row.num, colX[0]+2, y+5, {size:9, style:'bold'});
+    text('G'+row.group, colX[1]+2, y+5, {size:9});
+    text(row.divMedio != null ? row.divMedio.toFixed(1)+' deg' : '--', colX[2]+2, y+5, {size:9});
+    text('-- (v2)', colX[3]+2, y+5, {size:9, color:GRAY});  // placeholder
+    text(row.coneOK ? 'OK' : 'FUORI', colX[4]+2, y+5, {size:9, color:row.coneOK?GREEN:RED, style:'bold'});
+    text(row.millingOK ? 'OK' : 'FUORI', colX[5]+2, y+5, {size:9, color:row.millingOK?GREEN:RED, style:'bold'});
+    y += 7;
+  });
+
+  y += 6;
+  // Nota placeholder asse ottimizzato
+  box(MARGIN, y, PAGE_W-2*MARGIN, 18, [255,248,235], BORDER);
+  text('NOTA - Asse ottimizzato', MARGIN+3, y+6, {size:9, style:'bold', color:ORANGE});
+  text('Lasse ottimizzato (calcolato come asse che minimizza il massimo angolo di tutti i MUA)', MARGIN+3, y+11, {size:8, color:DARK});
+  text('verra introdotto nella prossima versione del report. Oggi vengono mostrati solo gli angoli vs asse medio.', MARGIN+3, y+15, {size:8, color:DARK});
+  y += 22;
+
+  addFooter(3, 6);
+
+  // ╔══════════════════════════════════════════════════════════════╗
+  // ║ PAGINA 4: MACCHINA + MAPPA POSIZIONE                         ║
+  // ╚══════════════════════════════════════════════════════════════╝
+  doc.addPage();
+  text('CONFIGURAZIONE FRESATURA', MARGIN, 25, {size:16, style:'bold', color:BLUE});
+  doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.8); doc.line(MARGIN, 28, MARGIN+50, 28);
+
+  y = 40;
+  // Box macchina
+  box(MARGIN, y, PAGE_W-2*MARGIN, 30, LIGHT, BORDER);
+  text('MACCHINA SELEZIONATA', MARGIN+5, y+8, {size:9, color:GRAY, style:'bold'});
+  text(data.machineName || 'Non selezionata', MARGIN+5, y+18, {size:14, style:'bold'});
+  text('Asse di lavoro: B (rotazione lato pezzo) - max ' + MAX_MILLING_ANGLE + ' deg', MARGIN+5, y+25, {size:9, color:GRAY});
+  text('Tipo: 5 assi', PAGE_W-MARGIN-5, y+18, {size:11, align:'right', color:BLUE, style:'bold'});
+
+  y += 38;
+
+  // Mappa posizione MUA (vista dallalto)
+  text('MAPPA POSIZIONE MUA (vista occlusale)', MARGIN, y, {size:11, style:'bold'});
+  y += 6;
+
+  var mapX = MARGIN, mapY = y, mapW = PAGE_W-2*MARGIN, mapH = 110;
+  box(mapX, mapY, mapW, mapH, [252,253,254], BORDER);
+
+  // Disegno arcata semplice (semi-cerchio)
+  doc.setDrawColor.apply(doc, GRAY); doc.setLineWidth(0.4);
+  var cx = mapX + mapW/2, cy = mapY + mapH - 12;
+  // Calcolo bbox MUA per scaling
+  var positions = data.muaTable.map(function(r){ return r.posXY; });
+  if(positions.length > 0){
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    positions.forEach(function(p){
+      if(p[0] < minX) minX = p[0]; if(p[0] > maxX) maxX = p[0];
+      if(p[1] < minY) minY = p[1]; if(p[1] > maxY) maxY = p[1];
+    });
+    var dxRange = maxX - minX || 1;
+    var dyRange = maxY - minY || 1;
+    var availW = mapW - 30, availH = mapH - 30;
+    var scale = Math.min(availW/dxRange, availH/dyRange) * 0.85;
+    var ox = mapX + mapW/2;
+    var oy = mapY + mapH/2;
+
+    // Linea arcata indicativa
+    doc.setLineDashPattern([1,1], 0);
+    doc.line(mapX+15, mapY+mapH-15, mapX+mapW-15, mapY+mapH-15);
+    doc.setLineDashPattern([], 0);
+
+    // Plotto i MUA
+    data.muaTable.forEach(function(row){
+      var px = ox + (row.posXY[0] - (minX+maxX)/2) * scale;
+      var py = oy + (row.posXY[1] - (minY+maxY)/2) * scale;
+      // Cerchio MUA con colore gruppo
+      var col = row.group === 0 ? BLUE : (row.group === 1 ? ORANGE : GREEN);
+      doc.setFillColor.apply(doc, col);
+      doc.circle(px, py, 3, 'F');
+      // Numero MUA
+      doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','bold');
+      doc.text(String(row.num), px, py+1.2, {align:'center'});
+      // Stato fresabilita: anello rosso se non OK
+      if(!row.millingOK){
+        doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.6);
+        doc.circle(px, py, 4.5);
+      }
+    });
+  }
+
+  // Legenda
+  var legY = mapY + mapH - 8;
+  doc.setFillColor.apply(doc, BLUE); doc.circle(mapX+10, legY, 2, 'F');
+  text('G0', mapX+14, legY+1, {size:8});
+  if(data.groupCount > 1){
+    doc.setFillColor.apply(doc, ORANGE); doc.circle(mapX+25, legY, 2, 'F');
+    text('G1', mapX+29, legY+1, {size:8});
+  }
+  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.6); doc.circle(mapX+45, legY, 3);
+  text('non fresabile', mapX+50, legY+1, {size:8});
+
+  // Indicazione gruppi
+  y = mapY + mapH + 8;
+  if(data.groupCount === 1){
+    box(MARGIN, y, PAGE_W-2*MARGIN, 12, [232,250,225], GREEN);
+    text('GRUPPO SINGOLO', MARGIN+3, y+5, {size:10, style:'bold', color:GREEN});
+    text(data.muaCount + ' MUA in un unico gruppo - protesi unica', MARGIN+3, y+10, {size:9});
+  } else {
+    box(MARGIN, y, PAGE_W-2*MARGIN, 12, [255,243,225], ORANGE);
+    text('GRUPPI MULTIPLI', MARGIN+3, y+5, {size:10, style:'bold', color:ORANGE});
+    text(data.groupCount + ' gruppi separati - ogni gruppo ha asse medio indipendente', MARGIN+3, y+10, {size:9});
+  }
+
+  addFooter(4, 6);
+
+  // ╔══════════════════════════════════════════════════════════════╗
+  // ║ PAGINA 5: PREVIEW 3D (PLACEHOLDER)                           ║
+  // ╚══════════════════════════════════════════════════════════════╝
+  doc.addPage();
+  text('PREVIEW 3D MUA E CONNESSIONI', MARGIN, 25, {size:16, style:'bold', color:BLUE});
+  doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.8); doc.line(MARGIN, 28, MARGIN+50, 28);
+
+  text('Snapshot 3D dei MUA accoppiati e delle sezioni con sottosquadri.', MARGIN, 36, {size:9, color:GRAY});
+
+  // 4 placeholder grid 2x2
+  var pgX = MARGIN, pgY = 45, pgW = (PAGE_W-2*MARGIN-8)/2, pgH = 65;
+  var slots = [
+    {label:'Vista occlusale', sub:'tutti i MUA + assi'},
+    {label:'Vista vestibolare', sub:'profilo arcata'},
+    {label:'Sezione MUA-connessione', sub:'profilo verticale'},
+    {label:'Mappa sottosquadri', sub:'gradiente clinico'}
+  ];
+  slots.forEach(function(s, i){
+    var col = i % 2, row = Math.floor(i/2);
+    var sx = pgX + col*(pgW+8);
+    var sy = pgY + row*(pgH+8);
+    box(sx, sy, pgW, pgH, [248,250,253], BORDER);
+    // Testo placeholder
+    text(s.label, sx+pgW/2, sy+pgH/2-4, {size:11, style:'bold', color:GRAY, align:'center'});
+    text(s.sub, sx+pgW/2, sy+pgH/2+1, {size:8, color:GRAY, align:'center'});
+    text('[snapshot 3D - v2]', sx+pgW/2, sy+pgH/2+8, {size:8, color:ORANGE, align:'center', style:'bold'});
+  });
+
+  y = pgY + 2*pgH + 16 + 6;
+  box(MARGIN, y, PAGE_W-2*MARGIN, 16, [255,248,235], BORDER);
+  text('Snapshot 3D - in arrivo nella prossima versione', MARGIN+3, y+6, {size:9, style:'bold', color:ORANGE});
+  text('Per ora questa pagina mostra solo i quadranti di posizionamento. Le immagini reali', MARGIN+3, y+11, {size:8});
+  text('verranno catturate dal viewer Three.js e iniettate nel PDF in v2.', MARGIN+3, y+14, {size:8});
+
+  addFooter(5, 6);
+
+  // ╔══════════════════════════════════════════════════════════════╗
+  // ║ PAGINA 6: CRITICITA                                          ║
+  // ╚══════════════════════════════════════════════════════════════╝
+  doc.addPage();
+  text('CRITICITA RILEVATE', MARGIN, 25, {size:16, style:'bold', color:BLUE});
+  doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.8); doc.line(MARGIN, 28, MARGIN+50, 28);
+
+  y = 40;
+  if(data.criticita.list.length === 0){
+    box(MARGIN, y, PAGE_W-2*MARGIN, 20, [232,250,225], GREEN);
+    text('NESSUNA CRITICITA RILEVATA', MARGIN+5, y+8, {size:12, style:'bold', color:GREEN});
+    text('Tutti i MUA rispettano le soglie cliniche e di fresatura.', MARGIN+5, y+14, {size:9});
+    y += 25;
+  } else {
+    data.criticita.list.forEach(function(c){
+      box(MARGIN, y, PAGE_W-2*MARGIN, 18, [255,240,235], RED);
+      text(c.title, MARGIN+5, y+7, {size:10, style:'bold', color:RED});
+      text(c.detail, MARGIN+5, y+13, {size:8, color:DARK});
+      y += 22;
+      if(y > PAGE_H - 30){ doc.addPage(); y = 25; addFooter(7,7); }
+    });
+  }
+
+  // Sezione "raccomandazioni" (placeholder testuale)
+  y += 8;
+  text('RACCOMANDAZIONI', MARGIN, y, {size:11, style:'bold'});
+  y += 6;
+  var recs = analReport_buildRecommendations(data);
+  recs.forEach(function(r){
+    text('- ' + r, MARGIN+3, y, {size:9});
+    y += 6;
+  });
+
+  addFooter(6, 6);
+
+  // Salva PDF
+  var fname = 'Report-Analizza-' + data.caseCode + '-' + data.dateFile + '.pdf';
+  doc.save(fname);
+  console.log('[analReport] Report generato:', fname);
+}
+
+// Raccolta dati per il report (estrae tutto da muaObjects + globali)
+function analReport_collectData(){
+  var aligned = muaObjects.filter(function(m){ return m.aligned; });
+
+  // Codice caso (placeholder per ora)
+  var caseCode = 'CASE-' + Date.now().toString().slice(-6);
+  var d = new Date();
+  var dateStr = d.toLocaleDateString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric'});
+  var dateFile = d.toISOString().slice(0,10);
+
+  // Macchina selezionata
+  var machineName = '';
+  try {
+    var sel = document.getElementById('fresMachineName');
+    if(sel) machineName = sel.textContent.trim();
+  } catch(e){}
+
+  // Tabella MUA
+  var muaTable = aligned.map(function(m){
+    return {
+      num: m.num,
+      group: m.groupId || 0,
+      divMedio: m.divergence,
+      coneOK: m.rigorousOK !== false,
+      millingOK: m.millingOK !== false,
+      undercutOK: m.undercutOK !== false,
+      posXY: [m.position.x, m.position.z]  // proiezione orizzontale (Y e altezza)
+    };
+  });
+
+  // Gruppi
+  var groupSet = {};
+  aligned.forEach(function(m){ groupSet[m.groupId || 0] = true; });
+  var groupCount = Object.keys(groupSet).length;
+
+  // Statistiche
+  var divs = aligned.map(function(m){ return m.divergence; }).filter(function(v){ return v != null; });
+  var maxDiv = divs.length > 0 ? Math.max.apply(null, divs) : null;
+  var avgDiv = divs.length > 0 ? divs.reduce(function(a,b){return a+b;},0) / divs.length : null;
+
+  // Criticita
+  var coneOutCount = aligned.filter(function(m){ return m.rigorousOK === false; }).length;
+  var millingOutCount = aligned.filter(function(m){ return m.millingOK === false; }).length;
+  // Conta coppie sottosquadro
+  var undercutPairs = 0;
+  for(var i=0; i<aligned.length; i++){
+    for(var j=i+1; j<aligned.length; j++){
+      if((aligned[i].groupId||0) !== (aligned[j].groupId||0)) continue;
+      var dot = aligned[i].axisDir.x*aligned[j].axisDir.x + aligned[i].axisDir.y*aligned[j].axisDir.y + aligned[i].axisDir.z*aligned[j].axisDir.z;
+      var ang = Math.acos(Math.min(1, Math.abs(dot))) * 180/Math.PI;
+      if(ang > MAX_COUPLE_DIVERGENCE) undercutPairs++;
+    }
+  }
+
+  // Score: Fresabilita = % MUA con millingOK
+  var fresabilita = aligned.length > 0 ? Math.round((aligned.length - millingOutCount) / aligned.length * 100) : 0;
+  var fresabilitaLabel = fresabilita >= 80 ? 'Ottima' : fresabilita >= 60 ? 'Accettabile' : 'Critica';
+
+  // Score: Possibilita protesica = % MUA con coneOK e nessuna coppia sottosquadro
+  var protesica = aligned.length > 0 ? Math.round((aligned.length - coneOutCount) / aligned.length * 100) : 0;
+  // penalizzazione per coppie sottosquadro
+  protesica = Math.max(0, protesica - undercutPairs * 10);
+  var protesicaLabel = protesica >= 80 ? 'Buona' : protesica >= 60 ? 'Limitata' : 'Compromessa';
+
+  // Lista criticita testuale
+  var critList = [];
+  aligned.forEach(function(m){
+    if(m.rigorousOK === false){
+      critList.push({title: 'MUA #'+m.num+' fuori cono ' + MUA_CONE_HALF_ANGLE + ' deg', detail: 'Divergenza '+(m.divergence!=null?m.divergence.toFixed(1):'?')+' deg dal asse medio - oltre la soglia clinica.'});
+    }
+    if(m.millingOK === false){
+      critList.push({title: 'MUA #'+m.num+' non fresabile', detail: 'Divergenza '+(m.divergence!=null?m.divergence.toFixed(1):'?')+' deg supera limite macchina ' + MAX_MILLING_ANGLE + ' deg.'});
+    }
+  });
+  if(undercutPairs > 0){
+    critList.push({title: undercutPairs + ' coppia/e con sottosquadri reciproci', detail: 'Divergenza tra MUA della stessa coppia oltre ' + MAX_COUPLE_DIVERGENCE + ' deg - nessun cammino di inserimento comune.'});
+  }
+
+  return {
+    caseCode: caseCode,
+    dateStr: dateStr,
+    dateFile: dateFile,
+    machineName: machineName,
+    muaCount: aligned.length,
+    groupCount: groupCount,
+    maxDiv: maxDiv,
+    avgDiv: avgDiv,
+    muaTable: muaTable,
+    criticita: {
+      coneOutCount: coneOutCount,
+      millingOutCount: millingOutCount,
+      undercutPairs: undercutPairs,
+      list: critList
+    },
+    scores: {
+      fresabilita: fresabilita,
+      fresabilitaLabel: fresabilitaLabel,
+      protesica: protesica,
+      protesicaLabel: protesicaLabel
+    }
+  };
+}
+
+// Costruzione raccomandazioni testuali (regole semplici)
+function analReport_buildRecommendations(data){
+  var recs = [];
+  if(data.criticita.coneOutCount > 0){
+    recs.push('Considerare il riposizionamento dei MUA fuori cono (semiangolo ' + MUA_CONE_HALF_ANGLE + ' deg) per rispettare le specifiche cliniche IPD.');
+  }
+  if(data.criticita.millingOutCount > 0){
+    recs.push('Valutare luso di MUA angolati (17 deg o 30 deg) per recuperare la fresabilita sui MUA fuori soglia di ' + MAX_MILLING_ANGLE + ' deg.');
+  }
+  if(data.criticita.undercutPairs > 0){
+    recs.push('Le coppie con sottosquadri non possono essere unite in protesi monolitica - separare in piu segmenti.');
+  }
+  if(data.groupCount > 1){
+    recs.push('Gruppi multipli rilevati: ogni gruppo richiede progettazione e fresatura indipendenti.');
+  }
+  if(recs.length === 0){
+    recs.push('Caso clinicamente e tecnicamente conforme - nessuna raccomandazione di modifica.');
+  }
+  return recs;
+}
+
 </script>
 
 </body>
