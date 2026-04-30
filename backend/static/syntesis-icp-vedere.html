@@ -1184,6 +1184,7 @@ input[type="file"]{display:none}
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TrackballControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
@@ -2037,17 +2038,27 @@ camera.position.set(30, 30, 50);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, stencil: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-const controls = new THREE.OrbitControls(camera, canvas);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-// Blocco 7b: rotazione completa senza limiti (anche vista da sotto e giri completi)
-// Si applica a tutti i workflow dentro Vedere v8: Vedere, Misurare, Analizza, Sostituire
-controls.minPolarAngle = -Infinity;
-controls.maxPolarAngle = Infinity;
-controls.minAzimuthAngle = -Infinity;
-controls.maxAzimuthAngle = Infinity;
-// Blocco 7c: Alt+click sinistro = imposta il punto cliccato come fulcro di rotazione.
-// Funzione definita pi&ugrave; sotto (installAltClickPivot).
+const controls = new THREE.TrackballControls(camera, canvas);
+// Blocco 7e: TrackballControls per rotazione completa senza limiti polari.
+// Mappo i parametri il piu vicino possibile a OrbitControls per minimizzare il cambio di feeling.
+controls.rotateSpeed = 1.6;        // sensibilita rotazione drag sinistro
+controls.zoomSpeed = 1.2;          // sensibilita zoom rotella
+controls.panSpeed = 0.6;           // sensibilita pan
+controls.staticMoving = false;     // damping attivo (era enableDamping=true)
+controls.dynamicDampingFactor = 0.15; // simile a dampingFactor=0.08 di OrbitControls (un po piu morbido)
+controls.noPan = false;
+controls.noZoom = false;
+controls.noRotate = false;
+// Mappa tasti: drag sinistro = ROTATE, drag destro = PAN, drag medio = ZOOM (come OrbitControls)
+controls.mouseButtons = {
+  LEFT: THREE.MOUSE.ROTATE,
+  MIDDLE: THREE.MOUSE.ZOOM,
+  RIGHT: THREE.MOUSE.PAN
+};
+// Limiti distanza zoom (OrbitControls li aveva impliciti, qui li imposto espliciti)
+controls.minDistance = 0.5;
+controls.maxDistance = 1000;
+// I limiti polari NON ESISTONO in TrackballControls: rotazione completamente libera in 3D.
 
 const transformControls = new THREE.TransformControls(camera, canvas);
 transformControls.setMode('translate');
@@ -2195,6 +2206,10 @@ function resize() {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    // Blocco 7e: TrackballControls richiede handleResize per rimappare le coordinate del mouse
+    if (controls && typeof controls.handleResize === 'function') {
+      controls.handleResize();
+    }
   }
 }
 function animate() {
@@ -2204,6 +2219,10 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
+// Blocco 7e: prima inizializzazione delle dimensioni per TrackballControls
+if (controls && typeof controls.handleResize === 'function') {
+  controls.handleResize();
+}
 
 // Parser STL custom — identico a quello di Analizzare/Sostituire.
 // Non estrae vertex colors: solo position + normal. Garantisce uniformità di rendering
