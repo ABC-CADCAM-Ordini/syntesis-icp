@@ -255,6 +255,72 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .tree-node .del-btn{margin-left:auto;padding:0 5px;border:1px solid var(--border);background:var(--white);color:var(--red);font-size:12px;border-radius:3px;cursor:pointer;font-family:var(--mono);font-weight:800;line-height:14px}
 .tree-node .del-btn:hover{background:var(--red);color:var(--white);border-color:var(--red)}
 
+/* === Blocco 7a: pannello unificato Albero Scena + Scene Registry === */
+/* Header di gruppo (FILE, MUA, ANALISI, TOGGLE MASSIVI) */
+.tree-group-header{
+  display:flex;align-items:center;gap:6px;
+  padding:8px 4px 3px 4px;margin-top:4px;
+  font-family:var(--mono);font-size:9px;font-weight:800;letter-spacing:.1em;
+  color:var(--gray);text-transform:uppercase;
+  border-bottom:1px solid rgba(0,0,0,0.06);margin-bottom:3px;
+}
+.tree-group-header:first-child{padding-top:2px;margin-top:0}
+.tree-group-header .group-count{
+  margin-left:auto;padding:1px 5px;
+  background:rgba(0,101,179,0.08);color:var(--blue);
+  border-radius:8px;font-size:9px;letter-spacing:0;font-weight:800;
+}
+/* Riga MUA arricchita con RMSD a destra */
+.tree-node .mua-rmsd{
+  font-family:var(--mono);font-size:9px;color:var(--gray);
+  padding:1px 5px;background:rgba(0,0,0,0.04);
+  border-radius:3px;font-weight:600;letter-spacing:0;
+}
+/* Slider opacità */
+.tree-opacity-row{
+  display:flex;align-items:center;gap:6px;
+  padding:2px 4px 4px 22px;
+}
+.tree-opacity-slider{
+  flex:1;height:14px;cursor:pointer;
+  -webkit-appearance:none;appearance:none;
+  background:transparent;
+}
+.tree-opacity-slider::-webkit-slider-runnable-track{
+  height:3px;border-radius:2px;
+  background:linear-gradient(to right, rgba(0,101,179,0.6), rgba(0,101,179,0.2));
+}
+.tree-opacity-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:11px;height:11px;border-radius:50%;
+  background:var(--blue);margin-top:-4px;
+  cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.2);
+}
+.tree-opacity-slider::-moz-range-thumb{
+  width:11px;height:11px;border-radius:50%;
+  background:var(--blue);border:none;cursor:pointer;
+}
+.tree-opacity-value{
+  font-family:var(--mono);font-size:9px;font-weight:800;
+  color:var(--gray);min-width:30px;text-align:right;
+}
+/* Bottoni globali in fondo al pannello */
+.tree-globals{
+  display:flex;gap:4px;padding:6px 0 2px 0;
+  margin-top:6px;border-top:1px solid rgba(0,0,0,0.06);
+}
+.tree-global-btn{
+  flex:1;padding:5px 4px;
+  border:1px solid var(--border);background:var(--white);
+  color:var(--gray);font-family:var(--mono);font-size:9px;font-weight:700;
+  letter-spacing:.05em;border-radius:5px;cursor:pointer;
+  text-transform:uppercase;transition:all .12s;
+}
+.tree-global-btn:hover{
+  border-color:var(--blue);color:var(--blue);
+  background:rgba(0,101,179,0.05);
+}
+
 /* Divergence labels */
 .divergence-label{position:absolute;transform:translate(-50%,-50%);padding:3px 9px;border-radius:11px;font-family:var(--mono);font-size:12px;font-weight:800;color:#fff;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35);z-index:3;opacity:1;border:1.5px solid rgba(255,255,255,0.25)}
 .divergence-label.good{background:var(--green)}
@@ -1318,12 +1384,13 @@ body .panel {
          Mostra in tempo reale lo stato del SynRegistry (registro
          centralizzato). Non interagisce con il codice esistente.
          ============================================================ -->
-    <div class="syn-layer-panel" id="synLayerPanel">
+    <!-- SCENE REGISTRY (PREVIEW v8) - nascosto dal Blocco 7a perche le sue funzioni sono confluite nellAlbero Scena unificato a sinistra. NON eliminato: se serve rimostrarlo basta togliere display:none -->
+    <div class="syn-layer-panel" id="synLayerPanel" style="display:none">
       <div class="slp-header" id="slpHeader">
         <span class="slp-badge">PREVIEW v8</span>
         <span class="slp-title">SCENE REGISTRY</span>
         <span class="slp-count" id="slpCount">0</span>
-        <button class="slp-toggle" id="slpToggle" title="Mostra/nascondi">−</button>
+        <button class="slp-toggle" id="slpToggle" title="Mostra/nascondi">&minus;</button>
       </div>
       <div class="slp-body" id="slpBody">
         <div class="slp-empty">Registro vuoto</div>
@@ -1346,7 +1413,7 @@ body .panel {
       <div id="clinicalBannerIcon" style="width:22px;height:22px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0"></div>
       <div id="clinicalBannerText" style="font-family:var(--mono);font-size:13px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
     </div>
-    <div id="layersPanel" style="display:flex;position:absolute;top:14px;left:14px;width:240px;max-height:calc(100% - 28px);background:rgba(255,255,255,0.70);border:1px solid var(--border);border-radius:8px;padding:6px 8px 8px 8px;z-index:8;box-shadow:0 4px 14px rgba(0,0,0,0.10);overflow-y:auto;flex-direction:column;gap:0;font-family:var(--mono);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)">
+    <div id="layersPanel" style="display:flex;position:absolute;top:14px;left:14px;width:280px;max-height:calc(100% - 28px);background:rgba(255,255,255,0.70);border:1px solid var(--border);border-radius:8px;padding:6px 8px 8px 8px;z-index:8;box-shadow:0 4px 14px rgba(0,0,0,0.10);overflow-y:auto;flex-direction:column;gap:0;font-family:var(--mono);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 2px 6px 2px;border-bottom:1px solid var(--border);margin-bottom:4px;flex-shrink:0">
         <span style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gray)">Albero Scena</span>
       </div>
@@ -3267,46 +3334,208 @@ function rebuildTree(){
       return;
     }
   }
-  var h='<div class="tree-node"><input type="checkbox" '+(scanMesh&&scanMesh.visible?'checked':'')+' onchange="toggleLayer(\'scan\',this.checked)"><span class="dot" style="background:#889aad"></span><span class="lbl">Scansione</span></div>';
-  if(muaObjects.length > 0){
-    h += '<div class="tree-node"><input type="checkbox" '+(scanbodiesVisible?'checked':'')+' onchange="toggleAllScanbodies(this.checked)"><span class="dot" style="background:#ffaa44"></span><span class="lbl">Scanbody 1T3 (tutti)</span></div>';
+  // === Blocco 7a: pannello unificato (Albero Scena + dati Registry) ===
+  // Mantengo TUTTI gli handler esistenti, riorganizzo in sezioni-gruppo.
+  var h = '';
+  
+  // ── Gruppo 1: FILE / SCANSIONI ──
+  if(scanMesh){
+    var triCount = '';
+    try {
+      if(scanMesh.geometry && scanMesh.geometry.index){
+        triCount = (scanMesh.geometry.index.count / 3);
+      } else if(scanMesh.geometry && scanMesh.geometry.attributes && scanMesh.geometry.attributes.position){
+        triCount = scanMesh.geometry.attributes.position.count / 3;
+      }
+      if(triCount) triCount = Math.round(triCount).toLocaleString('it-IT') + ' tri';
+    } catch(e){ triCount = ''; }
+    h += '<div class="tree-group-header">FILE / SCANSIONI<span class="group-count">1</span></div>';
+    var scanOpacity = 85; // default
+    try {
+      if(scanMesh.material && typeof scanMesh.material.opacity === 'number'){
+        scanOpacity = Math.round(scanMesh.material.opacity * 100);
+      }
+    } catch(e){}
+    h += '<div class="tree-node">'+
+      '<input type="checkbox" '+(scanMesh.visible?'checked':'')+' onchange="toggleLayer(\'scan\',this.checked)">'+
+      '<span class="dot" style="background:#889aad"></span>'+
+      '<span class="lbl">Scansione</span>'+
+      (triCount ? '<span class="mua-rmsd">'+triCount+'</span>' : '')+
+      '</div>'+
+      '<div class="tree-opacity-row">'+
+        '<input type="range" class="tree-opacity-slider" min="10" max="100" step="5" value="'+scanOpacity+'" oninput="treeUnified_setScanOpacity(this.value)" onchange="treeUnified_setScanOpacity(this.value)">'+
+        '<span class="tree-opacity-value" id="treeUnified_scanOpacityVal">'+scanOpacity+'%</span>'+
+      '</div>';
   }
-  // Conto stato toggle globali
-  var cutsOn = muaObjects.filter(function(m){ return m.scanbodyScanVisible === true; }).length;
-  var allCutsOn = muaObjects.length > 0 && cutsOn === muaObjects.length;
-  var coloredOn = muaObjects.filter(function(m){ return m.scanbodyColoredVisible === true; }).length;
-  var allColoredOn = muaObjects.length > 0 && coloredOn === muaObjects.length;
+  
+  // ── Gruppo 2: MUA ──
   if(muaObjects.length > 0){
-    h += '<div class="tree-node"><input type="checkbox" '+(allCutsOn?'checked':'')+' onchange="toggleAllScanbodyCuts(this.checked)"><span class="dot" style="background:#889aad;border:1px dashed #333"></span><span class="lbl">Taglia scansione su MUA (tutti)</span></div>';
-    h += '<div class="tree-node"><input type="checkbox" '+(allColoredOn?'checked':'')+' onchange="toggleAllScanbodyColored(this.checked)"><span class="dot" style="background:linear-gradient(135deg,#64748B,#0065B3)"></span><span class="lbl">Mostra scanbody scansione (tutti)</span></div>';
-    // Conto undercut map attive
+    h += '<div class="tree-group-header">MUA<span class="group-count">'+muaObjects.length+'</span></div>';
+    muaObjects.forEach(function(m, i){
+      var ch = '#'+m.color.toString(16).padStart(6, '0');
+      var rmsdText = m.aligned ? 'RMSD '+(m.rmsd*1000).toFixed(0)+' &micro;m' : 'non accoppiato';
+      var expanded = muaExpanded[m.num] === true;
+      var chev = expanded ? '&#9662;' : '&#9656;';
+      var groupBadge = (m.groupId && m.groupId > 0) 
+        ? '<span style="display:inline-block;padding:1px 4px;background:'+getGroupBadgeColor(m.groupId)+';color:#fff;font-family:var(--mono);font-size:10px;font-weight:800;border-radius:3px;margin-right:4px">G'+m.groupId+'</span>'
+        : '';
+      
+      h += '<div class="tree-node mua-header">'+
+        '<span class="chevron" onclick="toggleMuaExpand('+m.num+')">'+chev+'</span>'+
+        '<span class="dot" style="background:'+ch+'"></span>'+
+        groupBadge+
+        '<span class="lbl" onclick="toggleMuaExpand('+m.num+')">MUA #'+m.num+'</span>'+
+        '<span class="mua-rmsd">'+rmsdText+'</span>'+
+        '<button class="del-btn" onclick="removeMUA('+i+')" title="Elimina MUA #'+m.num+'">&#10005;</button>'+
+      '</div>';
+      
+      if(expanded){
+        h += '<div class="tree-node sub"><input type="checkbox" '+(m.sbVisible!==false?'checked':'')+' onchange="toggleMuaLayer('+i+',\'sb\',this.checked)"><span class="lbl">Scanbody 1T3</span></div>';
+        h += '<div class="tree-node sub"><input type="checkbox" checked onchange="toggleMuaLayer('+i+',\'an\',this.checked)"><span class="lbl">Analogo AB-AR</span></div>';
+        h += '<div class="tree-node sub"><input type="checkbox" checked onchange="toggleMuaLayer('+i+',\'mt\',this.checked)"><span class="lbl">Connessione IPD</span></div>';
+        h += '<div class="tree-node sub"><input type="checkbox" '+(m.undercutMapActive?'checked':'')+' onchange="toggleUndercutMap('+i+',this.checked)"><span class="lbl">Mappa sottosquadri</span></div>';
+        h += '<div class="tree-node sub"><input type="checkbox" '+(m.axisLine.visible?'checked':'')+' onchange="toggleMuaLayer('+i+',\'ax\',this.checked)"><span class="lbl">Asse</span></div>';
+        h += '<div class="tree-node sub"><input type="checkbox" '+(m.scanbodyScanVisible?'checked':'')+' onchange="toggleScanbodyCut('+i+',this.checked)"><span class="lbl">Taglia scansione</span></div>';
+        h += '<div class="tree-node sub"><input type="checkbox" '+(m.scanbodyColoredVisible?'checked':'')+' onchange="toggleScanbodyColored('+i+',this.checked)"><span class="lbl">Scanbody scansione (color)</span></div>';
+      }
+    });
+  }
+  
+  // ── Gruppo 3: ANALISI (asse medio + label divergenza) ──
+  if(meanAxisLine){
+    var analysisCount = 2;
+    h += '<div class="tree-group-header">ANALISI<span class="group-count">'+analysisCount+'</span></div>';
+    h += '<div class="tree-node">'+
+      '<input type="checkbox" '+(meanAxisLine.visible?'checked':'')+' onchange="meanAxisLine.visible=this.checked">'+
+      '<span class="dot" style="background:#fff;border:1px solid #aaa"></span>'+
+      '<span class="lbl">Asse medio</span>'+
+    '</div>';
+    h += '<div class="tree-node">'+
+      '<input type="checkbox" '+(divergenceLabelsVisible?'checked':'')+' onchange="toggleDivergenceLabels(this.checked)">'+
+      '<span class="dot" style="background:linear-gradient(90deg,#0D9E6E,#F59E0B,#F97316,#DC2626)"></span>'+
+      '<span class="lbl">Label divergenza</span>'+
+    '</div>';
+  }
+  
+  // ── Gruppo 4: TOGGLE MASSIVI (solo se ci sono MUA) ──
+  if(muaObjects.length > 0){
+    var cutsOn = muaObjects.filter(function(m){ return m.scanbodyScanVisible === true; }).length;
+    var allCutsOn = cutsOn === muaObjects.length;
+    var coloredOn = muaObjects.filter(function(m){ return m.scanbodyColoredVisible === true; }).length;
+    var allColoredOn = coloredOn === muaObjects.length;
     var umOn = muaObjects.filter(function(m){ return m.undercutMapActive === true; }).length;
-    var allUmOn = muaObjects.length > 0 && umOn === muaObjects.length;
+    var allUmOn = umOn === muaObjects.length;
+    
+    h += '<div class="tree-group-header">TOGGLE MASSIVI</div>';
+    h += '<div class="tree-node"><input type="checkbox" '+(scanbodiesVisible?'checked':'')+' onchange="toggleAllScanbodies(this.checked)"><span class="dot" style="background:#ffaa44"></span><span class="lbl">Scanbody 1T3 (tutti)</span></div>';
+    h += '<div class="tree-node"><input type="checkbox" '+(allCutsOn?'checked':'')+' onchange="toggleAllScanbodyCuts(this.checked)"><span class="dot" style="background:#889aad;border:1px dashed #333"></span><span class="lbl">Taglia scansione (tutti)</span></div>';
+    h += '<div class="tree-node"><input type="checkbox" '+(allColoredOn?'checked':'')+' onchange="toggleAllScanbodyColored(this.checked)"><span class="dot" style="background:linear-gradient(135deg,#64748B,#0065B3)"></span><span class="lbl">Scanbody scansione (tutti)</span></div>';
     h += '<div class="tree-node"><input type="checkbox" '+(allUmOn?'checked':'')+' onchange="toggleAllUndercutMaps(this.checked)"><span class="dot" style="background:linear-gradient(90deg,#0D9E6E,#F59E0B,#F97316,#DC2626)"></span><span class="lbl">Mappa sottosquadri (tutti)</span></div>';
   }
-  muaObjects.forEach(function(m,i){
-    var ch='#'+m.color.toString(16).padStart(6,'0');
-    var rt=m.aligned?' (RMSD '+(m.rmsd*1000).toFixed(0)+' um)':'';
-    var expanded = muaExpanded[m.num] === true;
-    var chev = expanded ? '▾' : '▸';
-    h+='<div class="tree-node mua-header"><span class="chevron" onclick="toggleMuaExpand('+m.num+')">'+chev+'</span><span class="dot" style="background:'+ch+'"></span>'+(m.groupId&&m.groupId>0?'<span style="display:inline-block;padding:1px 4px;background:'+getGroupBadgeColor(m.groupId)+';color:#fff;font-family:var(--mono);font-size:10px;font-weight:800;border-radius:3px;margin-right:4px">G'+m.groupId+'</span>':'')+'<span class="lbl" onclick="toggleMuaExpand('+m.num+')">MUA #'+m.num+rt+'</span><button class="del-btn" onclick="removeMUA('+i+')" title="Elimina MUA #'+m.num+'">✕</button></div>';
-    if(expanded){
-      h+='<div class="tree-node sub"><input type="checkbox" '+(m.sbVisible!==false?'checked':'')+' onchange="toggleMuaLayer('+i+',\'sb\',this.checked)"><span class="lbl">Scanbody 1T3</span></div>';
-      h+='<div class="tree-node sub"><input type="checkbox" checked onchange="toggleMuaLayer('+i+',\'an\',this.checked)"><span class="lbl">Analogo AB-AR</span></div>';
-      h+='<div class="tree-node sub"><input type="checkbox" checked onchange="toggleMuaLayer('+i+',\'mt\',this.checked)"><span class="lbl">Connessione IPD</span></div>';
-      h+='<div class="tree-node sub"><input type="checkbox" '+(m.undercutMapActive?'checked':'')+' onchange="toggleUndercutMap('+i+',this.checked)"><span class="lbl">Mappa sottosquadri</span></div>';
-      h+='<div class="tree-node sub"><input type="checkbox" '+(m.axisLine.visible?'checked':'')+' onchange="toggleMuaLayer('+i+',\'ax\',this.checked)"><span class="lbl">Asse</span></div>';
-      h+='<div class="tree-node sub"><input type="checkbox" '+(m.scanbodyScanVisible?'checked':'')+' onchange="toggleScanbodyCut('+i+',this.checked)"><span class="lbl">Taglia scansione</span></div>';
-      h+='<div class="tree-node sub"><input type="checkbox" '+(m.scanbodyColoredVisible?'checked':'')+' onchange="toggleScanbodyColored('+i+',this.checked)"><span class="lbl">Scanbody scansione (color)</span></div>';
-    }
-  });
-  // Toggle per asse medio e coni di divergenza (se presenti)
-  if(meanAxisLine){
-    h+='<div class="tree-node"><input type="checkbox" '+(meanAxisLine.visible?'checked':'')+' onchange="meanAxisLine.visible=this.checked"><span class="dot" style="background:#fff"></span><span class="lbl">Asse medio</span></div>';
-    h+='<div class="tree-node"><input type="checkbox" '+(divergenceLabelsVisible?'checked':'')+' onchange="toggleDivergenceLabels(this.checked)"><span class="dot" style="background:linear-gradient(90deg,#0D9E6E,#F59E0B,#F97316,#DC2626)"></span><span class="lbl">Label divergenza</span></div>';
+  
+  // ── Bottoni globali (Opacizza tutto / Ripristina) ──
+  if(scanMesh || muaObjects.length > 0){
+    h += '<div class="tree-globals">'+
+      '<button class="tree-global-btn" onclick="treeUnified_ghostAll()" title="Tutte le mesh al 30% di opacita">Opacizza</button>'+
+      '<button class="tree-global-btn" onclick="treeUnified_restoreAll()" title="Ripristina opacita originali">Ripristina</button>'+
+    '</div>';
   }
-  // Voce soglie angolari rimossa (goniometri nel pannello)
-  document.getElementById('layerTree').innerHTML=h;
+  
+  document.getElementById('layerTree').innerHTML = h;
+}
+
+// === Blocco 7a: helper per slider opacità e bottoni globali ===
+function treeUnified_setScanOpacity(val){
+  var v = Math.max(0.1, Math.min(1.0, parseFloat(val)/100));
+  if(scanMesh && scanMesh.material){
+    var mats = Array.isArray(scanMesh.material) ? scanMesh.material : [scanMesh.material];
+    mats.forEach(function(mat){
+      if(mat._origTransparent == null){
+        mat._origTransparent = mat.transparent;
+        mat._origOpacity = mat.opacity != null ? mat.opacity : 1.0;
+      }
+      mat.transparent = v < 1.0 || mat._origTransparent;
+      mat.opacity = v;
+      mat.needsUpdate = true;
+    });
+  }
+  // Aggiorna pure il SynRegistry per coerenza
+  try {
+    if(window.SynRegistry && scanMesh && scanMesh._synId){
+      window.SynRegistry.update(scanMesh._synId, {'visual.opacity': v});
+    }
+  } catch(e){}
+  var lbl = document.getElementById('treeUnified_scanOpacityVal');
+  if(lbl) lbl.textContent = Math.round(v*100)+'%';
+}
+
+function treeUnified_ghostAll(){
+  // Imposta tutte le mesh al 30%
+  var ghostOp = 0.30;
+  if(scanMesh && scanMesh.material){
+    var mats = Array.isArray(scanMesh.material) ? scanMesh.material : [scanMesh.material];
+    mats.forEach(function(mat){
+      if(mat._origTransparent == null){
+        mat._origTransparent = mat.transparent;
+        mat._origOpacity = mat.opacity != null ? mat.opacity : 1.0;
+      }
+      mat.transparent = true;
+      mat.opacity = ghostOp;
+      mat.needsUpdate = true;
+    });
+  }
+  muaObjects.forEach(function(m){
+    [m.scanbodyMesh, m.anMesh, m.mtMesh].forEach(function(mesh){
+      if(mesh && mesh.material){
+        var mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach(function(mat){
+          if(mat._origTransparent == null){
+            mat._origTransparent = mat.transparent;
+            mat._origOpacity = mat.opacity != null ? mat.opacity : 1.0;
+          }
+          mat.transparent = true;
+          mat.opacity = ghostOp;
+          mat.needsUpdate = true;
+        });
+      }
+    });
+  });
+  rebuildTree();
+}
+
+function treeUnified_restoreAll(){
+  // Ripristina opacita originali
+  if(scanMesh && scanMesh.material){
+    var mats = Array.isArray(scanMesh.material) ? scanMesh.material : [scanMesh.material];
+    mats.forEach(function(mat){
+      if(mat._origOpacity != null){
+        mat.opacity = mat._origOpacity;
+        mat.transparent = mat._origTransparent;
+      } else {
+        mat.opacity = 1.0;
+        mat.transparent = false;
+      }
+      mat.needsUpdate = true;
+    });
+  }
+  muaObjects.forEach(function(m){
+    [m.scanbodyMesh, m.anMesh, m.mtMesh].forEach(function(mesh){
+      if(mesh && mesh.material){
+        var mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach(function(mat){
+          if(mat._origOpacity != null){
+            mat.opacity = mat._origOpacity;
+            mat.transparent = mat._origTransparent;
+          } else {
+            mat.opacity = 1.0;
+            mat.transparent = false;
+          }
+          mat.needsUpdate = true;
+        });
+      }
+    });
+  });
+  rebuildTree();
 }
 function toggleLayer(name,on){
   if(name==='scan'&&scanMesh)scanMesh.visible=on;
