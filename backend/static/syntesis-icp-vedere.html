@@ -2040,12 +2040,18 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 const controls = new THREE.TrackballControls(camera, canvas);
 // Blocco 7e: TrackballControls per rotazione completa senza limiti polari.
-// Mappo i parametri il piu vicino possibile a OrbitControls per minimizzare il cambio di feeling.
-controls.rotateSpeed = 1.6;        // sensibilita rotazione drag sinistro
-controls.zoomSpeed = 1.2;          // sensibilita zoom rotella
-controls.panSpeed = 0.6;           // sensibilita pan
-controls.staticMoving = false;     // damping attivo (era enableDamping=true)
-controls.dynamicDampingFactor = 0.15; // simile a dampingFactor=0.08 di OrbitControls (un po piu morbido)
+// Blocco 7f: velocita base alzate + tasto Shift = turbo (raddoppia tutto)
+const SPEED_BASE = {
+  rotate: 3.0,   // era 1.6 - molto piu reattivo
+  zoom:   2.0,   // era 1.2
+  pan:    1.2    // era 0.6
+};
+const TURBO_MULT = 2.0;
+controls.rotateSpeed = SPEED_BASE.rotate;
+controls.zoomSpeed   = SPEED_BASE.zoom;
+controls.panSpeed    = SPEED_BASE.pan;
+controls.staticMoving = false;
+controls.dynamicDampingFactor = 0.15;
 controls.noPan = false;
 controls.noZoom = false;
 controls.noRotate = false;
@@ -2055,9 +2061,29 @@ controls.mouseButtons = {
   MIDDLE: THREE.MOUSE.ZOOM,
   RIGHT: THREE.MOUSE.PAN
 };
-// Limiti distanza zoom (OrbitControls li aveva impliciti, qui li imposto espliciti)
 controls.minDistance = 0.5;
 controls.maxDistance = 1000;
+// Tasto Shift: turbo (raddoppia velocita per movimenti rapidi)
+window.addEventListener('keydown', function(ev){
+  if(ev.key === 'Shift' && !ev.repeat){
+    controls.rotateSpeed = SPEED_BASE.rotate * TURBO_MULT;
+    controls.zoomSpeed   = SPEED_BASE.zoom   * TURBO_MULT;
+    controls.panSpeed    = SPEED_BASE.pan    * TURBO_MULT;
+  }
+});
+window.addEventListener('keyup', function(ev){
+  if(ev.key === 'Shift'){
+    controls.rotateSpeed = SPEED_BASE.rotate;
+    controls.zoomSpeed   = SPEED_BASE.zoom;
+    controls.panSpeed    = SPEED_BASE.pan;
+  }
+});
+// Sicurezza: se la finestra perde il focus mentre tieni Shift, ripristina la velocita base
+window.addEventListener('blur', function(){
+  controls.rotateSpeed = SPEED_BASE.rotate;
+  controls.zoomSpeed   = SPEED_BASE.zoom;
+  controls.panSpeed    = SPEED_BASE.pan;
+});
 // I limiti polari NON ESISTONO in TrackballControls: rotazione completamente libera in 3D.
 
 const transformControls = new THREE.TransformControls(camera, canvas);
