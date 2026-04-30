@@ -17848,12 +17848,542 @@ function analReport_generate(){
   text('Nota: questo report e la prima versione (Blocco 6a). Sezioni con dati', MARGIN, PAGE_H-25, {size:8, color:GRAY});
   text('parziali o placeholder verranno completate nelle iterazioni successive.', MARGIN, PAGE_H-21, {size:8, color:GRAY});
 
-  addFooter(1, 6);
+  addFooter(1, 7);
 
   // ╔══════════════════════════════════════════════════════════════╗
-  // ║ PAGINA 2: SPIEGAZIONE - ASSE MEDIO E SOTTOSQUADRI            ║
+  // ║ PAGINA 2: TAVOLA TECNICA MUA (landscape)                     ║
+  // ║ Riproduzione strutturale del mockup IPD - 5 box numerati     ║
+  // ║ I MUA renderizzati 3D del mockup non sono replicabili in     ║
+  // ║ jsPDF; uso schemi tecnici CAD-style con quote.               ║
+  // ║ La mappa sottosquadri (box 5) cattura la undercutMesh reale  ║
+  // ║ dal viewer Three.js.                                         ║
   // ╚══════════════════════════════════════════════════════════════╝
-  doc.addPage();
+  doc.addPage('a4', 'landscape');
+  // In landscape: PAGE_W=297, PAGE_H=210
+  var L_W = 297, L_H = 210, L_M = 8;
+
+  // ── Header tavola tecnica ──
+  text('Synthesis-ICP', L_M, 11, {size:11, style:'bold', color:BLUE});
+  text('REPORT ANALIZZA MUA  |  ' + data.caseCode, L_W/2, 11, {size:9, color:DARK, align:'center', style:'bold'});
+  text(data.dateStr, L_W-L_M, 11, {size:9, color:GRAY, align:'right'});
+  doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.3);
+  doc.line(L_M, 14, L_W-L_M, 14);
+
+  text('TAVOLA TECNICA - MULTI UNIT ABUTMENT (MUA)', L_M, 21, {size:13, style:'bold', color:DARK});
+  text('Geometria, angoli, cono di lavoro e sottosquadri', L_M, 26, {size:8, color:GRAY});
+
+  // Helper: numero box (cerchio blu con numero)
+  function boxNum(n, x, y){
+    doc.setFillColor.apply(doc, BLUE);
+    doc.circle(x+3.5, y+3.5, 3, 'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.text(String(n), x+3.5, y+5, {align:'center'});
+  }
+  // Helper: pannello con bordo + titolo
+  function panel(x, y, w, h, num, title){
+    doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.4);
+    doc.setFillColor(255,255,255); doc.rect(x, y, w, h, 'FD');
+    boxNum(num, x+2, y+2);
+    text(title, x+10, y+6, {size:9, style:'bold', color:DARK});
+  }
+
+  // Layout: 2 righe x 3 colonne sopra (box 1-2-3), riga sotto box 4-5 + footer dati
+  // Riga 1: y=30, h=85
+  // Riga 2: y=119, h=72  (box 4, 5 e box dati a destra)
+  // Footer: y=193, h=15
+
+  var rowY1 = 30, rowH1 = 85;
+  var rowY2 = 119, rowH2 = 72;
+
+  // Larghezze: box 1 (angoli MUA standard) = 75mm, box 2 (geometria) = 130mm, leg dim = 60mm
+  var col1W = 75, col2W = 130, col3W = 65;
+  var col1X = L_M, col2X = L_M + col1W + 2, col3X = L_M + col1W + col2W + 4;
+
+  // ──────────────────────────────────────────────────
+  // BOX 1: ANGOLI MUA STANDARD
+  // ──────────────────────────────────────────────────
+  panel(col1X, rowY1, col1W, rowH1, 1, 'ANGOLI MUA STANDARD');
+  text('Correzione discreta dellasse emergente', col1X+10, rowY1+10, {size:7, color:GRAY});
+
+  // Schema MUA 17 deg (sx) e 30 deg (dx)
+  function drawMUA(cx, cy, angleDeg, h, color){
+    // Asse implantare verticale
+    doc.setDrawColor.apply(doc, GRAY); doc.setLineWidth(0.3);
+    doc.setLineDashPattern([1,1], 0);
+    doc.line(cx, cy-h-12, cx, cy+8);
+    doc.setLineDashPattern([], 0);
+    // Vite filettata
+    doc.setDrawColor(140,130,80); doc.setLineWidth(0.4);
+    doc.setFillColor(220,200,150);
+    doc.rect(cx-1.5, cy, 3, 6, 'FD');
+    for(var i=0; i<3; i++){
+      doc.line(cx-1.5, cy+1+i*2, cx+1.5, cy+0.3+i*2);
+    }
+    // Base 1mm
+    doc.setFillColor(180,160,100);
+    doc.rect(cx-3, cy-2, 6, 2, 'FD');
+    // Corpo MUA inclinato (parallelogramma stilizzato)
+    var rad = angleDeg * Math.PI / 180;
+    var topW = 4, baseW = 5;
+    var topX = cx + Math.sin(rad) * h, topY = cy - h;
+    doc.setFillColor.apply(doc, color);
+    doc.setDrawColor(120,100,40);
+    // Trapezio del corpo MUA
+    doc.lines([
+      [baseW, 0],
+      [topX-cx + topW/2 - baseW/2 - baseW/2, -h],
+      [-topW, 0],
+      [topX-cx - topW/2 + baseW/2 - baseW/2, h]
+    ], cx-baseW/2, cy-2, [1,1], 'FD', true);
+    // Top piano (parte 2.1)
+    doc.setFillColor(240,210,120);
+    doc.rect(topX-topW/2, topY, topW, 1.5, 'FD');
+    return {topX:topX, topY:topY};
+  }
+
+  // MUA 17 deg
+  var m17cx = col1X + 22, m17cy = rowY1 + 65;
+  text('MUA ANGOLATO 17°', m17cx, rowY1+16, {size:7, color:DARK, align:'center', style:'bold'});
+  var m17 = drawMUA(m17cx, m17cy, 17, 26, [220,180,100]);
+  // Quote
+  doc.setDrawColor.apply(doc, GRAY); doc.setLineWidth(0.25);
+  // 17° angolo
+  doc.line(m17cx, m17cy-30, m17cx+12, m17cy-30);
+  doc.line(m17cx, m17cy-26, m17.topX+2, m17.topY+1);
+  text('17°', m17cx+8, m17cy-32, {size:7, color:DARK});
+  // 21° divergenza interna
+  text('21°', m17.topX+5, m17.topY+5, {size:6, color:DARK});
+  doc.line(m17.topX+1, m17.topY+2, m17.topX+5, m17.topY+8);
+  // 2.1 mm
+  doc.line(m17.topX-8, m17.topY-1, m17.topX-8, m17.topY+8);
+  text('2.1', m17.topX-12, m17.topY+5, {size:6, color:DARK, align:'right'});
+  // 3.2 mm
+  doc.line(m17cx-15, m17cy-26, m17cx-15, m17cy-2);
+  text('3.2', m17cx-17, m17cy-12, {size:6, color:DARK, align:'right'});
+  // 1mm base
+  text('1.0', m17cx+8, m17cy-1, {size:6, color:DARK});
+  // Asse implantare label
+  text('asse', m17cx-18, m17cy-32, {size:5, color:GRAY});
+  text('implantare', m17cx-18, m17cy-29, {size:5, color:GRAY});
+
+  // MUA 30 deg
+  var m30cx = col1X + 52, m30cy = rowY1 + 65;
+  text('MUA ANGOLATO 30°', m30cx, rowY1+16, {size:7, color:DARK, align:'center', style:'bold'});
+  var m30 = drawMUA(m30cx, m30cy, 30, 30, [230,200,110]);
+  // 30°
+  doc.line(m30cx, m30cy-32, m30cx+15, m30cy-32);
+  doc.line(m30cx, m30cy-28, m30.topX+2, m30.topY+1);
+  text('30°', m30cx+10, m30cy-34, {size:7, color:DARK});
+  // 21°
+  text('21°', m30.topX+5, m30.topY+5, {size:6, color:DARK});
+  // 2.1
+  doc.line(m30.topX-8, m30.topY-1, m30.topX-8, m30.topY+8);
+  text('2.1', m30.topX-12, m30.topY+5, {size:6, color:DARK, align:'right'});
+  // 3.6
+  doc.line(m30cx-12, m30cy-30, m30cx-12, m30cy-2);
+  text('3.6', m30cx-14, m30cy-15, {size:6, color:DARK, align:'right'});
+  text('1.0', m30cx+8, m30cy-1, {size:6, color:DARK});
+
+  // Tabellina angoli disponibili in basso
+  var tabY = rowY1 + 73;
+  doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.2);
+  doc.rect(col1X+2, tabY, col1W-4, 9);
+  text('ANGOLI DISPONIBILI', col1X+4, tabY+3, {size:6, style:'bold', color:GRAY});
+  doc.setFillColor(255,255,255); doc.circle(col1X+5, tabY+5.5, 0.8); doc.setDrawColor(100,100,100); doc.circle(col1X+5, tabY+5.5, 0.8);
+  text('0° dritto', col1X+8, tabY+6, {size:6});
+  doc.circle(col1X+25, tabY+5.5, 0.8); doc.circle(col1X+25, tabY+5.5, 0.8, 'S');
+  text('17° angolato leggero', col1X+28, tabY+6, {size:6});
+  doc.circle(col1X+5, tabY+8, 0.8); doc.circle(col1X+5, tabY+8, 0.8, 'S');
+  text('30° angolato marcato', col1X+8, tabY+8.5, {size:6});
+
+  // ──────────────────────────────────────────────────
+  // BOX 2: GEOMETRIA E DIMENSIONI
+  // ──────────────────────────────────────────────────
+  panel(col2X, rowY1, col2W, rowH1, 2, 'GEOMETRIA E DIMENSIONI');
+  text('quote in mm', col2X+45, rowY1+10, {size:7, color:GRAY, style:'italic'});
+
+  // 4 sub-MUA: angolato 17, angolato 30, dritto, dritto-alternativo
+  var subY = rowY1 + 65;
+
+  // angolato 17 (riprodotto piccolo)
+  text('MUA ANGOLATI (17° / 30°)', col2X+30, rowY1+16, {size:6, color:DARK, align:'center', style:'bold'});
+  drawMUA(col2X+15, subY, 17, 24, [220,180,100]);
+  drawMUA(col2X+45, subY, 30, 28, [230,200,110]);
+  text('2.1', col2X+5, subY-22, {size:5, color:DARK, align:'right'});
+  text('3.2', col2X+1, subY-12, {size:5, color:DARK, align:'right'});
+  text('17°', col2X+19, subY-26, {size:5});
+  text('30°', col2X+49, subY-28, {size:5});
+  text('1.0', col2X+19, subY-1, {size:5});
+  text('1.0', col2X+49, subY-1, {size:5});
+
+  // dritto
+  text('MUA DRITTO (0°)', col2X+85, rowY1+16, {size:6, color:DARK, align:'center', style:'bold'});
+  // Disegno cilindro grigio
+  doc.setFillColor(180,180,170); doc.setDrawColor(100,100,90);
+  doc.rect(col2X+78, subY-22, 14, 14, 'FD');
+  // testa esagonale stilizzata
+  doc.setFillColor(140,140,130);
+  doc.rect(col2X+82, subY-26, 6, 4, 'FD');
+  // Vite
+  doc.setFillColor(220,200,150);
+  doc.rect(col2X+83.5, subY-8, 3, 6, 'FD');
+  // Base transmucosale (rettangolo grigio chiaro tratteggiato per 1-5mm)
+  doc.setLineDashPattern([0.5,0.5], 0);
+  doc.rect(col2X+76, subY-8, 18, 8);
+  doc.setLineDashPattern([], 0);
+  // Quote
+  text('Ø 4.8', col2X+85, rowY1+22, {size:5, align:'center', color:DARK});
+  doc.line(col2X+96, subY-22, col2X+100, subY-22);
+  doc.line(col2X+96, subY-8, col2X+100, subY-8);
+  doc.line(col2X+99, subY-22, col2X+99, subY-8);
+  text('2.0', col2X+101, subY-15, {size:5});
+  doc.line(col2X+96, subY-8, col2X+100, subY-8);
+  doc.line(col2X+96, subY, col2X+100, subY);
+  text('1-5', col2X+101, subY-4, {size:5});
+
+  // dritto alternativo (con collo viola)
+  text('MUA DRITTO (0°) - ALTERNATIVO', col2X+115, rowY1+16, {size:6, color:DARK, align:'center', style:'bold'});
+  doc.setFillColor(220,180,100); doc.setDrawColor(140,100,40);
+  doc.rect(col2X+108, subY-22, 14, 14, 'FD');
+  doc.setFillColor(180,140,60);
+  doc.rect(col2X+112, subY-26, 6, 4, 'FD');
+  // Collo viola
+  doc.setFillColor(140,120,200); doc.setDrawColor(80,70,140);
+  doc.rect(col2X+108, subY-8, 14, 5, 'FD');
+  // Vite filettata
+  doc.setFillColor(180,140,80);
+  doc.rect(col2X+113.5, subY-3, 3, 7, 'FD');
+  text('Ø 4.8', col2X+115, rowY1+22, {size:5, align:'center', color:DARK});
+  doc.line(col2X+126, subY-22, col2X+128, subY-22);
+  doc.line(col2X+126, subY-8, col2X+128, subY-8);
+  text('2.0', col2X+125, subY-15, {size:5});
+  text('1-5', col2X+125, subY-4, {size:5});
+
+  // ──────────────────────────────────────────────────
+  // BOX LEGENDA DIMENSIONI (dx)
+  // ──────────────────────────────────────────────────
+  panel(col3X, rowY1, col3W, rowH1, 0, 'LEGENDA DIMENSIONI');
+  // Rimuovo numero (panel mette il cerchio)
+  doc.setFillColor(255,255,255); doc.rect(col3X+1, rowY1+1, 8, 8, 'F');
+  text('LEGENDA DIMENSIONI', col3X+3, rowY1+6, {size:8, style:'bold', color:DARK});
+
+  var legY = rowY1 + 14;
+  var legRows = [
+    ['Ø 4.8', 'Diametro piattaforma'],
+    ['2.0', 'Altezza porzione coronale'],
+    ['1-5', 'Altezza transmucosa (regolabile)'],
+    ['1.0', 'Offset verticale'],
+    ['2.1', 'Altezza porzione inclinata'],
+    ['3.2 / 3.6', 'Altezza totale variabile']
+  ];
+  legRows.forEach(function(r, i){
+    var ry = legY + i*10;
+    if(i % 2 === 0){
+      doc.setFillColor(248,250,253);
+      doc.rect(col3X+2, ry-3, col3W-4, 9, 'F');
+    }
+    text(r[0], col3X+5, ry+2, {size:7, style:'bold', color:BLUE});
+    text(r[1], col3X+22, ry+2, {size:6, color:DARK});
+  });
+
+  // ──────────────────────────────────────────────────
+  // BOX 3: CONO DI LAVORO E ASSE MEDIO
+  // ──────────────────────────────────────────────────
+  var box3W = 145;
+  panel(col1X, rowY2, box3W, rowH2, 3, 'CONO DI LAVORO E ASSE MEDIO DEL GRUPPO');
+
+  // Sub-blocco cono MUA (sx)
+  var coneCX = col1X + 25, coneCY = rowY2 + 35;
+  text('CONO MUA', coneCX, rowY2+12, {size:7, style:'bold', color:DARK, align:'center'});
+  text('semiangolo 20°', coneCX, rowY2+16, {size:6, color:GRAY, align:'center'});
+  // Disegno cono
+  doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.4);
+  doc.setLineDashPattern([1,1], 0);
+  doc.line(coneCX-12, coneCY-2, coneCX+12, coneCY-2); // base orizzontale
+  doc.setLineDashPattern([], 0);
+  doc.setDrawColor(150,150,160);
+  doc.line(coneCX, coneCY+5, coneCX-10, coneCY-12);
+  doc.line(coneCX, coneCY+5, coneCX+10, coneCY-12);
+  // Asse centrale
+  doc.setDrawColor.apply(doc, BLUE);
+  doc.setLineDashPattern([0.5,0.5], 0);
+  doc.line(coneCX, coneCY+5, coneCX, coneCY-15);
+  doc.setLineDashPattern([], 0);
+  // Angoli 20°
+  text('20°', coneCX-8, coneCY-7, {size:6, color:DARK});
+  text('20°', coneCX+5, coneCY-7, {size:6, color:DARK});
+  // MUA piccolino al centro
+  doc.setFillColor(220,180,100); doc.setDrawColor(140,100,40);
+  doc.rect(coneCX-2, coneCY+2, 4, 6, 'FD');
+  doc.setFillColor(180,140,60);
+  doc.rect(coneCX-1, coneCY-1, 2, 3, 'FD');
+
+  text('Ogni MUA e vincolato', coneCX, rowY2+50, {size:6, color:DARK, align:'center', style:'bold'});
+  text('da un cono di lavoro', coneCX, rowY2+53, {size:6, color:DARK, align:'center'});
+  text('(semiangolo 20°).', coneCX, rowY2+56, {size:6, color:DARK, align:'center'});
+
+  // Sub-blocco distribuzione angolare (centro)
+  var distX = col1X + 50;
+  text('DISTRIBUZIONE ANGOLARE RISPETTO ALL ASSE MEDIO', distX+25, rowY2+12, {size:7, style:'bold', color:DARK, align:'center'});
+  text('Direzione di inserimento protesica', distX+25, rowY2+16, {size:6, color:GRAY, align:'center'});
+
+  // Asse medio verticale (rosso tratteggiato, freccia in alto)
+  var axMX = distX + 35, axMY1 = rowY2+26, axMY2 = rowY2+58;
+  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.8);
+  doc.setLineDashPattern([1.5,1.5], 0);
+  doc.line(axMX, axMY2, axMX, axMY1);
+  doc.setLineDashPattern([], 0);
+  doc.lines([[1.5,3],[-3,0],[1.5,-3]], axMX-1.5, axMY1, [1,1], 'F');
+  text('ASSE MEDIO', axMX+3, axMY1+3, {size:6, color:RED, style:'bold'});
+  text('(DEL GRUPPO)', axMX+3, axMY1+6, {size:5, color:RED});
+
+  // 4 MUA sull arco gengivale (uso i veri dati: muaTable)
+  var arcCX = distX + 35, arcCY = rowY2+58, arcR = 30;
+  doc.setDrawColor.apply(doc, GRAY); doc.setLineWidth(0.3);
+  doc.setLineDashPattern([0.8,0.8], 0);
+  // Arco gengivale schematico
+  for(var ang = -60; ang <= 60; ang += 5){
+    var px = arcCX + Math.sin(ang*Math.PI/180) * arcR;
+    var py = arcCY - Math.cos(ang*Math.PI/180) * arcR + arcR;
+    if(ang === -60){ doc.lines([[0,0]], px, py); }
+  }
+  doc.line(arcCX-26, arcCY+3, arcCX+26, arcCY+3);
+  doc.setLineDashPattern([], 0);
+
+  // Disegno fino a 4 MUA realmente accoppiati con i loro angoli
+  var displayMuas = data.muaTable.slice(0, 4);
+  var muaPositions = [-22, -8, 8, 22];
+  displayMuas.forEach(function(m, i){
+    var mx = arcCX + muaPositions[i];
+    var my = arcCY + 3;
+    // MUA stilizzato (cilindro inclinato)
+    var divDeg = m.divMedio || 0;
+    var leanDir = i < 2 ? -1 : 1;
+    var leanRad = divDeg * Math.PI / 180 * leanDir;
+    doc.setFillColor(220,180,100); doc.setDrawColor(140,100,40);
+    doc.setLineWidth(0.3);
+    var topY = my - 14, topX = mx + Math.sin(leanRad) * 14;
+    // Corpo MUA (linee invece di rect per inclinazione)
+    doc.lines([
+      [Math.sin(leanRad)*14 - 2, -14],
+      [4, 0],
+      [-Math.sin(leanRad)*14 + 2, 14]
+    ], mx-2, my, [1,1], 'FD');
+    // Vite sotto
+    doc.setFillColor(180,140,60);
+    doc.rect(mx-1.5, my, 3, 3, 'FD');
+    // Quota angolo
+    var stato = m.coneOK ? 'DENTRO' : 'FUORI';
+    var quotaCol = m.coneOK ? GREEN : RED;
+    text('#' + m.num, mx-3, topY-6, {size:6, color:DARK, style:'bold'});
+    text(divDeg.toFixed(1)+'°', mx-3, topY-3, {size:5, color:quotaCol, style:'bold'});
+  });
+
+  // Tabellina "STATO VS CONO 20°" (dx box 3)
+  var tbX = col1X + box3W - 38, tbY = rowY2 + 20;
+  doc.setDrawColor.apply(doc, BORDER);
+  doc.rect(tbX, tbY, 36, 35);
+  text('STATO VS', tbX+18, tbY+4, {size:6, style:'bold', color:GRAY, align:'center'});
+  text('CONO 20°', tbX+18, tbY+7, {size:6, style:'bold', color:GRAY, align:'center'});
+  // Header
+  doc.setFillColor(248,250,253); doc.rect(tbX, tbY+9, 36, 4, 'F');
+  displayMuas.forEach(function(m, i){
+    var ty = tbY + 14 + i*5;
+    text('#'+m.num, tbX+3, ty+2, {size:6, style:'bold'});
+    var stato = m.divMedio != null ? m.divMedio.toFixed(1)+'°' : '--';
+    text(stato, tbX+13, ty+2, {size:6, style:'bold'});
+    text(m.coneOK ? 'DENTRO' : 'FUORI', tbX+22, ty+2, {size:6, color: m.coneOK ? GREEN : RED, style:'bold'});
+    // Pallino
+    doc.setFillColor.apply(doc, m.coneOK ? GREEN : RED);
+    doc.circle(tbX+33, ty+1, 1, 'F');
+  });
+
+  // Legenda stato (sotto tabella)
+  var lgY = tbY + 38;
+  doc.setDrawColor.apply(doc, BORDER);
+  doc.rect(tbX, lgY-2, 36, 18);
+  text('LEGENDA STATO', tbX+18, lgY+1, {size:5, style:'bold', color:GRAY, align:'center'});
+  doc.setFillColor.apply(doc, GREEN); doc.circle(tbX+3, lgY+5, 1, 'F');
+  text('DENTRO CONO (≤ 20°)', tbX+5, lgY+6, {size:5});
+  doc.setFillColor.apply(doc, GOLD); doc.circle(tbX+3, lgY+9, 1, 'F');
+  text('BORDERLINE (20° - 25°)', tbX+5, lgY+10, {size:5});
+  doc.setFillColor.apply(doc, RED); doc.circle(tbX+3, lgY+13, 1, 'F');
+  text('FUORI CONO (> 20°)', tbX+5, lgY+14, {size:5});
+
+  // Riferimento fresabilita VHF S5 (sotto box 3)
+  var frY = rowY2 + 60;
+  text('RIFERIMENTO FRESABILITA (' + (data.machineName || 'macchina') + ')', col1X+2, frY+3, {size:7, style:'bold', color:DARK});
+  text('Semiangolo massimo fresatura: ' + MAX_MILLING_ANGLE + '°', col1X+2, frY+6, {size:6, color:DARK});
+  // Cono fresabilita (esempio piccolo)
+  doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.4);
+  doc.setLineDashPattern([0.8,0.8], 0);
+  doc.line(col1X+50, frY+8, col1X+62, frY+1);
+  doc.line(col1X+62, frY+1, col1X+74, frY+8);
+  doc.setLineDashPattern([], 0);
+  text(MAX_MILLING_ANGLE+'°', col1X+58, frY+3, {size:6, color:BLUE});
+  text(MAX_MILLING_ANGLE+'°', col1X+66, frY+3, {size:6, color:BLUE});
+  text('Il cono di fresabilita ('+MAX_MILLING_ANGLE+'°) e piu ampio del cono MUA (20°).', col1X+78, frY+3, {size:6, color:DARK});
+  text('Un MUA puo essere fresabile anche se fuori cono clinico.', col1X+78, frY+7, {size:6, color:DARK});
+
+  // ──────────────────────────────────────────────────
+  // BOX 4: SOTTOSQUADRO RECIPROCO
+  // ──────────────────────────────────────────────────
+  var box4X = col1X + box3W + 2;
+  var box4W = 70;
+  panel(box4X, rowY2, box4W, rowH2, 4, 'SOTTOSQUADRO RECIPROCO');
+
+  // Schema 2 MUA divergenti > 40 deg
+  text('COPPIA DI MUA', box4X+18, rowY2+11, {size:6, color:DARK, style:'bold', align:'center'});
+  text('divergenza reciproca', box4X+18, rowY2+14, {size:5, color:GRAY, align:'center'});
+
+  var s4cx = box4X + 18, s4cy = rowY2 + 38;
+  // Asse medio centrale tratteggiato
+  doc.setDrawColor.apply(doc, GRAY); doc.setLineWidth(0.3);
+  doc.setLineDashPattern([1,1], 0);
+  doc.line(s4cx, s4cy+10, s4cx, s4cy-15);
+  doc.setLineDashPattern([], 0);
+  // 2 MUA divergenti molto
+  doc.setFillColor(220,180,100); doc.setDrawColor(140,100,40); doc.setLineWidth(0.4);
+  // sx
+  doc.lines([[-8,-12],[3,0],[8,12]], s4cx-2, s4cy+8, [1,1], 'FD');
+  doc.rect(s4cx-3.5, s4cy+8, 3, 4, 'FD');
+  // dx
+  doc.lines([[8,-12],[-3,0],[-8,12]], s4cx+2, s4cy+8, [1,1], 'FD');
+  doc.rect(s4cx+0.5, s4cy+8, 3, 4, 'FD');
+  // Area rossa tra i 2 MUA (zona impossibile)
+  doc.setFillColor(255,200,200); doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.5);
+  doc.lines([
+    [-7,-10],[14,0],[-7,10]
+  ], s4cx, s4cy-2, [1,1], 'F');
+  // Hatching per area sottosquadro
+  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.3);
+  for(var hx = -6; hx <= 6; hx += 1.5){
+    doc.line(s4cx+hx, s4cy-2-Math.abs(hx)*1.4, s4cx+hx-2, s4cy-2-Math.abs(hx)*1.4+2);
+  }
+  text('> 40°', s4cx, s4cy-12, {size:7, color:RED, align:'center', style:'bold'});
+
+  // Vista assiale (4 cerchi)
+  text('VISTA ASSIALE', box4X+50, rowY2+11, {size:6, color:DARK, style:'bold', align:'center'});
+  text('(dall alto)', box4X+50, rowY2+14, {size:5, color:GRAY, align:'center'});
+  var ax4cx = box4X + 50, ax4cy = rowY2 + 32;
+  // 4 cerchi MUA dorati
+  function goldCircle(x, y, num){
+    doc.setFillColor(230,200,100); doc.setDrawColor(140,100,40); doc.setLineWidth(0.4);
+    doc.circle(x, y, 3, 'FD');
+    doc.setFillColor(180,140,60);
+    doc.circle(x, y, 1.5, 'F');
+    text('#'+num, x, y+8, {size:5, color:DARK, align:'center', style:'bold'});
+  }
+  goldCircle(ax4cx-7, ax4cy-7, 1);
+  goldCircle(ax4cx+7, ax4cy-7, 2);
+  goldCircle(ax4cx-7, ax4cy+7, 3);
+  goldCircle(ax4cx+7, ax4cy+7, 4);
+  // X rossa centrale (sottosquadri)
+  doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.7);
+  doc.line(ax4cx-5, ax4cy-5, ax4cx+5, ax4cy+5);
+  doc.line(ax4cx-5, ax4cy+5, ax4cx+5, ax4cy-5);
+  text('Divergenza coppia critica', ax4cx, ax4cy+18, {size:5, color:DARK, align:'center'});
+  text('> 40° (sottosquadro)', ax4cx, ax4cy+21, {size:5, color:RED, align:'center', style:'bold'});
+
+  // Banner avviso sotto
+  doc.setFillColor(255,235,235); doc.setDrawColor.apply(doc, RED);
+  doc.rect(box4X+2, rowY2+58, box4W-4, 12, 'FD');
+  text('!', box4X+5, rowY2+64, {size:9, color:RED, style:'bold'});
+  text('SOTTOSQUADRO RECIPROCO', box4X+9, rowY2+62, {size:6, style:'bold', color:RED});
+  text('Nessun cammino di inserimento comune.', box4X+9, rowY2+66, {size:5, color:DARK});
+  text('La protesi non puo essere inserita come corpo unico.', box4X+9, rowY2+69, {size:5, color:DARK});
+
+  // ──────────────────────────────────────────────────
+  // BOX 5: MAPPA SOTTOSQUADRI (cattura reale Three.js)
+  // ──────────────────────────────────────────────────
+  var box5X = box4X + box4W + 2;
+  var box5W = L_W - L_M - box5X;
+  panel(box5X, rowY2, box5W, rowH2, 5, 'MAPPA SOTTOSQUADRI');
+  text('(gradiente clinico - vista occlusale del caso)', box5X+30, rowY2+10, {size:6, color:GRAY});
+
+  // Inserisco la vista occlusale catturata
+  if(views && views.occlusale){
+    try {
+      doc.addImage(views.occlusale, 'PNG', box5X+2, rowY2+13, box5W-4, 50, undefined, 'FAST');
+      doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.2);
+      doc.rect(box5X+2, rowY2+13, box5W-4, 50);
+    } catch(e){
+      box(box5X+2, rowY2+13, box5W-4, 50, [248,250,253], BORDER);
+      text('Vista occlusale non catturata', box5X+box5W/2, rowY2+38, {size:7, color:GRAY, align:'center'});
+    }
+  } else {
+    box(box5X+2, rowY2+13, box5W-4, 50, [248,250,253], BORDER);
+    text('Mappa sottosquadri', box5X+box5W/2, rowY2+35, {size:8, color:GRAY, align:'center', style:'bold'});
+    text('(richiede caso caricato)', box5X+box5W/2, rowY2+40, {size:6, color:GRAY, align:'center'});
+  }
+
+  // Legenda gradiente intensita sottosquadro
+  var grY = rowY2 + 65;
+  text('INTENSITA SOTTOSQUADRO', box5X+box5W/2, grY, {size:6, style:'bold', color:GRAY, align:'center'});
+  // Barra gradiente verde -> rosso (5 segmenti)
+  var grStartX = box5X+5, grEndX = box5X+box5W-5;
+  var segW = (grEndX - grStartX) / 5;
+  var grColors = [GREEN, [180,200,80], [232,200,90], ORANGE, RED];
+  grColors.forEach(function(col, i){
+    doc.setFillColor.apply(doc, col);
+    doc.rect(grStartX + i*segW, grY+2, segW, 2, 'F');
+  });
+  text('BASSA', grStartX, grY+6, {size:5, color:GRAY});
+  text('ALTA', grEndX, grY+6, {size:5, color:GRAY, align:'right'});
+
+  // ──────────────────────────────────────────────────
+  // FOOTER DATI CLINICI (5 colonne in fondo)
+  // ──────────────────────────────────────────────────
+  var ftY = 192;
+  doc.setFillColor(248,250,253); doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.3);
+  doc.rect(L_M, ftY, L_W-2*L_M, 14, 'FD');
+
+  var colW5 = (L_W - 2*L_M) / 5;
+  // Col 1: legenda simboli
+  text('LEGENDA SIMBOLI', L_M+2, ftY+3, {size:6, style:'bold', color:DARK});
+  doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.3);
+  doc.lines([[3,5],[-6,0],[3,-5]], L_M+4, ftY+5, [1,1], 'S');
+  text('cono MUA 20°', L_M+10, ftY+8, {size:5});
+  doc.setDrawColor.apply(doc, RED);
+  doc.triangle(L_M+4, ftY+13, L_M+7, ftY+9, L_M+1, ftY+9, 'S');
+  text('sottosquadro 40°', L_M+10, ftY+12, {size:5});
+
+  // Col 2: soglie applicate
+  var c2x = L_M + colW5;
+  text('SOGLIE APPLICATE', c2x, ftY+3, {size:6, style:'bold', color:DARK});
+  text('• Cono MUA: 20° (semiangolo)', c2x, ftY+6, {size:5});
+  text('• Coppia sottosquadro: 40°', c2x, ftY+9, {size:5});
+  text('• Fresabilita macchina: ' + MAX_MILLING_ANGLE + '° (' + (data.machineName||'') + ')', c2x, ftY+12, {size:5});
+
+  // Col 3: implicazioni cliniche
+  var c3x = L_M + 2*colW5;
+  text('IMPLICAZIONI CLINICHE', c3x, ftY+3, {size:6, style:'bold', color:DARK});
+  text('• Misfit passivo compromesso', c3x, ftY+6, {size:5});
+  text('• Interferenze inserimento/estrazione', c3x, ftY+9, {size:5});
+  text('• Necessita di segmentazione protesica', c3x, ftY+12, {size:5});
+
+  // Col 4: concetto chiave
+  var c4x = L_M + 3*colW5;
+  text('CONCETTO CHIAVE', c4x, ftY+3, {size:6, style:'bold', color:DARK});
+  text('Il sottosquadro non e un errore geometrico.', c4x, ftY+6, {size:5});
+  text('E lassenza di un asse comune tra MUA divergenti.', c4x, ftY+9, {size:5});
+  text('Il MUA non elimina la divergenza:', c4x, ftY+12, {size:5});
+
+  // Col 5: riepilogo caso attuale
+  var c5x = L_M + 4*colW5;
+  text('RIEPILOGO CASO ATTUALE', c5x, ftY+3, {size:6, style:'bold', color:BLUE});
+  text('• Max divergenza vs asse: ' + (data.maxDiv != null ? data.maxDiv.toFixed(1)+'°' : '--'), c5x, ftY+6, {size:5});
+  text('• MUA fuori cono 20°: ' + data.criticita.coneOutCount, c5x, ftY+9, {size:5});
+  text('• Coppie con sottosquadri: ' + data.criticita.undercutPairs, c5x, ftY+12, {size:5});
+
+  // Footer pagina (numerazione)
+  text('Synthesis-ICP - Report Analizza MUA ' + data.caseCode + ' - ' + data.dateStr, L_M, L_H-3, {size:7, color:GRAY});
+  text('Pag. 2 / 7', L_W-L_M, L_H-3, {size:7, color:GRAY, align:'right'});
+
+  // ╔══════════════════════════════════════════════════════════════╗
+  // ║ PAGINA 3: SPIEGAZIONE - ASSE MEDIO E SOTTOSQUADRI            ║
+  // ╚══════════════════════════════════════════════════════════════╝
+  doc.addPage('a4', 'portrait');
   text('METODO DI ANALISI', MARGIN, 25, {size:16, style:'bold', color:BLUE});
   doc.setDrawColor.apply(doc, BLUE); doc.setLineWidth(0.8); doc.line(MARGIN, 28, MARGIN+50, 28);
   text('Come Synthesis-ICP calcola asse medio, sottosquadri e fresabilita', MARGIN, 34, {size:9, color:GRAY, style:'italic'});
@@ -17976,7 +18506,7 @@ function analReport_generate(){
   text('Le prossime pagine mostrano la tabella numerica (pag. 3), la macchina e la mappa occlusale (pag. 4),', MARGIN, y, {size:8, color:GRAY, style:'italic'});
   text('le viste 3D del caso (pag. 5) e le criticita rilevate con le raccomandazioni (pag. 6).', MARGIN, y+4, {size:8, color:GRAY, style:'italic'});
 
-  addFooter(2, 6);
+  addFooter(3, 7);
 
   // ╔══════════════════════════════════════════════════════════════╗
   // ║ PAGINA 3: TABELLA ANGOLI                                     ║
@@ -18019,7 +18549,7 @@ function analReport_generate(){
   text('verra introdotto nella prossima versione del report. Oggi vengono mostrati solo gli angoli vs asse medio.', MARGIN+3, y+15, {size:8, color:DARK});
   y += 22;
 
-  addFooter(3, 6);
+  addFooter(4, 7);
 
   // ╔══════════════════════════════════════════════════════════════╗
   // ║ PAGINA 4: MACCHINA + MAPPA POSIZIONE                         ║
@@ -18072,7 +18602,7 @@ function analReport_generate(){
     text(data.groupCount + ' gruppi separati - ogni gruppo ha asse medio indipendente', MARGIN+3, y+10, {size:9});
   }
 
-  addFooter(4, 6);
+  addFooter(5, 7);
 
   // ╔══════════════════════════════════════════════════════════════╗
   // ║ PAGINA 5: VISTE 3D DAL VIEWER                                ║
@@ -18123,7 +18653,7 @@ function analReport_generate(){
   text('La sezione verticale per ogni gruppo (taglio sul piano dellasse medio) e la mappa', MARGIN+3, y+11, {size:8});
   text('dei sottosquadri come gradiente clinico verranno aggiunte nella prossima iterazione.', MARGIN+3, y+15, {size:8});
 
-  addFooter(5, 6);
+  addFooter(6, 7);
 
   // ╔══════════════════════════════════════════════════════════════╗
   // ║ PAGINA 6: CRITICITA                                          ║
@@ -18144,7 +18674,7 @@ function analReport_generate(){
       text(c.title, MARGIN+5, y+7, {size:10, style:'bold', color:RED});
       text(c.detail, MARGIN+5, y+13, {size:8, color:DARK});
       y += 22;
-      if(y > PAGE_H - 30){ doc.addPage(); y = 25; addFooter(7,7); }
+      if(y > PAGE_H - 30){ doc.addPage(); y = 25; addFooter(8,7); }
     });
   }
 
@@ -18158,7 +18688,7 @@ function analReport_generate(){
     y += 6;
   });
 
-  addFooter(6, 6);
+  addFooter(7, 7);
 
   // Salva PDF
   var fname = 'Report-Analizza-' + data.caseCode + '-' + data.dateFile + '.pdf';
