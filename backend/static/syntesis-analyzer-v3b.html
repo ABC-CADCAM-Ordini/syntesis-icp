@@ -17674,6 +17674,29 @@ function analReport_captureViews(){
       {x: 0, y: 0, z: -1}
     );
 
+    // Calcolo proiezioni 2D dei MUA in vista occlusale (per overlay label vettoriali nel PDF).
+    // Position.project(camera) restituisce coordinate normalizzate (-1..1) sul canvas.
+    // Salviamo NDC + canvas-fraction per ogni MUA accoppiato.
+    views.occlusalProjections = [];
+    var alignedMuas = muaObjects.filter(function(m){ return m.aligned; });
+    alignedMuas.forEach(function(m){
+      // Position.project() richiede che la camera sia ancora in posizione occlusale.
+      // Lo siamo, perche snap() lha appena impostata.
+      var proj = m.position.clone().project(camera);
+      // NDC -> canvas-fraction (0..1, top-left origin)
+      var fx = (proj.x + 1) / 2;
+      var fy = (-proj.y + 1) / 2;
+      views.occlusalProjections.push({
+        num: m.num,
+        groupId: m.groupId || 0,
+        divergence: m.divergence,
+        rigorousOK: m.rigorousOK !== false,
+        millingOK: m.millingOK !== false,
+        fx: fx, // frazione X (0=sinistra, 1=destra)
+        fy: fy  // frazione Y (0=alto, 1=basso)
+      });
+    });
+
     // VISTA VESTIBOLARE: camera davanti (Z positivo), guarda dietro
     // up = +Y standard
     views.vestibolare = snap(
@@ -18071,7 +18094,8 @@ function analReport_generate(){
     text('Servono almeno 2 MUA accoppiati', z2X+z2W/2, z2Y+z2H/2, {size:9, color:GRAY, align:'center'});
   }
 
-  // ── ZONA 3 (basso, full width): MAPPA POSIZIONI MUA ──
+  // ── ZONA 3 (basso, full width): MAPPA OCCLUSALE 3D + OVERLAY LABEL ──
+  // Cattura reale dal viewer Three.js + label divergenza ridisegnate vettoriali
   var z3X = L_M, z3Y = 132, z3W = L_W - 2*L_M, z3H = 65;
   doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.4);
   doc.setFillColor(252,253,254); doc.rect(z3X, z3Y, z3W, z3H, 'FD');
@@ -18080,136 +18104,130 @@ function analReport_generate(){
   doc.setFillColor.apply(doc, BLUE); doc.circle(z3X+5, z3Y+5, 3, 'F');
   doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
   doc.text('3', z3X+5, z3Y+6.5, {align:'center'});
-  text('MAPPA POSIZIONI MUA (vista occlusale)', z3X+11, z3Y+7, {size:10, style:'bold', color:DARK});
-  text('Coordinate XY reali estratte dal viewer 3D - distanze in mm', z3X+11, z3Y+11, {size:7, color:GRAY});
-
-  // Calcolo bbox dei MUA
-  var positions = data.muaTable.map(function(r){ return r.posXY; });
-  if(positions.length > 0){
-    var minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    positions.forEach(function(p){
-      if(p[0] < minX) minX = p[0]; if(p[0] > maxX) maxX = p[0];
-      if(p[1] < minZ) minZ = p[1]; if(p[1] > maxZ) maxZ = p[1];
-    });
-    var rangeX = (maxX - minX) || 1;
-    var rangeZ = (maxZ - minZ) || 1;
-    
-    // Area utile
-    var mapBoxX = z3X + 25, mapBoxY = z3Y + 17, mapBoxW = z3W - 100, mapBoxH = z3H - 22;
-    
-    // Sfondo griglia
-    doc.setDrawColor(230, 235, 242); doc.setLineWidth(0.15);
-    var gridStep = 5;
-    for(var gi = 0; gi <= 10; gi++){
-      doc.line(mapBoxX + (mapBoxW * gi / 10), mapBoxY, mapBoxX + (mapBoxW * gi / 10), mapBoxY + mapBoxH);
+  text('MAPPA OCCLUSALE - VISTA REALE DEL CASO', z3X+11, z3Y+7, {size:10, style:'bold', color:DARK});
+  text('Cattura del viewer 3D con asse medio e label divergenza vettoriali', z3X+11, z3Y+11, {size:7, color:GRAY});
+  
+  // Area mappa: lascio spazio a sx (titolo) e a dx (tabella riepilogo)
+  // Mappa: dal margine sx (dopo titolo) a 60mm prima del bordo dx
+  var mapBoxX = z3X + 4;
+  var mapBoxY = z3Y + 15;
+  var mapBoxW = z3W - 75; // lascio 70mm per tabella riepilogo
+  var mapBoxH = z3H - 19;
+  
+  // Inserisco la cattura 3D occlusale come sfondo
+  if(views && views.occlusale){
+    try {
+      doc.addImage(views.occlusale, 'PNG', mapBoxX, mapBoxY, mapBoxW, mapBoxH, undefined, 'FAST');
+      doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.3);
+      doc.rect(mapBoxX, mapBoxY, mapBoxW, mapBoxH);
+    } catch(e){
+      console.error('[analReport] addImage occlusale fallito:', e);
+      box(mapBoxX, mapBoxY, mapBoxW, mapBoxH, [248,250,253], BORDER);
+      text('Cattura occlusale non riuscita', mapBoxX+mapBoxW/2, mapBoxY+mapBoxH/2, {size:9, color:GRAY, align:'center'});
     }
-    for(var gi = 0; gi <= 6; gi++){
-      doc.line(mapBoxX, mapBoxY + (mapBoxH * gi / 6), mapBoxX + mapBoxW, mapBoxY + (mapBoxH * gi / 6));
-    }
-    
-    // Bordo area
-    doc.setDrawColor.apply(doc, BORDER); doc.setLineWidth(0.4);
-    doc.rect(mapBoxX, mapBoxY, mapBoxW, mapBoxH);
-    
-    // Scaling
-    var scale = Math.min(mapBoxW / (rangeX * 1.2), mapBoxH / (rangeZ * 1.2));
-    var ox = mapBoxX + mapBoxW/2;
-    var oz = mapBoxY + mapBoxH/2;
-    
-    // Linea arcata indicativa (ellisse stilizzata)
-    doc.setDrawColor(180, 200, 220); doc.setLineWidth(0.3);
-    doc.setLineDashPattern([1.5, 1.5], 0);
-    var arcCenterX = (minX + maxX)/2;
-    var arcCenterZ = (minZ + maxZ)/2;
-    // Disegno arcata come connessione punti ordinati per X
-    var sortedByX = data.muaTable.slice().sort(function(a,b){ return a.posXY[0] - b.posXY[0]; });
-    sortedByX.forEach(function(m, i){
-      if(i === 0) return;
-      var prev = sortedByX[i-1];
-      var p1x = ox + (prev.posXY[0] - arcCenterX) * scale;
-      var p1y = oz + (prev.posXY[1] - arcCenterZ) * scale;
-      var p2x = ox + (m.posXY[0] - arcCenterX) * scale;
-      var p2y = oz + (m.posXY[1] - arcCenterZ) * scale;
-      doc.line(p1x, p1y, p2x, p2y);
-    });
-    doc.setLineDashPattern([], 0);
-    
-    // Disegno coppie con sottosquadri come linee rosse
-    if(N >= 2){
-      for(var i=0; i<N; i++){
-        for(var j=i+1; j<N; j++){
-          if(coppieMatrix[i][j] > MAX_COUPLE_DIVERGENCE){
-            var pi = data.muaTable[i].posXY;
-            var pj = data.muaTable[j].posXY;
-            var pix = ox + (pi[0] - arcCenterX) * scale;
-            var piy = oz + (pi[1] - arcCenterZ) * scale;
-            var pjx = ox + (pj[0] - arcCenterX) * scale;
-            var pjy = oz + (pj[1] - arcCenterZ) * scale;
-            doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.6);
-            doc.setLineDashPattern([1, 1], 0);
-            doc.line(pix, piy, pjx, pjy);
-            doc.setLineDashPattern([], 0);
-            // Etichetta angolo a metà
-            text(coppieMatrix[i][j].toFixed(0)+'°', (pix+pjx)/2, (piy+pjy)/2 - 1, {size:6, color:RED, style:'bold', align:'center'});
-          }
-        }
+  } else {
+    box(mapBoxX, mapBoxY, mapBoxW, mapBoxH, [248,250,253], BORDER);
+    text('Vista occlusale non disponibile', mapBoxX+mapBoxW/2, mapBoxY+mapBoxH/2, {size:9, color:GRAY, align:'center'});
+  }
+  
+  // Overlay: label pillola vettoriali sopra la cattura, usando le proiezioni 2D
+  if(views && views.occlusalProjections && views.occlusalProjections.length > 0){
+    views.occlusalProjections.forEach(function(p){
+      // Coordinate canvas-fraction (0..1) -> coordinate PDF (mm)
+      var px = mapBoxX + p.fx * mapBoxW;
+      var py = mapBoxY + p.fy * mapBoxH;
+      
+      // Color status semaforo
+      var divDeg = p.divergence != null ? p.divergence : 0;
+      var pillBg, pillBorder, pillText;
+      if(!p.rigorousOK){
+        // FUORI cono - rosso
+        pillBg = [255, 220, 220]; pillBorder = RED; pillText = RED;
+      } else if(divDeg > 17){
+        // Borderline - oro
+        pillBg = [255, 245, 215]; pillBorder = GOLD; pillText = [180, 100, 5];
+      } else {
+        // OK - verde
+        pillBg = [225, 245, 220]; pillBorder = GREEN; pillText = [50, 110, 40];
       }
-    }
-    
-    // Plotto i MUA come cerchi grandi numerati
-    data.muaTable.forEach(function(m){
-      var px = ox + (m.posXY[0] - arcCenterX) * scale;
-      var pz = oz + (m.posXY[1] - arcCenterZ) * scale;
       
-      // Colore in base al gruppo
-      var grpCol = m.group === 0 ? BLUE : (m.group === 1 ? ORANGE : GREEN);
+      // Testo pillola
+      var labelText = '#' + p.num + ' ' + divDeg.toFixed(1) + '°';
+      // Stima larghezza testo (approssimazione): 1.6mm per char + padding
+      var pillW = labelText.length * 1.6 + 6;
+      var pillH = 4.5;
       
-      // Cerchio esterno se non fresabile (ring rosso)
-      if(!m.millingOK){
-        doc.setDrawColor.apply(doc, RED); doc.setLineWidth(0.8);
-        doc.circle(px, pz, 5);
+      // Posiziono la pillola sopra-destra del punto MUA (offset per non coprire il MUA)
+      var pillX = px + 1.5; // offset destra
+      var pillY = py - pillH - 1.5; // offset sopra
+      
+      // Se troppo a destra esce dalla mappa, lo metto a sx
+      if(pillX + pillW > mapBoxX + mapBoxW){
+        pillX = px - pillW - 1.5;
       }
-      // Cerchio principale
-      doc.setFillColor.apply(doc, grpCol); doc.setDrawColor.apply(doc, DARK); doc.setLineWidth(0.4);
-      doc.circle(px, pz, 4, 'FD');
-      // Numero MUA dentro
-      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(8);
-      doc.text(String(m.num), px, pz+1.5, {align:'center'});
+      // Se troppo in alto esce dalla mappa, lo metto sotto
+      if(pillY < mapBoxY){
+        pillY = py + 1.5;
+      }
       
-      // Etichetta angolo divergenza vicino al cerchio
-      var divDeg = m.divMedio || 0;
-      var divCol = m.coneOK ? GREEN : RED;
-      text(divDeg.toFixed(1)+'°', px, pz+9, {size:6, color:divCol, style:'bold', align:'center'});
-    });
-    
-    // Indicatori cardinali: anteriore (basso = +Z), posteriore (alto = -Z)
-    text('ANTERIORE', mapBoxX+mapBoxW/2, mapBoxY+mapBoxH+5, {size:7, color:GRAY, style:'bold', align:'center'});
-    text('POSTERIORE', mapBoxX+mapBoxW/2, mapBoxY-2, {size:7, color:GRAY, style:'bold', align:'center'});
-    text('SX', mapBoxX-2, mapBoxY+mapBoxH/2, {size:7, color:GRAY, style:'bold', align:'right'});
-    text('DX', mapBoxX+mapBoxW+2, mapBoxY+mapBoxH/2, {size:7, color:GRAY, style:'bold'});
-    
-    // Tabella riepilogo MUA a destra della mappa
-    var tabZ3X = mapBoxX + mapBoxW + 10;
-    var tabZ3Y = mapBoxY;
-    text('RIEPILOGO MUA', tabZ3X, tabZ3Y+3, {size:8, style:'bold', color:DARK});
-    var rowY = tabZ3Y + 8;
-    // Header
-    doc.setFillColor(248, 250, 253); doc.rect(tabZ3X, rowY-3, 60, 4, 'F');
-    text('MUA', tabZ3X+2, rowY, {size:6, style:'bold', color:GRAY});
-    text('div.', tabZ3X+18, rowY, {size:6, style:'bold', color:GRAY});
-    text('cono', tabZ3X+33, rowY, {size:6, style:'bold', color:GRAY});
-    text('fres.', tabZ3X+48, rowY, {size:6, style:'bold', color:GRAY});
-    rowY += 4;
-    data.muaTable.forEach(function(m){
-      var grpCol2 = m.group === 0 ? BLUE : (m.group === 1 ? ORANGE : GREEN);
-      doc.setFillColor.apply(doc, grpCol2); doc.circle(tabZ3X+3, rowY-1, 1.5, 'F');
-      text('#'+m.num, tabZ3X+6, rowY, {size:6, style:'bold'});
-      text((m.divMedio||0).toFixed(1)+'°', tabZ3X+18, rowY, {size:6});
-      text(m.coneOK?'OK':'X', tabZ3X+33, rowY, {size:6, color: m.coneOK?GREEN:RED, style:'bold'});
-      text(m.millingOK?'OK':'X', tabZ3X+48, rowY, {size:6, color: m.millingOK?GREEN:RED, style:'bold'});
-      rowY += 4;
+      // Linea di collegamento punto -> pillola
+      doc.setDrawColor.apply(doc, pillBorder); doc.setLineWidth(0.3);
+      doc.line(px, py, pillX + pillW/2, pillY + pillH/2);
+      
+      // Punto MUA (cerchietto)
+      doc.setFillColor.apply(doc, pillBorder); doc.setDrawColor(255,255,255); doc.setLineWidth(0.4);
+      doc.circle(px, py, 1.5, 'FD');
+      
+      // Pillola: rect arrotondato (jsPDF roundedRect)
+      doc.setFillColor.apply(doc, pillBg); doc.setDrawColor.apply(doc, pillBorder); doc.setLineWidth(0.5);
+      try {
+        doc.roundedRect(pillX, pillY, pillW, pillH, 1.5, 1.5, 'FD');
+      } catch(e){
+        // fallback rect normale
+        doc.rect(pillX, pillY, pillW, pillH, 'FD');
+      }
+      
+      // Dot colorato a sx dentro la pillola
+      doc.setFillColor.apply(doc, pillBorder);
+      doc.circle(pillX + 2, pillY + pillH/2, 0.8, 'F');
+      
+      // Testo
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(6);
+      doc.setTextColor.apply(doc, pillText);
+      doc.text(labelText, pillX + 4, pillY + pillH/2 + 1);
     });
   }
+  
+  // Tabella riepilogo MUA a destra della mappa (resta uguale a prima)
+  var tabZ3X = mapBoxX + mapBoxW + 5;
+  var tabZ3Y = mapBoxY;
+  text('RIEPILOGO MUA', tabZ3X, tabZ3Y+3, {size:8, style:'bold', color:DARK});
+  var rowY = tabZ3Y + 8;
+  // Header
+  doc.setFillColor(248, 250, 253); doc.rect(tabZ3X, rowY-3, 65, 4, 'F');
+  text('MUA', tabZ3X+2, rowY, {size:6, style:'bold', color:GRAY});
+  text('div.', tabZ3X+18, rowY, {size:6, style:'bold', color:GRAY});
+  text('cono', tabZ3X+33, rowY, {size:6, style:'bold', color:GRAY});
+  text('fres.', tabZ3X+50, rowY, {size:6, style:'bold', color:GRAY});
+  rowY += 4;
+  data.muaTable.forEach(function(m){
+    var grpCol2 = m.group === 0 ? BLUE : (m.group === 1 ? ORANGE : GREEN);
+    doc.setFillColor.apply(doc, grpCol2); doc.circle(tabZ3X+3, rowY-1, 1.5, 'F');
+    text('#'+m.num, tabZ3X+6, rowY, {size:6, style:'bold'});
+    text((m.divMedio||0).toFixed(1)+'°', tabZ3X+18, rowY, {size:6});
+    text(m.coneOK?'OK':'X', tabZ3X+33, rowY, {size:6, color: m.coneOK?GREEN:RED, style:'bold'});
+    text(m.millingOK?'OK':'X', tabZ3X+50, rowY, {size:6, color: m.millingOK?GREEN:RED, style:'bold'});
+    rowY += 4;
+  });
+  // Legenda colori semaforo sotto la tabella
+  var legZ3Y = mapBoxY + mapBoxH - 14;
+  text('LEGENDA STATO', tabZ3X, legZ3Y, {size:6, style:'bold', color:GRAY});
+  doc.setFillColor.apply(doc, GREEN); doc.circle(tabZ3X+2, legZ3Y+4, 1, 'F');
+  text('dentro cono', tabZ3X+5, legZ3Y+4.5, {size:5});
+  doc.setFillColor.apply(doc, GOLD); doc.circle(tabZ3X+2, legZ3Y+8, 1, 'F');
+  text('borderline (>17°)', tabZ3X+5, legZ3Y+8.5, {size:5});
+  doc.setFillColor.apply(doc, RED); doc.circle(tabZ3X+2, legZ3Y+12, 1, 'F');
+  text('fuori cono (>20°)', tabZ3X+5, legZ3Y+12.5, {size:5});
 
   // Footer pagina
   text('Synthesis-ICP - Report Analizza MUA ' + data.caseCode + ' - ' + data.dateStr, L_M, L_H-3, {size:7, color:GRAY});
