@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.0.0-fase3h-source-correct — LAB</title>
+<title>Syntesis-ICP - Analizzare v8.0.0-fase3i-server-os — LAB</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2191,7 +2191,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.0.0-fase3h-source-correct';
+window.ANALIZZA_BUILD = '8.0.0-fase3i-server-os';
 window.ANALIZZA_BUILD_DATE = '2026-05-01';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2716,7 +2716,7 @@ function placeMUA(rawPoint,rawNormal){
   var axisMat=new THREE.LineBasicMaterial({color:color,linewidth:2});
   var axisLine=new THREE.Line(axisGeo,axisMat);axisLine.visible=axesVisible;scene.add(axisLine);
 
-  muaObjects.push({id:id,num:muaCounter,group:group,scanbodyGeo:sbResult.geometry,scanbodyMesh:sbMesh,anMesh:anMesh,mtMesh:matMesh,color:color,axisLine:axisLine,position:point.clone(),clickPoint:point.clone(),clickNormal:n.clone(),axisDir:n.clone(),aligned:false,rmsd:null,sbVisible:true,sbType:sbType});  // /lab v7.3.9.108: sbType
+  muaObjects.push({id:id,num:muaCounter,group:group,scanbodyGeo:sbResult.geometry,scanbodyMesh:sbMesh,anMesh:anMesh,mtMesh:matMesh,color:color,axisLine:axisLine,position:point.clone(),clickPoint:point.clone(),clickNormal:n.clone(),axisDir:n.clone(),aligned:false,rmsd:null,sbVisible:true,sbType:sbType,templateId:sbType});  // /lab v8.0.0-fase3i: sbType + templateId per server ICP
   // ── BRIDGE Synthesis Core (Fase 1): MUA = marker nel registro ───
   try {
     if (window.SynRegistry) {
@@ -2819,11 +2819,18 @@ function extractScanTopFaceNear(scanGeo, clickPos, clickNormal, radiusMm){
 }
 
 function alignAll(){
-  // v7.3.9.082 - DUAL ALGORITHM ROUTING
-  // Default 'client' -> findScanbodyCenter (comportamento storico)
-  // Opt-in 'server' -> /api/place-mua weighted ICP
+  // /lab v8.0.0-fase3i: routing dual con preferenza SERVER per OS.
+  // Logica: se anche un solo MUA e' OS -> server (weighted ICP migliore su cap piccola).
+  //         altrimenti rispetta localStorage (default 'client' per 1T3).
   var algoChoice = 'client';
   try { algoChoice = localStorage.getItem('syntesis_mua_algorithm') || 'client'; } catch(e){}
+  // Lab override: se almeno un MUA e' OS, forziamo server (la cap OS e' troppo piccola
+  // per il fit-cerchio deterministico; il weighted ICP server-side e' piu' robusto).
+  var hasOS = muaObjects.some(function(m){ return m.sbType === 'OS'; });
+  if(hasOS && algoChoice === 'client'){
+    console.log('[lab] OS detected, routing to server ICP');
+    algoChoice = 'server';
+  }
   if(algoChoice === 'server'){
     return alignAllServer();
   }
@@ -2910,6 +2917,40 @@ function alignAll(){
   }, 50);
 }
 
+function _alignAllClientFallback(){
+  // /lab v8.0.0-fase3i: copia della path client di alignAll, usata come fallback
+  // quando il server ICP non e' disponibile (es. token mancante). NON ri-controlla
+  // il routing per evitare ricorsione.
+  if(!scanMesh || muaObjects.length === 0){showStatus('Carica scansione + posiziona MUA'); return}
+  var anyCut = muaObjects.some(function(m){ return m.scanbodyScanVisible === true; });
+  if(anyCut){
+    showStatus('Raffina non disponibile: disattiva il taglio scansione per ripristinare i riferimenti.');
+    return;
+  }
+  showStatus('Raffinamento (client fit-cerchio)...');
+  setTimeout(function(){
+    muaObjects.forEach(function(mua){
+      var alignRad = (mua.sbType && SCANBODY_CFG[mua.sbType]) ? SCANBODY_CFG[mua.sbType].radius : 2.515;
+      var autoResult = findScanbodyCenter(scanMesh.geometry, mua.clickPoint || mua.position, mua.clickNormal, { radius: alignRad });
+      var center = autoResult.center;
+      var axis = autoResult.axis.clone().normalize();
+      var newM = new THREE.Matrix4();
+      var up = new THREE.Vector3(0,0,1);
+      var q = new THREE.Quaternion().setFromUnitVectors(up, axis);
+      newM.makeRotationFromQuaternion(q);
+      newM.setPosition(center);
+      mua.group.matrix.copy(newM);
+      mua.group.matrixAutoUpdate = false;
+      mua.position.copy(center);
+      mua.axisDir.copy(axis);
+      mua.aligned = true;
+    });
+    if(typeof rebuildTree === 'function') rebuildTree();
+    showStatus('Raffinamento client completato.');
+  }, 30);
+}
+
+
 // v7.3.9.082 - alignAll variante SERVER (weighted ICP)
 function alignAllServer(){
   if(!scanMesh || muaObjects.length === 0){showStatus('Carica scansione + posiziona MUA'); return}
@@ -2920,14 +2961,10 @@ function alignAllServer(){
   }
   showStatus('Raffinamento (server weighted ICP)...');
 
+  // /lab v8.0.0-fase3i: endpoint pubblico, token non necessario.
+  // (la variabile resta declared per non rompere riferimenti residui ma non e' usata)
   var token = '';
   try { token = localStorage.getItem('syntesis_token') || ''; } catch(e){}
-  if(!token){
-    showStatus('Algoritmo server richiede login. Torno al client.');
-    // Fallback graceful: rieseguo path client salvando preferenza al volo
-    try { localStorage.setItem('syntesis_mua_algorithm', 'client'); } catch(e){}
-    return alignAll();
-  }
 
   // Per ogni MUA: estraggo crop di scansione attorno al click + invio al server
   var promises = muaObjects.map(function(mua){
@@ -2963,9 +3000,10 @@ function alignAllServer(){
 
     var templateId = (mua.templateId || mua.scanbodyType || '1T3').toUpperCase();
     var t0 = performance.now();
-    return fetch('/api/place-mua-lab', {
+    // /lab v8.0.0-fase3i: usa endpoint pubblico (no auth) per testing libero
+    return fetch('/api/place-mua-lab-public', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         scan_crop_tris: cropTris,
         click_point: [clickPt.x, clickPt.y, clickPt.z],
