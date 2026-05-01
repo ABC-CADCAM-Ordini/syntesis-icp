@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.0.0-fase3f-os-selector — LAB</title>
+<title>Syntesis-ICP - Analizzare v8.0.0-fase3g-triade-fix — LAB</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1588,14 +1588,14 @@ body .panel {
     <div class="panel-section" id="panelScanbodyType">
       <div class="panel-label">Tipo scanbody</div>
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:6px;line-height:1.5">
-        Marker da posizionare sui prossimi MUA. I MUA gia' posati restano del loro tipo.
+        Marker overlay sui prossimi MUA (source = 1T3 fisso). I MUA gia' posati restano del loro tipo.
       </div>
       <div class="comp-radio" id="analyzeSbTypeRadio">
         <label class="active"><input type="radio" name="analyzeSbType" value="1T3" checked onchange="setAnalyzeSbType('1T3')"><span class="sw" style="background:#ffaa44"></span>1T3</label>
         <label><input type="radio" name="analyzeSbType" value="OS" onchange="setAnalyzeSbType('OS')"><span class="sw" style="background:#639922"></span>OS</label>
       </div>
       <div style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-top:8px;line-height:1.45;opacity:0.75" id="analyzeSbTypeHint">
-        1T3: cap z=+10, r=2.515mm
+        Source 1T3 fisso. 1T3 = cap al click. OS = cap 4mm sotto.
       </div>
     </div>
 
@@ -1896,8 +1896,10 @@ function setAnalyzeSbType(t){
   try {
     var hint = document.getElementById('analyzeSbTypeHint');
     if(hint){
-      var cfg = SCANBODY_CFG[t];
-      hint.textContent = t + ': cap z=+' + cfg.capZ + ', r=' + cfg.radius + 'mm';
+      // /lab v8.0.0-fase3g: triade canonica, source 1T3 fisso
+      if(t === '1T3') hint.textContent = 'Cap al click. Connessione a click-10mm.';
+      else if(t === 'OS') hint.textContent = 'Cap 4mm sotto al click. Connessione a click-10mm (condivisa).';
+      else hint.textContent = t + ' overlay';
     }
   } catch(e){}
 }
@@ -2189,7 +2191,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.0.0-fase3f-os-selector';
+window.ANALIZZA_BUILD = '8.0.0-fase3g-triade-fix';
 window.ANALIZZA_BUILD_DATE = '2026-05-01';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2670,34 +2672,32 @@ function placeMUA(rawPoint,rawNormal){
   // sono condivisi (triade canonica: stesso sistema fisico sotto la cap).
   var sbType = getAnalyzeSbType();
   var sbCfg  = getAnalyzeSbCfg();
-  // Auto-centratura deterministica: trova il centro reale dello scanbody con il raggio CAD corretto
-  var autoResult = findScanbodyCenter(scanMesh.geometry, rawPoint, rawNormal, { radius: sbCfg.radius });
+  // /lab v8.0.0-fase3g-triade: TRIADE CANONICA con source 1T3.
+  // Schema: 1T3 e' il marker presente nella scansione (source · disco scansionato).
+  // OS/SR sono overlay visivi che condividono lo stesso piano di connessione clinica.
+  //
+  // Pipeline:
+  //   1. Fit cerchio sulla cap del 1T3 nella scansione  -> radius 2.515 (sempre)
+  //   2. Click identifica il punto sulla CAP DI 1T3 (z=+10 nel sistema CAD)
+  //   3. Tutte e 3 le geometrie del marker (cap selezionata + matematica + analogo)
+  //      vengono traslate di -10 lungo Z. Cosi' la connessione clinica (z=0 CAD)
+  //      arriva a click-10 in world, condivisa tra 1T3, OS e SR.
+  //   4. La cap visualizzata si posiziona automaticamente alla quota corretta:
+  //      - 1T3 cap (z=10 CAD) -> click       (al click)
+  //      - OS  cap (z= 6 CAD) -> click - 4   (4mm sotto, schema)
+  //      - SR  cap (z=-5 CAD) -> click - 15  (cap-down, schema)
+  var autoResult = findScanbodyCenter(scanMesh.geometry, rawPoint, rawNormal, { radius: 2.515 });
   var point = autoResult.center;
   var normal = autoResult.axis;
   muaCounter++;var color=MUA_COLORS[(muaCounter-1)%MUA_COLORS.length];var id='MUA_'+muaCounter;
-  showStatus('Caricamento MUA #'+muaCounter+' ('+sbType+')...');
+  showStatus('Caricamento MUA #'+muaCounter+' (overlay '+sbType+')...');
   var buffers=[b64toArrayBuffer(sbCfg.b64()),b64toArrayBuffer(MATEMATICA_B64),b64toArrayBuffer(ANALOGO_B64)];
   var sbResult=parseSTL(buffers[0]),matResult=parseSTL(buffers[1]),anResult=parseSTL(buffers[2]);
-  // /lab v7.3.9.108: offset Z dipende dal tipo (1T3: -10, OS: -6).
-  // La cap (originalmente a Z=capZ) va portata a Z=0 cosi' che l'origine del gruppo
-  // (= punto di click) coincida con la faccia piatta. Matematica e analogo restano
-  // ancorati al loro Z=0 originale (sistema di coordinate clinico condiviso).
-  sbResult.geometry.translate(0,0,-sbCfg.capZ);
-  // matematica e analogo NON traslano col cap: la triade canonica condivide il piano implantare.
-  // (per 1T3 con capZ=10 il comportamento e' identico al precedente perche' anche matematica/analogo
-  // erano traslati di -10; ma per OS dobbiamo cambiare strategia. Vedi nota sotto.)
-  // NOTA STRATEGIA TRIADE CANONICA:
-  // Originalmente tutte e 3 le geometrie venivano traslate di -10 perche' il MUA 1T3 ha matematica
-  // e analogo gia' ancorati alla cap a z=10. Per la triade canonica condivisa, matematica e analogo
-  // sono ancorati al PIANO IMPLANTARE (z=0 nel sistema CAD). Quando cambia la cap, la matematica
-  // e l'analogo restano dove sono. Ma il codice originale assumeva che fossero a z=10.
-  // -> Per ora manteniamo il comportamento originale per 1T3 (traslazione -10 di tutto)
-  //    e per OS trasliamo SOLO la cap di -6, mat/an restano a z=0 originale (gia' al piano implantare).
-  if(sbType === '1T3'){
-    matResult.geometry.translate(0,0,-10);
-    anResult.geometry.translate(0,0,-10);
-  }
-  // Per 'OS': matematica e analogo gia' ancorati a z=0 (piano implantare), niente traslazione.
+  // Traslazione canonica condivisa: SEMPRE -10, source = 1T3.
+  // La connessione clinica e' a click-10 lungo asse per tutti i tipi di marker.
+  sbResult.geometry.translate(0,0,-10);
+  matResult.geometry.translate(0,0,-10);
+  anResult.geometry.translate(0,0,-10);
   var group=new THREE.Group();group.name=id;
 
   // Scanbody (visibile, toggleable)
@@ -2845,10 +2845,10 @@ function alignAll(){
   showStatus('Raffinamento...');
   setTimeout(function(){
     muaObjects.forEach(function(mua){
-      // /lab v7.3.9.108: usa il raggio CAD del tipo del MUA (default 1T3 per retrocompat)
-      var alignRad = (mua.sbType && SCANBODY_CFG[mua.sbType]) ? SCANBODY_CFG[mua.sbType].radius : 2.515;
-      // Ri-esegui l'auto-centratura con il click originale (deterministico)
-      var autoResult = findScanbodyCenter(scanMesh.geometry, mua.clickPoint || mua.position, mua.clickNormal, { radius: alignRad });
+      // /lab v8.0.0-fase3g-triade: source SEMPRE 1T3, raggio fit fisso 2.515mm.
+      // La cap che viene fittata nella scansione e' quella del 1T3 (canonica),
+      // indipendentemente dal marker overlay scelto dall'utente.
+      var autoResult = findScanbodyCenter(scanMesh.geometry, mua.clickPoint || mua.position, mua.clickNormal, { radius: 2.515 });
       var center = autoResult.center;
       var axis = autoResult.axis.clone().normalize();
 
