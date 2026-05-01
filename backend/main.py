@@ -632,6 +632,122 @@ async def place_mua_lab(req: PlaceMuaRequest, current_user: dict = Depends(verif
 
 
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# /lab v8.0.0-fase3i: endpoint PUBBLICO senza auth per testing /lab.
+# Permette al modulo /lab di chiamare il weighted ICP server-side senza
+# richiedere il login dell'utente. Stessa logica di /api/place-mua-lab.
+# Coerente con /api/analyze-public per il modulo Misurare.
+# Rate limit: TBD (per ora open).
+# ─────────────────────────────────────────────────────────────────────────────
+@app.post("/api/place-mua-lab-public")
+async def place_mua_lab_public(req: PlaceMuaRequest):
+    """LAB pubblico (no auth): identico a /api/place-mua-lab ma senza token.
+
+    Per testing libero del modulo /lab. Se in futuro si decide di promuovere
+    questo flusso in produzione, si valutera' rate limiting o auth.
+    """
+    import time as _time
+    import numpy as _np
+    from icp_engine_lab import (
+        align_template_to_marker, find_components, _cap_centroid_for_cluster,
+        cyl_axis
+    )
+
+    t0 = _time.time()
+
+    if not req.scan_crop_tris or len(req.scan_crop_tris) < 30:
+        raise HTTPException(400, detail="Crop scansione troppo piccolo (min 30 triangoli).")
+    if len(req.click_point) != 3 or len(req.click_normal) != 3:
+        raise HTTPException(400, detail="click_point e click_normal devono essere [x,y,z].")
+
+    try:
+        scan_tris = _np.array(req.scan_crop_tris, dtype=_np.float32)
+        if scan_tris.ndim != 3 or scan_tris.shape[1:] != (3, 3):
+            raise ValueError(f"Shape inattesa: {scan_tris.shape}, atteso (N,3,3)")
+        click_pt = _np.array(req.click_point, dtype=_np.float32)
+        click_n = _np.array(req.click_normal, dtype=_np.float32)
+        click_n = click_n / (_np.linalg.norm(click_n) + 1e-9)
+    except Exception as e:
+        raise HTTPException(400, detail=f"Input malformato: {e}")
+
+    centroids = scan_tris.mean(axis=1)
+    dists = _np.linalg.norm(centroids - click_pt, axis=1)
+    near_mask = dists < 5.0
+    near_pts = centroids[near_mask]
+
+    if len(near_pts) < 30:
+        raise HTTPException(
+            422,
+            detail=f"Pochi punti vicini al click ({len(near_pts)} < 30)."
+        )
+
+    radius_map = {"1T3": 2.515, "OS": 1.78, "SR": 2.03}
+    # Type-aware template parameters: cap_z (height of cap top in template local frame),
+    # body_height (cylinder height before cap), cap_thickness.
+    # Approximate the actual scanbody geometry per type to give ICP a better starting target.
+    template_params = {
+        "1T3": {"radius": 2.515, "cap_z": 4.0, "body_levels": [0.5, 1.5, 2.5, 3.5]},
+        "OS":  {"radius": 1.78,  "cap_z": 4.5, "body_levels": [0.5, 1.5, 2.5, 3.5]},
+        "SR":  {"radius": 2.03,  "cap_z": 3.0, "body_levels": [0.5, 1.0, 1.5, 2.0, 2.5]},
+    }
+    tid = (req.template_id or "1T3").upper()
+    params = template_params.get(tid, template_params["1T3"])
+    radius = req.template_radius or params["radius"]
+    cap_z  = params["cap_z"]
+    body_levels = params["body_levels"]
+
+    n_side = 80
+    n_cap = 60
+    template_pts = []
+    for i in range(n_side):
+        ang = 2 * 3.14159 * i / n_side
+        for z in body_levels:
+            template_pts.append([radius * _np.cos(ang), radius * _np.sin(ang), z])
+    for i in range(n_cap):
+        r = radius * (i / n_cap) ** 0.5
+        ang = 2 * 3.14159 * i * 0.382
+        template_pts.append([r * _np.cos(ang), r * _np.sin(ang), cap_z])
+    template_pts = _np.array(template_pts, dtype=_np.float32)
+    n_tri = (len(template_pts) - 2) // 3
+    template_tris = template_pts[:n_tri*3].reshape(n_tri, 3, 3)
+
+    try:
+        result = align_template_to_marker(
+            template_tris=template_tris,
+            marker_pts=near_pts,
+            use_icp=True,
+            n_rot_attempts=8
+        )
+    except Exception as e:
+        raise HTTPException(500, detail=f"Allineamento fallito: {type(e).__name__}: {e}")
+
+    R = _np.array(result["R"])
+    t = _np.array(result["t"])
+    rmsd = float(result["rmsd"])
+
+    cap_top_local = _np.array([0, 0, cap_z])
+    center = (R @ cap_top_local + t).tolist()
+    axis_z_local = _np.array([0, 0, 1.0])
+    axis_world = (R @ axis_z_local).tolist()
+
+    elapsed_ms = int((_time.time() - t0) * 1000)
+
+    return {
+        "center": center,
+        "axis": axis_world,
+        "rmsd": rmsd,
+        "method": result.get("method", "weighted_icp"),
+        "algorithm": "server_weighted_icp_lab_public_v1",
+        "elapsed_ms": elapsed_ms,
+        "n_marker_pts": int(len(near_pts)),
+        "template_id": tid,
+        "template_radius": radius,
+        "template_cap_z": cap_z,
+        "branch": "lab-public"
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # v7.3.9.046 - BACKEND UTENTE
 # Area personale: lista mie analisi, rinomina, archivia, elimina, profilo
