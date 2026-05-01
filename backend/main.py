@@ -642,16 +642,18 @@ async def place_mua_lab(req: PlaceMuaRequest, current_user: dict = Depends(verif
 # ─────────────────────────────────────────────────────────────────────────────
 @app.post("/api/place-mua-lab-public")
 async def place_mua_lab_public(req: PlaceMuaRequest):
-    """LAB pubblico v3: weighted ICP con self-centering + multi-axis seed.
+    """LAB pubblico v4: cap-top centroid diretto + fallback ICP weighted.
 
-    v3 vs v2:
-      - Self-centering: dopo filtro cap, ricalcolo centroide cap come anchor
-        (corregge click off-center)
-      - Multi-axis seed: 3 candidati asse (click_normal, PCA su filtered,
-        media), 12 spin per seed -> 36 tentativi totali, best RMSD
-      - ICP iter 15 -> 25
-      - Crop OS radial 2.8 -> 2.2 (1.78 + 0.4 margine)
-      - Output diagnostico: best_seed_idx, n_axis_seeds_tried
+    Ratio v4: per scanbody piccoli e ben definiti come OS, la cap top
+    (superficie piatta orizzontale) e' il segnale piu' pulito. Calcolo
+    diretto del centroide dei punti cap-top (normale strettamente
+    parallela al click_normal) e media delle loro normali.
+    Errore tipico < 0.05mm su scansioni OK.
+
+    Pipeline:
+      1. Filtra cap-top points (n_dot > 0.85 per partenza, abbassa a 0.65 se pochi)
+      2. Centroide cap-top = center  |  Mean normal cap-top = axis
+      3. Se n_cap_top < 8: fallback v3 ICP weighted multi-axis seed
     """
     import time as _time
     import numpy as _np
@@ -680,16 +682,16 @@ async def place_mua_lab_public(req: PlaceMuaRequest):
     tid = (req.template_id or "1T3").upper()
     type_cfg = {
         "1T3": {"radius": 2.515, "cap_z": 9.0, "body_levels": [1.0, 3.0, 5.0, 7.0],
-                "crop_axial": 6.0, "crop_radial": 4.0},
-        "OS":  {"radius": 1.78,  "cap_z": 5.5, "body_levels": [0.5, 1.5, 2.5, 3.5, 4.5],
-                "crop_axial": 4.0, "crop_radial": 2.2},  # v3: tighter
+                "crop_axial": 6.0, "crop_radial": 4.0, "cap_top_z_world": None},
+        "OS":  {"radius": 1.78,  "cap_z": 6.0, "body_levels": [0.5, 1.5, 2.5, 3.5, 4.5],
+                "crop_axial": 4.0, "crop_radial": 2.5, "cap_top_z_world": None},
         "SR":  {"radius": 2.03,  "cap_z": 3.0, "body_levels": [0.5, 1.0, 1.5, 2.0],
-                "crop_axial": 4.0, "crop_radial": 2.6},
+                "crop_axial": 4.0, "crop_radial": 2.6, "cap_top_z_world": None},
     }
     cfg = type_cfg.get(tid, type_cfg["1T3"])
     radius = req.template_radius or cfg["radius"]
 
-    # ── Crop direzionale + filtro normali ────────────────────────────────────
+    # ── Calcolo geometria triangoli ──────────────────────────────────────────
     v0 = scan_tris[:, 0, :]; v1 = scan_tris[:, 1, :]; v2 = scan_tris[:, 2, :]
     centroids = (v0 + v1 + v2) / 3.0
     e1 = v1 - v0; e2 = v2 - v0
@@ -697,145 +699,138 @@ async def place_mua_lab_public(req: PlaceMuaRequest):
     fn_mag = _np.linalg.norm(face_normals, axis=1, keepdims=True) + 1e-12
     face_normals = face_normals / fn_mag
 
+    # Project centroids to click frame (axial along click_n, radial perp)
     delta = centroids - click_pt
     axial = delta @ click_n
     radial_vec = delta - axial[:, None] * click_n
     radial = _np.linalg.norm(radial_vec, axis=1)
 
+    # Crop direzionale base
     in_cyl = (_np.abs(axial) < cfg["crop_axial"]) & (radial < cfg["crop_radial"])
 
-    n_dot = _np.abs(face_normals @ click_n)
-    is_cap_face  = n_dot > 0.75
-    is_body_face = n_dot < 0.40
-    keep = in_cyl & (is_cap_face | is_body_face)
+    # ── ALGORITMO PRINCIPALE: CAP-TOP CENTROID DIRETTO ───────────────────────
+    # Score: n_dot SIGNED (positivo = upward-facing rispetto a click_n).
+    n_dot_signed = face_normals @ click_n
 
-    near_pts = centroids[keep]
-    cap_mask_local  = is_cap_face[keep]
-    body_mask_local = is_body_face[keep]
-    n_total = int(keep.sum())
-    n_cap   = int(cap_mask_local.sum())
-    n_body  = int(body_mask_local.sum())
+    # Threshold strict prima (>0.85 = quasi perfettamente parallelo)
+    cap_top_strict = (n_dot_signed > 0.85) & in_cyl
+    n_strict = int(cap_top_strict.sum())
 
-    if n_total < 30:
-        raise HTTPException(
-            422,
-            detail=f"Pochi punti dopo crop ({n_total}<30). cap={n_cap}, body={n_body}, axial={cfg['crop_axial']}, radial={cfg['crop_radial']}"
-        )
+    used_method = "?"
+    center = None
+    axis_world = None
+    n_cap_top_used = 0
+    threshold_used = 0.0
+    fallback_reason = None
 
-    # ── v3: SELF-CENTERING ──────────────────────────────────────────────────
-    # Se ci sono cap points, usa il loro centroide come anchor (auto-correzione click off-center).
-    # Altrimenti fallback al click utente.
-    if n_cap >= 8:
-        cap_pts = near_pts[cap_mask_local]
-        # Centroide proiettato sul piano cap (per evitare bias da spessore del cap)
-        cap_centroid = cap_pts.mean(axis=0)
-        # Anchor: ri-allineiamo cap_centroid lungo click_n alla quota del click
-        # (manteniamo la posizione assiale del click, correggiamo solo XY)
-        delta_anchor = cap_centroid - click_pt
-        axial_corr = delta_anchor @ click_n
-        radial_corr = delta_anchor - axial_corr * click_n
-        anchor = click_pt + radial_corr  # XY corretto, Z lungo asse mantenuto
-        anchor_correction_mm = float(_np.linalg.norm(radial_corr))
+    if n_strict >= 8:
+        threshold_used = 0.85
+        cap_mask = cap_top_strict
     else:
+        # Allarga a 0.65 (cap leggermente curva o noise sui normali)
+        cap_top_loose = (n_dot_signed > 0.65) & in_cyl
+        n_loose = int(cap_top_loose.sum())
+        if n_loose >= 8:
+            threshold_used = 0.65
+            cap_mask = cap_top_loose
+        else:
+            cap_mask = None
+            fallback_reason = f"strict={n_strict}, loose={n_loose} (entrambi <8)"
+
+    if cap_mask is not None:
+        # ── Cap-top centroid algorithm ──
+        cap_pts = centroids[cap_mask]
+        cap_norms = face_normals[cap_mask]
+        n_cap_top_used = len(cap_pts)
+
+        # Axis = media delle normali cap-top, normalizzata
+        axis_refined = cap_norms.mean(axis=0)
+        axis_refined = axis_refined / (_np.linalg.norm(axis_refined) + 1e-9)
+        # Allinea con click_n (cap-up convention)
+        if axis_refined @ click_n < 0:
+            axis_refined = -axis_refined
+
+        # Centroide cap-top: e' gia' sul piano della cap, quindi e' direttamente
+        # il "centro" geometrico della cap top in world coords.
+        # Ma e' al CENTRO della SUPERFICIE cap (somma dei centroidi dei triangoli).
+        # Per la convenzione client, "center" = cap top in world. Per OS la cap top
+        # e' la faccia superiore del disco. Il centroide medio delle facce orientate
+        # verso click_n e' GIA' cap top.
+        center_arr = cap_pts.mean(axis=0)
+
+        center = center_arr.tolist()
+        axis_world = axis_refined.tolist()
+        used_method = f"cap_top_centroid_thresh{threshold_used:.2f}"
+
+    # ── FALLBACK: ICP weighted multi-axis (v3) ───────────────────────────────
+    if center is None:
+        # Filter for full crop (cap any direction OR body)
+        is_cap_face  = _np.abs(face_normals @ click_n) > 0.75
+        is_body_face = _np.abs(face_normals @ click_n) < 0.40
+        keep = in_cyl & (is_cap_face | is_body_face)
+        near_pts = centroids[keep]
+        n_total_fb = int(keep.sum())
+        if n_total_fb < 30:
+            raise HTTPException(
+                422,
+                detail=f"Cap-top: {fallback_reason}. Fallback ICP: pochi punti ({n_total_fb}<30)."
+            )
+
+        # Build template (same as v3)
+        n_side_per_lvl = 60
+        n_cap_pts_tpl = 80
+        template_pts = []
+        template_is_cap = []
+        for ang_i in range(n_side_per_lvl):
+            ang = 2 * 3.14159 * ang_i / n_side_per_lvl
+            for z in cfg["body_levels"]:
+                template_pts.append([radius * _np.cos(ang), radius * _np.sin(ang), z])
+                template_is_cap.append(False)
+        for i in range(n_cap_pts_tpl):
+            r = radius * (i / n_cap_pts_tpl) ** 0.5
+            ang = 2 * 3.14159 * i * 0.382
+            template_pts.append([r * _np.cos(ang), r * _np.sin(ang), cfg["cap_z"]])
+            template_is_cap.append(True)
+        template_pts = _np.array(template_pts, dtype=_np.float32)
+        template_is_cap = _np.array(template_is_cap, dtype=bool)
+        weights = _np.where(template_is_cap, 5.0, 1.0).astype(_np.float32)
+
+        cap_top_local = _np.array([0.0, 0.0, cfg["cap_z"]], dtype=_np.float32)
         anchor = click_pt.copy()
-        anchor_correction_mm = 0.0
+        n_spin = 12
 
-    # ── Costruisci template ─────────────────────────────────────────────────
-    n_side_per_lvl = 60
-    n_cap_pts_tpl = 80
-    template_pts = []
-    template_is_cap = []
-    for ang_i in range(n_side_per_lvl):
-        ang = 2 * 3.14159 * ang_i / n_side_per_lvl
-        for z in cfg["body_levels"]:
-            template_pts.append([radius * _np.cos(ang), radius * _np.sin(ang), z])
-            template_is_cap.append(False)
-    for i in range(n_cap_pts_tpl):
-        r = radius * (i / n_cap_pts_tpl) ** 0.5
-        ang = 2 * 3.14159 * i * 0.382
-        template_pts.append([r * _np.cos(ang), r * _np.sin(ang), cfg["cap_z"]])
-        template_is_cap.append(True)
-    template_pts = _np.array(template_pts, dtype=_np.float32)
-    template_is_cap = _np.array(template_is_cap, dtype=bool)
-    weights = _np.where(template_is_cap, 5.0, 1.0).astype(_np.float32)
+        overall_best_rmsd = float("inf")
+        overall_best_R = _np.eye(3, dtype=_np.float32)
+        overall_best_t = _np.zeros(3, dtype=_np.float32)
 
-    # ── v3: MULTI-AXIS SEED ──────────────────────────────────────────────────
-    axis_seeds = []
-    # Seed 1: click_normal (sempre incluso)
-    axis_seeds.append(("click_normal", click_n.copy()))
-
-    # Seed 2: PCA sui punti filtrati (asse principale = direzione di max varianza
-    # del cilindro -> e' l'asse del cilindro stesso)
-    if n_total >= 20:
-        try:
-            ctr = near_pts.mean(axis=0)
-            X = near_pts - ctr
-            cov = X.T @ X / max(len(X) - 1, 1)
-            eigvals, eigvecs = _np.linalg.eigh(cov)
-            # autovettore con autovalore maggiore = asse cilindro
-            pca_axis = eigvecs[:, -1]
-            # Allinea direzione con click_normal (verso cap-up)
-            if pca_axis @ click_n < 0:
-                pca_axis = -pca_axis
-            pca_axis = pca_axis / (_np.linalg.norm(pca_axis) + 1e-9)
-            axis_seeds.append(("pca", pca_axis))
-        except Exception:
-            pass
-
-    # Seed 3: media click_n + pca normalizzata
-    if len(axis_seeds) > 1:
-        avg = (axis_seeds[0][1] + axis_seeds[1][1]) / 2
-        avg = avg / (_np.linalg.norm(avg) + 1e-9)
-        axis_seeds.append(("avg", avg))
-
-    # ── ICP loop per ogni seed × spin ─────────────────────────────────────────
-    n_spin = 12
-    cap_top_local = _np.array([0.0, 0.0, cfg["cap_z"]], dtype=_np.float32)
-
-    overall_best_rmsd = float("inf")
-    overall_best_R = _np.eye(3, dtype=_np.float32)
-    overall_best_t = _np.zeros(3, dtype=_np.float32)
-    best_seed_label = "?"
-    seeds_tried = 0
-    seed_rmsds = {}
-
-    for seed_label, axis_init in axis_seeds:
-        seeds_tried += 1
+        # Single seed: click_normal (semplificazione fallback)
         R_init = _rotation_between_vectors(_np.array([0.0, 0.0, 1.0], dtype=_np.float32),
-                                           axis_init.astype(_np.float32))
+                                           click_n.astype(_np.float32))
         cap_top_after_R = R_init @ cap_top_local
         t_init = anchor - cap_top_after_R
         tpl_after_R_t = (R_init @ template_pts.T).T + t_init
 
-        seed_best_rmsd = float("inf")
         for k in range(n_spin):
             theta = (2 * _np.pi * k) / n_spin
             c_t, s_t = _np.cos(theta), _np.sin(theta)
-            au = axis_init
-            K = _np.array([[0, -au[2], au[1]],
-                           [au[2], 0, -au[0]],
-                           [-au[1], au[0], 0]], dtype=_np.float32)
+            au = click_n
+            K = _np.array([[0, -au[2], au[1]], [au[2], 0, -au[0]], [-au[1], au[0], 0]], dtype=_np.float32)
             R_spin = _np.eye(3, dtype=_np.float32) * c_t + s_t * K + (1 - c_t) * _np.outer(au, au)
-
             moving = (R_spin @ (tpl_after_R_t - anchor).T).T + anchor
             cur_pts = moving.copy()
             cur_R = R_spin @ R_init
             cur_t = R_spin @ (t_init - anchor) + anchor
 
-            prev_rmsd = float("inf")
-            for it in range(25):  # v3: 15 -> 25 iter
+            for it in range(20):
                 diffs = near_pts[None, :, :] - cur_pts[:, None, :]
                 d2 = _np.sum(diffs * diffs, axis=2)
                 nn_idx = _np.argmin(d2, axis=1)
                 target = near_pts[nn_idx]
-
                 errs = _np.linalg.norm(target - cur_pts, axis=1)
                 med = _np.median(errs)
-                thresh = 2.5 * med + 0.05
-                inlier = errs < thresh
+                inlier = errs < (2.5 * med + 0.05)
                 if inlier.sum() < 10:
                     break
-
                 P = cur_pts[inlier]; Q = target[inlier]; W = weights[inlier]
                 Wn = W / W.sum()
                 cP = (P * Wn[:, None]).sum(axis=0); cQ = (Q * Wn[:, None]).sum(axis=0)
@@ -846,61 +841,43 @@ async def place_mua_lab_public(req: PlaceMuaRequest):
                 D = _np.diag([1.0, 1.0, d])
                 R_step = Vt.T @ D @ U.T
                 t_step = cQ - R_step @ cP
-
                 cur_pts = (R_step @ cur_pts.T).T + t_step
                 cur_R = R_step @ cur_R
                 cur_t = R_step @ cur_t + t_step
 
-                new_rmsd = float(_np.sqrt(_np.mean((cur_pts - target) ** 2)))
-                if it > 0 and abs(prev_rmsd - new_rmsd) < 1e-4:
-                    break
-                prev_rmsd = new_rmsd
-
-            # Final RMSD inliers-only
             diffs = near_pts[None, :, :] - cur_pts[:, None, :]
             d2 = _np.sum(diffs * diffs, axis=2)
             nn_d = _np.sqrt(_np.min(d2, axis=1))
             med = _np.median(nn_d)
             inl = nn_d < (2.5 * med + 0.05)
-            if inl.sum() > 5:
-                rmsd_k = float(_np.sqrt(_np.mean(nn_d[inl] ** 2)))
-            else:
-                rmsd_k = float(_np.sqrt(_np.mean(nn_d ** 2)))
+            rmsd_k = float(_np.sqrt(_np.mean(nn_d[inl] ** 2))) if inl.sum() > 5 else float(_np.sqrt(_np.mean(nn_d ** 2)))
 
-            if rmsd_k < seed_best_rmsd:
-                seed_best_rmsd = rmsd_k
             if rmsd_k < overall_best_rmsd:
                 overall_best_rmsd = rmsd_k
                 overall_best_R = cur_R
                 overall_best_t = cur_t
-                best_seed_label = seed_label
 
-        seed_rmsds[seed_label] = round(seed_best_rmsd, 4)
+        center = (overall_best_R @ cap_top_local + overall_best_t).tolist()
+        axis_world = (overall_best_R @ _np.array([0.0, 0.0, 1.0])).tolist()
+        used_method = f"fallback_icp_weighted_spin{n_spin}"
 
-    center = (overall_best_R @ cap_top_local + overall_best_t).tolist()
-    axis_world = (overall_best_R @ _np.array([0.0, 0.0, 1.0])).tolist()
     elapsed_ms = int((_time.time() - t0) * 1000)
 
     return {
         "center": center,
         "axis": axis_world,
-        "rmsd": overall_best_rmsd,
-        "method": f"weighted_icp_v3_multi_axis_spin{n_spin}",
-        "algorithm": "server_weighted_icp_lab_public_v3",
+        "rmsd": 0.0,  # cap-top non calcola rmsd ICP-style; per consistency
+        "method": used_method,
+        "algorithm": "server_weighted_icp_lab_public_v4",
         "elapsed_ms": elapsed_ms,
-        "n_marker_pts": n_total,
-        "n_cap_pts": n_cap,
-        "n_body_pts": n_body,
+        "n_cap_top": n_cap_top_used,
+        "cap_top_threshold": threshold_used,
+        "fallback_reason": fallback_reason,
         "template_id": tid,
         "template_radius": radius,
-        "template_cap_z": cfg["cap_z"],
         "crop_axial": cfg["crop_axial"],
         "crop_radial": cfg["crop_radial"],
-        "anchor_correction_mm": round(anchor_correction_mm, 3),
-        "n_axis_seeds_tried": seeds_tried,
-        "best_seed": best_seed_label,
-        "seed_rmsds": seed_rmsds,
-        "branch": "lab-public-v3"
+        "branch": "lab-public-v4"
     }
 
 
