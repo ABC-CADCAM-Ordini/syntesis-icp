@@ -738,29 +738,38 @@ async def place_mua_lab_public(req: PlaceMuaRequest):
             fallback_reason = f"strict={n_strict}, loose={n_loose} (entrambi <8)"
 
     if cap_mask is not None:
-        # ── Cap-top centroid algorithm ──
+        # ── Cap-top centroid + SVD plane axis ──
         cap_pts = centroids[cap_mask]
         cap_norms = face_normals[cap_mask]
         n_cap_top_used = len(cap_pts)
 
-        # Axis = media delle normali cap-top, normalizzata
-        axis_refined = cap_norms.mean(axis=0)
-        axis_refined = axis_refined / (_np.linalg.norm(axis_refined) + 1e-9)
-        # Allinea con click_n (cap-up convention)
-        if axis_refined @ click_n < 0:
-            axis_refined = -axis_refined
-
-        # Centroide cap-top: e' gia' sul piano della cap, quindi e' direttamente
-        # il "centro" geometrico della cap top in world coords.
-        # Ma e' al CENTRO della SUPERFICIE cap (somma dei centroidi dei triangoli).
-        # Per la convenzione client, "center" = cap top in world. Per OS la cap top
-        # e' la faccia superiore del disco. Il centroide medio delle facce orientate
-        # verso click_n e' GIA' cap top.
+        # Centroide = centro XY della cap top (in world)
         center_arr = cap_pts.mean(axis=0)
+
+        # Asse via SVD: piano di best-fit attraverso cap_pts.
+        # L'autovettore con autovalore MINIMO = normale del piano = asse.
+        # Robust al rumore di triangolazione (usa posizioni, non normali calcolate).
+        Pc = cap_pts - center_arr
+        try:
+            _U, _S, Vt = _np.linalg.svd(Pc, full_matrices=False)
+            axis_svd = Vt[-1]  # smallest singular value = plane normal
+            axis_svd = axis_svd / (_np.linalg.norm(axis_svd) + 1e-9)
+            # Allinea con click_n (cap-up)
+            if axis_svd @ click_n < 0:
+                axis_svd = -axis_svd
+            axis_refined = axis_svd
+            axis_method = "svd_plane"
+        except Exception:
+            # Fallback: media delle normali
+            axis_refined = cap_norms.mean(axis=0)
+            axis_refined = axis_refined / (_np.linalg.norm(axis_refined) + 1e-9)
+            if axis_refined @ click_n < 0:
+                axis_refined = -axis_refined
+            axis_method = "mean_normal_fallback"
 
         center = center_arr.tolist()
         axis_world = axis_refined.tolist()
-        used_method = f"cap_top_centroid_thresh{threshold_used:.2f}"
+        used_method = f"cap_top_centroid_{axis_method}_thresh{threshold_used:.2f}"
 
     # ── FALLBACK: ICP weighted multi-axis (v3) ───────────────────────────────
     if center is None:
