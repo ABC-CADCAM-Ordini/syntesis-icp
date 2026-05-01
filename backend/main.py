@@ -642,13 +642,16 @@ async def place_mua_lab(req: PlaceMuaRequest, current_user: dict = Depends(verif
 # ─────────────────────────────────────────────────────────────────────────────
 @app.post("/api/place-mua-lab-public")
 async def place_mua_lab_public(req: PlaceMuaRequest):
-    """LAB pubblico v2 (no auth): weighted ICP con crop direzionale + filtro normali.
+    """LAB pubblico v3: weighted ICP con self-centering + multi-axis seed.
 
-    Iterazione 2 vs v1:
-      - Crop direzionale (cilindro lungo click_normal) invece di sfera
-      - Filtro normali: tieni solo cap-like (normale parallela) o body-like (perpendicolare)
-      - Template parametrico type-aware con cap_z fedele al CAD
-      - Weighted ICP: cap points weight 5x, body 1x (memoria v7.3.7.004)
+    v3 vs v2:
+      - Self-centering: dopo filtro cap, ricalcolo centroide cap come anchor
+        (corregge click off-center)
+      - Multi-axis seed: 3 candidati asse (click_normal, PCA su filtered,
+        media), 12 spin per seed -> 36 tentativi totali, best RMSD
+      - ICP iter 15 -> 25
+      - Crop OS radial 2.8 -> 2.2 (1.78 + 0.4 margine)
+      - Output diagnostico: best_seed_idx, n_axis_seeds_tried
     """
     import time as _time
     import numpy as _np
@@ -674,77 +677,72 @@ async def place_mua_lab_public(req: PlaceMuaRequest):
     except Exception as e:
         raise HTTPException(400, detail=f"Input malformato: {e}")
 
-    # ── Type-aware template + crop parameters ────────────────────────────────
     tid = (req.template_id or "1T3").upper()
     type_cfg = {
-        "1T3": {
-            "radius": 2.515,         # cap radius CAD
-            "cap_z":  9.0,           # cap top in template local frame
-            "body_levels": [1.0, 3.0, 5.0, 7.0],  # body cylinder levels
-            "crop_axial":  6.0,      # ±mm along click axis
-            "crop_radial": 4.0,      # mm from click axis
-        },
-        "OS": {
-            "radius": 1.78,
-            "cap_z":  5.5,           # cap top at z=+5.5 (real CAD: cap z=4.9-6.0)
-            "body_levels": [0.5, 1.5, 2.5, 3.5, 4.5],
-            "crop_axial":  4.0,      # OS e' piu' corto, crop piu' stretto
-            "crop_radial": 2.8,      # 1.78 + ~1mm margine = scanbody only
-        },
-        "SR": {
-            "radius": 2.03,
-            "cap_z":  3.0,           # cap top a z=+3 (cap thickness ~3mm)
-            "body_levels": [0.5, 1.0, 1.5, 2.0],
-            "crop_axial":  4.0,
-            "crop_radial": 3.2,
-        },
+        "1T3": {"radius": 2.515, "cap_z": 9.0, "body_levels": [1.0, 3.0, 5.0, 7.0],
+                "crop_axial": 6.0, "crop_radial": 4.0},
+        "OS":  {"radius": 1.78,  "cap_z": 5.5, "body_levels": [0.5, 1.5, 2.5, 3.5, 4.5],
+                "crop_axial": 4.0, "crop_radial": 2.2},  # v3: tighter
+        "SR":  {"radius": 2.03,  "cap_z": 3.0, "body_levels": [0.5, 1.0, 1.5, 2.0],
+                "crop_axial": 4.0, "crop_radial": 2.6},
     }
     cfg = type_cfg.get(tid, type_cfg["1T3"])
     radius = req.template_radius or cfg["radius"]
 
     # ── Crop direzionale + filtro normali ────────────────────────────────────
-    # Per ogni triangolo: centroide, normale (face normal via cross product).
-    v0 = scan_tris[:, 0, :]
-    v1 = scan_tris[:, 1, :]
-    v2 = scan_tris[:, 2, :]
+    v0 = scan_tris[:, 0, :]; v1 = scan_tris[:, 1, :]; v2 = scan_tris[:, 2, :]
     centroids = (v0 + v1 + v2) / 3.0
-    e1 = v1 - v0
-    e2 = v2 - v0
+    e1 = v1 - v0; e2 = v2 - v0
     face_normals = _np.cross(e1, e2)
     fn_mag = _np.linalg.norm(face_normals, axis=1, keepdims=True) + 1e-12
     face_normals = face_normals / fn_mag
 
-    # Project to click-aligned frame
     delta = centroids - click_pt
-    axial = delta @ click_n                           # signed distance along click axis
+    axial = delta @ click_n
     radial_vec = delta - axial[:, None] * click_n
     radial = _np.linalg.norm(radial_vec, axis=1)
 
-    # Direzionale: dentro il cilindro
     in_cyl = (_np.abs(axial) < cfg["crop_axial"]) & (radial < cfg["crop_radial"])
 
-    # Filtro normali: cap (||) oppure body (perp). Scarta tutto il resto (gum noise).
-    n_dot = _np.abs(face_normals @ click_n)           # 0=perp, 1=parallel
-    is_cap_face  = n_dot > 0.75                        # cap-like surface
-    is_body_face = n_dot < 0.40                        # cylinder side
+    n_dot = _np.abs(face_normals @ click_n)
+    is_cap_face  = n_dot > 0.75
+    is_body_face = n_dot < 0.40
     keep = in_cyl & (is_cap_face | is_body_face)
 
     near_pts = centroids[keep]
-    cap_mask_local = is_cap_face[keep]
+    cap_mask_local  = is_cap_face[keep]
     body_mask_local = is_body_face[keep]
-    n_total  = int(keep.sum())
-    n_cap    = int(cap_mask_local.sum())
-    n_body   = int(body_mask_local.sum())
+    n_total = int(keep.sum())
+    n_cap   = int(cap_mask_local.sum())
+    n_body  = int(body_mask_local.sum())
 
     if n_total < 30:
         raise HTTPException(
             422,
-            detail=f"Pochi punti dopo crop direzionale ({n_total}<30). cap={n_cap}, body={n_body}, cropAxial={cfg['crop_axial']}, cropRadial={cfg['crop_radial']}"
+            detail=f"Pochi punti dopo crop ({n_total}<30). cap={n_cap}, body={n_body}, axial={cfg['crop_axial']}, radial={cfg['crop_radial']}"
         )
 
-    # ── Costruisci template sintetico fedele al CAD ──────────────────────────
+    # ── v3: SELF-CENTERING ──────────────────────────────────────────────────
+    # Se ci sono cap points, usa il loro centroide come anchor (auto-correzione click off-center).
+    # Altrimenti fallback al click utente.
+    if n_cap >= 8:
+        cap_pts = near_pts[cap_mask_local]
+        # Centroide proiettato sul piano cap (per evitare bias da spessore del cap)
+        cap_centroid = cap_pts.mean(axis=0)
+        # Anchor: ri-allineiamo cap_centroid lungo click_n alla quota del click
+        # (manteniamo la posizione assiale del click, correggiamo solo XY)
+        delta_anchor = cap_centroid - click_pt
+        axial_corr = delta_anchor @ click_n
+        radial_corr = delta_anchor - axial_corr * click_n
+        anchor = click_pt + radial_corr  # XY corretto, Z lungo asse mantenuto
+        anchor_correction_mm = float(_np.linalg.norm(radial_corr))
+    else:
+        anchor = click_pt.copy()
+        anchor_correction_mm = 0.0
+
+    # ── Costruisci template ─────────────────────────────────────────────────
     n_side_per_lvl = 60
-    n_cap_pts = 80
+    n_cap_pts_tpl = 80
     template_pts = []
     template_is_cap = []
     for ang_i in range(n_side_per_lvl):
@@ -752,132 +750,157 @@ async def place_mua_lab_public(req: PlaceMuaRequest):
         for z in cfg["body_levels"]:
             template_pts.append([radius * _np.cos(ang), radius * _np.sin(ang), z])
             template_is_cap.append(False)
-    # Cap: distribuzione golden-angle sul disco superiore (full top + small bottom layer to give cap volume)
-    for i in range(n_cap_pts):
-        r = radius * (i / n_cap_pts) ** 0.5
+    for i in range(n_cap_pts_tpl):
+        r = radius * (i / n_cap_pts_tpl) ** 0.5
         ang = 2 * 3.14159 * i * 0.382
         template_pts.append([r * _np.cos(ang), r * _np.sin(ang), cfg["cap_z"]])
         template_is_cap.append(True)
-
     template_pts = _np.array(template_pts, dtype=_np.float32)
     template_is_cap = _np.array(template_is_cap, dtype=bool)
-
-    # ── Allineamento iniziale (click come prior) ─────────────────────────────
-    # Asse iniziale = click_normal (l'utente ha indicato la direzione cap-up)
-    # Tpl axis = +Z, marker axis = click_n
-    R_init = _rotation_between_vectors(_np.array([0.0, 0.0, 1.0], dtype=_np.float32), click_n)
-    # Translation: cap top di template (in local = [0,0,cap_z]) deve cadere al click
-    cap_top_local = _np.array([0.0, 0.0, cfg["cap_z"]], dtype=_np.float32)
-    tpl_after_R = (R_init @ template_pts.T).T
-    cap_top_after_R = R_init @ cap_top_local
-    t_init = click_pt - cap_top_after_R
-    tpl_aligned = tpl_after_R + t_init
-
-    # ── Weighted ICP con spin attempts ───────────────────────────────────────
-    # Pesi: cap 5x, body 1x. Replica filosofia v7.3.7.004 di Sostituire.
     weights = _np.where(template_is_cap, 5.0, 1.0).astype(_np.float32)
 
-    # Spin loop
+    # ── v3: MULTI-AXIS SEED ──────────────────────────────────────────────────
+    axis_seeds = []
+    # Seed 1: click_normal (sempre incluso)
+    axis_seeds.append(("click_normal", click_n.copy()))
+
+    # Seed 2: PCA sui punti filtrati (asse principale = direzione di max varianza
+    # del cilindro -> e' l'asse del cilindro stesso)
+    if n_total >= 20:
+        try:
+            ctr = near_pts.mean(axis=0)
+            X = near_pts - ctr
+            cov = X.T @ X / max(len(X) - 1, 1)
+            eigvals, eigvecs = _np.linalg.eigh(cov)
+            # autovettore con autovalore maggiore = asse cilindro
+            pca_axis = eigvecs[:, -1]
+            # Allinea direzione con click_normal (verso cap-up)
+            if pca_axis @ click_n < 0:
+                pca_axis = -pca_axis
+            pca_axis = pca_axis / (_np.linalg.norm(pca_axis) + 1e-9)
+            axis_seeds.append(("pca", pca_axis))
+        except Exception:
+            pass
+
+    # Seed 3: media click_n + pca normalizzata
+    if len(axis_seeds) > 1:
+        avg = (axis_seeds[0][1] + axis_seeds[1][1]) / 2
+        avg = avg / (_np.linalg.norm(avg) + 1e-9)
+        axis_seeds.append(("avg", avg))
+
+    # ── ICP loop per ogni seed × spin ─────────────────────────────────────────
     n_spin = 12
-    best_rmsd = float("inf")
-    best_R = R_init.copy()
-    best_t = t_init.copy()
+    cap_top_local = _np.array([0.0, 0.0, cfg["cap_z"]], dtype=_np.float32)
 
-    for k in range(n_spin):
-        theta = (2 * _np.pi * k) / n_spin
-        c_t, s_t = _np.cos(theta), _np.sin(theta)
-        au = click_n
-        K = _np.array([[0, -au[2], au[1]],
-                       [au[2], 0, -au[0]],
-                       [-au[1], au[0], 0]], dtype=_np.float32)
-        R_spin = _np.eye(3, dtype=_np.float32) * c_t + s_t * K + (1 - c_t) * _np.outer(au, au)
+    overall_best_rmsd = float("inf")
+    overall_best_R = _np.eye(3, dtype=_np.float32)
+    overall_best_t = _np.zeros(3, dtype=_np.float32)
+    best_seed_label = "?"
+    seeds_tried = 0
+    seed_rmsds = {}
 
-        # Spin attorno a click_pt: P' = R_spin @ (P - click_pt) + click_pt
-        moving = (R_spin @ (tpl_aligned - click_pt).T).T + click_pt
+    for seed_label, axis_init in axis_seeds:
+        seeds_tried += 1
+        R_init = _rotation_between_vectors(_np.array([0.0, 0.0, 1.0], dtype=_np.float32),
+                                           axis_init.astype(_np.float32))
+        cap_top_after_R = R_init @ cap_top_local
+        t_init = anchor - cap_top_after_R
+        tpl_after_R_t = (R_init @ template_pts.T).T + t_init
 
-        # ── Custom weighted ICP loop (15 iter, point-to-point con peso) ─────
-        cur_pts = moving.copy()
-        cur_R   = R_spin @ R_init
-        cur_t   = R_spin @ (t_init - click_pt) + click_pt
-        for it in range(15):
-            # Nearest neighbor in marker space (KDTree-like via brute force, ok per <500 pts)
+        seed_best_rmsd = float("inf")
+        for k in range(n_spin):
+            theta = (2 * _np.pi * k) / n_spin
+            c_t, s_t = _np.cos(theta), _np.sin(theta)
+            au = axis_init
+            K = _np.array([[0, -au[2], au[1]],
+                           [au[2], 0, -au[0]],
+                           [-au[1], au[0], 0]], dtype=_np.float32)
+            R_spin = _np.eye(3, dtype=_np.float32) * c_t + s_t * K + (1 - c_t) * _np.outer(au, au)
+
+            moving = (R_spin @ (tpl_after_R_t - anchor).T).T + anchor
+            cur_pts = moving.copy()
+            cur_R = R_spin @ R_init
+            cur_t = R_spin @ (t_init - anchor) + anchor
+
+            prev_rmsd = float("inf")
+            for it in range(25):  # v3: 15 -> 25 iter
+                diffs = near_pts[None, :, :] - cur_pts[:, None, :]
+                d2 = _np.sum(diffs * diffs, axis=2)
+                nn_idx = _np.argmin(d2, axis=1)
+                target = near_pts[nn_idx]
+
+                errs = _np.linalg.norm(target - cur_pts, axis=1)
+                med = _np.median(errs)
+                thresh = 2.5 * med + 0.05
+                inlier = errs < thresh
+                if inlier.sum() < 10:
+                    break
+
+                P = cur_pts[inlier]; Q = target[inlier]; W = weights[inlier]
+                Wn = W / W.sum()
+                cP = (P * Wn[:, None]).sum(axis=0); cQ = (Q * Wn[:, None]).sum(axis=0)
+                Pc = P - cP; Qc = Q - cQ
+                H = (Pc * W[:, None]).T @ Qc
+                U, _, Vt = _np.linalg.svd(H)
+                d = _np.sign(_np.linalg.det(Vt.T @ U.T))
+                D = _np.diag([1.0, 1.0, d])
+                R_step = Vt.T @ D @ U.T
+                t_step = cQ - R_step @ cP
+
+                cur_pts = (R_step @ cur_pts.T).T + t_step
+                cur_R = R_step @ cur_R
+                cur_t = R_step @ cur_t + t_step
+
+                new_rmsd = float(_np.sqrt(_np.mean((cur_pts - target) ** 2)))
+                if it > 0 and abs(prev_rmsd - new_rmsd) < 1e-4:
+                    break
+                prev_rmsd = new_rmsd
+
+            # Final RMSD inliers-only
             diffs = near_pts[None, :, :] - cur_pts[:, None, :]
             d2 = _np.sum(diffs * diffs, axis=2)
-            nn_idx = _np.argmin(d2, axis=1)
-            target = near_pts[nn_idx]
+            nn_d = _np.sqrt(_np.min(d2, axis=1))
+            med = _np.median(nn_d)
+            inl = nn_d < (2.5 * med + 0.05)
+            if inl.sum() > 5:
+                rmsd_k = float(_np.sqrt(_np.mean(nn_d[inl] ** 2)))
+            else:
+                rmsd_k = float(_np.sqrt(_np.mean(nn_d ** 2)))
 
-            # Tukey-like outlier rejection
-            errs = _np.linalg.norm(target - cur_pts, axis=1)
-            med = _np.median(errs)
-            thresh = 2.5 * med + 0.05
-            inlier = errs < thresh
-            if inlier.sum() < 10:
-                break
+            if rmsd_k < seed_best_rmsd:
+                seed_best_rmsd = rmsd_k
+            if rmsd_k < overall_best_rmsd:
+                overall_best_rmsd = rmsd_k
+                overall_best_R = cur_R
+                overall_best_t = cur_t
+                best_seed_label = seed_label
 
-            P = cur_pts[inlier]
-            Q = target[inlier]
-            W = weights[inlier]
-            Wn = W / W.sum()
+        seed_rmsds[seed_label] = round(seed_best_rmsd, 4)
 
-            # Weighted Kabsch
-            cP = (P * Wn[:, None]).sum(axis=0)
-            cQ = (Q * Wn[:, None]).sum(axis=0)
-            Pc = P - cP
-            Qc = Q - cQ
-            H = (Pc * W[:, None]).T @ Qc
-            U, _, Vt = _np.linalg.svd(H)
-            d = _np.sign(_np.linalg.det(Vt.T @ U.T))
-            D = _np.diag([1.0, 1.0, d])
-            R_step = Vt.T @ D @ U.T
-            t_step = cQ - R_step @ cP
-
-            # Apply
-            cur_pts = (R_step @ cur_pts.T).T + t_step
-            cur_R = R_step @ cur_R
-            cur_t = R_step @ cur_t + t_step
-
-            new_rmsd = float(_np.sqrt(_np.mean((cur_pts - target) ** 2)))
-            if it > 0 and abs(prev_rmsd - new_rmsd) < 1e-4:
-                break
-            prev_rmsd = new_rmsd
-
-        # Final RMSD weighted on inliers only
-        diffs = near_pts[None, :, :] - cur_pts[:, None, :]
-        d2 = _np.sum(diffs * diffs, axis=2)
-        nn_d = _np.sqrt(_np.min(d2, axis=1))
-        med = _np.median(nn_d)
-        inlier = nn_d < (2.5 * med + 0.05)
-        if inlier.sum() > 5:
-            rmsd_k = float(_np.sqrt(_np.mean(nn_d[inlier] ** 2)))
-        else:
-            rmsd_k = float(_np.sqrt(_np.mean(nn_d ** 2)))
-
-        if rmsd_k < best_rmsd:
-            best_rmsd = rmsd_k
-            best_R = cur_R
-            best_t = cur_t
-
-    # ── Output ───────────────────────────────────────────────────────────────
-    center = (best_R @ cap_top_local + best_t).tolist()
-    axis_world = (best_R @ _np.array([0.0, 0.0, 1.0])).tolist()
+    center = (overall_best_R @ cap_top_local + overall_best_t).tolist()
+    axis_world = (overall_best_R @ _np.array([0.0, 0.0, 1.0])).tolist()
     elapsed_ms = int((_time.time() - t0) * 1000)
 
     return {
         "center": center,
         "axis": axis_world,
-        "rmsd": best_rmsd,
-        "method": f"weighted_icp_v2_spin{n_spin}",
-        "algorithm": "server_weighted_icp_lab_public_v2",
+        "rmsd": overall_best_rmsd,
+        "method": f"weighted_icp_v3_multi_axis_spin{n_spin}",
+        "algorithm": "server_weighted_icp_lab_public_v3",
         "elapsed_ms": elapsed_ms,
-        "n_marker_pts": int(n_total),
-        "n_cap_pts": int(n_cap),
-        "n_body_pts": int(n_body),
+        "n_marker_pts": n_total,
+        "n_cap_pts": n_cap,
+        "n_body_pts": n_body,
         "template_id": tid,
         "template_radius": radius,
         "template_cap_z": cfg["cap_z"],
         "crop_axial": cfg["crop_axial"],
         "crop_radial": cfg["crop_radial"],
-        "branch": "lab-public-v2"
+        "anchor_correction_mm": round(anchor_correction_mm, 3),
+        "n_axis_seeds_tried": seeds_tried,
+        "best_seed": best_seed_label,
+        "seed_rmsds": seed_rmsds,
+        "branch": "lab-public-v3"
     }
 
 
