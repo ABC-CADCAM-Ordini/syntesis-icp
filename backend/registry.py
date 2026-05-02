@@ -26,7 +26,23 @@ import numpy as np
 # VERSION & METADATA
 # ─────────────────────────────────────────────────────────────────────────────
 
-REGISTRY_VERSION = "1.0.0"
+# Versione del backend nel suo insieme. Bumpa ad ogni commit che tocca codice
+# Python in backend/ (esclusi commit chore tipo CACHEBUST). Schema:
+#     MAJOR.MINOR.BUILD-FASE.STEP   p.es. 8.1.5-A.4.1
+# 8.x indica l'era post-v3b unificato (allineato alla serie Analizzare).
+# Suffisso "-A.X" traccia la fase del refactor layer condivisi.
+# Quando si promuove la Fase A in produzione, il suffisso sparisce -> 8.2.0.
+#
+# History:
+#   8.1.5-A.4.1 (2026-05-02): introduzione BACKEND_VERSION nel registry
+#   8.1.4-A.4   (2026-05-02): pdf_gen.py legge palette brand dal registry
+#   8.1.3-A.3   (2026-05-02): icp_engine.py legge max_tris dal registry
+#   8.1.2-A.2   (2026-05-02): aggiunto backend/registry.py + endpoint
+#   8.1.1-A.0   (2026-05-02): rimosso icp_engine_lab.py (copia 1:1)
+#   8.1.0       (2026-05-02): stato pre-Fase A (Analizzare promosso ieri)
+BACKEND_VERSION = "8.1.5-A.4.1"
+
+REGISTRY_VERSION = "1.0.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
 REGISTRY_SOURCE = "backend/registry.py"
 LAST_UPDATED = "2026-05-02"
 
@@ -239,6 +255,7 @@ def to_dict() -> dict:
     Usato dall'endpoint /api/registry/constants per esporlo ai frontend.
     """
     return {
+        "backend_version": BACKEND_VERSION,
         "version": REGISTRY_VERSION,
         "source": REGISTRY_SOURCE,
         "last_updated": LAST_UPDATED,

@@ -10,7 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Cache bust per forzare COPY aggiornato: 20260414142806
-ARG CACHEBUST=20260502-134203-faseA-registry
+ARG CACHEBUST=20260502-134857-A.4.1-versioning
 
 # Copia tutto il contenuto della directory backend (inclusa static/)
 COPY . .
