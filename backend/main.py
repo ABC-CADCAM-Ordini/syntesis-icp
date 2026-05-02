@@ -646,6 +646,25 @@ async def place_mua_lab(req: PlaceMuaRequest, current_user: dict = Depends(verif
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# REGISTRY: costanti del dominio (Fase A audit layer condivisi, 2026-05-02)
+# Fonte di verita' unica per CAD, soglie cliniche, palette, config globali.
+# I frontend leggono questo endpoint al boot per non avere costanti hardcodate
+# sparse nei vari workflow. Vedi backend/registry.py per la definizione.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/registry/constants", include_in_schema=False)
+async def registry_constants():
+    """Ritorna le costanti canoniche del dominio.
+
+    Letto dai frontend (Misurare, Analizza, Sostituire) al boot.
+    Sostituisce le costanti hardcodate sparse nei vari workflow.
+    Lazy import: errori nel registry non fanno cadere l'app al boot.
+    """
+    from registry import to_dict
+    return to_dict()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # v7.3.9.046 - BACKEND UTENTE
 # Area personale: lista mie analisi, rinomina, archivia, elimina, profilo
 # ─────────────────────────────────────────────────────────────────────────────
