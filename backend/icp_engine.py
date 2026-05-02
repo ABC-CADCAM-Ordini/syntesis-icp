@@ -12,6 +12,18 @@ import numpy as np
 from typing import Optional
 
 
+# ── Registry: fonte di verita' unica per costanti del dominio ────────────────
+# Lazy import con fallback robusto: se registry.py ha un problema di sintassi
+# o di self-test, icp_engine.py continua a funzionare con i valori canonici
+# precedenti. Il registry e' la fonte autoritativa; il fallback e' una rete.
+# Vedi backend/registry.py (Fase A audit layer condivisi, 2026-05-02).
+try:
+    from registry import THRESHOLDS as _REGISTRY_THRESHOLDS
+    _MAX_TRIS_OOM = _REGISTRY_THRESHOLDS["max_tris_oom"]
+except Exception:
+    _MAX_TRIS_OOM = 2500  # fallback al valore canonico
+
+
 # ── Scanbody profiles ─────────────────────────────────────────────────────────
 SCANBODY_PROFILES = [
     {
@@ -1084,7 +1096,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
          (formula iperbole inflection 110um steepness 1.5)
 
     Costanti chiave:
-      - max_tris=2500    Limite OOM Railway
+      - max_tris (default da registry, 2500)  Limite OOM Railway
       - SR_FLIP_X=180°   Convenzione Z invertita SR (cap a Zmin)
       - Cap weight = 5x  Pesatura ICP
 
@@ -1580,7 +1592,7 @@ def analyze_stl_pair(data_a: bytes, data_b: bytes,
     detected = dominant_profile(scan_a + scan_b)
 
     # Prepara triangoli mesh per anteprime (subsample se troppo grandi)
-    def tris_to_list(t, max_tris=2500):
+    def tris_to_list(t, max_tris=_MAX_TRIS_OOM):
         arr = np.asarray(t)
         if len(arr) == 0:
             return []
