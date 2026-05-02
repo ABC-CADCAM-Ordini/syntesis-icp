@@ -34,15 +34,16 @@ import numpy as np
 # Quando si promuove la Fase A in produzione, il suffisso sparisce -> 8.2.0.
 #
 # History:
+#   8.1.6-A.5.0 (2026-05-02): aggiunte soglie angolari (angular_deg, angular_classes_it)
 #   8.1.5-A.4.1 (2026-05-02): introduzione BACKEND_VERSION nel registry
 #   8.1.4-A.4   (2026-05-02): pdf_gen.py legge palette brand dal registry
 #   8.1.3-A.3   (2026-05-02): icp_engine.py legge max_tris dal registry
 #   8.1.2-A.2   (2026-05-02): aggiunto backend/registry.py + endpoint
 #   8.1.1-A.0   (2026-05-02): rimosso icp_engine_lab.py (copia 1:1)
 #   8.1.0       (2026-05-02): stato pre-Fase A (Analizzare promosso ieri)
-BACKEND_VERSION = "8.1.5-A.4.1"
+BACKEND_VERSION = "8.1.6-A.5.0"
 
-REGISTRY_VERSION = "1.0.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
+REGISTRY_VERSION = "1.1.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
 REGISTRY_SOURCE = "backend/registry.py"
 LAST_UPDATED = "2026-05-02"
 
@@ -128,6 +129,17 @@ THRESHOLDS = {
         "Rischioso",
         "Tensione",
         "Fuori posizione",
+    ],
+
+    # Soglie angolari (deviazione asse) in gradi.
+    # Riusano la palette d3 per coerenza visiva delle classi cliniche.
+    "angular_deg": [0.5, 1.5, 3, 6],
+    "angular_classes_it": [
+        "Ottimo",
+        "Accettabile",
+        "Rischioso",
+        "Tensione",
+        "Fuori",
     ],
 
     # MUA: parametri geometrici del cono di accoppiamento.
@@ -288,6 +300,13 @@ def _self_test() -> None:
     n_thr = len(THRESHOLDS["d3_um"])
     n_cls = len(THRESHOLDS["d3_classes_it"])
     assert n_cls == n_thr + 1, f"d3_classes={n_cls}, atteso d3_um+1={n_thr+1}"
+
+    # 2b. angular_classes ha esattamente angular_deg + 1 elementi
+    n_ang_thr = len(THRESHOLDS["angular_deg"])
+    n_ang_cls = len(THRESHOLDS["angular_classes_it"])
+    assert n_ang_cls == n_ang_thr + 1, (
+        f"angular_classes={n_ang_cls}, atteso angular_deg+1={n_ang_thr+1}"
+    )
 
     # 3. palette d3 ha lo stesso numero di colori delle classi
     assert len(PALETTE["d3_hex"]) == n_cls, (
