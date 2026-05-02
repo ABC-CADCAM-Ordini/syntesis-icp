@@ -158,10 +158,12 @@ async def analyzer_page():
 
 
 # ── LAB: branch parallelo del modulo Analizzare ─────────────────────────────
-# Stesso codice del modulo Analizzare al giorno zero, ma su rotta separata
-# (/lab) e con motore ICP isolato (icp_engine_lab.py). Permette di iterare
-# sull'algoritmo ICP senza toccare la produzione. Quando il motore lab sara'
-# validato, sostituira' icp_engine.py e questa rotta verra' rimossa.
+# UI separata su rotta /lab (syntesis-analyzer-lab.html), banco test per
+# esperimenti UI/UX e per future piste algoritmiche. Dal 2026-05-02 usa lo
+# stesso motore della produzione (icp_engine.py): la pista fase4d e' stata
+# promossa a canonica con v8.1.0 (validata clinicamente, 16 MUA reali).
+# Quando si vorra' sperimentare un nuovo algoritmo, si creera' un modulo
+# dedicato (es. icp_engine_v2.py) e si aggiornera' l'import sotto.
 @app.get("/lab", include_in_schema=False)
 async def analyzer_lab_page():
     _lb = _STATIC_DIR / "syntesis-analyzer-lab.html"
@@ -538,14 +540,16 @@ async def place_mua(req: PlaceMuaRequest, current_user: dict = Depends(verify_to
 
 
 # ── LAB: endpoint parallelo per il modulo /lab ───────────────────────────
-# Identico a /api/place-mua al giorno zero, ma importa da icp_engine_lab.
-# Cosi' le modifiche al motore ICP nel branch lab non toccano la produzione.
+# Stessa logica di /api/place-mua. Endpoint separato preservato come hook
+# per future sperimentazioni: per provare un motore alternativo, sostituire
+# l'import sotto senza toccare /lab e l'UI lab.
 @app.post("/api/place-mua-lab")
 async def place_mua_lab(req: PlaceMuaRequest, current_user: dict = Depends(verify_token)):
-    """LAB branch: come /api/place-mua, ma usa icp_engine_lab (motore isolato)."""
+    """LAB branch: stessa logica di /api/place-mua. Endpoint separato preservato
+    come hook per future sperimentazioni algoritmiche."""
     import time as _time
     import numpy as _np
-    from icp_engine_lab import (
+    from icp_engine import (
         align_template_to_marker, find_components, _cap_centroid_for_cluster,
         cyl_axis
     )
