@@ -13,6 +13,16 @@ import math
 from datetime import datetime
 from typing import Optional
 
+# ── Registry: fonte di verita' unica per palette brand ──────────────────────
+# Lazy import con fallback robusto. Se registry.py ha problemi, pdf_gen.py
+# continua a funzionare con i valori canonici precedenti.
+# Vedi backend/registry.py (Fase A audit layer condivisi, 2026-05-02).
+try:
+    from registry import PALETTE as _REGISTRY_PALETTE
+    _BRAND = _REGISTRY_PALETTE["brand"]
+except Exception:
+    _BRAND = {"blue": "#0052A3", "dark": "#0D1B2A", "gray": "#64748B"}
+
 VERSION = "7.3.9.093"
 SCORE_MODEL_VERSION = "Syntesis Score v1.0"
 
@@ -273,12 +283,12 @@ def _generate_reportlab(record: dict) -> bytes:
                              topMargin=20*mm, bottomMargin=20*mm)
 
     # Palette
-    BLUE     = HexColor("#0052A3")
+    BLUE     = HexColor(_BRAND["blue"])    # registry.PALETTE.brand.blue
     BLUE_L   = HexColor("#EBF4FF")
     BLUE_MID = HexColor("#1A6DC8")
-    DARK     = HexColor("#0D1B2A")
+    DARK     = HexColor(_BRAND["dark"])    # registry.PALETTE.brand.dark
     SLATE    = HexColor("#334155")
-    GRAY     = HexColor("#64748B")
+    GRAY     = HexColor(_BRAND["gray"])    # registry.PALETTE.brand.gray
     GRAY_L   = HexColor("#F8FAFC")
     GREEN    = HexColor("#059669")
     AMBER    = HexColor("#D97706")
