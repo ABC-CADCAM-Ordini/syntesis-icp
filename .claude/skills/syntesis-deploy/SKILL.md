@@ -175,17 +175,21 @@ Il file e' gitignored (verifica con `git check-ignore -v scripts/.env.local`). C
 
 ### Mutation per entrambi i servizi
 
+> **Nota shell compat (caso noto, primo emerso nel deploy di A.5.2 il 2026-05-06)**: lo shell di default su macOS e' `zsh`, non `bash`. La sintassi `${!var}` (bash indirect expansion) **non funziona in zsh** e fallisce con `bad substitution`. Per iterare sui due service ID o leggere variabili indirettamente, usare uno di questi pattern compatibili: (a) due blocchi espliciti (preferito, piu' leggibile - vedi sotto); (b) `eval "echo \$$var"` per dereferenziare in modo cross-shell; (c) leggere direttamente i valori da `scripts/.env.local` via `grep -E '^RW_SVC_' scripts/.env.local | sed 's/.*=//'`. Stessa avvertenza vale per qualunque altro pattern bash-only nei loop di polling/verify.
+
 Lancia in successione (non in parallelo, per leggibilita' degli output):
 
 ```bash
-for SVC_VAR in RW_SVC_LEGACY RW_SVC_BACKEND; do
-  SVC=${!SVC_VAR}
-  echo ">>> deploying $SVC_VAR ($SVC)"
-  curl -sS -H "Authorization: Bearer $RW_TOKEN" -H "Content-Type: application/json" \
-    -X POST "$RW_GQL" \
-    -d "{\"query\":\"mutation{serviceInstanceDeploy(serviceId:\\\"$SVC\\\",environmentId:\\\"$RW_ENV_ID\\\",latestCommit:true)}\"}"
-  echo
-done
+echo ">>> deploying LEGACY"
+curl -sS -H "Authorization: Bearer $RW_TOKEN" -H "Content-Type: application/json" \
+  -X POST "$RW_GQL" \
+  -d "{\"query\":\"mutation{serviceInstanceDeploy(serviceId:\\\"$RW_SVC_LEGACY\\\",environmentId:\\\"$RW_ENV_ID\\\",latestCommit:true)}\"}"
+echo
+echo ">>> deploying BACKEND"
+curl -sS -H "Authorization: Bearer $RW_TOKEN" -H "Content-Type: application/json" \
+  -X POST "$RW_GQL" \
+  -d "{\"query\":\"mutation{serviceInstanceDeploy(serviceId:\\\"$RW_SVC_BACKEND\\\",environmentId:\\\"$RW_ENV_ID\\\",latestCommit:true)}\"}"
+echo
 ```
 
 Risposta attesa per ogni servizio: `{"data":{"serviceInstanceDeploy":true}}`.
@@ -259,6 +263,7 @@ echo "Re-deploying current main on Railway: $NEW_VER"
 | `app.syntesis-icp.com` SSL cert error | Segnala soltanto, non bloccare. Sospeso pre-esistente, non legato al deploy. |
 | `RW_TOKEN` mancante (no `scripts/.env.local`) | Chiedi all'utente, crea il file con `chmod 600`, prosegui. Non loggare il valore. |
 | Sanity check versioni mismatch | Stop&ask prima del commit. Probabile bump incompleto, va sistemato. |
+| `bad substitution` su `${!var}` o pattern simili | Caso noto zsh vs bash: lo shell di default su macOS e' zsh. Riscrivere con due blocchi espliciti, oppure `eval "echo \$$var"`, oppure leggere il valore via `grep`/`sed` direttamente da `scripts/.env.local`. Vedi nota a inizio sezione "Mutation per entrambi i servizi". |
 
 ## Rollback
 
