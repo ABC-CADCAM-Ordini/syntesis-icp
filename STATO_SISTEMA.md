@@ -6,8 +6,8 @@
 
 | Componente | Versione |
 |---|---|
-| Backend (registry) | 8.1.11-A.5.2 |
-| /analizzare | v8.1.11-A.5.2 (fix run_icp ritorna rmsd corretto, audit C9) |
+| Backend (registry) | 8.1.12-A.5.2 |
+| /analizzare | v8.1.12-A.5.2 (code health batch: audit C2 C6 C7 C8 C13) |
 | /replacer | v7.3.9.107 |
 | / (Hub) | v8.0.0-refactor |
 

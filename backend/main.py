@@ -56,6 +56,12 @@ validate_security_config()
 # invece di bloccare il worker Uvicorn indefinitamente.
 ICP_TIMEOUT_SECONDS = int(os.getenv("ICP_TIMEOUT_SECONDS", "60"))
 
+# Audit C6: cap superiore sul numero di triangoli accettati da /api/place-mua
+# e /api/place-mua-lab. Evita che un client autenticato saturi RAM/CPU del
+# worker uvicorn mandando milioni di triangoli. 200k e' >> qualunque caso
+# clinico realistico (un crop di scansione tipico e' 500-5000 triangoli).
+MAX_PLACE_MUA_TRIS = int(os.getenv("MAX_PLACE_MUA_TRIS", "200000"))
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -101,7 +107,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    # Audit C13: PATCH/DELETE usati su /api/me/projects, /contacts, /folders.
+    # OPTIONS necessario per il preflight CORS dei browser su cross-origin.
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -451,6 +459,12 @@ async def place_mua(req: PlaceMuaRequest, current_user: dict = Depends(verify_to
     # Validazione
     if not req.scan_crop_tris or len(req.scan_crop_tris) < 30:
         raise HTTPException(400, detail="Crop scansione troppo piccolo (min 30 triangoli).")
+    # Audit C6: upper bound RAM/CPU
+    if len(req.scan_crop_tris) > MAX_PLACE_MUA_TRIS:
+        raise HTTPException(
+            413,
+            detail=f"Crop scansione troppo grande ({len(req.scan_crop_tris)} > {MAX_PLACE_MUA_TRIS} triangoli)."
+        )
     if len(req.click_point) != 3 or len(req.click_normal) != 3:
         raise HTTPException(400, detail="click_point e click_normal devono essere [x,y,z].")
 
@@ -502,12 +516,26 @@ async def place_mua(req: PlaceMuaRequest, current_user: dict = Depends(verify_to
     n_tri = (len(template_pts) - 2) // 3
     template_tris = template_pts[:n_tri*3].reshape(n_tri, 3, 3)
 
+    # Audit C6: align_template_to_marker e' CPU-bound numpy. Lo fuori-bordo
+    # nell'event loop con run_in_executor + wait_for, come fa /api/analyze.
     try:
-        result = align_template_to_marker(
-            template_tris=template_tris,
-            marker_pts=near_pts,
-            use_icp=True,
-            n_rot_attempts=8
+        result = await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: align_template_to_marker(
+                    template_tris=template_tris,
+                    marker_pts=near_pts,
+                    use_icp=True,
+                    n_rot_attempts=8
+                )
+            ),
+            timeout=ICP_TIMEOUT_SECONDS
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"Timeout place-mua dopo {ICP_TIMEOUT_SECONDS}s (template={req.template_id})")
+        raise HTTPException(
+            504,
+            detail=f"Place MUA troppo lungo (>{ICP_TIMEOUT_SECONDS}s)."
         )
     except Exception as e:
         raise HTTPException(500, detail=f"Allineamento fallito: {type(e).__name__}: {e}")
@@ -558,6 +586,12 @@ async def place_mua_lab(req: PlaceMuaRequest, current_user: dict = Depends(verif
 
     if not req.scan_crop_tris or len(req.scan_crop_tris) < 30:
         raise HTTPException(400, detail="Crop scansione troppo piccolo (min 30 triangoli).")
+    # Audit C6: upper bound RAM/CPU
+    if len(req.scan_crop_tris) > MAX_PLACE_MUA_TRIS:
+        raise HTTPException(
+            413,
+            detail=f"Crop scansione troppo grande ({len(req.scan_crop_tris)} > {MAX_PLACE_MUA_TRIS} triangoli)."
+        )
     if len(req.click_point) != 3 or len(req.click_normal) != 3:
         raise HTTPException(400, detail="click_point e click_normal devono essere [x,y,z].")
 
@@ -600,12 +634,25 @@ async def place_mua_lab(req: PlaceMuaRequest, current_user: dict = Depends(verif
     n_tri = (len(template_pts) - 2) // 3
     template_tris = template_pts[:n_tri*3].reshape(n_tri, 3, 3)
 
+    # Audit C6: stesso wrapping eseguito su /api/place-mua.
     try:
-        result = align_template_to_marker(
-            template_tris=template_tris,
-            marker_pts=near_pts,
-            use_icp=True,
-            n_rot_attempts=8
+        result = await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: align_template_to_marker(
+                    template_tris=template_tris,
+                    marker_pts=near_pts,
+                    use_icp=True,
+                    n_rot_attempts=8
+                )
+            ),
+            timeout=ICP_TIMEOUT_SECONDS
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"Timeout place-mua-lab dopo {ICP_TIMEOUT_SECONDS}s (template={req.template_id})")
+        raise HTTPException(
+            504,
+            detail=f"Place MUA lab troppo lungo (>{ICP_TIMEOUT_SECONDS}s)."
         )
     except Exception as e:
         raise HTTPException(500, detail=f"Allineamento fallito: {type(e).__name__}: {e}")
@@ -1006,8 +1053,10 @@ async def gdrive_connect_start(token: str):
         user_id = payload.get("user_id") or payload.get("sub")
         if not user_id:
             raise HTTPException(401, detail="Token JWT non valido.")
-    except Exception as e:
-        raise HTTPException(401, detail=f"Token JWT non valido: {e}")
+    except Exception:
+        # Audit C7: niente interpolazione del messaggio dell'eccezione (puo'
+        # leakare info pyjwt-specifici sul motivo del fallimento).
+        raise HTTPException(401, detail="Token non valido.")
     auth_url = gdrive.get_authorization_url(user_id)
     return RedirectResponse(url=auth_url, status_code=302)
 
@@ -1366,9 +1415,21 @@ async def me_gdrive_file_content(
     except Exception as e:
         logger.error(f"[gdrive content] file={file_id} error: {e}")
         raise HTTPException(500, detail=f"Errore download: {str(e)[:200]}")
+    # Audit C2: prevenzione XSS via file caricato sul Drive dell'utente.
+    # 1. Filtro CRLF/quotes nel filename per evitare header injection (anche
+    #    se ASGI moderno rifiuta CRLF, difensiva).
+    # 2. Force "attachment" se il MIME non e' immagine/video: cosi' un file
+    #    HTML/SVG/PDF caricato a scopo XSS viene scaricato invece di
+    #    eseguito inline nell'origin Syntesis-ICP.
+    # 3. X-Content-Type-Options: nosniff blocca lo sniffing MIME del browser.
+    safe_mime = (mime_type or "application/octet-stream").lower()
+    is_displayable = safe_mime.startswith("image/") or safe_mime.startswith("video/")
+    safe_name = (name or "file").replace("\r", "").replace("\n", "").replace('"', "'")
+    disposition = "inline" if is_displayable else "attachment"
     headers = {
-        "Content-Disposition": f'inline; filename="{name}"',
+        "Content-Disposition": f'{disposition}; filename="{safe_name}"',
         "Cache-Control": "private, max-age=300",
+        "X-Content-Type-Options": "nosniff",
     }
     return Response(content=data, media_type=mime_type or "application/octet-stream", headers=headers)
 

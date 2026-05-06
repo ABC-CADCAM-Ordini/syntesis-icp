@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.1.11-A.5.2</title>
+<title>Syntesis-ICP - Analizzare v8.1.12-A.5.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2261,7 +2261,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.1.11-A.5.2';
+window.ANALIZZA_BUILD = '8.1.12-A.5.2';
 window.ANALIZZA_BUILD_DATE = '2026-05-06';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -5026,213 +5026,12 @@ function fresBuildArrow(gid, origin){
   return grp;
 }
 
-function fresClearAllArrows(){
-  Object.keys(fresState.arrowsByGid).forEach(function(k){
-    var g = fresState.arrowsByGid[k];
-    if(g){
-      g.traverse(function(o){
-        if(o.geometry) o.geometry.dispose();
-        if(o.material){
-          if(Array.isArray(o.material)) o.material.forEach(function(mm){mm.dispose();});
-          else o.material.dispose();
-        }
-      });
-      scene.remove(g);
-    }
-  });
-  fresState.arrowsByGid = {};
-  fresState.pickersByGid = {};
-  fresState.arrowGroup = null;
-  fresState.pickerSphere = null;
-}
-
-function fresBuildAllArrows(){
-  fresClearAllArrows();
-  var aligned = muaObjects.filter(function(m){ return m.aligned; });
-  if(aligned.length < 2) return;
-  var groupsMap = {};
-  aligned.forEach(function(m){
-    var g = m.groupId || 0;
-    if(!groupsMap[g]) groupsMap[g] = [];
-    groupsMap[g].push(m);
-  });
-  Object.keys(groupsMap).forEach(function(gKey){
-    var gid = parseInt(gKey, 10);
-    var gr = groupsMap[gKey];
-    if(gr.length < 2) return;
-    var origin = new THREE.Vector3(0, 0, 0);
-    gr.forEach(function(m){ origin.add(m.position); });
-    origin.divideScalar(gr.length);
-    fresBuildArrow(gid, origin);
-  });
-}
-
-function fresClearAllArrows(){
-  Object.keys(fresState.arrowsByGid).forEach(function(k){
-    var g = fresState.arrowsByGid[k];
-    if(g){
-      g.traverse(function(o){
-        if(o.geometry) o.geometry.dispose();
-        if(o.material){
-          if(Array.isArray(o.material)) o.material.forEach(function(mm){mm.dispose();});
-          else o.material.dispose();
-        }
-      });
-      if(fresOverlayScene) fresOverlayScene.remove(g);
-    }
-  });
-  fresState.arrowsByGid = {};
-  fresState.pickersByGid = {};
-  fresState.arrowGroup = null;
-  fresState.pickerSphere = null;
-}
-
-function fresBuildAllArrows(){
-  fresClearAllArrows();
-  var aligned = muaObjects.filter(function(m){ return m.aligned; });
-  if(aligned.length < 2) return;
-  var groupsMap = {};
-  aligned.forEach(function(m){
-    var g = m.groupId || 0;
-    if(!groupsMap[g]) groupsMap[g] = [];
-    groupsMap[g].push(m);
-  });
-  Object.keys(groupsMap).forEach(function(gKey){
-    var gid = parseInt(gKey, 10);
-    var gr = groupsMap[gKey];
-    if(gr.length < 2) return;
-    var origin = new THREE.Vector3(0, 0, 0);
-    gr.forEach(function(m){ origin.add(m.position); });
-    origin.divideScalar(gr.length);
-    fresBuildArrow(gid, origin);
-  });
-}
-
-function fresClearAllArrows(){
-  Object.keys(fresState.arrowsByGid).forEach(function(k){
-    var g = fresState.arrowsByGid[k];
-    if(g){
-      g.traverse(function(o){
-        if(o.geometry) o.geometry.dispose();
-        if(o.material){
-          if(Array.isArray(o.material)) o.material.forEach(function(mm){mm.dispose();});
-          else o.material.dispose();
-        }
-      });
-      scene.remove(g);
-    }
-  });
-  fresState.arrowsByGid = {};
-  fresState.pickersByGid = {};
-  fresState.arrowGroup = null;
-  fresState.pickerSphere = null;
-}
-
-function fresBuildAllArrows(){
-  fresClearAllArrows();
-  var aligned = muaObjects.filter(function(m){ return m.aligned; });
-  if(aligned.length < 2) return;
-  var groupsMap = {};
-  aligned.forEach(function(m){
-    var g = m.groupId || 0;
-    if(!groupsMap[g]) groupsMap[g] = [];
-    groupsMap[g].push(m);
-  });
-  Object.keys(groupsMap).forEach(function(gKey){
-    var gid = parseInt(gKey, 10);
-    var gr = groupsMap[gKey];
-    if(gr.length < 2) return;
-    var origin = new THREE.Vector3(0, 0, 0);
-    gr.forEach(function(m){ origin.add(m.position); });
-    origin.divideScalar(gr.length);
-    fresBuildArrow(gid, origin);
-  });
-}
-
-function fresClearAllArrows(){
-  Object.keys(fresState.arrowsByGid).forEach(function(k){
-    var g = fresState.arrowsByGid[k];
-    if(g){
-      g.traverse(function(o){
-        if(o.geometry) o.geometry.dispose();
-        if(o.material){
-          if(Array.isArray(o.material)) o.material.forEach(function(mm){mm.dispose();});
-          else o.material.dispose();
-        }
-      });
-      scene.remove(g);
-    }
-  });
-  fresState.arrowsByGid = {};
-  fresState.pickersByGid = {};
-  fresState.arrowGroup = null;
-  fresState.pickerSphere = null;
-}
-
-function fresBuildAllArrows(){
-  fresClearAllArrows();
-  var aligned = muaObjects.filter(function(m){ return m.aligned; });
-  if(aligned.length < 2) return;
-  var groupsMap = {};
-  aligned.forEach(function(m){
-    var g = m.groupId || 0;
-    if(!groupsMap[g]) groupsMap[g] = [];
-    groupsMap[g].push(m);
-  });
-  Object.keys(groupsMap).forEach(function(gKey){
-    var gid = parseInt(gKey, 10);
-    var gr = groupsMap[gKey];
-    if(gr.length < 2) return;
-    var origin = new THREE.Vector3(0, 0, 0);
-    gr.forEach(function(m){ origin.add(m.position); });
-    origin.divideScalar(gr.length);
-    fresBuildArrow(gid, origin);
-  });
-}
-
-function fresClearAllArrows(){
-  Object.keys(fresState.arrowsByGid).forEach(function(k){
-    var g = fresState.arrowsByGid[k];
-    if(g){
-      // dispose geometries/materials
-      g.traverse(function(o){
-        if(o.geometry) o.geometry.dispose();
-        if(o.material){
-          if(Array.isArray(o.material)) o.material.forEach(function(mm){mm.dispose();});
-          else o.material.dispose();
-        }
-      });
-      scene.remove(g);
-    }
-  });
-  fresState.arrowsByGid = {};
-  fresState.pickersByGid = {};
-  fresState.arrowGroup = null;
-  fresState.pickerSphere = null;
-}
-
-function fresBuildAllArrows(){
-  fresClearAllArrows();
-  var aligned = muaObjects.filter(function(m){ return m.aligned; });
-  if(aligned.length < 2) return;
-  var groupsMap = {};
-  aligned.forEach(function(m){
-    var g = m.groupId || 0;
-    if(!groupsMap[g]) groupsMap[g] = [];
-    groupsMap[g].push(m);
-  });
-  Object.keys(groupsMap).forEach(function(gKey){
-    var gid = parseInt(gKey, 10);
-    var gr = groupsMap[gKey];
-    if(gr.length < 2) return;
-    var origin = new THREE.Vector3(0, 0, 0);
-    gr.forEach(function(m){ origin.add(m.position); });
-    origin.divideScalar(gr.length);
-    fresBuildArrow(gid, origin);
-  });
-}
-
-// v7.3.9.082: cleanup di tutte le frecce
+// Audit C8 (cleanup 2026-05-06): rimosse 5 ridefinizioni morte di
+// fresClearAllArrows() e 5 di fresBuildAllArrows() ravvicinate qui sopra
+// (r.5029-5234 storiche). Erano residuo di un refactor non concluso
+// dell'arrow rendering: le 5 versioni precedenti erano shadowate dalla
+// 6a (sotto) tramite hoisting JS, quindi dead code che non veniva mai
+// eseguito. La versione attiva e' l'unica seguente.
 function fresClearAllArrows(){
   Object.keys(fresState.arrowsByGid).forEach(function(k){
     var g = fresState.arrowsByGid[k];
