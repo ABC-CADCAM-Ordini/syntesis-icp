@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.1.7-A.5.1</title>
+<title>Syntesis-ICP - Analizzare v8.1.8-A.5.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2261,8 +2261,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.1.7-A.5.1';
-window.ANALIZZA_BUILD_DATE = '2026-05-03';
+window.ANALIZZA_BUILD = '8.1.8-A.5.1';
+window.ANALIZZA_BUILD_DATE = '2026-05-06';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -8179,7 +8179,89 @@ function misICP_pdfDrawMethodologyPage(doc){
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  PAGINA 3: GLOSSARIO E SOGLIE CLINICHE                            ║
+// ║  PAGINA 3: LETTURA DEI VALORI                                     ║
+// ║                                                                   ║
+// ║  Spiega come leggere XY (con quota interpretativa scarico cono)   ║
+// ║  e Z+angolari (vincoli geometrici rigidi). Schema in sezione      ║
+// ║  dell'accoppiamento cono MUA-fresato.                             ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// Preload del PNG schema scarico cono - embed via doc.addImage in
+// misICP_pdfDrawValuesGuidePage. Caricato al boot per evitare race
+// condition al click di "Genera report".
+var _synScaricoConoImg = new Image();
+_synScaricoConoImg.src = '/static/assets/scarico_cono_mua_v4.png';
+
+function misICP_pdfDrawValuesGuidePage(doc){
+  var W=210, H=297, ml=14, mr=14, cw=W-ml-mr;
+  function setTxt(hex){ var c=misICP_hexRGB(hex); doc.setTextColor(c[0],c[1],c[2]); }
+
+  // Header (band gray + 5mm accent blu, identico a Methodology/Glossary)
+  doc.setFillColor(247,249,252); doc.rect(0,0,W,16,'F');
+  doc.setFillColor(0,101,179);   doc.rect(0,0,5,16,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); setTxt('#0F1923');
+  doc.text('Lettura dei valori', ml+2, 9);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); setTxt('#7A90A4');
+  doc.text('Significato diagnostico delle componenti di scostamento', ml+2, 14);
+
+  var y = 24;
+
+  // Paragrafo introduttivo
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); setTxt('#0F1923');
+  var para1 = 'Il report restituisce per ogni componente quattro famiglie di scostamento: i decentramenti nel piano (X, Y), lo scivolamento assiale (Z) e l\'errore di orientamento (valori angolari). Non hanno tutti lo stesso peso diagnostico.';
+  var l1 = doc.splitTextToSize(para1, cw);
+  doc.text(l1, ml, y);
+  y += l1.length * 4 + 6;
+
+  // Sotto-sezione: Piano XY
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt('#0065B3');
+  doc.text('Piano XY', ml, y);
+  y += 5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); setTxt('#0F1923');
+  var paraXY = 'Gli scostamenti laterali misurano il decentramento del componente rispetto all\'asse di riferimento. Sono valori rilevanti, ma ammettono una quota interpretativa: lo scarico del cono interno alla struttura fresata, cioe\' la tolleranza geometrica dell\'accoppiamento conico, contribuisce fisiologicamente al gioco laterale. Uno scarico eccessivo, o una sua deriva in fase produttiva, amplifica gli incrementi misurati in X e Y senza che questo costituisca di per se\' un errore di fresatura.';
+  var lXY = doc.splitTextToSize(paraXY, cw);
+  doc.text(lXY, ml, y);
+  y += lXY.length * 4 + 6;
+
+  // Sotto-sezione: Asse Z e valori angolari
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setTxt('#0065B3');
+  doc.text('Asse Z e valori angolari', ml, y);
+  y += 5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); setTxt('#0F1923');
+  var paraZ = 'Lo stop assiale del cono e l\'orientamento del suo asse sono vincolati dalla geometria stessa dell\'accoppiamento e non risentono del gioco di interfaccia. Variazioni in Z o in angolo derivano quasi esclusivamente da errori o incertezze di produzione. Sono pertanto i parametri di riferimento per giudicare la qualita\' del manufatto fresato.';
+  var lZ = doc.splitTextToSize(paraZ, cw);
+  doc.text(lZ, ml, y);
+  y += lZ.length * 4 + 8;
+
+  // Schema illustrativo (PNG pre-rasterizzato dall'SVG, ratio 680:500)
+  // Larghezza 75% del frame utile, centrato in pagina.
+  var imgW = cw * 0.75;             // 136.5 mm
+  var imgH = imgW * (500/680);      // ~100.4 mm
+  var imgX = (W - imgW) / 2;        // ~36.75 mm
+  var imgY = y;
+  try {
+    if(_synScaricoConoImg && _synScaricoConoImg.complete && _synScaricoConoImg.naturalWidth > 0){
+      doc.addImage(_synScaricoConoImg, 'PNG', imgX, imgY, imgW, imgH);
+    } else {
+      doc.setDrawColor(203,213,225); doc.setLineWidth(0.3);
+      doc.rect(imgX, imgY, imgW, imgH, 'D');
+      doc.setFont('helvetica','italic'); doc.setFontSize(8); setTxt('#94A3B8');
+      doc.text('[schema in caricamento]', W/2, imgY + imgH/2, {align:'center'});
+    }
+  } catch(e){ /* schema opzionale, il testo resta */ }
+  y += imgH + 5;
+
+  // Caption sotto lo schema (italic 10pt, grigio, centrato)
+  doc.setFont('helvetica','italic'); doc.setFontSize(10); setTxt('#7A90A4');
+  var cap = 'Sezione dell\'accoppiamento cono MUA-struttura fresata. Il gioco XY e\' ammesso dallo scarico del cono interno; lo stop Z e l\'asse comune sono vincoli geometrici rigidi.';
+  var lc = doc.splitTextToSize(cap, cw * 0.85);
+  lc.forEach(function(line, i){
+    doc.text(line, W/2, y + i*4.2, {align:'center'});
+  });
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  PAGINA 4: GLOSSARIO E SOGLIE CLINICHE                            ║
 // ║                                                                   ║
 // ║  Definizioni dei termini tecnici + tabella soglie + come leggere  ║
 // ║  il documento.                                                    ║
@@ -8555,8 +8637,9 @@ function misICP_drawCentroidGraph(cv, data, currentPi){
 function misICP_renderClinicalPDF(data){
   var doc = new window.jspdf.jsPDF({unit:'mm', format:'a4', compress:true});
   var W=210, H=297;
-  // 1 cover + 2 pagine documentazione + N cilindri + M coppie inter-centroide
-  var docPages = 2;
+  // 1 cover + 3 pagine documentazione (metodologia, lettura valori, glossario)
+  // + N cilindri + M coppie inter-centroide
+  var docPages = 3;
   var totPages = 1 + docPages + data.nCyl + data.interCentroidPairs.length;
 
   misICP_pdfDrawCover(doc, data, 'Precision Scanner Report - Clinico');
@@ -8570,12 +8653,20 @@ function misICP_renderClinicalPDF(data){
     'Pag. 2 / '+totPages,
     false);
 
-  // Pagina 3: Glossario e soglie cliniche (statica, identica per ogni report)
+  // Pagina 3: Lettura dei valori (statica, identica per ogni report)
+  doc.addPage();
+  misICP_pdfDrawValuesGuidePage(doc);
+  misICP_pdfFooter(doc,
+    'Syntesis-ICP - Lettura dei valori',
+    'Pag. 3 / '+totPages,
+    false);
+
+  // Pagina 4: Glossario e soglie cliniche (statica, identica per ogni report)
   doc.addPage();
   misICP_pdfDrawGlossaryPage(doc);
   misICP_pdfFooter(doc,
     'Syntesis-ICP - Glossario e soglie',
-    'Pag. 3 / '+totPages,
+    'Pag. 4 / '+totPages,
     false);
 
   // Pagine cilindri

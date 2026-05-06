@@ -2,12 +2,12 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-05-03)
+## Versione live (2026-05-06)
 
 | Componente | Versione |
 |---|---|
-| Backend (registry) | 8.1.7-A.5.1 |
-| /analizzare | v8.1.7-A.5.1 (chiuso A.5.1, commit 9dff66d) |
+| Backend (registry) | 8.1.8-A.5.1 |
+| /analizzare | v8.1.8-A.5.1 (feature: pagina "Lettura dei valori" nel report clinico jsPDF) |
 | /replacer | v7.3.9.107 |
 | / (Hub) | v8.0.0-refactor |
 
@@ -16,6 +16,8 @@
 Schema: MAJOR.MINOR.BUILD-FASE.STEP. Promozione Fase A → 8.2.0.
 
 **Chiusi**: A.1, A.2, A.3, A.4, A.4.1, A.5.0, A.5.1.
+
+**Note feature 2026-05-06 (8.1.8-A.5.1)**: aggiunta nuova pagina interpretativa "Lettura dei valori" (pag. 3) nel report clinico jsPDF, tra Note metodologiche e Glossario. Schema in sezione dell'accoppiamento cono MUA-fresato (PNG pre-rasterizzato in `backend/static/assets/`). Niente cairosvg/cache: l'asset e' statico, committato nel repo.
 
 **A.5.2 (next)**: SOSTITUIRE_TEMPLATE_INFO + TPL_ORDER + allineamento colore SR in v3b.html. Stesso pattern di A.5.1: lettura da window.SYN.
 
@@ -44,4 +46,4 @@ Schema: MAJOR.MINOR.BUILD-FASE.STEP. Promozione Fase A → 8.2.0.
 - **Fase 2 lancio** (Q4 2026): rete LifeDental, paper JIPD, espansione laboratori e studi
 
 ---
-*Snapshot 2026-05-03. Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-05-06. Aggiornare al prossimo cambio di stato.*
