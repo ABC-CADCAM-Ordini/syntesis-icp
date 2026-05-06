@@ -34,6 +34,7 @@ import numpy as np
 # Quando si promuove la Fase A in produzione, il suffisso sparisce -> 8.2.0.
 #
 # History:
+#   8.1.11-A.5.2 (2026-05-06): FIX run_icp ritorna rmsd corretto (era prev_rmsd, audit C9); aggiunto init rmsd=inf per edge case max_iter=0
 #   8.1.10-A.5.2 (2026-05-06): FIX typo bbox OS in SCANBODY (5.56 -> 3.56, cilindro x=y); valore corretto verificato sul file STL reale
 #   8.1.9-A.5.2 (2026-05-06): SOSTITUIRE_TEMPLATE_INFO + TPL_ORDER allineati a window.SYN; SR a 0x0052A3 ovunque (incluso swatch UI sostSource e CSS --syn-marker-sr)
 #   8.1.8-A.5.1 (2026-05-06): pagina "Lettura dei valori" nel report clinico jsPDF (schema scarico cono MUA)
@@ -45,7 +46,7 @@ import numpy as np
 #   8.1.2-A.2   (2026-05-02): aggiunto backend/registry.py + endpoint
 #   8.1.1-A.0   (2026-05-02): rimosso icp_engine_lab.py (copia 1:1)
 #   8.1.0       (2026-05-02): stato pre-Fase A (Analizzare promosso ieri)
-BACKEND_VERSION = "8.1.10-A.5.2"
+BACKEND_VERSION = "8.1.11-A.5.2"
 
 REGISTRY_VERSION = "1.1.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
 REGISTRY_SOURCE = "backend/registry.py"

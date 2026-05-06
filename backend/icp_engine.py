@@ -567,6 +567,7 @@ def run_icp(fixed: np.ndarray, moving: np.ndarray, max_iter: int = 80) -> dict:
     R_acc = np.eye(3)
     t_acc = np.zeros(3)
     prev_rmsd = float("inf")
+    rmsd = float("inf")  # default per il caso degenere max_iter=0
 
     for _ in range(max_iter):
         # Nearest neighbor (brute-force OK per N ≤ ~100 centroidi)
@@ -586,7 +587,7 @@ def run_icp(fixed: np.ndarray, moving: np.ndarray, max_iter: int = 80) -> dict:
 
     trace = np.trace(R_acc)
     angle_deg = float(np.degrees(np.arccos(np.clip((trace - 1) / 2, -1, 1))))
-    return {"R": R_acc, "t": t_acc, "aligned": Bt, "rmsd": prev_rmsd, "angle": angle_deg}
+    return {"R": R_acc, "t": t_acc, "aligned": Bt, "rmsd": rmsd, "angle": angle_deg}
 
 
 # ── Cylinder axis ─────────────────────────────────────────────────────────────
