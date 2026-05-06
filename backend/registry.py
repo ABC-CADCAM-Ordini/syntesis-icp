@@ -34,6 +34,7 @@ import numpy as np
 # Quando si promuove la Fase A in produzione, il suffisso sparisce -> 8.2.0.
 #
 # History:
+#   8.2.0          (2026-05-06): PROMOTION chiusura Fase A. Refactor "registry come single source of truth" completato. Suffisso -A.x.y rimosso (regola 3 schema versioning). Step chiusi: A.1, A.2, A.3, A.4, A.4.1, A.5.0, A.5.1, A.5.2 + debito CLIN_LEVELS/CLIN_AXIS chiuso. A.6 cancellata: index.html e' hub navigazionale puro, syntesis-icp-replacer.html non esisteva.
 #   8.1.13-A.5.2 (2026-05-06): FIX quick win cleanup (audit C3 C12 C15): /api/me/projects/{id}/files restored happy path (sposta gdrive.list_folder dentro funzione, rimuove dead code orfano), MAX_DRIVE_PROXY_BYTES cap 100MB su /api/me/gdrive/file/.../content (pre-check via gdrive.get_file_metadata), CLIN_LEVELS+CLIN_AXIS importate da registry.THRESHOLDS+PALETTE (single source of truth, fallback canonico), allineato angular_classes_it[-1] "Fuori" -> "Fuori posizione" per coerenza con d3
 #   8.1.12-A.5.2 (2026-05-06): FIX code health batch (audit C2 C6 C7 C8 C13): JWT error generic, CORS PATCH/DELETE/OPTIONS, MAX_PLACE_MUA_TRIS cap + run_in_executor su /api/place-mua{,-lab}, X-Content-Type-Options nosniff + force attachment per Drive proxy, cleanup 5x dead def fresClear/BuildAllArrows in v3b.html
 #   8.1.11-A.5.2 (2026-05-06): FIX run_icp ritorna rmsd corretto (era prev_rmsd, audit C9); aggiunto init rmsd=inf per edge case max_iter=0
@@ -48,7 +49,7 @@ import numpy as np
 #   8.1.2-A.2   (2026-05-02): aggiunto backend/registry.py + endpoint
 #   8.1.1-A.0   (2026-05-02): rimosso icp_engine_lab.py (copia 1:1)
 #   8.1.0       (2026-05-02): stato pre-Fase A (Analizzare promosso ieri)
-BACKEND_VERSION = "8.1.13-A.5.2"
+BACKEND_VERSION = "8.2.0"
 
 REGISTRY_VERSION = "1.1.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
 REGISTRY_SOURCE = "backend/registry.py"
