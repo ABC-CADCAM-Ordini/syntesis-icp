@@ -17,10 +17,15 @@ from typing import Optional
 # o di self-test, icp_engine.py continua a funzionare con i valori canonici
 # precedenti. Il registry e' la fonte autoritativa; il fallback e' una rete.
 # Vedi backend/registry.py (Fase A audit layer condivisi, 2026-05-02).
+# Audit C15 (2026-05-06): esteso a THRESHOLDS d3_um/angular_deg + d3_classes_it
+# /angular_classes_it + PALETTE.d3_hex per chiudere il debito Fase A su
+# CLIN_LEVELS / CLIN_AXIS (prima hardcoded e drift-prone).
 try:
-    from registry import THRESHOLDS as _REGISTRY_THRESHOLDS
+    from registry import THRESHOLDS as _REGISTRY_THRESHOLDS, PALETTE as _REGISTRY_PALETTE
     _MAX_TRIS_OOM = _REGISTRY_THRESHOLDS["max_tris_oom"]
 except Exception:
+    _REGISTRY_THRESHOLDS = None
+    _REGISTRY_PALETTE = None
     _MAX_TRIS_OOM = 2500  # fallback al valore canonico
 
 
@@ -58,21 +63,56 @@ SCANBODY_PROFILES = [
     },
 ]
 
-CLIN_LEVELS = [
-    {"max": 50,   "label": "Ottimo",          "col": "#639922"},
-    {"max": 100,  "label": "Accettabile",      "col": "#D97706"},
-    {"max": 150,  "label": "Rischioso",        "col": "#F97316"},
-    {"max": 250,  "label": "Tensione",         "col": "#EF4444"},
-    {"max": 99999,"label": "Fuori posizione",  "col": "#A855F7"},
-]
+# Audit C15: CLIN_LEVELS e CLIN_AXIS sono derivati da registry quando
+# l'import e' andato a buon fine (fonte autoritativa, evita drift coi
+# frontend che leggono da /api/registry/constants). Il fallback canonico
+# e' la rete di sicurezza in caso di import fallito (es. registry.py
+# rotto in dev). Shape preservata: lista di dict con chiavi "max", "label"
+# e (per d3) "col" — compatibile con i consumer attuali.
 
-CLIN_AXIS = [
-    {"max": 0.5,  "label": "Ottimo"},
-    {"max": 1.5,  "label": "Accettabile"},
-    {"max": 3.0,  "label": "Rischioso"},
-    {"max": 6.0,  "label": "Tensione"},
-    {"max": 9999, "label": "Fuori posizione"},
-]
+def _build_clin_levels():
+    if _REGISTRY_THRESHOLDS and _REGISTRY_PALETTE:
+        thr = _REGISTRY_THRESHOLDS["d3_um"]
+        labels = _REGISTRY_THRESHOLDS["d3_classes_it"]
+        cols = _REGISTRY_PALETTE["d3_hex"]
+        levels = [
+            {"max": thr[i], "label": labels[i], "col": cols[i]}
+            for i in range(len(thr))
+        ]
+        # Ultimo bucket open-ended: cap numerico high + label/colore della
+        # 5a classe (oltre l'ultima soglia).
+        levels.append({"max": 99999, "label": labels[-1], "col": cols[-1]})
+        return levels
+    return [
+        {"max": 50,   "label": "Ottimo",          "col": "#639922"},
+        {"max": 100,  "label": "Accettabile",      "col": "#D97706"},
+        {"max": 150,  "label": "Rischioso",        "col": "#F97316"},
+        {"max": 250,  "label": "Tensione",         "col": "#EF4444"},
+        {"max": 99999,"label": "Fuori posizione",  "col": "#A855F7"},
+    ]
+
+
+def _build_clin_axis():
+    if _REGISTRY_THRESHOLDS:
+        thr = _REGISTRY_THRESHOLDS["angular_deg"]
+        labels = _REGISTRY_THRESHOLDS["angular_classes_it"]
+        levels = [
+            {"max": float(thr[i]), "label": labels[i]}
+            for i in range(len(thr))
+        ]
+        levels.append({"max": 9999, "label": labels[-1]})
+        return levels
+    return [
+        {"max": 0.5,  "label": "Ottimo"},
+        {"max": 1.5,  "label": "Accettabile"},
+        {"max": 3.0,  "label": "Rischioso"},
+        {"max": 6.0,  "label": "Tensione"},
+        {"max": 9999, "label": "Fuori posizione"},
+    ]
+
+
+CLIN_LEVELS = _build_clin_levels()
+CLIN_AXIS = _build_clin_axis()
 
 
 def clin_level(d3_um: float) -> dict:

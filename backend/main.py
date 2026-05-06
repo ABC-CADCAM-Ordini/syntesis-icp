@@ -62,6 +62,13 @@ ICP_TIMEOUT_SECONDS = int(os.getenv("ICP_TIMEOUT_SECONDS", "60"))
 # clinico realistico (un crop di scansione tipico e' 500-5000 triangoli).
 MAX_PLACE_MUA_TRIS = int(os.getenv("MAX_PLACE_MUA_TRIS", "200000"))
 
+# Audit C3: cap dimensione file proxiato da Drive in /api/me/gdrive/file/.../content.
+# Il file passa per la RAM del worker (download_file_bytes lo materializza tutto
+# in memoria prima di restituirlo). Un attaccante autenticato che carica un file
+# grosso nel proprio Drive potrebbe OOMare il worker. 100MB e' un compromesso
+# generoso per anteprime cliniche (STL grandi, video) ma blocca file da GB.
+MAX_DRIVE_PROXY_BYTES = int(os.getenv("MAX_DRIVE_PROXY_BYTES", "104857600"))
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -1170,8 +1177,17 @@ async def me_project_files(project_id: str,
         raise HTTPException(404, detail="Progetto non trovato.")
     if not proj.get("gdrive_folder_id"):
         return {"files": [], "folder_id": None}
-
-
+    # Audit C12: prima questo blocco era stranded fuori funzione (avanzo
+    # merge nel bg task _replicate_file_to_members), causando il return
+    # implicito None sul happy path "progetto con folder configurata".
+    try:
+        refresh_token = gdrive.decrypt_token(creds["refresh_token_encrypted"])
+        service = gdrive.get_drive_service(refresh_token)
+        files = gdrive.list_folder(service, proj["gdrive_folder_id"])
+        return {"files": files, "folder_id": proj["gdrive_folder_id"]}
+    except Exception as e:
+        logger.error(f"list files failed: {e}")
+        raise HTTPException(502, detail=f"Drive API error: {str(e)[:200]}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1410,6 +1426,20 @@ async def me_gdrive_file_content(
     except Exception:
         logger.exception("decrypt refresh_token fallito (content endpoint)")
         raise HTTPException(500, detail="Token Drive corrotto. Disconnetti e riconnetti.")
+    # Audit C3: pre-check size via metadata Drive (1 chiamata API, niente download).
+    # Blocca attacchi DoS RAM via file grossi caricati nel Drive dell'attaccante.
+    # 'size' e' None solo per Google Docs nativi (size non esposta da Drive),
+    # in quel caso lasciamo passare: i Docs sono testuali e raramente >100MB.
+    try:
+        meta = gdrive.get_file_metadata(refresh_token, file_id)
+    except Exception as e:
+        logger.error(f"[gdrive content] metadata file={file_id} error: {e}")
+        raise HTTPException(500, detail=f"Errore metadata: {str(e)[:200]}")
+    if meta["size"] is not None and meta["size"] > MAX_DRIVE_PROXY_BYTES:
+        raise HTTPException(
+            413,
+            detail=f"File troppo grande per anteprima ({meta['size']} bytes > {MAX_DRIVE_PROXY_BYTES})."
+        )
     try:
         data, name, mime_type = gdrive.download_file_bytes(refresh_token, file_id)
     except Exception as e:
@@ -1784,11 +1814,8 @@ async def _replicate_file_to_members(
                 logger.warning(f"[replicate] fail user={t['user_id']}: {e}")
     except Exception as e:
         logger.exception("replicate task crashed")
-    try:
-        refresh_token = gdrive.decrypt_token(creds["refresh_token_encrypted"])
-        service = gdrive.get_drive_service(refresh_token)
-        files = gdrive.list_folder(service, proj["gdrive_folder_id"])
-        return {"files": files, "folder_id": proj["gdrive_folder_id"]}
-    except Exception as e:
-        logger.error(f"list files failed: {e}")
-        raise HTTPException(502, detail=f"Drive API error: {str(e)[:200]}")
+    # Audit C12 (cleanup 2026-05-06): rimosso codice morto orfano qui sopra
+    # (un try/except con gdrive.decrypt_token / list_folder / return) che
+    # apparteneva semanticamente a /api/me/projects/{id}/files (ora spostato
+    # nella sua funzione corretta). Era irraggiungibile e referenziava
+    # variabili (creds, proj) non definite in questo scope.

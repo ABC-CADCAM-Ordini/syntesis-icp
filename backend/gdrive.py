@@ -436,6 +436,20 @@ def create_folder_in(refresh_token: str, name: str, parent_id: Optional[str] = N
     return {"id": folder_id, "name": name, "parent_id": parent_id}
 
 
+def get_file_metadata(refresh_token: str, file_id: str) -> dict:
+    """Ritorna metadata Drive (name, mimeType, size in bytes) senza scaricare.
+    Usato per pre-check size prima di un download proxiato (audit C3).
+    'size' puo' essere None se il file e' un Google Doc nativo (no size esposta)."""
+    service = get_drive_service(refresh_token)
+    meta = service.files().get(fileId=file_id, fields="id,name,mimeType,size").execute()
+    return {
+        "id": meta.get("id"),
+        "name": meta.get("name", "file"),
+        "mime_type": meta.get("mimeType", "application/octet-stream"),
+        "size": int(meta["size"]) if meta.get("size") else None,
+    }
+
+
 def download_file_bytes(refresh_token: str, file_id: str) -> tuple[bytes, str, str]:
     """Scarica i bytes di un file da Drive. Ritorna (data, name, mime_type).
     Per replica server-mediata: il file passa per la RAM del server, non viene salvato su disco."""

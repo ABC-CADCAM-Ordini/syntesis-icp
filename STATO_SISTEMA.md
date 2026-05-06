@@ -6,8 +6,8 @@
 
 | Componente | Versione |
 |---|---|
-| Backend (registry) | 8.1.12-A.5.2 |
-| /analizzare | v8.1.12-A.5.2 (code health batch: audit C2 C6 C7 C8 C13) |
+| Backend (registry) | 8.1.13-A.5.2 |
+| /analizzare | v8.1.13-A.5.2 (quick win cleanup: audit C3 C12 C15, chiude debito refactor Fase A su CLIN_LEVELS/CLIN_AXIS) |
 | /replacer | v7.3.9.107 |
 | / (Hub) | v8.0.0-refactor |
 
