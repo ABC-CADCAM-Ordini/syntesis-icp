@@ -6,7 +6,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.1.8-A.5.1</title>
+<title>Syntesis-ICP - Analizzare v8.1.9-A.5.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1879,7 +1879,7 @@ if (document.readyState === 'loading') {
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin:12px 0 4px 0;line-height:1.5">Scansione di partenza (marker presente):</div>
       <div class="comp-radio" id="sostSourceRadio">
         <label class="active"><input type="radio" name="sostSource" value="1T3" checked onchange="sostOnSourceChange(this)"><span class="sw" style="background:#ffaa44"></span>1T3</label>
-        <label><input type="radio" name="sostSource" value="SR" onchange="sostOnSourceChange(this)"><span class="sw" style="background:#0065B3"></span>SR</label>
+        <label><input type="radio" name="sostSource" value="SR" onchange="sostOnSourceChange(this)"><span class="sw" style="background:#0052A3"></span>SR</label>
         <label><input type="radio" name="sostSource" value="OS" onchange="sostOnSourceChange(this)"><span class="sw" style="background:#639922"></span>OS</label>
       </div>
 
@@ -2229,7 +2229,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
     --syn-tol-ottimo:#639922;--syn-tol-accettabile:#D97706;
     --syn-tol-rischioso:#F97316;--syn-tol-tensione:#EF4444;
     --syn-tol-fuori-posto:#A855F7;
-    --syn-marker-os:#0D9E6E;--syn-marker-sr:#0065B3;
+    --syn-marker-os:#0D9E6E;--syn-marker-sr:#0052A3;
     --syn-marker-1t3:#F59E0B;--syn-marker-mua:#A855F7;
     --syn-marker-scan:#b8a090;
     --syn-ref-a:#F97316;--syn-ref-b:#0065B3;
@@ -2261,7 +2261,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.1.8-A.5.1';
+window.ANALIZZA_BUILD = '8.1.9-A.5.2';
 window.ANALIZZA_BUILD_DATE = '2026-05-06';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -14878,18 +14878,31 @@ var SOSTITUIRE_SOURCE_OFFSET = {
 };
 
 // --- METADATA TEMPLATE ---
-var SOSTITUIRE_TEMPLATE_INFO = {
-  // v7.3.9.102 - zDisc: distanza nominale CLINICA tra il disco del marker e
-  // la connessione implantare (Z=0 locale del marker fisico). I CAD STL
-  // template caricati nell'app contengono solo la cap (per ridurre i triangoli):
-  // bbox.max.z del 1T3 e' 8.5 ma la realta' clinica e' 10 (la cap fisica e'
-  // 1.5mm piu' alta del CAD ridotto). bbox di SR e OS coincide con i nominali.
-  // Usato per calcolare la distanza disco-a-disco corretta tra source e
-  // sostituto specchiato (es. 1T3+SR = 10+5 = 15mm, NON 8.5+5 = 13.5).
-  '1T3': { label: 'Marker 1T3', radius: 2.515, color: 0xffaa44, zDisc: 10.0 },
-  'SR':  { label: 'Marker SR',  radius: 2.030, color: 0x0065B3, zDisc:  5.0 },
-  'OS':  { label: 'Marker OS',  radius: 1.780, color: 0x639922, zDisc:  6.0 }
-};
+// A.5.2: legge radius e color da window.SYN.scanbody (fallback ai valori
+// canonici allineati al registry). label e zDisc restano locali: il primo e'
+// UI string specifica di SOSTITUIRE, il secondo e' un dato clinico
+// (distanza disco-implant) che non vive nel bootstrap window.SYN.
+//
+// zDisc: distanza nominale CLINICA tra il disco del marker e la connessione
+// implantare (Z=0 locale del marker fisico). I CAD STL template caricati
+// nell'app contengono solo la cap (per ridurre i triangoli): bbox.max.z del
+// 1T3 e' 8.5 ma la realta' clinica e' 10. bbox di SR e OS coincide con i
+// nominali. Usato per calcolare la distanza disco-a-disco corretta tra
+// source e sostituto specchiato (es. 1T3+SR = 10+5 = 15mm, NON 8.5+5).
+var SOSTITUIRE_TEMPLATE_INFO = (function(){
+  var sb = (window.SYN && window.SYN.scanbody) || {};
+  var info = {
+    '1T3': { label: 'Marker 1T3', radius: 2.515, color: 0xFFAA44, zDisc: 10.0 },
+    'SR':  { label: 'Marker SR',  radius: 2.030, color: 0x0052A3, zDisc:  5.0 },
+    'OS':  { label: 'Marker OS',  radius: 1.780, color: 0x639922, zDisc:  6.0 }
+  };
+  Object.keys(info).forEach(function(k){
+    if(!sb[k]) return;
+    if(typeof sb[k].radius_mm === 'number') info[k].radius = sb[k].radius_mm;
+    if(typeof sb[k].color_hex === 'number') info[k].color  = sb[k].color_hex;
+  });
+  return info;
+})();
 
 // ── Decompressione template base64+gzip (cache Uint8Array) ──
 function sostDecodeTemplate(name){
@@ -16273,11 +16286,18 @@ function sostRebuildTree(){
          '<span class="dot" style="background:#0D1B2A;border:2px solid #fff;box-sizing:border-box"></span>' +
          '<span class="lbl" style="flex:1">Etichette numeriche</span>' +
          '</div>';
-    var TPL_ORDER = [
-      { key: '1T3', label: 'Marker 1T3', color: '#ffaa44' },
-      { key: 'SR',  label: 'Marker SR',  color: '#0065B3' },
-      { key: 'OS',  label: 'Marker OS',  color: '#639922' }
-    ];
+    // A.5.2: derivato da SOSTITUIRE_TEMPLATE_INFO (single source of truth,
+    // allineato a window.SYN). Conversione color int -> CSS hex string per
+    // gli inline style della UI dell'albero.
+    var TPL_ORDER = ['1T3', 'SR', 'OS'].map(function(k){
+      var info = SOSTITUIRE_TEMPLATE_INFO[k] || {};
+      var col = info.color || 0x888888;
+      return {
+        key: k,
+        label: info.label || ('Marker ' + k),
+        color: '#' + ('000000' + col.toString(16)).slice(-6).toUpperCase()
+      };
+    });
     TPL_ORDER.forEach(function(tpl){
       var ui = sostGroupUI[tpl.key] || { collapsed: false, opacity: 1.0 };
       var anyVisible = false, allVisible = true;

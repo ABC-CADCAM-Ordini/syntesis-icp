@@ -34,6 +34,7 @@ import numpy as np
 # Quando si promuove la Fase A in produzione, il suffisso sparisce -> 8.2.0.
 #
 # History:
+#   8.1.9-A.5.2 (2026-05-06): SOSTITUIRE_TEMPLATE_INFO + TPL_ORDER allineati a window.SYN; SR a 0x0052A3 ovunque (incluso swatch UI sostSource e CSS --syn-marker-sr)
 #   8.1.8-A.5.1 (2026-05-06): pagina "Lettura dei valori" nel report clinico jsPDF (schema scarico cono MUA)
 #   8.1.7-A.5.1 (2026-05-03): bootstrap window.SYN nel frontend (SCANBODY_CFG, MUA, MIS_CLIN, MIS_CLIN_AX)
 #   8.1.6-A.5.0 (2026-05-02): aggiunte soglie angolari (angular_deg, angular_classes_it)
@@ -43,7 +44,7 @@ import numpy as np
 #   8.1.2-A.2   (2026-05-02): aggiunto backend/registry.py + endpoint
 #   8.1.1-A.0   (2026-05-02): rimosso icp_engine_lab.py (copia 1:1)
 #   8.1.0       (2026-05-02): stato pre-Fase A (Analizzare promosso ieri)
-BACKEND_VERSION = "8.1.8-A.5.1"
+BACKEND_VERSION = "8.1.9-A.5.2"
 
 REGISTRY_VERSION = "1.1.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
 REGISTRY_SOURCE = "backend/registry.py"
