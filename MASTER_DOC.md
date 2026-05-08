@@ -665,6 +665,19 @@ mutation {
 
 Verificare poi che `meta.commitHash` del nuovo deployment corrisponda al commit pushato.
 
+**Trappola jq nel polling** (incontrata 2026-05-08, deploy 8.2.1). La query GraphQL `deployments(...)` ritorna un campo `meta` JSON che può contenere caratteri di controllo non escapati (output di build, log fragments). `jq` lo rifiuta con `parse error: Invalid string: control characters from U+0000 through U+001F must be escaped`. **Workaround**: escludere `meta` dal selettore se non serve. Per il polling `status` basta:
+
+```bash
+QUERY='query{
+  backend: deployments(first:1, input:{serviceId: "'$RW_SVC_BACKEND'", environmentId: "'$RW_ENV_ID'"}) { edges { node { id status createdAt } } }
+  legacy:  deployments(first:1, input:{serviceId: "'$RW_SVC_LEGACY'",  environmentId: "'$RW_ENV_ID'"}) { edges { node { id status createdAt } } }
+}'
+curl -s -X POST "$RW_GQL" -H "Authorization: Bearer $RW_TOKEN" -H "Content-Type: application/json" \
+     -d "$(jq -nc --arg q "$QUERY" '{query:$q}')" | jq '.data'
+```
+
+Se serve `meta.commitHash` per la verifica, leggerlo separatamente con `--raw-output` e parsing tollerante (es. `python -c "import json,sys; ..."` oppure `grep` sui campi noti). Mai includere `meta` nudo dentro un pipe a `jq`.
+
 ### A.6.2 Verifica integrazione su file servito
 
 Dopo deploy, fare hard refresh e controllare:
