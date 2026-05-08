@@ -2,15 +2,29 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-05-06)
+## Versione live (2026-05-08)
 
 | Componente | Versione |
 |---|---|
-| Backend (registry) | 8.2.0 |
-| /analizzare | v8.2.0 (Fase A promossa, suffisso A.x.y rimosso) |
+| Backend (registry) | 8.2.1 |
+| /analizzare | v8.2.1 |
 | / (Hub) | v8.0.0-refactor |
 
 > Voce `/replacer v7.3.9.107` rimossa il 2026-05-06: era stale, riferimento a un frontend obsoleto / mai integrato (la route `/replacer` non esiste in `main.py` e il file `syntesis-icp-replacer.html` non e' mai esistito in `backend/static/`).
+
+> Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
+
+## 8.2.1 — UI alignment Vedere (2026-05-08)
+
+Allineamento header `/vedere` al pattern canonico `.app-header` (Hub/Calibrator). Singolo cambio CSS sulla classe genitore `.header` di `syntesis-icp-vedere.html`:
+
+- `border-bottom: 1px solid var(--border)` → `3px solid var(--blue)` (separazione identitaria forte)
+- `padding: 10px 16px` → `14px 20px` (respiro verticale, in linea con Hub)
+- `gap: 6px` → `12px` (logo / titolo / toolbar / bottoni distanziati)
+
+Toolbar interna (logo, "Vedere", home/File/Workflow, Aggiungi file/Svuota scena) intatta: il delta tocca solo le proprietà del genitore. Verificato live su entrambi i servizi Railway (BACKEND + LEGACY): HTTP 200, `backend_version: 8.2.1`, `ANALIZZA_BUILD = '8.2.1'`.
+
+Punto #2 del piano UI (allineamento font/header tra moduli) chiuso. Statistiche v002 era già su Source Sans 3, niente da migrare lato font. Resta sospeso il dominio custom `app.syntesis-icp.com` (#2 sospesi).
 
 ## Fase A — Chiusa (2026-05-06)
 
