@@ -34,7 +34,8 @@ import numpy as np
 # Quando si promuove la Fase A in produzione, il suffisso sparisce -> 8.2.0.
 #
 # History:
-#   8.2.2          (2026-05-08): UI alignment Calibrator font a Source Sans 3 (era Plus Jakarta Sans + DM Mono, ultimo modulo outlier sul font). Allineato anche il <link> Google Fonts. Pulizia preparatoria all'introduzione di syntesis-ds.css (#1 piano UI).
+#   8.2.3          (2026-05-08): CLEANUP dead code ad alta confidenza (5 file). Cancellati: backend/static/syntesis-calibrator-v1.html (reliquia pre-v4 del modulo Calibrator dismesso ufficialmente in v7.3.9.001 — vedi MASTER_DOC §B.2), frontend/index.html (Hub vecchio v7.3.9.045 mai servito perche' Railway usa backend/Dockerfile, non il Dockerfile root), Dockerfile (root, mai usato da Railway), Dockerfile.frontend (mai referenziato), Dockerfile.root (mai referenziato). Bumpato CACHEBUST nel backend/Dockerfile (quello vero) per forzare rebuild del layer COPY su Railway. NOTA: il cleanup chiude anche un effetto collaterale dei deploy 8.2.1 e 8.2.2, dove il CACHEBUST era stato bumpato nel Dockerfile root sbagliato.
+#   8.2.2          (2026-05-08): UI alignment Calibrator font a Source Sans 3 (era Plus Jakarta Sans + DM Mono, ultimo modulo outlier sul font). Allineato anche il <link> Google Fonts. Pulizia preparatoria all'introduzione di syntesis-ds.css (#1 piano UI). NOTA: post-deploy emerso che syntesis-calibrator-v1.html era dead code (zero route, dismesso da v7.3.9.001), quindi la modifica e' stata su file orfano. File cancellato in 8.2.3.
 #   8.2.1          (2026-05-08): UI alignment Vedere header al canone .app-header (border-bottom 3px var(--blue), padding 14/20, gap 12). Cleanup dead code: rimosso syntesis-statistiche-v7.4.0.001.html (146KB, zero referenze nel repo, sostituito da v7.4.0.002 servito su /statistiche).
 #   8.2.0          (2026-05-06): PROMOTION chiusura Fase A. Refactor "registry come single source of truth" completato. Suffisso -A.x.y rimosso (regola 3 schema versioning). Step chiusi: A.1, A.2, A.3, A.4, A.4.1, A.5.0, A.5.1, A.5.2 + debito CLIN_LEVELS/CLIN_AXIS chiuso. A.6 cancellata: index.html e' hub navigazionale puro, syntesis-icp-replacer.html non esisteva.
 #   8.1.13-A.5.2 (2026-05-06): FIX quick win cleanup (audit C3 C12 C15): /api/me/projects/{id}/files restored happy path (sposta gdrive.list_folder dentro funzione, rimuove dead code orfano), MAX_DRIVE_PROXY_BYTES cap 100MB su /api/me/gdrive/file/.../content (pre-check via gdrive.get_file_metadata), CLIN_LEVELS+CLIN_AXIS importate da registry.THRESHOLDS+PALETTE (single source of truth, fallback canonico), allineato angular_classes_it[-1] "Fuori" -> "Fuori posizione" per coerenza con d3
@@ -51,7 +52,7 @@ import numpy as np
 #   8.1.2-A.2   (2026-05-02): aggiunto backend/registry.py + endpoint
 #   8.1.1-A.0   (2026-05-02): rimosso icp_engine_lab.py (copia 1:1)
 #   8.1.0       (2026-05-02): stato pre-Fase A (Analizzare promosso ieri)
-BACKEND_VERSION = "8.2.2"
+BACKEND_VERSION = "8.2.3"
 
 REGISTRY_VERSION = "1.1.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
 REGISTRY_SOURCE = "backend/registry.py"
