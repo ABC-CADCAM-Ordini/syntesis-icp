@@ -6,10 +6,12 @@
 
 | Componente | Versione |
 |---|---|
-| Backend (registry) | 8.3.1 |
-| /analizzare | v8.3.1 |
+| Backend (registry) | 8.3.3 (live) — 8.3.5 in registry git (version trail doc-only) |
+| /analizzare | v8.3.3 |
 | /vedere (default home) | v8.0.0-refactor |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
+
+> 8.3.3 (deploy 2026-05-08): tentativo fix cutview opacità 100% via `material.transparent = true` forzato nello slider di /vedere. Diagnosi originale errata (queue switch). Bug reale identificato successivamente come collisione cromatica cap-mesh — ticket aperto in MASTER_DOC §B.8. Patch 8.3.3 resta in produzione perché non rompe nulla. 8.3.4 e 8.3.5 sono solo doc patch (registry version trail), non deployati.
 
 > Voce `/replacer v7.3.9.107` rimossa il 2026-05-06: era stale, riferimento a un frontend obsoleto / mai integrato (la route `/replacer` non esiste in `main.py` e il file `syntesis-icp-replacer.html` non e' mai esistito in `backend/static/`).
 
@@ -57,6 +59,7 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 **Media**
 4. Merge Albero Scena + Scene Registry in /analizzare (lista lineare con RMSD/gruppo/opacità)
 5. Test pytest sul motore ICP (set base: 16 MUA reali validati clinicamente in v8.1.0)
+6. Cutview /vedere: collisione cromatica cap-mesh quando utente sceglie colore palette compatibile (vedi MASTER_DOC §B.8). Fix da 5 min, 3 opzioni candidate (cap neutro / contrasto automatico / complementare). Decisione alla prossima sessione.
 
 > Sospeso #6 "Cleanup syntesis-analyzer-lab.html" chiuso il 2026-05-08 in 8.2.5 con cancellazione del file e della route /lab.
 
