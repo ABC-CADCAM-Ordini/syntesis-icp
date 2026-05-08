@@ -74,9 +74,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # La sorgente unica del frontend e` backend/static/index.html nel repo.
-    # Viene copiata dal Dockerfile (COPY backend/ .) e servita staticamente.
-    # Nessuna decodifica o riscrittura al boot (v7.3.7.004+).
+    # backend/static/ contiene tutti i file statici serviti via mount /static/*.
+    # Viene copiata dal Dockerfile (COPY . .) e servita staticamente. Include:
+    # gli HTML serviti dalle route (vedere, v3b, dashboard), gli asset (logo,
+    # scarico_cono_mua_v4 per il PDF clinico) e il design system (ds/tokens.css,
+    # ds/components.css). Nessuna decodifica o riscrittura al boot (v7.3.7.004+).
     await init_db()
     yield
 
@@ -131,9 +133,7 @@ app.include_router(auth_router, prefix="/auth")
 # ── Serve frontend statico ────────────────────────────────────────────────────
 import pathlib
 _STATIC_DIR = pathlib.Path(__file__).parent / "static"
-_INDEX = _STATIC_DIR / "index.html"
-
-if _INDEX.exists():
+if _STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 # Header anti-cache per pagine HTML dinamiche (hub + moduli)
