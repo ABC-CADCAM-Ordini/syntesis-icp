@@ -34,6 +34,7 @@ import numpy as np
 # Quando si promuove la Fase A in produzione, il suffisso sparisce -> 8.2.0.
 #
 # History:
+#   8.2.4          (2026-05-08): CLEANUP step 2 — cancellato Hub legacy backend/static/index.html (servito su /static/index.html come asset ma mai linkato da nessun modulo vivo, ultimo commit attivo 2026-04-27 v7.3.9.083). Idee design archiviate in MASTER_DOC §C.1 prima della cancellazione (splash a 2 card numerate). Auto-load STL via ?file_id= NON perso: gia' vivo in /vedere "Blocco 5r" (linee 2728-2740). Conseguenza non eseguita in questo commit: i 5 file in backend/static/js/ (splash.js, controller.js, pdf-gen.js, stl-engine.js, supabase-ui.js, ~265KB) erano importati solo da questo Hub e ora sono orfani per dipendenza — decisione separata.
 #   8.2.3          (2026-05-08): CLEANUP dead code ad alta confidenza (5 file). Cancellati: backend/static/syntesis-calibrator-v1.html (reliquia pre-v4 del modulo Calibrator dismesso ufficialmente in v7.3.9.001 — vedi MASTER_DOC §B.2), frontend/index.html (Hub vecchio v7.3.9.045 mai servito perche' Railway usa backend/Dockerfile, non il Dockerfile root), Dockerfile (root, mai usato da Railway), Dockerfile.frontend (mai referenziato), Dockerfile.root (mai referenziato). Bumpato CACHEBUST nel backend/Dockerfile (quello vero) per forzare rebuild del layer COPY su Railway. NOTA: il cleanup chiude anche un effetto collaterale dei deploy 8.2.1 e 8.2.2, dove il CACHEBUST era stato bumpato nel Dockerfile root sbagliato.
 #   8.2.2          (2026-05-08): UI alignment Calibrator font a Source Sans 3 (era Plus Jakarta Sans + DM Mono, ultimo modulo outlier sul font). Allineato anche il <link> Google Fonts. Pulizia preparatoria all'introduzione di syntesis-ds.css (#1 piano UI). NOTA: post-deploy emerso che syntesis-calibrator-v1.html era dead code (zero route, dismesso da v7.3.9.001), quindi la modifica e' stata su file orfano. File cancellato in 8.2.3.
 #   8.2.1          (2026-05-08): UI alignment Vedere header al canone .app-header (border-bottom 3px var(--blue), padding 14/20, gap 12). Cleanup dead code: rimosso syntesis-statistiche-v7.4.0.001.html (146KB, zero referenze nel repo, sostituito da v7.4.0.002 servito su /statistiche).
@@ -52,7 +53,7 @@ import numpy as np
 #   8.1.2-A.2   (2026-05-02): aggiunto backend/registry.py + endpoint
 #   8.1.1-A.0   (2026-05-02): rimosso icp_engine_lab.py (copia 1:1)
 #   8.1.0       (2026-05-02): stato pre-Fase A (Analizzare promosso ieri)
-BACKEND_VERSION = "8.2.3"
+BACKEND_VERSION = "8.2.4"
 
 REGISTRY_VERSION = "1.1.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
 REGISTRY_SOURCE = "backend/registry.py"

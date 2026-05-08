@@ -821,3 +821,27 @@ Il file `syntesis-analyzer-v3b.html` ora coincide tra working copy e produzione:
 ---
 
 *Fine appendice B — v7.3.9.001 deploy SUCCESS commit 5111c84e — Sezione redatta da Claude il pomeriggio del 2026-04-25*
+
+
+# Appendice C — Design ideas archiviate (2026-05-08)
+
+Sezione per conservare idee UI/UX che vengono cancellate dal repo come dead code ma che potrebbero tornare utili come riferimento progettuale. Niente codice qui dentro, solo descrizione concettuale + ultimo commit dove l'idea era visibile.
+
+## C.1 Hub splash a 2 card numerate (cancellato in 8.2.4)
+
+Il file `backend/static/index.html` (servito su `/static/index.html` come asset, mai linkato da nessun modulo vivo) implementava un Hub-splash con 2 card affiancate:
+
+- Card `01 — Attivo — Analizzare` → click → `/analizzare`. Descritta come "Ambiente unificato per analisi angolare implantare, accoppiamento ICP, misura di precisione e fresabilità". Footer compatto con elenco workflow integrati.
+- Card `02 — Area personale — Backend` → click → `/dashboard`. Descritta come "Spazio cloud privato per gestire scansioni, progetti, contatti e condivisioni con i collaboratori".
+
+Elementi grafici distintivi: numeri `01` / `02` grandi (78px, opacity 6%) come watermark in basso a destra di ogni card, tag pillola colorato in alto (blu chiaro per "Attivo", verde chiaro per "Area personale"), titolo grande (26px), descrizione media (14px) e dettaglio compatto (13px).
+
+L'idea era una scelta "macro" tra modulo di analisi e modulo personale, presentata all'apertura. Quando il prodotto si è semplificato attorno al workflow Vedere come default home (`/` redirect a `/vedere`), questa scelta di entry-point è diventata ridondante: l'utente entra direttamente in Vedere e da lì naviga tramite il menu WorkFlow per i moduli di analisi e tramite il menu File per Dashboard.
+
+Ultimo commit dove il Hub-splash era visibile: `f334d60` (2026-04-27, v7.3.9.083 "feat(splash): aggiunto modulo Backend - 2 card Analizzare + Backend"). Cancellato in commit 8.2.4 dopo verifica che non era linkato da nessun modulo vivo.
+
+**Quando potrebbe tornare utile**: se in futuro il prodotto vuole presentare una scelta di entry-point diversa da "default Vedere" (per esempio, un primo accesso utente che mostra una scelta tra "analisi tecnica" e "area personale"), il pattern delle 2 card numerate è un buon punto di partenza visivo. Il file vive in storia git al commit f334d60.
+
+## C.2 Auto-load STL via `?file_id=` (NON archiviato — gia` vivo in /vedere)
+
+Il Hub legacy implementava anche un auto-load di file STL via query parameter `?file_id=` (per integrazione con Drive/Dashboard). Questa feature **non e` archiviata qui** perche` e` gia` viva in `/vedere` come "Blocco 5r: AUTO-LOAD DA URL" (vedi `syntesis-icp-vedere.html` linee 2728-2740). Cancellando il Hub legacy non si perde questa funzionalita`.
