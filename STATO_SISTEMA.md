@@ -54,13 +54,14 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 **Media**
 4. Merge Albero Scena + Scene Registry in /analizzare (lista lineare con RMSD/gruppo/opacità)
 5. Test pytest sul motore ICP (set base: 16 MUA reali validati clinicamente in v8.1.0)
-6. Cleanup `syntesis-analyzer-lab.html`: probabile copia pre-A.5 con costanti hardcoded duplicate. Da migrare o rigenerare da v3b post-A.5
+
+> Sospeso #6 "Cleanup syntesis-analyzer-lab.html" chiuso il 2026-05-08 in 8.2.5 con cancellazione del file e della route /lab.
 
 **Bassa**
-7. Spegnimento servizio Railway legacy (7ac922ce)
-8. Sentry / monitoring errori frontend
-9. Pubblicazione paper JIPD con dati Syntesis-ICP
-10. Audit 2026-05-06 cluster MEDI/BASSI: ~25 finding di code health, performance icp_engine, listener/dispose leak in v3b.html
+6. Spegnimento servizio Railway legacy (7ac922ce)
+7. Sentry / monitoring errori frontend
+8. Pubblicazione paper JIPD con dati Syntesis-ICP
+9. Audit 2026-05-06 cluster MEDI/BASSI: ~25 finding di code health, performance icp_engine, listener/dispose leak in v3b.html
 
 ## Roadmap prodotto
 

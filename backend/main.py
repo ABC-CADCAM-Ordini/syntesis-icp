@@ -172,20 +172,6 @@ async def analyzer_page():
     return JSONResponse({"error": "Analyzer not found"}, status_code=404)
 
 
-# ── LAB: branch parallelo del modulo Analizzare ─────────────────────────────
-# UI separata su rotta /lab (syntesis-analyzer-lab.html), banco test per
-# esperimenti UI/UX e per future piste algoritmiche. Dal 2026-05-02 usa lo
-# stesso motore della produzione (icp_engine.py): la pista fase4d e' stata
-# promossa a canonica con v8.1.0 (validata clinicamente, 16 MUA reali).
-# Quando si vorra' sperimentare un nuovo algoritmo, si creera' un modulo
-# dedicato (es. icp_engine_v2.py) e si aggiornera' l'import sotto.
-@app.get("/lab", include_in_schema=False)
-async def analyzer_lab_page():
-    _lb = _STATIC_DIR / "syntesis-analyzer-lab.html"
-    if _lb.exists():
-        return FileResponse(str(_lb), headers=_NO_STORE_HEADERS)
-    return JSONResponse({"error": "Lab analyzer not found"}, status_code=404)
-
 @app.get("/vedere", include_in_schema=False)
 async def vedere_page():
     """Workflow Vedere: viewer 3D multi-formato (STL/OBJ/PLY/XYZ/PCD/PTS)
@@ -194,13 +180,6 @@ async def vedere_page():
     if _vd.exists():
         return FileResponse(str(_vd), headers=_NO_STORE_HEADERS)
     return JSONResponse({"error": "Vedere not found"}, status_code=404)
-
-@app.get("/statistiche", include_in_schema=False)
-async def statistiche_page():
-    _st = _STATIC_DIR / "syntesis-statistiche-v7.4.0.002.html"
-    if _st.exists():
-        return FileResponse(str(_st), headers=_NO_STORE_HEADERS)
-    return JSONResponse({"error": "Statistiche not found"}, status_code=404)
 
 @app.get("/dashboard", include_in_schema=False)
 async def dashboard_page():
