@@ -1,0 +1,101 @@
+/* Syntesis-ICP Design System — components.css
+ *
+ * Classi prefissate .syn-* riutilizzabili dai moduli. Ogni classe è additive
+ * rispetto al CSS embedded del modulo: il DS si aggancia con classi nuove,
+ * non sovrascrive selettori esistenti.
+ *
+ * Ordine di inclusione richiesto: <link> di tokens.css e components.css PRIMA
+ * del <style> embedded del modulo. Cosi' la cascade fa vincere l'embedded
+ * sui suoi selettori, mentre le classi .syn-* portano regole nuove.
+ *
+ * Pilota: 8.3.0 — usato in /vedere su .syn-app-header e .syn-btn--primary.
+ */
+
+/* === Header bar (pattern .app-header del Hub canonico) === */
+/* Si applica come SECONDA classe accanto a .header o .app-header esistente,
+ * cosi' eventuali querySelector('.header') continuano a funzionare. Il modulo
+ * embedded mantiene proprieta' specifiche (border-radius wrapper, z-index,
+ * flex-shrink) e cede al DS le 4 proprieta'-firma del pattern. */
+.syn-app-header {
+  background:     var(--syn-white);
+  border-bottom:  3px solid var(--syn-blue);
+  /* 14px 20px: valori di componente validati nel pattern header bar (8.2.1).
+   * 14px non corrisponde a un token della spacing scale (4/8/12/16/24): e'
+   * la cifra di componente, non di base. Se in futuro tutti i moduli con
+   * .syn-app-header convergono a 12 o 16, si potra' allineare a token puri. */
+  padding:        14px 20px;
+  gap:            var(--syn-space-md);  /* 12px */
+}
+
+/* === Bottoni === */
+/* Base: usata da sola, look outline neutro coerente con .btn legacy.
+ * Modificatori: .syn-btn--primary (CTA blu pieno), .syn-btn--outline (alias base),
+ * .syn-btn--ghost (transparent). */
+.syn-btn {
+  font-family:     var(--syn-mono);
+  font-size:       12px;
+  font-weight:     800;
+  letter-spacing:  0.06em;
+  padding:         var(--syn-space-sm) var(--syn-space-md);  /* 8px 12px */
+  border-radius:   var(--syn-radius-sm);                     /* 6px */
+  border:          1.5px solid var(--syn-border);
+  background:      var(--syn-white);
+  color:           var(--syn-dark);
+  cursor:          pointer;
+  transition:      all 0.15s ease;
+  display:         inline-flex;
+  align-items:     center;
+  gap:             var(--syn-space-xs);                       /* 4px */
+  line-height:     1;
+}
+.syn-btn svg {
+  flex-shrink: 0;
+  display:     block;
+}
+.syn-btn:hover {
+  border-color: var(--syn-blue);
+  color:        var(--syn-blue);
+}
+.syn-btn:disabled,
+.syn-btn[disabled] {
+  opacity:        0.4;
+  cursor:         not-allowed;
+  pointer-events: none;
+}
+
+/* --- Primary CTA (gradient blu pieno) --- */
+.syn-btn--primary {
+  background:    linear-gradient(135deg, var(--syn-blue-mid), var(--syn-blue-deep));
+  color:         var(--syn-white);
+  border-color:  transparent;
+  box-shadow:    0 4px 16px rgba(0, 100, 180, 0.30);
+}
+.syn-btn--primary:hover {
+  border-color: transparent;   /* override del .syn-btn:hover */
+  color:        var(--syn-white);
+  transform:    translateY(-1px);
+  box-shadow:   0 6px 22px rgba(0, 100, 180, 0.40);
+}
+/* SVG dentro un primary eredita il colore del bottone (icona bianca su sfondo blu).
+ * Richiede che lo stroke/fill nel markup SVG sia "currentColor", non un hex
+ * hardcoded come "#0065B3". */
+.syn-btn--primary svg {
+  stroke: currentColor;
+}
+
+/* --- Outline (alias esplicito del look base, per markup leggibile) --- */
+.syn-btn--outline {
+  /* identico a .syn-btn base. Esiste per chiarezza di intent nel markup. */
+}
+
+/* --- Ghost (transparent, per azioni a basso peso) --- */
+.syn-btn--ghost {
+  background:    transparent;
+  border-color:  transparent;
+  color:         var(--syn-gray);
+}
+.syn-btn--ghost:hover {
+  background:    var(--syn-light);
+  color:         var(--syn-blue);
+  border-color:  transparent;
+}

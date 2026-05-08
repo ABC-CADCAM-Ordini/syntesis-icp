@@ -1,0 +1,43 @@
+/* Syntesis-ICP Design System — tokens.css
+ *
+ * Single source of truth per i token visuali condivisi tra i moduli.
+ * Namespace --syn-* per non collidere con i token esistenti --blue/--gray/--radius
+ * dei singoli moduli. I moduli che migrano al DS sostituiscono progressivamente
+ * var(--blue) con var(--syn-blue), ecc.
+ *
+ * Pilota: introdotto in 8.3.0 con migrazione header + bottone primario di /vedere.
+ */
+:root {
+  /* === Colori === */
+  --syn-blue:        #0065B3;
+  --syn-blue-mid:    #0077CC;
+  --syn-blue-light:  #E8F4FF;
+  --syn-blue-glow:   rgba(0, 101, 179, 0.16);
+  --syn-blue-deep:   #0050A0;
+  --syn-dark:        #0F1923;
+  --syn-mid:         #3D5166;
+  --syn-gray:        #7A90A4;
+  --syn-pearl:       #F0F5FA;
+  --syn-light:       #F7F9FC;
+  --syn-border:      #D6E4F0;
+  --syn-white:       #FFFFFF;
+  --syn-green:       #0D9E6E;
+  --syn-red:         #DC2626;
+  --syn-gold:        #F59E0B;
+
+  /* === Radius scale === */
+  --syn-radius-sm:   6px;
+  --syn-radius-md:   10px;
+  --syn-radius-lg:   14px;
+
+  /* === Spacing scale === */
+  --syn-space-xs:    4px;
+  --syn-space-sm:    8px;
+  --syn-space-md:    12px;
+  --syn-space-lg:    16px;
+  --syn-space-xl:    24px;
+
+  /* === Tipografia === */
+  --syn-font:        'Source Sans 3', 'Source Sans Pro', sans-serif;
+  --syn-mono:        'Source Sans 3', 'Source Sans Pro', sans-serif;
+}
