@@ -7920,7 +7920,7 @@ if (window.SynCutViewManager) {
       window.SynRegistry.update(sel.id, { 'visual.opacity': v });
       const layer = state.layers.find(l => l.synId === sel.id);
       if (layer && layer.material) {
-        layer.material.transparent = (v < 1.0);
+        layer.material.transparent = true;
         layer.material.opacity = v;
         layer.material.depthWrite = (v >= 1.0);
         layer.material.needsUpdate = true;
