@@ -680,7 +680,20 @@ Se serve `meta.commitHash` per la verifica, leggerlo separatamente con `--raw-ou
 
 ### A.6.2 Verifica integrazione su file servito
 
-Dopo deploy, fare hard refresh e controllare:
+**Pre-asserzione versione corrente (lezione 8.3.1 → 8.3.2).** Prima di affermare "siamo a versione X" in chat, codice, doc o piano di lavoro, NON inferire da commenti `# X.Y.Z (data): ...` nel `registry.py`: quelli sono history entries (sezione `# History:`), non lo stato corrente. La versione viva si legge in uno di questi due modi:
+
+```bash
+# (a) live (canonico, batte tutto):
+curl -s https://syntesis-icp-production.up.railway.app/api/registry/constants \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['backend_version'])"
+
+# (b) local (registry corrente del checkout):
+grep -E '^BACKEND_VERSION' backend/registry.py
+```
+
+Se i due divergono, il registry locale ha un bump non ancora deployato: dichiararlo esplicitamente prima di proporre nuovi bump o piani di lavoro. La regola nasce da un caso reale: in sessione 2026-05-08 il modello ha letto la riga 39 di `registry.py` (commento `# 8.2.5 (2026-05-08): CLEANUP...`) e l'ha presa per la versione corrente, mentre la costante alla riga 59 era già a `8.3.1` e la live coincideva. Conseguenza: piano di lavoro proposto su una baseline di 4 release più vecchia. La regola si applica anche a `<title>` e `window.ANALIZZA_BUILD` nel v3b: leggere il valore corrente, non un riferimento storico nei commenti adiacenti.
+
+**Post-deploy: verifica file servito.** Dopo deploy, fare hard refresh e controllare:
 
 ```bash
 URL="https://syntesis-icp-production.up.railway.app/analizzare?nocache=$(date +%s)"
