@@ -703,6 +703,19 @@ grep -c "{stringa_chiave_della_feature}" /tmp/served.html  # deve essere ≥ 1
 
 Se la dimensione del file servito non è cambiata o il marker non è presente, il deploy non ha pubblicato il commit giusto.
 
+**Cache busting durante verifica visiva post-deploy (lezione 8.3.3 → 8.3.6).** Il `curl ?nocache=...` sopra valida il **server**: conferma che Railway sta servendo il file giusto. Ma la **verifica visiva del fix nel browser** è una storia separata. Il browser tiene cache aggressiva su HTML statici di /analizzare (3.87 MB) e /vedere (~415 KB), e un reload normale (F5 / Cmd+R) può servire la versione precedente per minuti dopo il deploy, soprattutto se il file ha lo stesso URL.
+
+Prima di valutare un fix nel browser, una di queste due:
+
+1. **Hard refresh esplicito**: Cmd+Shift+R (macOS) / Ctrl+Shift+F5 (Windows/Linux). Non basta il reload normale, serve quello "ignore cache".
+2. **Querystring cache busting**: aprire l'URL con `?v=$(date +%s)` o un suffisso univoco — costringe il browser a trattarlo come risorsa nuova.
+
+Fonte di verità per "sto guardando il fix vero o un fantasma cached?" è il banner di versione in pagina:
+- `/analizzare` espone `window.ANALIZZA_BUILD` → leggibile da DevTools console (`ANALIZZA_BUILD`) o dal logo runtime patcher (CLAUDE.md §3 punto 1)
+- `/vedere` non ha banner runtime, controllare `<title>` o un marker nel sorgente servito
+
+Senza questo passaggio, una verifica visiva può smentire un fix che in realtà funziona — successo nella sessione 2026-05-08 dove 4 commit di doc consecutivi (8.3.4, 8.3.5, 8.3.6) sono stati spesi a ipotizzare cause inesistenti del cutview /vedere prima di scoprire che il fix originale 8.3.3 era corretto e l'errore era nel testarlo su cache stale.
+
 ### A.6.3 Checklist pre-cleanup file
 
 Prima di cancellare un file dal repo (HTML statico, modulo Python, asset, JS, ecc.), eseguire questi 6 controlli. La cerimonia costa qualche minuto ma blinda contro il tipo di regressione silenziosa scoperto nel 8.2.4 → 8.3.0 → 8.3.1 (cancellazione `backend/static/index.html` ha disattivato un mount StaticFiles condizionato a quel file specifico, mandando 404 ogni asset sotto `/static/*` per due release).
@@ -772,7 +785,7 @@ Pendenze su altri moduli:
 - DS1 cap-clustering DBSCAN: prototipo validato (6/6 e 5/5 sui casi di test), integrazione invasiva rimandata a v7.3.9 o successiva
 - DNS register.it: CNAME app.syntesis-icp.com da bdxfubdr a tqxxdh7s.up.railway.app (Francesco: "importa poco ora")
 - Master-doc principale (sezioni 1-14): aggiornato dalla v7.2.0.012; questa appendice ne è la continuazione
-- **Bug cutview /vedere**: ticket spostato in [§B.8](#b8-pendenze-rimandate) dopo correzione diagnosi (8.3.5). Le ipotesi 8.3.3 (queue switch su transparent flip) e 8.3.4 (angolo camera-piano) erano entrambe sbagliate. La causa reale, identificata con screenshot dall'utente, è una **collisione cromatica** tra colore mesh scelto dall'utente e colore fisso della cap del taglio. Il fix 8.3.3 resta in produzione perché non rompe nulla, ma è inutile: risolveva un problema che non c'era.
+- **Bug cutview /vedere — CHIUSO 2026-05-08 in 8.3.3** (ticket archiviato in [§B.8](#b8-pendenze-rimandate)). Il fix slider opacità (`material.transparent = true` forzato) ha realmente risolto il bug. Le ipotesi intermedie 8.3.4 (angolo camera) e 8.3.5 (collisione cromatica) erano artefatti di test su browser cache stale. Verifica utente a freddo con cache pulita ha confermato il fix 8.3.3 valido.
 
 ---
 
@@ -875,11 +888,7 @@ Il file `syntesis-analyzer-v3b.html` ora coincide tra working copy e produzione:
 - DS1 cap-clustering DBSCAN: prototipo validato 6/6 e 5/5 sui casi di test, integrazione invasiva rimandata.
 - Filtro Upper passo 2 (5→4 candidati): rimandato.
 - DNS register.it CNAME `app.syntesis-icp.com`: rimandato (Francesco "importa poco ora").
-- **Cutview /vedere — collisione cromatica cap-mesh (aperta 2026-05-08, 8.3.5)**: il colore della cap del taglio è impostato dinamicamente sul colore del primo layer visibile ([buildCapForSection riga 6539](backend/static/syntesis-icp-vedere.html:6539): `color: colorHexToInt(firstLayer.color || '#b8a090')`), quindi quando l'utente sceglie per la mesh un colore della palette compatibile con il default cap (es. arancio `#b8a090` o vicini), mesh e cap diventano monocromatiche e il rendering "sembra rotto" — in realtà è solo perdita di gerarchia visiva. **Diagnosi confermata da screenshot utente 2026-05-08**: mesh arancione + cap arancione = piatta monocromatica; mesh blu + cap arancione = cap distinta e leggibile. Le ipotesi 8.3.3 (queue switch transparent→opaque) e 8.3.4 (angolo camera-piano) erano sbagliate: il bug non era mai pipeline rendering, transparent flag, stencil, o z-fighting. La patch 8.3.3 (forzare `material.transparent = true` nello slider opacità) resta in produzione perché non rompe niente, ma è inutile: risolve un problema che non esisteva. Fix candidati per la prossima sessione, in ordine crescente di sofisticazione:
-    1. **Cap a colore fisso neutro**: cambiare il default arancio a un grigio scuro non in palette mesh (es. `#444` o `#2a2a2a`). 1 riga in `buildCapForSection`. Fix da 5 minuti.
-    2. **Cap con contrasto automatico**: la cap usa il colore della mesh con luminosità invertita (mesh chiara → cap scura, mesh scura → cap chiara). Calcolo HSL → flip L → back to hex. ~10 righe.
-    3. **Cap a colore complementare**: la cap usa il complementare del colore mesh sulla ruota cromatica (mesh arancione → cap blu, mesh blu → cap arancione). Calcolo HSL → flip H di 180° → back to hex. ~12 righe.
-  Mia raccomandazione: opzione 1 per minimizzare la superficie di cambiamento, opzione 2 se vuoi un comportamento adattivo che funzioni con qualunque colore mesh futuro. Opzione 3 ha più sapore visivo ma può produrre accoppiamenti cromatici aggressivi (es. arancio→ciano elettrico) che disturbano la lettura clinica. Decisione utente alla prossima sessione.
+- **Cutview /vedere — CHIUSO 2026-05-08 (8.3.3, archiviato in 8.3.6)**: il fix slider opacità (`material.transparent = true` forzato in [vedere.html:7923](backend/static/syntesis-icp-vedere.html:7923)) era corretto. Diagnosi originale corretta al primo turno: a opacità 100% lo slider flippava `material.transparent` a `false`, spostando la mesh dalla transparent queue alla opaque queue r128, dove l'ordinamento ascendente per `renderOrder` faceva renderizzare il layer mesh (depthWrite true) PRIMA delle stencil meshes della cap (depthTest true). La pipeline cap risultava compromessa, il cap copriva la mesh perdendo gerarchia visiva — l'utente lo percepiva come "rendering corrotto" o "collisione cromatica". Il fix ripristina il queue ordering corretto: stencil meshes prima, cap plane dopo, layer mesh in transparent queue come ultimo passo, niente interferenza depth buffer. Verifica utente a freddo (2026-05-08, post-cache busting esplicito): mesh arancione + cap arancione (default `#b8a090` ereditato dal `firstLayer.color`) + opacità 100% + sezione attiva = cap distinta dalla mesh grazie alla differenza di shading `MeshPhongMaterial` fra superficie curva e piano, niente bug. **Diagnosi sbagliate intermedie** (entrambe artefatti di test su browser cache stale ancora servente 8.3.1, prima di hard refresh esplicito): 8.3.4 "dipende dall'angolo camera-piano di taglio in viste grazing" — falsa, il bug non era angolo-dipendente; 8.3.5 "collisione cromatica fra mesh e cap" — falsa, mesh e cap sono distinguibili per shading anche con colore base uguale. Le 3 opzioni di fix cromatico (cap neutro fisso, contrasto automatico HSL, complementare HSL) erano per un problema che non esisteva. Lezione di processo annotata in [§A.6.2](#a62-verifica-integrazione-su-file-servito) ("Cache busting durante verifica visiva post-deploy") e in `feedback_cache_busting.md` della memoria operativa.
 
 ---
 

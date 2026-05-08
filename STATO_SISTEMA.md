@@ -11,7 +11,7 @@
 | /vedere (default home) | v8.0.0-refactor |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
-> 8.3.3 (deploy 2026-05-08): tentativo fix cutview opacità 100% via `material.transparent = true` forzato nello slider di /vedere. Diagnosi originale errata (queue switch). Bug reale identificato successivamente come collisione cromatica cap-mesh — ticket aperto in MASTER_DOC §B.8. Patch 8.3.3 resta in produzione perché non rompe nulla. 8.3.4 e 8.3.5 sono solo doc patch (registry version trail), non deployati.
+> 8.3.3 fix cutview opacità 100% **confermato risolto a freddo dopo verifica con cache pulita** (2026-05-08). Il fix slider (`material.transparent = true` forzato in /vedere) risolve davvero: ripristina il queue ordering corretto fra layer mesh, stencil meshes e cap plane. Le diagnosi 8.3.4 (angolo camera) e 8.3.5 (collisione cromatica) erano artefatti di test su browser cache stale che continuava a servire 8.3.1. Ticket archiviato in MASTER_DOC §B.8 (CHIUSO). Lezione di processo aggiunta a MASTER_DOC §A.6.2: cache busting esplicito (Cmd+Shift+R o `?v=$(date +%s)`) prima di ogni verifica visiva post-deploy. 8.3.4-5-6 sono doc patch (registry version trail), non deployati.
 
 > Voce `/replacer v7.3.9.107` rimossa il 2026-05-06: era stale, riferimento a un frontend obsoleto / mai integrato (la route `/replacer` non esiste in `main.py` e il file `syntesis-icp-replacer.html` non e' mai esistito in `backend/static/`).
 
@@ -59,9 +59,10 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 **Media**
 4. Merge Albero Scena + Scene Registry in /analizzare (lista lineare con RMSD/gruppo/opacità)
 5. Test pytest sul motore ICP (set base: 16 MUA reali validati clinicamente in v8.1.0)
-6. Cutview /vedere: collisione cromatica cap-mesh quando utente sceglie colore palette compatibile (vedi MASTER_DOC §B.8). Fix da 5 min, 3 opzioni candidate (cap neutro / contrasto automatico / complementare). Decisione alla prossima sessione.
 
 > Sospeso #6 "Cleanup syntesis-analyzer-lab.html" chiuso il 2026-05-08 in 8.2.5 con cancellazione del file e della route /lab.
+
+> Sospeso "Cutview /vedere collisione cromatica" aperto e chiuso nello stesso giorno (2026-05-08, 8.3.6): era falso allarme. La diagnosi cromatica 8.3.5 e l'angle-camera 8.3.4 erano entrambe artefatti di test su browser cache stale. Verifica utente a freddo con hard refresh ha confermato che il fix 8.3.3 (forzare `material.transparent = true` nello slider opacità) risolve davvero il bug. Vedi MASTER_DOC §B.8 (CHIUSO) e §A.6.2 (regola hard refresh post-deploy).
 
 **Bassa**
 6. Spegnimento servizio Railway legacy (7ac922ce)
