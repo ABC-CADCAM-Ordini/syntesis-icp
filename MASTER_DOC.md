@@ -690,6 +690,50 @@ grep -c "{stringa_chiave_della_feature}" /tmp/served.html  # deve essere ≥ 1
 
 Se la dimensione del file servito non è cambiata o il marker non è presente, il deploy non ha pubblicato il commit giusto.
 
+### A.6.3 Checklist pre-cleanup file
+
+Prima di cancellare un file dal repo (HTML statico, modulo Python, asset, JS, ecc.), eseguire questi 6 controlli. La cerimonia costa qualche minuto ma blinda contro il tipo di regressione silenziosa scoperto nel 8.2.4 → 8.3.0 → 8.3.1 (cancellazione `backend/static/index.html` ha disattivato un mount StaticFiles condizionato a quel file specifico, mandando 404 ogni asset sotto `/static/*` per due release).
+
+**1. Route HTML.** Per ogni `@app.get(...)` in `backend/main.py`, verificare che nessuno punti al file da cancellare:
+```bash
+grep -nE "@app\.(get|post|put|delete)" backend/main.py
+grep -n "<NOMEFILE>" backend/main.py
+```
+
+**2. Endpoint API.** Verificare che nessun handler API legga, importi o referenzi il file:
+```bash
+grep -rn "<NOMEFILE>" backend/*.py
+```
+Includere import Python (`from <modulo> import ...`), letture di filesystem (`Path(...) / "..."`), e riferimenti hardcoded.
+
+**3. Mount StaticFiles.** **Punto critico.** Per ogni `app.mount(...)` in `main.py`, verificare:
+- la condizione del mount (es. `if _INDEX.exists()`) non dipende dal file da cancellare;
+- il file da cancellare non è un asset servito tramite il mount.
+
+Se il file è un asset (logo, CSS, immagine), verificare quali HTML lo importano via path `/static/<percorso>`:
+```bash
+grep -rn "/static/<percorso>" backend/static/*.html
+```
+
+**4. HTML interni.** Tutti i file HTML serviti possono linkare al file via `<a href="...">`, `<script src="...">`, `<img src="...">`, `<link href="...">`, o `window.location = "..."`:
+```bash
+grep -rn "<NOMEFILE>" backend/static/*.html
+```
+
+**5. JS importers.** Se ci sono moduli JS in `backend/static/js/` (o assimilati), grep separato:
+```bash
+grep -rn "<NOMEFILE>" backend/static/js/
+```
+Anche `import`, `require`, e fetch dinamici.
+
+**6. Documentazione.** Cercare riferimenti in `MASTER_DOC.md`, `STORIA.md`, `STATO_SISTEMA.md`, `README.md`, `docs/`:
+```bash
+grep -rn "<NOMEFILE>" *.md docs/
+```
+Distinguere riferimenti storici (changelog, appendici) da riferimenti operativi (sospesi aperti, roadmap, route attive). I primi si lasciano, i secondi si aggiornano.
+
+**Verifica deploy post-cleanup.** Dopo il deploy della cancellazione, oltre alle solite curl su `/api/registry/constants` e sulla route HTML del modulo bumpato, fare almeno UN curl su un asset noto sotto `/static/*` (es. `/static/synthesis-logo.png`, `/static/assets/scarico_cono_mua_v4.png`, o un CSS del DS se presente). Le route HTML servite via `@app.get(...)` e gli endpoint API NON coprono il mount StaticFiles, che è un meccanismo separato.
+
 ## A.7 Catalogo file di sessione (locali)
 
 Working directory del lavoro intercorso:

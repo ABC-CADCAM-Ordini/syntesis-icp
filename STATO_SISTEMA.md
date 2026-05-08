@@ -6,13 +6,16 @@
 
 | Componente | Versione |
 |---|---|
-| Backend (registry) | 8.2.1 |
-| /analizzare | v8.2.1 |
-| / (Hub) | v8.0.0-refactor |
+| Backend (registry) | 8.3.1 |
+| /analizzare | v8.3.1 |
+| /vedere (default home) | v8.0.0-refactor |
+| Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
 > Voce `/replacer v7.3.9.107` rimossa il 2026-05-06: era stale, riferimento a un frontend obsoleto / mai integrato (la route `/replacer` non esiste in `main.py` e il file `syntesis-icp-replacer.html` non e' mai esistito in `backend/static/`).
 
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
+
+> DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
 ## 8.2.1 — UI alignment Vedere (2026-05-08)
 
