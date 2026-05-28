@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Syntesis-ICP — Accesso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#0065B3; --accent-deep:#004F8C; --ink:#0F1923; --ink-soft:#5A6E82;
+    --line:#E3E9F0; --bg:#FFFFFF; --bg-tint:#F6F9FC; --ok:#0D9E6E; --warn:#B7791F;
+    --err:#D64545; --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'IBM Plex Sans',sans-serif;color:var(--ink);background:var(--bg);
+    display:grid;grid-template-columns:1.05fr 1fr;min-height:100vh;overflow-x:hidden;
+  }
+  /* ---- LEFT brand ---- */
+  .stage{position:relative;background:var(--ink);color:#fff;padding:64px 56px;
+    display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;}
+  .stage::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(120% 90% at 18% 8%,rgba(0,101,179,.45),transparent 60%),
+      radial-gradient(90% 70% at 92% 96%,rgba(67,141,214,.28),transparent 55%);}
+  .grid-lines{position:absolute;inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
+    background-size:46px 46px;
+    mask-image:radial-gradient(120% 120% at 30% 30%,#000 40%,transparent 90%);}
+  .stage>*{position:relative;z-index:1}
+  .brand{display:flex;align-items:baseline;gap:12px}
+  .brand .mark{font-family:'Fraunces',serif;font-weight:500;font-size:30px;letter-spacing:-.01em}
+  .brand .icp{font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:.32em;color:#7FB3DE;padding-bottom:3px}
+  .lead{max-width:30ch}
+  .lead .kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.28em;
+    text-transform:uppercase;color:#7FB3DE;margin-bottom:22px;display:block}
+  .lead h1{font-family:'Fraunces',serif;font-weight:300;font-size:clamp(32px,3.4vw,46px);
+    line-height:1.08;letter-spacing:-.02em}
+  .lead h1 em{font-style:italic;color:#9FC8E8}
+  .lead p{margin-top:22px;color:#A9BCce;line-height:1.6;font-size:15px}
+  .metrics{display:flex;gap:40px}
+  .metric .num{font-family:'Fraunces',serif;font-weight:400;font-size:40px;line-height:1;letter-spacing:-.02em}
+  .metric .lbl{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.18em;
+    text-transform:uppercase;color:#7FB3DE;margin-top:8px}
+  /* ---- RIGHT panel ---- */
+  .panel{display:flex;align-items:center;justify-content:center;padding:48px 40px}
+  .card{width:100%;max-width:412px}
+  .tabs{display:flex;gap:4px;background:var(--bg-tint);border:1px solid var(--line);
+    border-radius:11px;padding:4px;margin-bottom:30px}
+  .tab{flex:1;border:0;background:transparent;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+    font-size:14px;font-weight:500;color:var(--ink-soft);padding:10px 0;border-radius:8px;transition:all .22s ease}
+  .tab.active{background:#fff;color:var(--accent);box-shadow:0 1px 3px rgba(15,25,35,.08)}
+  .head{margin-bottom:26px}
+  .head h2{font-family:'Fraunces',serif;font-weight:400;font-size:27px;letter-spacing:-.015em}
+  .head p{color:var(--ink-soft);font-size:14px;margin-top:7px;line-height:1.5}
+  form{display:flex;flex-direction:column;gap:16px}
+  .field{display:flex;flex-direction:column;gap:7px}
+  .field label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--ink-soft)}
+  .field label .opt{text-transform:none;letter-spacing:0;color:#9aa8b6}
+  .field input{font-family:'IBM Plex Sans',sans-serif;font-size:15px;color:var(--ink);
+    border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;background:#fff;
+    transition:border-color .18s,box-shadow .18s}
+  .field input::placeholder{color:#A9B6C4}
+  .field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,101,179,.12)}
+  .hint{font-size:11.5px;color:var(--ink-soft);margin-top:-2px}
+  .submit{margin-top:6px;border:0;cursor:pointer;background:var(--accent);color:#fff;
+    font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600;padding:13px;border-radius:10px;
+    transition:background .18s,transform .08s;display:flex;align-items:center;justify-content:center;gap:9px}
+  .submit:hover{background:var(--accent-deep)}
+  .submit:active{transform:translateY(1px)}
+  .submit:disabled{opacity:.6;cursor:not-allowed}
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+    border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .msg{font-size:13.5px;line-height:1.5;border-radius:10px;padding:11px 13px;display:none;margin-bottom:18px}
+  .msg.show{display:block}
+  .msg.error{background:#FCEDED;color:var(--err);border:1px solid #F3CFCF}
+  .msg.ok{background:#EAF7F1;color:var(--ok);border:1px solid #C5E8D8}
+  .foot{margin-top:24px;font-size:12.5px;color:var(--ink-soft);text-align:center;line-height:1.6}
+  .foot a{color:var(--accent);text-decoration:none}
+  .hidden{display:none}
+  /* ---- pending / authorized states ---- */
+  .state{text-align:center}
+  .badge{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    margin:0 auto 22px}
+  .badge.wait{background:#FBF3E2}
+  .badge.go{background:#EAF7F1}
+  .state h2{font-family:'Fraunces',serif;font-weight:400;font-size:26px;letter-spacing:-.015em;margin-bottom:10px}
+  .state p{color:var(--ink-soft);font-size:14.5px;line-height:1.6;max-width:34ch;margin:0 auto}
+  .who{margin-top:18px;font-size:13px;color:var(--ink-soft);
+    background:var(--bg-tint);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .who strong{color:var(--ink)}
+  .pulse-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);
+    margin-right:8px;animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+  .keybox{margin-top:24px;text-align:left}
+  .keybox .klabel{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;display:block}
+  .keyrow{display:flex;gap:8px}
+  .keyrow .kval{flex:1;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:17px;
+    letter-spacing:.04em;color:var(--accent-deep);background:#F0F6FC;border:1.5px dashed #B8D4EC;
+    border-radius:10px;padding:13px 15px;display:flex;align-items:center}
+  .copybtn{border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:0 15px;cursor:pointer;
+    font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:500;color:var(--ink);transition:all .16s}
+  .copybtn:hover{background:var(--bg-tint);border-color:#cfd9e4}
+  .copybtn.done{color:var(--ok);border-color:#C5E8D8;background:#EAF7F1}
+  .actions{margin-top:26px;display:flex;flex-direction:column;gap:10px}
+  .ghost{border:1.5px solid var(--line);background:#fff;cursor:pointer;
+    font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:500;color:var(--ink-soft);
+    padding:11px;border-radius:10px;transition:all .16s}
+  .ghost:hover{background:var(--bg-tint)}
+  /* ---- dev simulator ---- */
+  .devbar{position:fixed;bottom:14px;left:14px;z-index:50;background:#0F1923;color:#cdd8e3;
+    border-radius:10px;padding:9px 11px;font-family:'IBM Plex Mono',monospace;font-size:11px;
+    display:flex;gap:6px;align-items:center;box-shadow:0 6px 24px rgba(0,0,0,.25);opacity:.92}
+  .devbar span{color:#7FB3DE;letter-spacing:.1em;margin-right:4px}
+  .devbar button{background:#1d2b38;color:#cdd8e3;border:1px solid #2c3d4d;border-radius:6px;
+    padding:5px 9px;cursor:pointer;font-family:inherit;font-size:11px}
+  .devbar button:hover{background:#26384a}
+  @media (max-width:900px){
+    body{grid-template-columns:1fr}.stage{display:none}.panel{padding:40px 22px}
+    .devbar{font-size:10px}
+  }
+</style>
+</head>
+<body>
+  <aside class="stage">
+    <div class="grid-lines"></div>
+    <div class="brand"><span class="mark">Syntesis</span><span class="icp">ICP</span></div>
+    <div class="lead">
+      <span class="kicker">Analisi del posizionamento implantare</span>
+      <h1>La precisione<br>diventa <em>misura</em>.</h1>
+      <p>Confronto ICP tra scansioni STL, deviazioni assiali per scanbody, report clinici. Accedi al tuo spazio di lavoro.</p>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="num">36<span style="font-size:20px">&micro;m</span></div><div class="lbl">Accuratezza lineare</div></div>
+      <div class="metric"><div class="num">0.034<span style="font-size:20px">&deg;</span></div><div class="lbl">Precisione angolare</div></div>
+    </div>
+  </aside>
+
+  <main class="panel">
+    <div class="card">
+
+      <!-- ============ VIEW 1: AUTH ============ -->
+      <div id="view-auth">
+        <div class="tabs">
+          <button class="tab active" id="tab-login" type="button">Accedi</button>
+          <button class="tab" id="tab-register" type="button">Registrati</button>
+        </div>
+        <div id="auth-msg" class="msg"></div>
+
+        <section id="pane-login">
+          <div class="head"><h2>Bentornato</h2><p>Inserisci le tue credenziali per accedere.</p></div>
+          <form id="form-login" novalidate>
+            <div class="field"><label for="l-email">Email</label>
+              <input type="email" id="l-email" autocomplete="email" placeholder="nome@studio.it" required></div>
+            <div class="field"><label for="l-pass">Password</label>
+              <input type="password" id="l-pass" autocomplete="current-password" placeholder="••••••••" required></div>
+            <button class="submit" type="submit" id="btn-login">Accedi</button>
+          </form>
+        </section>
+
+        <section id="pane-register" class="hidden">
+          <div class="head"><h2>Crea il tuo accesso</h2>
+            <p>Registrati liberamente. La chiave di licenza ti sarà comunicata dopo l'autorizzazione.</p></div>
+          <form id="form-register" novalidate>
+            <div class="field"><label for="r-name">Nome e cognome</label>
+              <input type="text" id="r-name" autocomplete="name" placeholder="Mario Rossi" required></div>
+            <div class="field"><label for="r-email">Email</label>
+              <input type="email" id="r-email" autocomplete="email" placeholder="nome@studio.it" required></div>
+            <div class="field"><label for="r-org">Studio / organizzazione <span class="opt">(opzionale)</span></label>
+              <input type="text" id="r-org" autocomplete="organization" placeholder="Studio Dentistico Rossi"></div>
+            <div class="field"><label for="r-city">Città</label>
+              <input type="text" id="r-city" autocomplete="address-level2" placeholder="La Spezia" required></div>
+            <div class="field"><label for="r-phone">Cellulare</label>
+              <input type="tel" id="r-phone" autocomplete="tel" inputmode="tel" placeholder="+39 333 1234567" required>
+              <span class="hint">Numero di cellulare. Potrà essere usato per la verifica via SMS.</span></div>
+            <div class="field"><label for="r-pass">Password</label>
+              <input type="password" id="r-pass" autocomplete="new-password" placeholder="Almeno 8 caratteri" required>
+              <span class="hint">Minimo 8 caratteri.</span></div>
+            <button class="submit" type="submit" id="btn-register">Registrati</button>
+          </form>
+        </section>
+      </div>
+
+      <!-- ============ VIEW 2: PENDING ============ -->
+      <div id="view-pending" class="hidden">
+        <div class="state">
+          <div class="badge wait">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#B7791F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </div>
+          <h2>Registrazione ricevuta</h2>
+          <p>Il tuo account è in attesa di autorizzazione. Un amministratore verificherà la richiesta e genererà la tua chiave di licenza.</p>
+          <div class="who" id="pending-who"></div>
+          <div class="actions">
+            <div style="font-size:12.5px;color:var(--ink-soft);display:flex;align-items:center;justify-content:center">
+              <span class="pulse-dot"></span>Verifica automatica dello stato in corso…
+            </div>
+            <button class="ghost" id="pending-check" type="button">Controlla adesso</button>
+            <button class="ghost" id="pending-logout" type="button">Esci</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ VIEW 3: AUTHORIZED ============ -->
+      <div id="view-authorized" class="hidden">
+        <div class="state">
+          <div class="badge go">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0D9E6E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <h2>Account autorizzato</h2>
+          <p>La tua richiesta è stata approvata. Ecco la tua chiave di licenza personale.</p>
+          <div class="keybox">
+            <span class="klabel">Chiave di licenza</span>
+            <div class="keyrow">
+              <div class="kval" id="auth-key">SICP-0000-0000-0000</div>
+              <button class="copybtn" id="copy-key" type="button">Copia</button>
+            </div>
+            <span class="hint" style="margin-top:10px;display:block">Conservala. Ti identifica come utente autorizzato di Syntesis-ICP.</span>
+          </div>
+          <div class="actions">
+            <button class="submit" id="enter-app" type="button" style="margin-top:0">Entra in Syntesis-ICP</button>
+            <button class="ghost" id="auth-logout" type="button">Esci</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="foot">
+        Problemi di accesso? <a href="mailto:supporto@syntesis-icp.com">Contatta il supporto</a>
+      </p>
+    </div>
+  </main>
+
+  <!-- dev simulator: rimuovere in produzione -->
+  <div class="devbar">
+    <span>DEMO</span>
+    <button data-sim="auth">Auth</button>
+    <button data-sim="pending">In attesa</button>
+    <button data-sim="authorized">Autorizzato</button>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  var API = (location.origin && location.origin.startsWith("http"))
+              ? location.origin : "https://app.syntesis-icp.com";
+  var APP_REDIRECT = "/vedere";
+
+  var $ = function(id){ return document.getElementById(id); };
+  var session = { token:null, user:null };
+
+  // ---- view router ----
+  var views = { auth:$("view-auth"), pending:$("view-pending"), authorized:$("view-authorized") };
+  var pollTimer = null;
+
+  function showView(name){
+    Object.keys(views).forEach(function(k){ views[k].classList.toggle("hidden", k!==name); });
+    if(name === "pending"){ startPolling(); } else { stopPolling(); }
+  }
+
+  // ---- tabs ----
+  function setTab(isLogin){
+    $("tab-login").classList.toggle("active", isLogin);
+    $("tab-register").classList.toggle("active", !isLogin);
+    $("pane-login").classList.toggle("hidden", !isLogin);
+    $("pane-register").classList.toggle("hidden", isLogin);
+    hideMsg();
+  }
+  $("tab-login").addEventListener("click", function(){ setTab(true); });
+  $("tab-register").addEventListener("click", function(){ setTab(false); });
+
+  // ---- messages ----
+  var msg = $("auth-msg");
+  function showMsg(t,k){ msg.textContent=t; msg.className="msg show "+(k||"error"); }
+  function hideMsg(){ msg.className="msg"; }
+
+  function busy(btn,on,idle){
+    btn.disabled=on;
+    if(on){ btn.dataset.idle=btn.textContent; btn.innerHTML='<span class="spinner"></span>Attendere…'; }
+    else { btn.textContent=btn.dataset.idle||idle||""; }
+  }
+
+  function friendlyError(status, data){
+    if(status===401) return "Email o password non corretti.";
+    if(status===409) return "Esiste già un account con questa email.";
+    if(status===422) return "Controlla i campi inseriti.";
+    if(data && data.detail && typeof data.detail==="string") return data.detail;
+    return "Si è verificato un errore. Riprova tra poco.";
+  }
+
+  // ---- API ----
+  function apiPost(path, body){
+    return fetch(API+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+      .then(function(res){ return res.text().then(function(t){
+        var d=null; try{ d=t?JSON.parse(t):null; }catch(e){ d=t; }
+        return {ok:res.ok,status:res.status,data:d};
+      });});
+  }
+  function apiGet(path){
+    return fetch(API+path,{headers: session.token?{"Authorization":"Bearer "+session.token}:{}})
+      .then(function(res){ return res.text().then(function(t){
+        var d=null; try{ d=t?JSON.parse(t):null; }catch(e){ d=t; }
+        return {ok:res.ok,status:res.status,data:d};
+      });});
+  }
+
+  // ---- stato utente: il backend (dopo adattamento) restituira'
+  //      user.active (bool) e user.license_key (string|null).
+  //      authorized = active===true && license_key presente.
+  function classify(user){
+    if(!user) return "pending";
+    if(user.role === "admin") return "authorized"; // gli admin entrano sempre
+    var hasKey = !!(user.license_key && String(user.license_key).trim());
+    var active = user.active === true || user.active === undefined ? user.active : false;
+    // se il backend non manda 'active', ci basiamo sulla chiave
+    if(hasKey && active !== false) return "authorized";
+    return "pending";
+  }
+
+  function routeByUser(user){
+    session.user = user || session.user;
+    var state = classify(session.user);
+    if(state === "authorized"){
+      fillAuthorized(session.user);
+      showView("authorized");
+    } else {
+      fillPending(session.user);
+      showView("pending");
+    }
+  }
+
+  function fillPending(user){
+    var name = (user && user.name) ? user.name : "";
+    var email = (user && user.email) ? user.email : "";
+    var city = (user && user.city) ? user.city : "";
+    var phone = (user && user.phone) ? user.phone : "";
+    var html = "Registrato come <strong>"+escapeHtml(name)+"</strong><br>"+escapeHtml(email);
+    if(city || phone){
+      html += "<br>"+escapeHtml([city, phone].filter(Boolean).join(" · "));
+    }
+    $("pending-who").innerHTML = html;
+  }
+  function fillAuthorized(user){
+    var key = (user && user.license_key) ? user.license_key : "SICP-XXXX-XXXX-XXXX";
+    $("auth-key").textContent = key;
+  }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+
+  // ---- polling stato (pannello attesa) ----
+  function startPolling(){
+    stopPolling();
+    pollTimer = setInterval(checkStatus, 15000); // ogni 15s
+  }
+  function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+
+  function checkStatus(){
+    if(!session.token){ return; }
+    // /auth/me restituira' lo stato aggiornato dell'utente
+    apiGet("/auth/me").then(function(r){
+      if(r.ok && r.data){
+        // /auth/me oggi ritorna il payload del token; dopo l'adattamento
+        // restituira' anche active + license_key aggiornati.
+        var u = r.data.user || r.data;
+        session.user = Object.assign({}, session.user, u);
+        if(classify(session.user) === "authorized"){
+          fillAuthorized(session.user);
+          showView("authorized");
+        }
+      }
+    }).catch(function(){ /* silenzioso: riprova al prossimo giro */ });
+  }
+
+  // ---- LOGIN ----
+  $("form-login").addEventListener("submit", function(e){
+    e.preventDefault(); hideMsg();
+    var email=$("l-email").value.trim(), pass=$("l-pass").value;
+    if(!email||!pass){ showMsg("Inserisci email e password."); return; }
+    var btn=$("btn-login"); busy(btn,true);
+    apiPost("/auth/login",{email:email,password:pass}).then(function(r){
+      busy(btn,false,"Accedi");
+      if(r.ok && r.data){ session.token=r.data.access_token; routeByUser(r.data.user); }
+      else { showMsg(friendlyError(r.status,r.data)); }
+    }).catch(function(){ busy(btn,false,"Accedi"); showMsg("Impossibile contattare il server."); });
+  });
+
+  // ---- REGISTER (senza licenza) ----
+  $("form-register").addEventListener("submit", function(e){
+    e.preventDefault(); hideMsg();
+    var name=$("r-name").value.trim(), email=$("r-email").value.trim(),
+        org=$("r-org").value.trim(), city=$("r-city").value.trim(),
+        phone=$("r-phone").value.trim(), pass=$("r-pass").value;
+    if(!name||!email||!city||!phone||!pass){ showMsg("Compila tutti i campi obbligatori."); return; }
+    if(pass.length<8){ showMsg("La password deve avere almeno 8 caratteri."); return; }
+    // validazione cellulare: cifre, spazi, + e - ; almeno 8 cifre
+    var digits = phone.replace(/[^0-9]/g,"");
+    if(!/^[0-9+\-\s]+$/.test(phone) || digits.length < 8){
+      showMsg("Inserisci un numero di cellulare valido."); return;
+    }
+    var payload={name:name,email:email,password:pass,city:city,phone:phone};
+    if(org) payload.organization=org;
+    var btn=$("btn-register"); busy(btn,true);
+    apiPost("/auth/register",payload).then(function(r){
+      busy(btn,false,"Registrati");
+      if(r.ok && r.data){
+        session.token=r.data.access_token;
+        // nuovo registrato: quasi sempre pending
+        routeByUser(r.data.user || {name:name,email:email,active:false,license_key:null});
+      } else { showMsg(friendlyError(r.status,r.data)); }
+    }).catch(function(){ busy(btn,false,"Registrati"); showMsg("Impossibile contattare il server."); });
+  });
+
+  // ---- pending actions ----
+  $("pending-check").addEventListener("click", checkStatus);
+  $("pending-logout").addEventListener("click", logout);
+  $("auth-logout").addEventListener("click", logout);
+
+  function logout(){
+    session={token:null,user:null}; stopPolling();
+    $("form-login").reset(); $("form-register").reset();
+    setTab(true); showView("auth");
+  }
+
+  // ---- authorized actions ----
+  $("copy-key").addEventListener("click", function(){
+    var key=$("auth-key").textContent;
+    var btn=$("copy-key");
+    var done=function(){ btn.textContent="Copiato"; btn.classList.add("done");
+      setTimeout(function(){ btn.textContent="Copia"; btn.classList.remove("done"); },1800); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(key).then(done).catch(done);
+    } else { done(); }
+  });
+  $("enter-app").addEventListener("click", function(){
+    var frag = session.token ? ("#access_token="+encodeURIComponent(session.token)) : "";
+    window.location.href = APP_REDIRECT + frag;
+  });
+
+  // ---- DEV simulator (rimuovere in produzione) ----
+  document.querySelectorAll(".devbar button").forEach(function(b){
+    b.addEventListener("click", function(){
+      var sim=b.getAttribute("data-sim");
+      if(sim==="auth"){ logout(); }
+      else if(sim==="pending"){
+        session.user={name:"Mario Rossi",email:"mario@studio.it",city:"La Spezia",phone:"+39 333 1234567",active:false,license_key:null};
+        session.token="demo"; fillPending(session.user); showView("pending");
+      }
+      else if(sim==="authorized"){
+        session.user={name:"Mario Rossi",email:"mario@studio.it",active:true,license_key:"SICP-A1B2-C3D4-E5F6"};
+        session.token="demo"; fillAuthorized(session.user); showView("authorized");
+      }
+    });
+  });
+
+})();
+</script>
+</body>
+</html>
