@@ -58,29 +58,3 @@ async def admin_revoke(user_id: str, admin: dict = Depends(require_admin)):
     if not ok:
         raise HTTPException(404, detail="Utente non trovato.")
     return {"user_id": user_id, "revoked": True}
-
-
-# ── BOOTSTRAP TEMPORANEO: promozione primo admin ──────────────────────────────
-# Da RIMUOVERE subito dopo l'uso. Protetto da BOOTSTRAP_ADMIN_SECRET (env var).
-import os as _os
-from pydantic import BaseModel as _BaseModel
-
-class _BootstrapReq(_BaseModel):
-    secret: str
-    email: str
-
-@router.post("/bootstrap-admin")
-async def bootstrap_admin(req: _BootstrapReq):
-    expected = _os.getenv("BOOTSTRAP_ADMIN_SECRET", "")
-    import hmac as _hmac
-    if not expected or not _hmac.compare_digest(req.secret, expected):
-        raise HTTPException(403, detail="Non autorizzato.")
-    from database import get_pool
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "UPDATE users SET role='admin', active=TRUE WHERE LOWER(email)=LOWER($1) RETURNING id, email, role, active",
-            req.email)
-    if not row:
-        raise HTTPException(404, detail="Email non trovata.")
-    return {"id": row["id"], "email": row["email"], "role": row["role"], "active": row["active"]}
