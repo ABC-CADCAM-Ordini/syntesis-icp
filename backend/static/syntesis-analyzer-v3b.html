@@ -17612,30 +17612,14 @@ if(document.readyState === 'loading'){
       <button onclick="syntAuthDoLogin()" id="syntAuthLoginBtn" style="width:100%;padding:11px;background:linear-gradient(135deg,#0077CC,#0050A0);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">Accedi</button>
     </div>
 
-    <!-- Register form -->
-    <div id="syntAuthRegisterForm" style="padding:18px 22px;display:none">
-      <div style="margin-bottom:10px">
-        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Email *</label>
-        <input type="email" id="syntAuthRegEmail" placeholder="email@esempio.it" style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none">
+    <!-- Register form: registrazione spostata al pannello /accedi (no chiave) -->
+    <div id="syntAuthRegisterForm" style="padding:22px;display:none">
+      <div style="font-size:13px;color:#5A6E82;line-height:1.6;margin-bottom:18px">
+        La registrazione non richiede pi&ugrave; una chiave di licenza. Crea il tuo
+        account dal nuovo pannello: un amministratore lo autorizzer&agrave; e ti verr&agrave;
+        comunicata la chiave.
       </div>
-      <div style="margin-bottom:10px">
-        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Nome completo *</label>
-        <input type="text" id="syntAuthRegName" placeholder="Mario Rossi" style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none">
-      </div>
-      <div style="margin-bottom:10px">
-        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Password * (min 8 caratteri)</label>
-        <input type="password" id="syntAuthRegPwd" style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none">
-      </div>
-      <div style="margin-bottom:10px">
-        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Organizzazione (opz.)</label>
-        <input type="text" id="syntAuthRegOrg" placeholder="Studio dentistico, laboratorio..." style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none">
-      </div>
-      <div style="margin-bottom:10px">
-        <label style="display:block;font-size:10px;font-weight:800;color:#7A90A4;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Chiave di licenza *</label>
-        <input type="text" id="syntAuthRegLicense" placeholder="SICP-XXXX-XXXX-XXXX" style="width:100%;padding:10px 12px;border:1.5px solid #D6E4F0;border-radius:7px;font-size:13px;outline:none;font-family:monospace">
-      </div>
-      <div id="syntAuthRegErr" style="color:#DC2626;font-size:12px;margin-bottom:8px;font-family:monospace;min-height:14px"></div>
-      <button onclick="syntAuthDoRegister()" id="syntAuthRegBtn" style="width:100%;padding:11px;background:linear-gradient(135deg,#0077CC,#0050A0);color:#fff;border:none;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer">Crea account</button>
+      <a href="/accedi" style="display:block;text-align:center;text-decoration:none;width:100%;padding:11px;background:linear-gradient(135deg,#0077CC,#0050A0);color:#fff;border-radius:8px;font-weight:800;font-size:13px">Vai alla registrazione</a>
     </div>
   </div>
 </div>

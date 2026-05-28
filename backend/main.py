@@ -20,7 +20,7 @@ from typing import Optional
 from pathlib import Path
 
 from pydantic import BaseModel
-from auth import router as auth_router, verify_token
+from auth import router as auth_router, verify_token, require_authorized
 from admin import router as admin_router
 from icp_engine import analyze_stl_pair
 from pdf_gen import generate_pdf
@@ -191,6 +191,24 @@ async def dashboard_page():
         return FileResponse(str(_dh), headers=_NO_STORE_HEADERS)
     return JSONResponse({"error": "Dashboard not found"}, status_code=404)
 
+@app.get("/accedi", include_in_schema=False)
+async def accedi_page():
+    """Pannello accesso a 3 stati: login, registrazione senza licenza (utente
+    pending), pannello attesa con polling /auth/me + vista autorizzato."""
+    _ac = _STATIC_DIR / "syntesis-accedi.html"
+    if _ac.exists():
+        return FileResponse(str(_ac), headers=_NO_STORE_HEADERS)
+    return JSONResponse({"error": "Accedi not found"}, status_code=404)
+
+@app.get("/gestione", include_in_schema=False)
+async def gestione_page():
+    """Pannello amministrazione: lista registrati, autorizza (genera chiave),
+    revoca. Le API /admin/* sono protette da require_admin (403 ai non-admin)."""
+    _ge = _STATIC_DIR / "syntesis-gestione.html"
+    if _ge.exists():
+        return FileResponse(str(_ge), headers=_NO_STORE_HEADERS)
+    return JSONResponse({"error": "Gestione not found"}, status_code=404)
+
 @app.post("/api/analyze")
 async def analyze(
     file_a: UploadFile = File(..., description="STL riferimento"),
@@ -199,7 +217,7 @@ async def analyze(
     operator_name: Optional[str] = None,
     location: Optional[str] = None,
     consent: bool = False,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_authorized)
 ):
     check_rate_limit(current_user["user_id"])
 
@@ -286,7 +304,7 @@ async def analyze(
 @app.post("/api/report/{analysis_id}")
 async def get_report(
     analysis_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_authorized)
 ):
     """Genera e restituisce il PDF firmato server-side."""
     # Recupera risultato dal db (implementato in database.py)
@@ -310,7 +328,7 @@ async def get_report(
 async def leaderboard(
     brand: Optional[str] = None,
     limit: int = 50,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_authorized)
 ):
     rows = await get_leaderboard(brand=brand, limit=min(limit, 100))
     return {"rows": rows}
@@ -424,7 +442,7 @@ class PlaceMuaRequest(BaseModel):
 
 
 @app.post("/api/place-mua")
-async def place_mua(req: PlaceMuaRequest, current_user: dict = Depends(verify_token)):
+async def place_mua(req: PlaceMuaRequest, current_user: dict = Depends(require_authorized)):
     """v7.3.9.042: posizionamento singolo MUA con weighted ICP server-side.
 
     Path opt-in alternativa a findScanbodyCenter() client-side. Stesso input
@@ -560,7 +578,7 @@ async def place_mua(req: PlaceMuaRequest, current_user: dict = Depends(verify_to
 # per future sperimentazioni: per provare un motore alternativo, sostituire
 # l'import sotto senza toccare /lab e l'UI lab.
 @app.post("/api/place-mua-lab")
-async def place_mua_lab(req: PlaceMuaRequest, current_user: dict = Depends(verify_token)):
+async def place_mua_lab(req: PlaceMuaRequest, current_user: dict = Depends(require_authorized)):
     """LAB branch: stessa logica di /api/place-mua. Endpoint separato preservato
     come hook per future sperimentazioni algoritmiche."""
     import time as _time
@@ -793,7 +811,7 @@ async def me_change_password(
 
 @app.get("/api/me/analyses")
 async def me_analyses(archived: bool = False, limit: int = 50, offset: int = 0,
-                        current_user: dict = Depends(verify_token)):
+                        current_user: dict = Depends(require_authorized)):
     """Lista delle mie analisi (paginate, filtrabili per archived).
     archived=False (default): solo attive
     archived=True: solo archiviate"""
@@ -819,7 +837,7 @@ async def me_analyses(archived: bool = False, limit: int = 50, offset: int = 0,
 
 @app.get("/api/me/analyses/{analysis_id}")
 async def me_analysis_detail(analysis_id: str,
-                               current_user: dict = Depends(verify_token)):
+                               current_user: dict = Depends(require_authorized)):
     """Dettaglio completo di un'analisi (con result_json fuso)."""
     from database import get_analysis
     record = await get_analysis(analysis_id, current_user["user_id"])
@@ -835,7 +853,7 @@ async def me_analysis_detail(analysis_id: str,
 
 @app.patch("/api/me/analyses/{analysis_id}")
 async def me_update_analysis(analysis_id: str, req: AnalysisMetaUpdate,
-                               current_user: dict = Depends(verify_token)):
+                               current_user: dict = Depends(require_authorized)):
     """Aggiorna metadata di un'analisi (rinomina, note, archivia/de-archivia)."""
     name = req.display_name.strip() if req.display_name is not None else None
     if name is not None and (len(name) < 1 or len(name) > 200):
@@ -857,7 +875,7 @@ async def me_update_analysis(analysis_id: str, req: AnalysisMetaUpdate,
 
 @app.delete("/api/me/analyses/{analysis_id}")
 async def me_delete_analysis(analysis_id: str,
-                               current_user: dict = Depends(verify_token)):
+                               current_user: dict = Depends(require_authorized)):
     """Elimina permanentemente un'analisi.
     Rimuove cascata l'eventuale entry leaderboard."""
     ok = await delete_user_analysis(analysis_id, current_user["user_id"])
@@ -894,7 +912,7 @@ class AnalysisAssignToProject(BaseModel):
 
 @app.get("/api/me/projects")
 async def me_list_projects(archived: bool = False,
-                            current_user: dict = Depends(verify_token)):
+                            current_user: dict = Depends(require_authorized)):
     """Lista progetti dell'utente con conteggio analisi."""
     items = await list_user_projects(current_user["user_id"], archived=archived)
     # Serializzo datetimes
@@ -908,7 +926,7 @@ async def me_list_projects(archived: bool = False,
 
 @app.get("/api/me/projects/{project_id}")
 async def me_project_detail(project_id: str,
-                              current_user: dict = Depends(verify_token)):
+                              current_user: dict = Depends(require_authorized)):
     """Dettaglio progetto + analisi associate."""
     proj = await get_user_project(project_id, current_user["user_id"])
     if not proj:
@@ -927,7 +945,7 @@ async def me_project_detail(project_id: str,
 
 @app.post("/api/me/projects")
 async def me_create_project(req: ProjectCreate,
-                              current_user: dict = Depends(verify_token)):
+                              current_user: dict = Depends(require_authorized)):
     """Crea un nuovo progetto."""
     name = (req.name or "").strip()
     if len(name) < 1 or len(name) > 200:
@@ -956,7 +974,7 @@ async def me_create_project(req: ProjectCreate,
 
 @app.patch("/api/me/projects/{project_id}")
 async def me_update_project(project_id: str, req: ProjectUpdate,
-                              current_user: dict = Depends(verify_token)):
+                              current_user: dict = Depends(require_authorized)):
     """Aggiorna metadati progetto."""
     name = req.name.strip() if req.name is not None else None
     if name is not None and (len(name) < 1 or len(name) > 200):
@@ -980,7 +998,7 @@ async def me_update_project(project_id: str, req: ProjectUpdate,
 
 @app.delete("/api/me/projects/{project_id}")
 async def me_delete_project(project_id: str, cascade: bool = False,
-                              current_user: dict = Depends(verify_token)):
+                              current_user: dict = Depends(require_authorized)):
     """Elimina un progetto.
     cascade=False (default): le analisi restano ma con project_id=NULL
     cascade=True: elimina anche le analisi associate."""
@@ -993,7 +1011,7 @@ async def me_delete_project(project_id: str, cascade: bool = False,
 
 @app.patch("/api/me/analyses/{analysis_id}/project")
 async def me_assign_analysis(analysis_id: str, req: AnalysisAssignToProject,
-                                current_user: dict = Depends(verify_token)):
+                                current_user: dict = Depends(require_authorized)):
     """Associa o dissocia un'analisi a un progetto."""
     ok = await assign_analysis_to_project(
         analysis_id, current_user["user_id"], req.project_id
@@ -1011,7 +1029,7 @@ async def me_assign_analysis(analysis_id: str, req: AnalysisAssignToProject,
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/api/me/gdrive/status")
-async def me_gdrive_status(current_user: dict = Depends(verify_token)):
+async def me_gdrive_status(current_user: dict = Depends(require_authorized)):
     """Stato connessione Drive per l'utente corrente."""
     if not gdrive.is_configured():
         return {"configured": False, "connected": False,
@@ -1110,7 +1128,7 @@ async def gdrive_callback(code: str = "", state: str = "", error: str = ""):
 
 
 @app.post("/auth/gdrive/disconnect")
-async def gdrive_disconnect(current_user: dict = Depends(verify_token)):
+async def gdrive_disconnect(current_user: dict = Depends(require_authorized)):
     """Rimuove le credenziali Drive dal nostro DB.
     L'utente puo' anche revocare manualmente da
     https://myaccount.google.com/permissions per togliere il consent Google."""
@@ -1120,7 +1138,7 @@ async def gdrive_disconnect(current_user: dict = Depends(verify_token)):
 
 @app.post("/api/me/projects/{project_id}/sync-folder")
 async def me_project_sync_folder(project_id: str,
-                                    current_user: dict = Depends(verify_token)):
+                                    current_user: dict = Depends(require_authorized)):
     """Crea (o recupera) la folder Drive associata al progetto.
     Idempotente: se gia' esiste, ritorna l'ID esistente."""
     creds = await get_gdrive_credentials(current_user["user_id"])
@@ -1148,7 +1166,7 @@ async def me_project_sync_folder(project_id: str,
 
 @app.get("/api/me/projects/{project_id}/files")
 async def me_project_files(project_id: str,
-                              current_user: dict = Depends(verify_token)):
+                              current_user: dict = Depends(require_authorized)):
     """Lista file caricati su Drive per questo progetto."""
     creds = await get_gdrive_credentials(current_user["user_id"])
     if not creds:
@@ -1196,7 +1214,7 @@ class ContactUpdate(BaseModel):
 @app.get("/api/me/contacts")
 async def me_list_contacts(
     pro_role: Optional[str] = None,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_authorized)
 ):
     """Lista contatti dell'utente corrente. Filtro opzionale ?pro_role=medico|laboratorio."""
     items = await list_user_contacts(current_user["user_id"])
@@ -1215,7 +1233,7 @@ async def me_list_contacts(
 
 @app.post("/api/me/contacts")
 async def me_create_contact(req: ContactCreate,
-                              current_user: dict = Depends(verify_token)):
+                              current_user: dict = Depends(require_authorized)):
     """Aggiunge un contatto alla rubrica. Se l'email corrisponde a un utente
     Syntesis, viene auto-collegato (status=active), altrimenti resta pending."""
     # Validazione email
@@ -1251,7 +1269,7 @@ async def me_create_contact(req: ContactCreate,
 
 @app.patch("/api/me/contacts/{contact_id}")
 async def me_update_contact(contact_id: str, req: ContactUpdate,
-                              current_user: dict = Depends(verify_token)):
+                              current_user: dict = Depends(require_authorized)):
     """Aggiorna nome/ruolo/note di un contatto. L'email non e' modificabile."""
     name = req.display_name.strip() if req.display_name is not None else None
     if name is not None and len(name) > 200:
@@ -1272,7 +1290,7 @@ async def me_update_contact(contact_id: str, req: ContactUpdate,
 
 @app.delete("/api/me/contacts/{contact_id}")
 async def me_delete_contact(contact_id: str,
-                              current_user: dict = Depends(verify_token)):
+                              current_user: dict = Depends(require_authorized)):
     """Rimuove un contatto dalla rubrica."""
     ok = await delete_user_contact(contact_id, current_user["user_id"])
     if not ok:
@@ -1287,7 +1305,7 @@ async def me_delete_contact(contact_id: str,
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/api/me/storage")
-async def me_storage(current_user: dict = Depends(verify_token)):
+async def me_storage(current_user: dict = Depends(require_authorized)):
     """Ritorna stato consumo mensile dell'utente: plan, used, limit, %, periodo."""
     status = await get_user_storage_status(current_user["user_id"])
     return status
@@ -1304,7 +1322,7 @@ async def me_storage(current_user: dict = Depends(verify_token)):
 @app.get("/api/me/gdrive/browse")
 async def me_gdrive_browse(
     folder_id: Optional[str] = None,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_authorized)
 ):
     """Lista contenuti di una cartella Drive dell'utente.
     Se folder_id e' omesso, ritorna la root Syntesis-ICP."""
@@ -1339,7 +1357,7 @@ async def me_gdrive_browse(
 @app.get("/api/me/gdrive/file/{file_id}/link")
 async def me_gdrive_file_link(
     file_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_authorized)
 ):
     """Ritorna il link diretto al file su Drive (per visualizzazione/download via Drive)."""
     creds_data = await get_gdrive_credentials(current_user["user_id"])
@@ -1372,7 +1390,7 @@ async def me_get_pro_role(current_user: dict = Depends(verify_token)):
 @app.post("/api/me/pro-role")
 async def me_set_pro_role(
     req: ProRoleRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_authorized)
 ):
     """Imposta il pro_role dell\'utente (medico/laboratorio).
     Si puo\' settare una sola volta. Cambi successivi richiedono supporto admin."""
@@ -1392,7 +1410,7 @@ async def me_set_pro_role(
 @app.get("/api/me/gdrive/file/{file_id}/content")
 async def me_gdrive_file_content(
     file_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_authorized)
 ):
     """Proxy del contenuto file da Drive. Streamed bytes con Content-Type
     inferito. Usato dal frontend per anteprime (immagini, pdf, stl, video).
@@ -1459,7 +1477,7 @@ class CreateFolderBody(BaseModel):
 
 @app.get("/api/me/gdrive/access-token")
 async def me_gdrive_access_token(
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_authorized)
 ):
     """Ritorna un access_token Drive short-lived per uso lato browser.
     Permette al frontend di scaricare file direttamente da Drive,
@@ -1486,7 +1504,7 @@ async def me_gdrive_access_token(
 @app.post("/api/me/folders")
 async def me_create_folder(
     body: CreateFolderBody,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_authorized),
 ):
     """Crea una nuova cartella nel Drive dell'utente (dentro Syntesis-ICP o sub)."""
     creds_data = await get_gdrive_credentials(current_user["user_id"])
@@ -1513,7 +1531,7 @@ class CreateSharedFolderBody(BaseModel):
 @app.post("/api/me/shared-folders")
 async def me_create_shared_folder(
     body: CreateSharedFolderBody,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_authorized),
 ):
     """Registra una condivisione: la cartella esiste gia' su Drive (creata
     in precedenza con /api/me/folders), questa chiamata invita i membri."""
@@ -1580,7 +1598,7 @@ async def me_create_shared_folder(
 
 
 @app.get("/api/me/shared-folders")
-async def me_list_shared_folders(current_user: dict = Depends(verify_token)):
+async def me_list_shared_folders(current_user: dict = Depends(require_authorized)):
     """Lista cartelle che ho condiviso io (owned) e quelle condivise con me (member)."""
     owned = await list_owned_shared_folders(current_user["user_id"])
     member = await list_member_shared_folders(current_user["user_id"])
@@ -1588,7 +1606,7 @@ async def me_list_shared_folders(current_user: dict = Depends(verify_token)):
 
 
 @app.get("/api/me/shared-folders/incoming")
-async def me_list_incoming_invites(current_user: dict = Depends(verify_token)):
+async def me_list_incoming_invites(current_user: dict = Depends(require_authorized)):
     """Inviti pending per me (non ancora accettati o rifiutati)."""
     invites = await list_pending_invites_for_user(
         current_user["user_id"],
@@ -1600,7 +1618,7 @@ async def me_list_incoming_invites(current_user: dict = Depends(verify_token)):
 @app.post("/api/me/shared-folders/invites/{membership_id}/accept")
 async def me_accept_invite(
     membership_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_authorized),
 ):
     """Accetto un invito: creo cartella mirror nel mio Drive e replica i file
     esistenti dal Drive del creatore al mio (sync server-mediato, fino a 200 file)."""
@@ -1694,7 +1712,7 @@ async def me_accept_invite(
 @app.post("/api/me/shared-folders/invites/{membership_id}/decline")
 async def me_decline_invite(
     membership_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_authorized),
 ):
     user_email = (current_user.get("email") or "").lower().strip()
     ok = await decline_shared_invite(
@@ -1712,7 +1730,7 @@ async def me_upload_file_to_folder(
     folder_drive_id: str,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_authorized),
 ):
     """Upload di un file in una cartella Drive. Se la cartella e' condivisa
     (owner o member), replica il file sui Drive degli altri membri attivi."""
