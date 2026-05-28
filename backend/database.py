@@ -156,6 +156,12 @@ async def init_db():
         -- v7.3.9.054 - Piano di abbonamento per utente
         ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'free';
         ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_renewed_at TIMESTAMPTZ DEFAULT NOW();
+
+        -- v8.x - Nuovo flusso registrazione/autorizzazione
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS city        TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS phone       TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login  TIMESTAMPTZ;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS login_count INTEGER DEFAULT 0;
         """)
 
 
@@ -361,6 +367,114 @@ async def verify_license(key: str) -> bool:
         if not row:
             return False
         return bool(row["active"]) and row["used_by"] is None
+
+
+# ── v8.x: nuovo flusso registrazione → autorizzazione ─────────────────────────
+async def create_user_pending(email: str, name: str, password_hash: str, salt: str,
+                              organization: Optional[str], city: str, phone: str) -> str:
+    """Crea un utente in attesa di autorizzazione (nessuna licenza).
+    active = FALSE, license_key = NULL. Solleva ValueError se l'email esiste già."""
+    import uuid
+    user_id = str(uuid.uuid4())
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        try:
+            await conn.execute("""
+                INSERT INTO users (id, email, name, organization, password_hash, salt,
+                                   city, phone, role, active, license_key, login_count)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'user', FALSE, NULL, 0)
+            """, user_id, email, name, organization, password_hash, salt, city, phone)
+        except Exception as e:
+            if "duplicate key" in str(e).lower() or "unique" in str(e).lower():
+                raise ValueError("Email già registrata.")
+            raise
+    return user_id
+
+
+async def touch_login(user_id: str) -> None:
+    """Aggiorna last_login e incrementa login_count a ogni accesso riuscito."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE users
+            SET last_login = NOW(),
+                login_count = COALESCE(login_count, 0) + 1
+            WHERE id = $1
+        """, user_id)
+
+
+async def list_all_users() -> list[dict]:
+    """Tutti gli utenti con metriche per il pannello admin.
+    Una sola query con LEFT JOIN sul conteggio analisi (niente N+1)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT u.id, u.email, u.name, u.organization, u.city, u.phone,
+                   u.role, u.active, u.license_key, u.created_at,
+                   u.last_login, COALESCE(u.login_count, 0) AS login_count,
+                   COALESCE(a.cnt, 0) AS analyses_count
+            FROM users u
+            LEFT JOIN (
+                SELECT user_id, COUNT(*) AS cnt FROM analyses GROUP BY user_id
+            ) a ON a.user_id = u.id
+            ORDER BY u.created_at DESC
+        """)
+        return [dict(r) for r in rows]
+
+
+async def authorize_user(user_id: str) -> Optional[str]:
+    """Autorizza un utente pending: genera una chiave SICP, la inserisce in licenses,
+    la associa all'utente e mette active = TRUE. Tutto in transazione.
+    Ritorna la chiave generata, None se l'utente non esiste.
+    Se l'utente ha già una licenza, la restituisce senza generarne una nuova."""
+    import uuid
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            urow = await conn.fetchrow(
+                "SELECT license_key FROM users WHERE id = $1 FOR UPDATE", user_id)
+            if not urow:
+                return None
+            if urow["license_key"]:
+                await conn.execute("UPDATE users SET active = TRUE WHERE id = $1", user_id)
+                return urow["license_key"]
+
+            def _gen():
+                parts = [uuid.uuid4().hex[:4].upper() for _ in range(3)]
+                return f"SICP-{'-'.join(parts)}"
+            key = _gen()
+            for _ in range(5):
+                exists = await conn.fetchval("SELECT 1 FROM licenses WHERE key = $1", key)
+                if not exists:
+                    break
+                key = _gen()
+
+            await conn.execute("""
+                INSERT INTO licenses (key, used_by, used_at, active)
+                VALUES ($1, $2, NOW(), TRUE)
+            """, key, user_id)
+            await conn.execute("""
+                UPDATE users SET license_key = $1, active = TRUE WHERE id = $2
+            """, key, user_id)
+            return key
+
+
+async def revoke_user(user_id: str) -> bool:
+    """Revoca l'autorizzazione: disattiva la licenza, la scollega dall'utente,
+    mette active = FALSE. L'utente torna in stato pending."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            urow = await conn.fetchrow(
+                "SELECT license_key FROM users WHERE id = $1 FOR UPDATE", user_id)
+            if not urow:
+                return False
+            if urow["license_key"]:
+                await conn.execute(
+                    "UPDATE licenses SET active = FALSE WHERE key = $1", urow["license_key"])
+            await conn.execute(
+                "UPDATE users SET license_key = NULL, active = FALSE WHERE id = $1", user_id)
+            return True
 
 
 async def log_analysis(analysis_id: str, user_id: str, filename_a: str,
