@@ -21,6 +21,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 from auth import router as auth_router, verify_token
+from admin import router as admin_router
 from icp_engine import analyze_stl_pair
 from pdf_gen import generate_pdf
 from database import (
@@ -129,6 +130,7 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.include_router(auth_router, prefix="/auth")
+app.include_router(admin_router, prefix="/admin")
 
 # ── Serve frontend statico ────────────────────────────────────────────────────
 import pathlib
