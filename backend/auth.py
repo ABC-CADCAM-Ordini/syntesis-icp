@@ -67,6 +67,18 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
     return decode_token(credentials.credentials)
 
 
+async def require_authorized(current_user: dict = Depends(verify_token)) -> dict:
+    """v8.x: consente l'accesso ai servizi solo a utenti autorizzati
+    (licenza attiva) oppure agli admin. Gli utenti pending ricevono 403."""
+    if current_user.get("role") == "admin":
+        return current_user
+    from database import get_user_by_email
+    u = await get_user_by_email(current_user.get("email"))
+    if not u or not u.get("active") or not u.get("license_key"):
+        raise HTTPException(403, detail="Account non ancora autorizzato.")
+    return current_user
+
+
 # ── Password hashing ──────────────────────────────────────────────────────────
 def hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
     if not salt:
@@ -89,7 +101,8 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     name: str
-    license_key: str
+    city: str
+    phone: str
     organization: Optional[str] = None
 
 class TokenResponse(BaseModel):
@@ -105,8 +118,16 @@ async def login(req: LoginRequest):
         raise HTTPException(401, detail="Credenziali non valide.")
     if not verify_password(req.password, user["password_hash"], user["salt"]):
         raise HTTPException(401, detail="Credenziali non valide.")
-    if not user["active"]:
-        raise HTTPException(403, detail="Account disabilitato. Contatta il supporto.")
+    # NOTA (v8.x): rimosso il 403 per utente non attivo. Gli utenti in attesa di
+    # autorizzazione devono poter accedere al pannello provvisorio. Il gate sui
+    # servizi è applicato separatamente (require_authorized).
+
+    # Traccia l'accesso (non deve mai bloccare il login)
+    try:
+        from database import touch_login
+        await touch_login(user["id"])
+    except Exception:
+        pass
 
     token = create_token({
         "user_id": user["id"],
@@ -122,39 +143,46 @@ async def login(req: LoginRequest):
             "email": user["email"],
             "name": user["name"],
             "role": user["role"],
-            "organization": user.get("organization")
+            "organization": user.get("organization"),
+            "city": user.get("city"),
+            "phone": user.get("phone"),
+            "active": user["active"],
+            "license_key": user.get("license_key")
         }
     }
 
 
 @router.post("/register", response_model=TokenResponse)
 async def register(req: RegisterRequest):
-    # Verifica licenza
-    license_ok = await verify_license(req.license_key)
-    if not license_ok:
-        raise HTTPException(403, detail="Chiave di licenza non valida o già usata.")
-
+    # v8.x: registrazione libera, senza chiave di licenza.
+    # L'utente nasce in stato pending (active = FALSE) e la chiave gli verrà
+    # assegnata da un amministratore tramite il pannello admin.
     existing = await get_user_by_email(req.email)
     if existing:
         raise HTTPException(409, detail="Email già registrata.")
 
     if len(req.password) < 8:
         raise HTTPException(400, detail="La password deve essere di almeno 8 caratteri.")
+    if not req.city.strip() or not req.phone.strip():
+        raise HTTPException(400, detail="Città e cellulare sono obbligatori.")
 
     hashed, salt = hash_password(req.password)
-    # v7.3.9.040: cattura race condition fra verify_license e create_user
+
+    from database import create_user_pending
     try:
-        user_id = await create_user(
+        user_id = await create_user_pending(
             email=req.email,
             name=req.name,
             password_hash=hashed,
             salt=salt,
             organization=req.organization,
-            license_key=req.license_key
+            city=req.city.strip(),
+            phone=req.phone.strip()
         )
     except ValueError as ve:
         raise HTTPException(409, detail=str(ve))
 
+    # Token rilasciato comunque: serve per accedere al pannello di attesa
     token = create_token({
         "user_id": user_id,
         "email": req.email,
@@ -162,17 +190,18 @@ async def register(req: RegisterRequest):
         "role": "user",
         "org": req.organization or ""
     })
-    # v7.3.9.053: riconcilia eventuali contatti pending che hanno questa email
+
+    # Riconcilia eventuali contatti/inviti pending che usano questa email
     try:
         from database import reconcile_pending_contacts
         await reconcile_pending_contacts(user_id, req.email)
-        try:
-            from database import reconcile_pending_shared_invites
-            await reconcile_pending_shared_invites(user_id=new_user_id, user_email=email)
-        except Exception as e:
-            logger.warning(f"reconcile_pending_shared_invites fail: {e}")
     except Exception:
-        pass  # non bloccare la registrazione se la riconciliazione fallisce
+        pass
+    try:
+        from database import reconcile_pending_shared_invites
+        await reconcile_pending_shared_invites(user_id=user_id, user_email=req.email)
+    except Exception:
+        pass
 
     return {
         "access_token": token,
@@ -181,14 +210,36 @@ async def register(req: RegisterRequest):
             "email": req.email,
             "name": req.name,
             "role": "user",
-            "organization": req.organization
+            "organization": req.organization,
+            "city": req.city,
+            "phone": req.phone,
+            "active": False,
+            "license_key": None
         }
     }
 
 
 @router.get("/me")
 async def me(current_user: dict = Depends(verify_token)):
-    return current_user
+    # v8.x: rilegge l'utente dal DB per restituire lo stato aggiornato
+    # (active, license_key). Serve al polling del pannello di attesa per
+    # rilevare l'avvenuta autorizzazione senza ricaricare la pagina.
+    u = await get_user_by_email(current_user.get("email"))
+    if not u:
+        return {"user": current_user}
+    return {
+        "user": {
+            "id": u["id"],
+            "email": u["email"],
+            "name": u["name"],
+            "role": u["role"],
+            "organization": u.get("organization"),
+            "city": u.get("city"),
+            "phone": u.get("phone"),
+            "active": u["active"],
+            "license_key": u.get("license_key")
+        }
+    }
 
 
 # ── Social Login (Google, Apple, Facebook) ────────────────────────────────────
