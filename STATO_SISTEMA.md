@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-05-29, fix layout pannello /gestione)
+## Versione live (2026-05-29, gate accesso /analizzare attivo)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.4.1 (live, deploy `2600f1c9` del 2026-05-29, commit `92ec9ae`) |
-| Legacy syntesis-icp (7ac922ce) | 8.4.1 (live, deploy `32006304` del 2026-05-29, commit `92ec9ae`) |
-| /analizzare | v8.3.3 (codice eseguito invariato; registry trail 8.4.1) |
+| Backend principale (b7671e12) | 8.4.3 (live, commit `618d23b` del 2026-05-29) |
+| Legacy syntesis-icp (7ac922ce) | 8.4.3 (live, commit `618d23b` del 2026-05-29) |
+| /analizzare | v8.4.3 — gate accesso attivo (redirect `/accedi` per pending/anonimo; reveal per authorized/admin) |
 | /vedere (default home) | v8.0.0-refactor |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
@@ -21,6 +21,15 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.4.3 — gate accesso /analizzare (2026-05-29)
+
+Gate di accesso client-side su `/analizzare`, ora **chiuso ai non autorizzati** e verificato funzionante su entrambi i servizi. Nuovo `backend/static/ds/syn-gate.js` agganciato nel `<head>` di `syntesis-analyzer-v3b.html`: nasconde la pagina (`visibility:hidden` + backup CSS anti-flash), interroga `/auth/me` col token, redirige a `/accedi` per utente pending / anonimo / errore / rete giù, rivela il body solo per `authorized` o `admin`. Il deep link richiesto viene salvato in `sessionStorage.syn_after_login`.
+
+- **8.4.2** (commit `ec068c5`): feature introdotta come canary sul solo LEGACY. `syn-gate.js` + aggancio in v3b (`<head>`: backup CSS anti-flash + `<script src="/static/ds/syn-gate.js">`).
+- **8.4.3** (commit `618d23b`): fix `reveal()` — su /analizzare la pagina restava nera anche per authorized/admin perché `visibility = ""` (stringa vuota) non vinceva per specificity sul backup CSS `html{visibility:hidden}`. Corretto in `visibility = "visible"` (inline non vuoto = override). 1 riga in `syn-gate.js`. Promosso live su entrambi i servizi.
+
+Il gating server-side `require_authorized` resta intatto: è la sicurezza vera, `syn-gate.js` è solo lo strato UX (niente flash di contenuto protetto, redirect pulito). `/vedere` e `/dashboard` NON sono ancora agganciati (vedi Sospesi). Versione live confermata da `registry.py` (`BACKEND_VERSION = 8.4.3`) e v3b (`window.ANALIZZA_BUILD = 8.4.3`); ID di deploy Railway non annotati in questa sessione.
 
 ## 8.4.1 — fix layout tabella pannello /gestione (2026-05-29)
 
@@ -104,6 +113,11 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 
 ## Sospesi
 
+**Gate accesso — completamento rollout** (aperti in 8.4.3)
+- Agganciare il gate `syn-gate.js` anche a `/vedere` e `/dashboard` (oggi protegge solo `/analizzare`).
+- Rimuovere l'endpoint `/api/analyze-public`: finché esiste è un bypass del gate (analisi senza utente autorizzato).
+- Gestire il deep link in `/accedi`: consumare `sessionStorage.syn_after_login` dopo il login e tornare alla pagina richiesta (oggi `syn-gate.js` lo salva ma `/accedi` non lo rilegge).
+
 **Alta priorità**
 1. Fase 0 stabilizzazione: split v3b.html, scripts/, pytest base
 2. app.syntesis-icp.com HTTP 404 + cert SSL mismatch (verificato 2026-05-21 post-incident: edge Railway risponde 404 sulla "/", cert servito è `*.up.railway.app` invece di copertura `syntesis-icp.com`). Fix: rigenerare custom domain in Railway Settings → Networking del backend. Workaround attuale: URL Railway diretto.
@@ -152,4 +166,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-05-29 post-fix layout /gestione. Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-05-29 — gate accesso /analizzare live su entrambi i servizi (8.4.3). Aggiornare al prossimo cambio di stato.*
