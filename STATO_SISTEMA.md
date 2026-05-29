@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-05-21, post-incident postgres sleep)
+## Versione live (2026-05-29, fix layout pannello /gestione)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.3.6 (live, deploy `2beaa3ff` del 2026-05-21) |
-| Legacy syntesis-icp (7ac922ce) | 8.3.6 (live, deploy `62422769` del 2026-05-21 — era 8.3.3, salita a HEAD doc-only) |
-| /analizzare | v8.3.3 (codice eseguito invariato; registry trail 8.3.6) |
+| Backend principale (b7671e12) | 8.4.1 (live, deploy `2600f1c9` del 2026-05-29, commit `92ec9ae`) |
+| Legacy syntesis-icp (7ac922ce) | 8.4.1 (live, deploy `32006304` del 2026-05-29, commit `92ec9ae`) |
+| /analizzare | v8.3.3 (codice eseguito invariato; registry trail 8.4.1) |
 | /vedere (default home) | v8.0.0-refactor |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
@@ -21,6 +21,16 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.4.1 — fix layout tabella pannello /gestione (2026-05-29)
+
+Bugfix CSS chirurgico su `backend/static/syntesis-gestione.html` (pannello admin "Richieste di accesso"). La tabella andava in overflow orizzontale rispetto al `.wrap` da 1080px e `.tablecard{overflow:hidden}` clippava la colonna Licenza e il bottone Revoca a destra ("Revoc..." invece di "Revoca"). Tre modifiche puntuali:
+
+- `.wrap` `max-width` 1080 → 1200px (+120px utili)
+- padding orizzontale celle thead/tbody 18 → 12px (-108px su 9 colonne)
+- `.tablecard` `overflow:hidden` → `overflow-x:auto` (safety net per dati lunghi/viewport stretti; `border-radius:14px` preservato sia con sia senza scrollbar)
+
+Nessuna modifica a HTML, JS, struttura colonne, media-query mobile (`@media max-width:720px`). `/accedi` non toccato: usa layout card centered (`.card max-width:412px`), non condivide `.wrap` dashboard. Deploy combinato verificato su entrambi i servizi: BACKEND principale (`/api/registry/constants` HTTP 200 `backend_version=8.4.1`, `/gestione` HTTP 200) e LEGACY (idem su `syntesis-icp-production-40e1.up.railway.app`). Sospesi: nessuno in apertura, nessuno in chiusura — il pannello `/gestione` era nato in 8.4.0 (2026-05-28), il bug è emerso nell'uso reale del giorno dopo.
 
 ## 8.2.1 — UI alignment Vedere (2026-05-08)
 
@@ -142,4 +152,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-05-21 post-incident. Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-05-29 post-fix layout /gestione. Aggiornare al prossimo cambio di stato.*
