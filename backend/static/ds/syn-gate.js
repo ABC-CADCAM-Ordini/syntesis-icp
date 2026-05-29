@@ -33,7 +33,12 @@
   var LOGIN_PAGE      = "/accedi";
 
   function reveal(){
-    try { document.documentElement.style.visibility = ""; } catch(e){}
+    // Inline "visible" (non stringa vuota): batte per specificity il backup
+    // CSS <style>html{visibility:hidden}</style> presente nelle pagine
+    // protette. Con valore vuoto l'inline si annulla e la rule CSS torna a
+    // vincere -> pagina resta hidden anche per utenti authorized (bug 8.4.2,
+    // fix 8.4.3).
+    try { document.documentElement.style.visibility = "visible"; } catch(e){}
   }
 
   function rememberDeepLink(){
