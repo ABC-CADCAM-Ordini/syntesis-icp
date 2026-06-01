@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, redesign testata+hero home)
+## Versione live (2026-06-01, home dark + bordo animato)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.5.1 (live, commit `f874e5f` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.5.1 (live, commit `f874e5f` del 2026-06-01) |
-| / (home pubblica, 8.5.1) | `synthesis-home.html` — splash: logo 84px (no "ICP"), hero senza H1 (tagline blu = headline) + immagine ingrandita fusa nel fondo pagina unificato `#F0F1F5`, 4 card workflow; sostituisce il redirect 302 a /vedere (resta fallback) |
+| Backend principale (b7671e12) | 8.6.0 (live, commit `725786a` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.6.0 (live, commit `725786a` del 2026-06-01) |
+| / (home pubblica, 8.6.0) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): bordo perimetrale animato (`.synt-frame`, fixed overlay, `pointer-events:none`), logo bianco (invert), hero (eyebrow + headline accent + lead) + immagine in card chiara, 4 tool-card scure; sostituisce il redirect 302 a /vedere (resta fallback) |
 | /analizzare | v8.5.0 — reader `?wf=` (deep-link workflow misurare/sostituire dalla home); export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
@@ -23,6 +23,12 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.6.0 — home dark + bordo perimetrale animato (2026-06-01)
+
+Redesign visivo della sola `synthesis-home.html` in **tema scuro stile software** (le 4 card workflow e i link invariati). Tema `--dark #0F1923`; **bordo perimetrale animato** `.synt-frame`: un `div` `position:fixed` in overlay (`inset:18px`, `pointer-events:none`, `z-index:9999`) con conic-gradient rosa/viola/arancio il cui angolo `--synt-sa` è animato via `@property` + `@keyframes syntSpin` 4s linear infinite — resta fermo allo scroll e **non blocca i click** sulle card (la home scrolla, a differenza del bordo originale di Vedere che è su `<body>` a tutto schermo). Header col logo reale reso **bianco** da `filter:invert(1) brightness(1.9)` (PNG nero su trasparente, pixel opachi 100% neri → invert pulito, niente aloni). Hero: eyebrow "Synthesis-ICP" + headline con accent blu ("…implantare diventa misura.") + lead; immagine `padova-17_001.jpeg` in card chiara `.hero-img-wrap` (`#F0F1F5` + ombra/glow) che la stacca dal fondo scuro. 4 `.tool-card` scure con hover-lift e SVG inline. Template di partenza fornito dall'utente; i 2 segnaposto (`.logo-placeholder`, `.hero-img-ph`) sostituiti coi file reali e rimossi i CSS/commenti orfani. `main.py` invariato; `v3b` non toccato (`ANALIZZA_BUILD`/`<title>` restano 8.5.0).
+
+Deploy verificato live su entrambi i servizi (commit `725786a`, sequenza LEGACY canary → BACKEND, build ~120s/~24s): `backend_version=8.6.0`, `GET /` 200 con `<title>Synthesis-ICP</title>` e **markup dark servito** verificato (`--dark:#0F1923`, `.synt-frame`, `@property`/`@keyframes`, `pointer-events:none`, `filter:invert`, img logo+hero reali, zero residui segnaposto), logo `/static/synthesis-logo.png` 200 (png 75645 B) e immagine `/static/assets/padova-17_001.jpeg` 200 (jpeg 774315 B), `/analizzare` 200, gating anonimo `/api/me/storage` → 403. `app.syntesis-icp.com` → 200. Sospesi: nessuno aperto/chiuso (resta il follow-up cert dominio-H `app.synthesis-icp.com`).
 
 ## 8.5.1 — redesign testata+hero home (2026-06-01)
 
