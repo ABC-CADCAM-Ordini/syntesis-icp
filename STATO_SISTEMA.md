@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-05-29, gate accesso /analizzare attivo)
+## Versione live (2026-06-01, pulsante Reset nell'header)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.4.3 (live, commit `618d23b` del 2026-05-29) |
-| Legacy syntesis-icp (7ac922ce) | 8.4.3 (live, commit `618d23b` del 2026-05-29) |
-| /analizzare | v8.4.3 — gate accesso attivo (redirect `/accedi` per pending/anonimo; reveal per authorized/admin) |
+| Backend principale (b7671e12) | 8.4.4 (live, commit `9ca5a68` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.4.4 (live, commit `9ca5a68` del 2026-06-01) |
+| /analizzare | v8.4.4 — pulsante Reset persistente nell'header; gate accesso attivo (redirect `/accedi` per pending/anonimo; reveal per authorized/admin) |
 | /vedere (default home) | v8.0.0-refactor |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
@@ -21,6 +21,16 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.4.4 — pulsante Reset nell'header (2026-06-01)
+
+Nuovo pulsante **Reset** persistente nell'header di `syntesis-analyzer-v3b.html`, tra il blocco File e il blocco WorkFlow. Affordance UI additiva per ripartire con una nuova analisi da zero senza passare da File → Nuovo: `hardReset()` ricarica l'applicazione con un cache-bust querystring (`?_r=Date.now()`), chiedendo conferma solo se c'è stato corrente da perdere (`scanMesh` caricata o `muaObjects` posizionati). Solo frontend: nessun endpoint, API o logica backend toccata.
+
+- Markup `.btn` + SVG freccia circolare (blu `#0065B3`) dopo la chiusura di `.file-menu-wrapper` (~riga 1262).
+- Funzione `hardReset()` accanto a `newCase()` (~riga 4218).
+- Bump 8.4.3 → 8.4.4 sui 3 marker (`<title>`, `window.ANALIZZA_BUILD`, `BACKEND_VERSION`/`LAST_UPDATED` + History). Niente CACHEBUST (superfluo con `serviceInstanceDeploy latestCommit:true`, CLAUDE.md §6).
+
+Deploy verificato live su entrambi i servizi (commit `9ca5a68`, sequenza LEGACY canary → BACKEND): `/api/registry/constants` `backend_version=8.4.4`, `/analizzare` HTTP 200 con `<title>` `v8.4.4` + `ANALIZZA_BUILD = '8.4.4'`, pulsante Reset presente nell'HTML servito, gating anonimo `/api/me/analyses` → 403. `app.syntesis-icp.com` escluso dalla verifica (cert SSL pre-esistente, sospeso noto). Sospesi: nessuno aperto, nessuno chiuso.
 
 ## 8.4.3 — gate accesso /analizzare (2026-05-29)
 
@@ -166,4 +176,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-05-29 — gate accesso /analizzare live su entrambi i servizi (8.4.3). Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-01 — pulsante Reset persistente nell'header live su entrambi i servizi (8.4.4). Aggiornare al prossimo cambio di stato.*
