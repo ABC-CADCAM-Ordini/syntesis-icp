@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.4.7 — **Data:** 2026-06-01
+> **Versione software mappata:** 8.4.8 — **Data:** 2026-06-01
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -188,7 +188,7 @@ Sostituzione scan body con ICP. Pannello `panelSostituire` [1876]:
 
 ## Vista: Vedere (`/vedere` → `syntesis-icp-vedere.html`)
 
-Home di default (redirect da `/`). Viewer 3D multi-formato con misura, forme, annotazioni e sezione. ~8245 righe. **Wiring**: l'header usa `onclick` inline; la toolbar del viewer è cablata in JS (78 `addEventListener`). Per i bottoni della toolbar la colonna "Funzione" riporta l'**id** del bottone — la funzione legata via `addEventListener` **non è tracciata per-bottone in questo passaggio** (segnalato come tale, non inventato). Righe = `syntesis-icp-vedere.html`.
+Home di default (redirect da `/`). Viewer 3D multi-formato con misura, forme, annotazioni e sezione. ~8245 righe. **Wiring**: l'header usa `onclick` inline; la toolbar del viewer è cablata in JS (78 `addEventListener`). Gli handler reali dei bottoni toolbar sono **tracciati per-bottone** nella tabella sotto (nome funzione + riga del binding, verificati con `grep -n`). Righe = `syntesis-icp-vedere.html`.
 
 ### Header (inline)
 
@@ -205,24 +205,30 @@ Home di default (redirect da `/`). Viewer 3D multi-formato con misura, forme, an
 
 ### Toolbar viewer (bottoni id, handler JS-wired via `addEventListener`)
 
-| Elemento (scopo da id/title) | id | Effetto a valle | Righe |
-|---|---|---|---|
-| Aggiungi file | `#btnPick` | carica STL/OBJ/PLY/XYZ/PCD/PTS | [1020] |
-| Reset | `#btnReset` | reset vista/scena | [1024] |
-| Aggiungi | `#btnAdd` | aggiunge file | [1038] |
-| Sposta / Ruota | `#btnMoveMode` / `#btnRotateMode` | modalità trasformazione | [1046-1049] |
-| Deseleziona | `#btnDeselect` | deseleziona oggetto | [1052] |
-| **Righello / Angolo** (misura) | `#btnRuler` / `#btnAngle` | misura distanza / angolo | [1056-1059] |
-| **Forme** Cerchio/Quadrato/Esagono/Ottagono/Torx | `#btnCircle`/`#btnSquare`/`#btnHex`/`#btnOct`/`#btnTorx` | annotazioni forma | [1066-1078] |
-| Sezione | `#btnSection` | piano di sezione | [1082] |
-| Gomma | `#btnEraser` | cancella annotazione | [1085] |
-| Pulisci righelli | `#btnRulerClear` | rimuove misure | [1098] |
-| Home camera | `#btnHome` | reset camera | [1104] |
-| Modalità render | `[data-mode]` solid/wireframe/both | shading mesh | [7694-7696] |
-| Pannello sezione | `#secRulerBtn`/`#secFitBtn`/`#secSwapBtn`/`#secMaxBtn`/`#secCloseBtn` | controlli sezione | [1129-1143] |
-| Modal impostazioni | `#vsmClose` / `#vsmOk` | chiudi / conferma | [8183-8190] |
+| Elemento | id | Handler reale → riga binding | Cosa fa | Righe markup |
+|---|---|---|---|---|
+| Aggiungi file | `#btnPick` | `pickFiles` → [2727] | apre il file dialog (`filePicker.click()`, [2726]; input [1028]) | [1020] |
+| Aggiungi (dup) | `#btnAdd` | `pickFiles` → [2728] | come btnPick: apre il file dialog | [1038] |
+| Reset | `#btnReset` | arrow → [2800] | svuota scena: `clearAllMeasures`+`clearAllCircles`+`clearScene` | [1024] |
+| Home camera | `#btnHome` | `fitCameraToScene` → [2807] | inquadra tutta la scena (fit camera) | [1104] |
+| Sposta | `#btnMoveMode` | `setTransformMode('translate')` → [2808] | gizmo traslazione sull'oggetto selezionato | [1046] |
+| Ruota | `#btnRotateMode` | `setTransformMode('rotate')` → [2809] | gizmo rotazione | [1049] |
+| Deseleziona | `#btnDeselect` | `deselectLayer` → [2810] | deseleziona l'oggetto | [1052] |
+| Righello | `#btnRuler` | arrow → [5732] | toggle misura distanza (`setRulerActive`; spegne cerchio) | [1056] |
+| Angolo | `#btnAngle` | arrow → [5736] | toggle misura angolo (`setAngleActive`; spegne cerchio/righello) | [1059] |
+| Forme Cerchio/Quadrato/Esagono/Ottagono/Torx | `#btnCircle`/`#btnSquare`/`#btnHex`/`#btnOct`/`#btnTorx` | `bindShapeButton(id,shape)` → [5811-5815] (def [5801]) | toggle annotazione forma (`setCircleActive` con la forma scelta) | [1066-1078] |
+| Sezione | `#btnSection` | arrow → [7050] | se sezione attiva → `removeSection`; altrimenti `setSectionPlaceMode` | [1082] |
+| Gomma | `#btnEraser` | arrow → [5746] | toggle gomma topologica (`setEraserActive`; spegne cerchio/righello/angolo) | [1085] |
+| Pulisci righelli | `#btnRulerClear` | arrow → [5790] | `clearAllMeasures` + `clearAllCircles` | [1098] |
+| Modalità render solid/wireframe/both | `[data-action="render-mode"][data-mode]` | **delegato**: `body.addEventListener('click')` [7376] → case `render-mode` [7975] | imposta `visual.renderMode` del layer via `SynRegistry.update` | [7694-7696] |
+| Pannello sezione (PiP): chiudi/max/swap/righello/fit | `#secCloseBtn`/`#secMaxBtn`/`#secSwapBtn`/`#secRulerBtn`/`#secFitBtn` | `removeSection` [7060] / `toggleSectionPipMaxi` [7063] / `swapSectionPip` [7064] / arrow `setSectionRulerActive` [7065] / arrow `fitSectionCameraToContent` [7068] | controlli del PiP di sezione | [1129-1143] |
+| Modal impostazioni Vedere | `#vsmClose` / `#vsmOk` | `close` → [8198] / [8199] | chiude il modale (creato lazy da `openVedereSettings` [8174], aperto da File→Impostazioni [964]) | [8183-8190] |
 
-> **DA CHIARIRE:** il "primo click a vuoto" su Vedere citato come bug noto non è stato verificato nel codice in questo passaggio — va confermato (probabile interazione focus/raycaster al primo click dopo load).
+> **✅ "Primo click a vuoto" su `#btnPick` — RISOLTO in 8.4.8.** Sintomo (confermato runtime): al primo click il file dialog si apriva e si richiudeva subito; al secondo restava. Causa: `#btnPick` aveva **DUE** handler che chiamavano entrambi `filePicker.click()`:
+> - `onclick` inline nel markup ([1020]: `onclick="document.getElementById('filePicker').click()"`)
+> - `addEventListener('click', pickFiles)` ([2727], con `pickFiles` = `filePicker.click()` [2726])
+>
+> → due `.click()` sincroni sull'input file per un solo click utente → la seconda chiamata annullava il dialog appena aperto (flicker open→close). `#btnAdd` ([1038], pannello layer) non ha l'`onclick` inline (solo `addEventListener` [2728]) → single trigger, e infatti funzionava: coerente col fatto che il sintomo era **specifico di `#btnPick`**. (`filePicker.value=''` [2732] è nel handler `change`, non c'entra.) **Fix (8.4.8)**: rimosso l'`onclick` inline da [1020]; `#btnPick` ora ha il **solo** `addEventListener` [2727] → single trigger (un solo `filePicker.click()`), coerente con `#btnAdd`/`#btnReset`.
 
 ## Vista: Dashboard (`/dashboard` → `syntesis-dashboard-v1.html`)
 
@@ -302,7 +308,7 @@ Pannello admin (~390 righe). **Wiring via `addEventListener`**; righe utente gen
 | `render` / `onAuthorize` / `onRevoke` | gestione [262] / [332] / [343] | Render lista / autorizza (genera chiave) / revoca | filtri, righe utente |
 | `setTab` / `checkStatus` / `logout` | accedi [263] / [359] / [421] | Tab login/reg / polling stato / logout | tabs, pannello pending |
 
-> **DA CHIARIRE:** per Vedere le funzioni legate ai bottoni toolbar (`#btnRuler`, `#btnSection`, ecc.) sono cablate via `addEventListener` non tracciato in questo passaggio; i bottoni sono citati per id+riga, le funzioni no.
+> **✅ Vedere — handler toolbar: RISOLTO.** Le funzioni legate ai bottoni toolbar sono ora tracciate per-bottone (nome + riga del binding) nella tabella "Toolbar viewer" della sezione Vedere.
 
 ## Stato globale e classi di visibilità
 
@@ -338,4 +344,4 @@ Più i pannelli per-id nella **matrice di visibilità** della sezione Analizzare
 
 ---
 
-_Fine mappa. Stato: tutte e 5 le viste coperte. Voci marcate **DA CHIARIRE**: (1) handler toolbar Vedere non tracciati per-bottone; (2) "primo click a vuoto" Vedere non verificato._
+_Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE aperta**. Storico risolto: (1) handler toolbar Vedere → tracciati per-bottone; (2) "primo click a vuoto" `#btnPick` → **RISOLTO in 8.4.8** (rimosso doppio trigger: onclick inline su #btnPick, ora solo addEventListener)._
