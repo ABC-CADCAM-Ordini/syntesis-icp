@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, home dark + bordo animato)
+## Versione live (2026-06-01, home dark 8.6.1 — fix contenuto visibile)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.6.0 (live, commit `725786a` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.6.0 (live, commit `725786a` del 2026-06-01) |
-| / (home pubblica, 8.6.0) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): bordo perimetrale animato (`.synt-frame`, fixed overlay, `pointer-events:none`), logo bianco (invert), hero (eyebrow + headline accent + lead) + immagine in card chiara, 4 tool-card scure; sostituisce il redirect 302 a /vedere (resta fallback) |
+| Backend principale (b7671e12) | 8.6.1 (live, commit `d8d0890` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.6.1 (live, commit `d8d0890` del 2026-06-01) |
+| / (home pubblica, 8.6.1) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): bordo perimetrale animato **cavo** (`.synt-frame` via `mask`, fixed overlay, `pointer-events:none` — **8.6.1 fix**: interno trasparente → contenuto visibile, prima il riempimento opaco copriva la pagina), logo bianco (invert), hero (eyebrow + headline accent + lead) + immagine in card chiara, 4 tool-card scure; sostituisce il redirect 302 a /vedere (resta fallback) |
 | /analizzare | v8.5.0 — reader `?wf=` (deep-link workflow misurare/sostituire dalla home); export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
@@ -23,6 +23,16 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.6.1 — fix home dark invisibile (cornice cava) (2026-06-01)
+
+Hotfix del redesign 8.6.0: sul live la home mostrava **solo il bordo animato**, tutto il contenuto invisibile (scuro dentro la cornice). Causa: `.synt-frame` (overlay `position:fixed`, `z-index:9999`) col trucco doppio-background **riempiva il proprio interno** di `--dark` opaco (layer `linear-gradient(--dark)` clippato a `padding-box`) → coperchio su `.page` (`z-index:1`). Il contenuto era integro nel markup (verificato: headline, 4 card, logo, immagine presenti) → problema puramente CSS, non perdita di file.
+
+- Fix: cornice **cava** via `mask`. Il conic-gradient riempie tutto l'elemento; `-webkit-mask`/`mask-composite:exclude` esclude il `content-box` → interno **trasparente**, contenuto sotto visibile. Mantenuti: spin (`@property --synt-sa` + `@keyframes syntSpin` 4s), `position:fixed`, `pointer-events:none`, glow.
+- Robustezza (richiesta): animazioni d'ingresso (`fadeUp`/`fadeDown`/`fadeIn`) spostate sotto `@media (prefers-reduced-motion:no-preference)`; tolti gli `animation:...both` dai blocchi base → contenuto `opacity:1` di default, fade solo enhancement (un'animazione che non parte non può più lasciare il contenuto invisibile).
+- Verifica logo a immagine: `#000` + `filter:invert(1) brightness(1.9)` → `(255,255,255)` bianco pieno, leggibile sul fondo scuro. Solo `synthesis-home.html`; `v3b` non toccato.
+
+Deploy verificato live su entrambi i servizi (commit `d8d0890`, LEGACY canary → BACKEND, build ~168s/~48s): `backend_version=8.6.1`, `GET /` 200 con `v8.6.1`, **markup servito**: `mask-composite:exclude` ×1 e **0** riempimento `--dark` opaco (cornice cava), `filter:invert(1) brightness(1.9)` ×1, contenuto presente (headline/4 card/logo/immagine), `@media no-preference` ×1; logo + immagine 200; `/analizzare` 200, gating `/api/me/storage` → 403. `app.syntesis-icp.com` → 200. Sospesi: nessuno aperto/chiuso (resta follow-up cert dominio-H).
 
 ## 8.6.0 — home dark + bordo perimetrale animato (2026-06-01)
 
