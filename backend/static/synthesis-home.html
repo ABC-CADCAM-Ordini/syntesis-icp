@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Synthesis-ICP</title>
-<!-- Synthesis-ICP - Home (splash) v8.6.0 -->
+<!-- Synthesis-ICP - Home (splash) v8.6.1 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
@@ -35,18 +35,20 @@ body{
 
 /* ===== CORNICE PERIMETRALE ANIMATA (stile software, adattata per pagina che scrolla) =====
    Frame FISSO in overlay: resta fermo mentre il contenuto scrolla dentro.
-   NB: il software originale la metteva su <body> con overflow:hidden (app a tutto schermo).
-   Qui la home scrolla, quindi usiamo un div position:fixed dedicato. */
+   8.6.1: cornice CAVA. Il conic riempie tutto l'elemento, la mask mostra SOLO
+   l'anello (padding) escludendo il content-box -> interno TRASPARENTE, il
+   contenuto sotto resta visibile. (In 8.6.0 il layer linear-gradient(--dark)
+   clippato a padding-box riempiva l'interno di scuro e, a z-index:9999, faceva
+   da coperchio sull'intera pagina -> contenuto invisibile.) */
 .synt-frame{
   position:fixed;
   inset:18px;
-  border:4px solid transparent;
   border-radius:var(--radius);
-  background-image:
-    linear-gradient(var(--dark),var(--dark)),
-    conic-gradient(from var(--synt-sa,0deg),#FF8C42,#FF4D8D,#FFD166,#C84BFF,#FF6B35,#FF9FC8,#FF8C42);
-  background-origin:padding-box,border-box;
-  background-clip:padding-box,border-box;
+  padding:4px;                 /* spessore del bordo */
+  background:conic-gradient(from var(--synt-sa,0deg),#FF8C42,#FF4D8D,#FFD166,#C84BFF,#FF6B35,#FF9FC8,#FF8C42);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+          mask-composite:exclude;
   animation:syntSpin 4s linear infinite;
   box-shadow:0 0 22px rgba(255,140,66,.32),0 0 52px rgba(200,75,255,.16);
   pointer-events:none;
@@ -69,7 +71,6 @@ body{
   display:flex;
   align-items:center;
   padding:8px 0 0;
-  animation:fadeDown .8s ease both;
 }
 /* Logo: il PNG e' NERO su trasparente; su fondo scuro invert(1) brightness(1.9)
    lo rende bianco pulito (verificato: pixel opachi 100% neri, niente aloni). */
@@ -88,7 +89,6 @@ body{
   margin-top:54px;
   min-height:62vh;
 }
-.hero-left{animation:fadeUp 1s ease .15s both}
 
 .eyebrow{
   font-size:13px;
@@ -122,7 +122,6 @@ body{
   display:flex;
   align-items:center;
   justify-content:center;
-  animation:fadeIn 1.4s ease .3s both;
 }
 .hero-img-wrap{
   position:relative;
@@ -135,7 +134,7 @@ body{
 .hero-img{width:100%;display:block}
 
 /* ===== STRUMENTI ===== */
-.tools-section{margin-top:78px;animation:fadeUp 1s ease .45s both}
+.tools-section{margin-top:78px}
 .tools-label{
   font-size:12px;font-weight:700;letter-spacing:3px;
   text-transform:uppercase;color:var(--gray);margin-bottom:22px;
@@ -189,9 +188,18 @@ body{
   .tools-grid{grid-template-columns:1fr}
   .logo-img{height:60px}
 }
+/* 8.6.1: animazioni d'ingresso come ENHANCEMENT. Contenuto visibile di default
+   (i blocchi NON hanno opacity:0); le fade partono SOLO se l'utente non ha
+   chiesto meno movimento -> un'animazione che non parte non puo' mai lasciare
+   il contenuto invisibile. */
+@media(prefers-reduced-motion:no-preference){
+  .topbar{animation:fadeDown .8s ease both}
+  .hero-left{animation:fadeUp 1s ease .15s both}
+  .hero-right{animation:fadeIn 1.4s ease .3s both}
+  .tools-section{animation:fadeUp 1s ease .45s both}
+}
 @media(prefers-reduced-motion:reduce){
   .synt-frame{animation:none}
-  .topbar,.hero-left,.hero-right,.tools-section{animation:none}
 }
 </style>
 </head>

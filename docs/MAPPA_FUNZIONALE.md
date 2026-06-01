@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.6.0 — **Data:** 2026-06-01
+> **Versione software mappata:** 8.6.1 — **Data:** 2026-06-01
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -63,7 +63,7 @@ Splash **pubblica** (`FileResponse`, nessun gate; fallback a `/vedere` se il fil
 
 | Elemento | Riferimento | Destinazione / effetto |
 |---|---|---|
-| Bordo animato | `.synt-frame` (div `position:fixed`, `inset:18px`, `pointer-events:none`, `z-index:9999`) | cornice perimetrale a conic-gradient (rosa/viola/arancio), angolo `--synt-sa` animato via `@property` + `@keyframes syntSpin` 4s linear infinite; **overlay fisso** (fermo allo scroll), **non blocca i click** sulle card |
+| Bordo animato | `.synt-frame` (div `position:fixed`, `inset:18px`, `pointer-events:none`, `z-index:9999`) | cornice perimetrale **cava** (8.6.1: `mask-composite:exclude` → interno **trasparente**, il contenuto sotto resta visibile; in 8.6.0 il riempimento `--dark` opaco copriva la pagina) a conic-gradient (rosa/viola/arancio), angolo `--synt-sa` animato via `@property` + `@keyframes syntSpin` 4s linear infinite; **overlay fisso** (fermo allo scroll), **non blocca i click** |
 | Logo | `<img class="logo-img" src="/static/synthesis-logo.png">` (topbar, `height:84px`) | PNG nero → reso **bianco** da `filter:invert(1) brightness(1.9)` (verificato: pixel opachi 100% neri, niente aloni). Nessun suffisso "ICP" |
 | Hero testo | eyebrow "Synthesis-ICP" + `.headline` (con `.accent` blu) + `.lead` | titolo "Dove la connessione **implantare diventa misura.**" + paragrafo di presentazione |
 | Hero immagine | `<img class="hero-img" src="/static/assets/padova-17_001.jpeg">` dentro `.hero-img-wrap` | dente reale → mesh; tenuta in **card chiara** (`#F0F1F5` + ombra/glow) che la stacca dal fondo scuro |
