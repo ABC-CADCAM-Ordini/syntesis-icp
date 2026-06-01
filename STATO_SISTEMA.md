@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, home pubblica + deep-link ?wf=)
+## Versione live (2026-06-01, redesign testata+hero home)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.5.0 (live, commit `8736299` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.5.0 (live, commit `8736299` del 2026-06-01) |
-| / (home pubblica, 8.5.0) | `synthesis-home.html` — splash presentazione + immagine hero + 4 card workflow; sostituisce il redirect 302 a /vedere (che resta fallback) |
+| Backend principale (b7671e12) | 8.5.1 (live, commit `f874e5f` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.5.1 (live, commit `f874e5f` del 2026-06-01) |
+| / (home pubblica, 8.5.1) | `synthesis-home.html` — splash: logo 84px (no "ICP"), hero senza H1 (tagline blu = headline) + immagine ingrandita fusa nel fondo pagina unificato `#F0F1F5`, 4 card workflow; sostituisce il redirect 302 a /vedere (resta fallback) |
 | /analizzare | v8.5.0 — reader `?wf=` (deep-link workflow misurare/sostituire dalla home); export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
@@ -23,6 +23,12 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.5.1 — redesign testata+hero home (2026-06-01)
+
+Ritocco grafico alla sola `synthesis-home.html` (le 4 card workflow invariate). Testata: logo ingrandito 42px→84px, rimosso il suffisso "ICP" (resta solo il logo). Hero: rimosso l'H1 "Synthesis-ICP" (ridondante col logo), la tagline diventa l'headline (blu, 30px); immagine `padova-17_001.jpeg` ingrandita (`grid 1fr 1.25fr`) e privata di card/bordo/ombra. **Fusione**: sfondo della pagina unificato a `#F0F1F5` — il colore reale campionato dal fondo del JPEG (via PIL; bordi/angoli uniformi 240,241,245) — così il fondo è continuo dall'alto in basso e l'immagine si dissolve senza fascia né bordo. Le card bianche restano staccate (Δ luminanza ~15 + bordo + ombra). Responsive: ≤900px le colonne si impilano (testo sopra, immagine sotto). Solo frontend; `v3b`/analyzer non toccato (`ANALIZZA_BUILD`/`<title>` restano 8.5.0); `registry.BACKEND_VERSION` = versione canonica del rilascio.
+
+Deploy verificato live su entrambi i servizi (commit `f874e5f`, sequenza LEGACY canary → BACKEND; build LEGACY ~48s, BACKEND ~264s — più lento ma SUCCESS): `backend_version=8.5.1`, `GET /` 200 con `<title>Synthesis-ICP</title>` e **markup servito** verificato (`height:84px` ×1, `background:#F0F1F5` ×1, `<h1>` 0, `class="suffix"` 0), immagine hero 200 (image/jpeg, 774315 B), `/analizzare` 200, gating anonimo `/api/me/storage` → 403. `app.syntesis-icp.com` → 200. Sospesi: nessuno aperto/chiuso (resta il follow-up cert dominio-H `app.synthesis-icp.com`).
 
 ## 8.5.0 — home pubblica + deep-link ?wf= + ritorno login (2026-06-01)
 
