@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, home dark 8.6.3 — layout 16:9 una schermata)
+## Versione live (2026-06-01, home dark 8.6.4 — allineamento desktop ampio)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.6.3 (live, commit `c0515fd` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.6.3 (live, commit `c0515fd` del 2026-06-01) |
-| / (home pubblica, 8.6.3) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
+| Backend principale (b7671e12) | 8.6.4 (live, commit `7cc5151` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.6.4 (live, commit `7cc5151` del 2026-06-01) |
+| / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
 | /analizzare | v8.5.0 — reader `?wf=` (deep-link workflow misurare/sostituire dalla home); export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
@@ -23,6 +23,12 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.6.4 — allineamento home desktop ampio (2026-06-01)
+
+Rifinitura di `synthesis-home.html` su schermi medi/grandi (riferimento utente). Il logo era in una `.topbar` separata sopra l'hero → più in alto e scollegato dall'immagine, e piccolo. Modifiche: logo spostato DENTRO `.hero-left` come primo elemento (ordine logo → headline → lead, stesso bordo sinistro); `.hero` `align-items:center → start` → **top del logo = top dell'immagine** (misurato a 1920×1080: scarto 166px → 0). Logo più grande: `clamp(48px,8vh,84px)` → `clamp(70px,12vh,124px)` (+48%). Eyebrow "Synthesis-ICP" rimosso dall'HTML (assente nel riferimento; il logo ne fa le veci) — la regola CSS `.eyebrow` resta orfana (follow-up cleanup §3.4). Layout più ampio: `.page` `max-width 1340 → 1600` + `justify-content:center` → margini simmetrici (a 1920×1080: sx=dx=192px, alto=basso=105px; a 4:3 1600×1200: 167/167 centrato). `.hero` `flex 1 1 auto → 0 0 auto`. Immagine a filo del bordo destro = ultima card. Desktop basso (≤900h) e mobile (≤900w) protetti con `justify-content:flex-start` + logo ridimensionato → "una schermata" e responsive verticale invariati (overflow 0). Verificato via JS getBoundingClientRect. Solo `synthesis-home.html`; v3b non toccato (`ANALIZZA_BUILD`/`<title>` restano 8.5.0).
+
+Deploy verificato live su entrambi (commit `7cc5151`, sequenza LEGACY canary → BACKEND, ~60s ciascuno): `backend_version=8.6.4`, `GET /` 200 col marker `v8.6.4` + `eyebrow` assente + `max-width:1600px` servito, `/analizzare` 200, gating `/api/me/storage` → 403. `app.syntesis-icp.com` (no-h) → 200. Sospesi: nessuno aperto/chiuso (resta il follow-up cert dominio-H, ora in validazione finale: vedi Sospesi #2).
 
 ## 8.6.3 — fit home 16:9 anche su schermi bassi (2026-06-01)
 
@@ -214,7 +220,7 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 
 **Alta priorità**
 1. Fase 0 stabilizzazione: split v3b.html, scripts/, pytest base
-2. app.syntesis-icp.com HTTP 404 + cert SSL mismatch (verificato 2026-05-21 post-incident: edge Railway risponde 404 sulla "/", cert servito è `*.up.railway.app` invece di copertura `syntesis-icp.com`). Fix: rigenerare custom domain in Railway Settings → Networking del backend. Workaround attuale: URL Railway diretto.
+2. **Dominio brand con-h `app.synthesis-icp.com`**: il no-h `app.syntesis-icp.com` è **sano** (HTTP 200, cert VALID — la vecchia voce "404 + cert mismatch" del 2026-05-21 era stale, archiviata). Il con-h (brand corretto "Synthesis", CON la h) aveva il cert Railway incagliato in `VALIDATING_OWNERSHIP` nonostante DNS corretto: il 2026-06-01 delete+recreate del custom domain sul backend (nuovo id `e3c276f8`) → nuovo target CNAME `wcu5nq5m.up.railway.app`; CNAME aggiornato su register.it (zona synthesis-icp.com) e propagato (~30 min, nameserver register.it inizialmente incoerenti). Cert in validazione finale, atteso `VALID` + HTTP 200 a breve.
 3. Audit 2026-05-06 finding open: C1 (JWT in query), C4 (Google access-token client) — diventano critici al lancio Fase 1 SaaS (sharing folder cross-utente, free-tier registration)
 
 **Media**
@@ -260,4 +266,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-06-01 — fix primo-click #btnPick su Vedere live su entrambi i servizi (8.4.8). Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-01 — home 8.6.4 (allineamento desktop ampio) live su entrambi i servizi. Aggiornare al prossimo cambio di stato.*
