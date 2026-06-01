@@ -1,8 +1,8 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.4.5 — **Data:** 2026-06-01
+> **Versione software mappata:** 8.4.6 — **Data:** 2026-06-01
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
-> **Stato documento:** Fase 1 (impianto: indice route + classi di visibilità). Le sezioni di dettaglio per-vista sono in compilazione (Fase 2).
+> **Stato documento:** completo — tutte e 5 le viste coperte.
 
 Sorgenti primarie:
 - `backend/main.py` — route che servono le pagine.
@@ -48,7 +48,7 @@ Classi CSS che `selectWorkflow` usa per mostrare/nascondere i pulsanti di toolba
 |---|---|---|---|---|---|---|---|
 | `.analisi-only` | 11 | [4609](../backend/static/syntesis-analyzer-v3b.html#L4609) | mostra `''` [4647] | mostra `''` [4669] | nascondi `none` [4694] | nascondi `none` [4719] | Bottoni Analizza/Accoppia (es. "+ Posiziona", "Raffina"). |
 | `.misurare-only` | 2 | [4610](../backend/static/syntesis-analyzer-v3b.html#L4610) | nascondi `none` [4648] | nascondi `none` [4670] | mostra `''` [4695] | nascondi `none` [4720] | |
-| `.sostituire-only` | 3 | [4721](../backend/static/syntesis-analyzer-v3b.html#L4721) (inline nel ramo sostituire) | — | — | — | mostra `''` [4722] | **DA CHIARIRE (fase 2):** non gestita esplicitamente nei rami analizza/accoppia/misurare. Verificare se ha `display:none` di default in CSS/markup o se è un leak simmetrico a quello di `#panelScanbodyType` (corretto in 8.4.5). |
+| `.sostituire-only` | 4 | [4721](../backend/static/syntesis-analyzer-v3b.html#L4721) inline + gestione centralizzata a fine `selectWorkflow` | nascondi `none` | nascondi `none` | nascondi `none` | mostra `''` | **Corretto in 8.4.6**: gestione centralizzata in `selectWorkflow` (`querySelectorAll('.sostituire-only')` + display per `wf === 'sostituire'`), simmetrica al fix `#panelScanbodyType` 8.4.5. Visibili solo in sostituire, nascosti altrove. |
 | `.icon-only` | 26 | — | n/a | n/a | n/a | n/a | **Non** è gating per-workflow: styling per bottoni a sola icona. Citata per completezza. |
 
 ### Pannelli a visibilità per-id (non per-classe)
@@ -92,18 +92,18 @@ App monolite (~3.87 MB). 4 workflow interni commutati da `selectWorkflow(wf)` ([
 | Elemento | id / classe | Funzione | Visibile in | Effetto a valle | Righe | Note |
 |---|---|---|---|---|---|---|
 | Livelli | `#btnLivelli` `.analisi-only` | `toggleLayersPanel` | analizza+accoppia | toggle albero scena (`layersPanel`) | [1337] | |
-| Livelli (dup) | `.sostituire-only` | `toggleLayersPanel` | solo sostituire | toggle albero scena | [1345] | `display:none` default → **leak gemello** |
+| Livelli (dup) | `.sostituire-only` | `toggleLayersPanel` | solo sostituire | toggle albero scena | [1345] | `display:none` default; visibilità centralizzata in `selectWorkflow` (corretto 8.4.6) |
 | **Posiziona** | `.green .analisi-only` | `startPlacement` | analizza+accoppia | `placementMode=true` → al click `placeMUA` | [1353] | |
 | **Raffina** | `#btnRaffina` `.analisi-only` | `alignAll` | analizza+accoppia | ICP refine di tutti i MUA | [1363] | |
 | Crea gruppo | `.analisi-only` | `openGroupDialog` | analizza+accoppia | apre dialog gruppi | [1373] | |
 | Mostra assi | `#btnAxes` `.analisi-only` | `toggleAxes` | analizza+accoppia | toggle assi 3D | [1383] | |
 | Sezione | `.analisi-only` | `openCutView` | analizza+accoppia | cutview MUA (overlay) | [1392] | |
 | Sezione (mis) | `.misurare-only` | `misICP_toggleCutview` | solo misurare | cutview ICP | [1400] | `display:none` default |
-| Sezione (sost) | `.sostituire-only` | `sostOpenCutView` | solo sostituire | cutview marker | [1408] | `display:none` default → **leak gemello** |
+| Sezione (sost) | `.sostituire-only` | `sostOpenCutView` | solo sostituire | cutview marker | [1408] | `display:none` default; visibilità centralizzata in `selectWorkflow` (corretto 8.4.6) |
 | Annulla | (toolbar dx) | `undoLastMUA` | analizza (toolbar) | rimuove ultimo MUA | [1418] | |
 | Menu reset | | `toggleResetMenu` | analizza | dropdown: `resetCamera` [1432], `resetGroups`, `clearAllMUA` | [1424] | |
 
-> **🐞 LEAK GEMELLO (bug noto, da fixare — NON corretto in questa fase).** I 2 bottoni `.sostituire-only` ([1345], [1408]) hanno `display:none` inline (sicuri al load), vengono mostrati nel ramo sostituire ([4722]) ma **nessuno li rinasconde uscendo**: il blocco di uscita ([4630-4634]) nasconde solo `panelSostituire`, `_hardResetSostituire` ([4503]) non li tocca, e i rami analizza/accoppia/misurare settano `analisiBtns`/`misurareBtns` ma mai `sostituireBtns`. → dopo aver visitato Sostituire e tornato altrove, restano visibili. Stesso pattern del fix `#panelScanbodyType` 8.4.5, ma manifesto solo *dopo* una visita a Sostituire. Fix simmetrico suggerito: rinasconderli nei rami non-sostituire (o gestione centralizzata come per `panelScanbodyType`).
+> **✅ Leak gemello — CORRETTO in 8.4.6.** I 2 bottoni `.sostituire-only` ([1345], [1408]) hanno `display:none` inline; il ramo sostituire li mostra ([4722]), ma prima nessuno li rinascondeva uscendo (il blocco di uscita nascondeva solo `panelSostituire`, `_hardResetSostituire` non li toccava, e i rami analizza/accoppia/misurare non settavano mai `sostituireBtns`) → restavano visibili dopo una visita a Sostituire. **Fix 8.4.6**: gestione centralizzata a fine `selectWorkflow` (`querySelectorAll('.sostituire-only')` + `display` per `wf === 'sostituire'`) — nessun ramo può dimenticarli. La riga inline ridondante ([4722]) è lasciata invariata (innocua). Simmetrico al fix `#panelScanbodyType` 8.4.5.
 
 ### Pannelli destri — matrice di visibilità per workflow (`selectWorkflow`)
 
@@ -182,7 +182,7 @@ Sostituzione scan body con ICP. Pannello `panelSostituire` [1876]:
 | Raffina | `#sostBtnRefine` | onclick | `sostAlignAll` | — | ICP sostituzione | [1900] | disabled di default |
 | Esporta STL | `#sostBtnExport` | onclick | `sostExportSTL` | — | scarica risultato | [1907] | `display:none` default |
 
-> **Box B vs Box A**: Box B (`sostSourceTemplate`) = tipo di marker **già presente** nella scansione di partenza, per la registrazione (`SOSTITUIRE_TEMPLATE_INFO`, `BBOX_LOCAL`, `T_ROOT` — [15093]/[15263]/[15273]). NON è ridondante con Box A (`_ANALYZE_SBTYPE`, che guida `placeMUA` in Analizza). Vedi fix 8.4.5 e leak gemello sopra.
+> **Box B vs Box A**: Box B (`sostSourceTemplate`) = tipo di marker **già presente** nella scansione di partenza, per la registrazione (`SOSTITUIRE_TEMPLATE_INFO`, `BBOX_LOCAL`, `T_ROOT` — [15106]/[15276]/[15286]). NON è ridondante con Box A (`_ANALYZE_SBTYPE`, che guida `placeMUA` in Analizza). Vedi fix 8.4.5 e 8.4.6 sopra.
 
 ---
 
@@ -281,22 +281,22 @@ Pannello admin (~390 righe). **Wiring via `addEventListener`**; righe utente gen
 
 | Funzione | File / Riga (def) | Cosa fa (1 frase) | Chiamata da |
 |---|---|---|---|
-| `selectWorkflow` | v3b [4565] | Commuta workflow analyzer e gestisce visibilità pannelli/toolbar | menu WorkFlow, `setMode` [4737] |
+| `selectWorkflow` | v3b [4565] | Commuta workflow analyzer e gestisce visibilità pannelli/toolbar | menu WorkFlow, `setMode` [4742] |
 | `placeMUA` | v3b [2753] | Posiziona un MUA (legge `_ANALYZE_SBTYPE` → radius/searchR) | click viewport quando `placementMode` [2547] |
-| `startPlacement` | v3b [2534] | Attiva `placementMode` | btn Posiziona [1353], tasto P [17107] |
+| `startPlacement` | v3b [2534] | Attiva `placementMode` | btn Posiziona [1353], tasto P [17119] |
 | `alignAll` | v3b [2912] | Raffina con ICP tutti i MUA | btn Raffina [1363] |
 | `loadScan` / `loadScanFile` | v3b [2511] / [2512] | Carica STL della scansione in `scanMesh` | `#inputScan` [1930], File→Importa |
 | `hardReset` | v3b [4218] | Ricarica l'app con cache-bust `?_r=` | btn Reset [1262] |
 | `newCase` | v3b [4165] | Reset del caso corrente (confirm se stato) | File→Nuovo [1222] |
 | `setAnalyzeSbType` / `getAnalyzeSbType` / `getAnalyzeSbCfg` | v3b [1967] / [1986] / [1987] | Scrive/legge `_ANALYZE_SBTYPE` e cfg CAD | radio Box A [1666-1669]; `placeMUA` |
-| `sostStartPlacement` / `sostAlignAll` | v3b [14955] / [15412] | Placement marker / ICP nel workflow Sostituire | btn `#sostBtnPlace` [1899] / `#sostBtnRefine` [1900] |
-| `sostOnSourceChange` | v3b [14799] | Scrive `sostSourceTemplate`/`sostActiveTemplate` (Box B) | radio Box B [1889-1892] |
+| `sostStartPlacement` / `sostAlignAll` | v3b [14960] / [15417] | Placement marker / ICP nel workflow Sostituire | btn `#sostBtnPlace` [1899] / `#sostBtnRefine` [1900] |
+| `sostOnSourceChange` | v3b [14812] | Scrive `sostSourceTemplate`/`sostActiveTemplate` (Box B) | radio Box B [1889-1892] |
 | `_hardResetSostituire` | v3b [4503] | Reset stato Sostituire all'uscita | `selectWorkflow` [4592] |
-| `misICP_run` | v3b [6259] | ICP di confronto fra 2 STL (Misurare) | btn `#misBtnRun` [1849] |
+| `misICP_run` | v3b [6264] | ICP di confronto fra 2 STL (Misurare) | btn `#misBtnRun` [1849] |
 | `toggleLayersPanel` | v3b [3491] | Toggle albero scena (`layersPanel`) | btn Livelli [1337] |
-| `openFresability` / `exportComponents` / `openCutView` / `openGroupDialog` / `openSettings` | v3b [5414] / [10090] / [10678] / [11496] / [12439] | Pannelli/dialog: fresabilità, export STL, cutview, gruppi, impostazioni | toolbar/pannelli Analizza/Accoppia |
+| `openFresability` / `exportComponents` / `openCutView` / `openGroupDialog` / `openSettings` | v3b [5419] / [10095] / [10683] / [11501] / [12444] | Pannelli/dialog: fresabilità, export STL, cutview, gruppi, impostazioni | toolbar/pannelli Analizza/Accoppia |
 | `saveCase` / `exportCase` / `undoLastMUA` / `clearAllMUA` / `toggleAxes` | v3b [3414] / [4228] / [4104] / [4111] / [3365] | Salva, esporta, annulla, reset MUA, toggle assi | menu File / toolbar |
-| `syntesisOpenFileDialog` | v3b [17127] | Apre file dialog STL | btn Carica file [1331] |
+| `syntesisOpenFileDialog` | v3b [17132] | Apre file dialog STL | btn Carica file [1331] |
 | `switchTab` | dashboard [1461] | Cambia sezione della dashboard | sidebar [975-1043] |
 | `render` / `onAuthorize` / `onRevoke` | gestione [262] / [332] / [343] | Render lista / autorizza (genera chiave) / revoca | filtri, righe utente |
 | `setTab` / `checkStatus` / `logout` | accedi [263] / [359] / [421] | Tab login/reg / polling stato / logout | tabs, pannello pending |
@@ -314,7 +314,7 @@ Pannello admin (~390 righe). **Wiring via `addEventListener`**; righe utente gen
 | `scanMesh` | `loadScanFile`, `newCase`, `hardReset` | `placeMUA`, export, stato | — |
 | `muaObjects` | `placeMUA`, `clearAllMUA`, `newCase` | analisi angolare, report | — |
 | `window._ANALYZE_SBTYPE` | `setAnalyzeSbType` [1969] | `getAnalyzeSbType`/`placeMUA` | init [1966] |
-| `sostSourceTemplate` / `sostActiveTemplate` | `sostOnSourceChange` [14800-14801] | pipeline Sostituire ([15093],[15263],[15273]) | decl [14675] |
+| `sostSourceTemplate` / `sostActiveTemplate` | `sostOnSourceChange` [14813-14814] | pipeline Sostituire ([15106],[15276],[15286]) | decl [14688] |
 | `placementMode` | `startPlacement` [2534] | click handler [2541] | — |
 | `envSettings` | `openSettings`/impostazioni | render mesh, export | — |
 
@@ -324,7 +324,7 @@ Pannello admin (~390 righe). **Wiring via `addEventListener`**; righe utente gen
 |---|---|---|---|---|---|
 | `.analisi-only` | ✅ | ✅ | ✕ | ✕ | [4647]/[4669]/[4694]/[4719] |
 | `.misurare-only` | ✕ | ✕ | ✅ | ✕ | [4648]/[4670]/[4695]/[4720] |
-| `.sostituire-only` | ✕* | ✕* | ✕* | ✅ | [4722] (solo show) — **\*leak**: non rinascosti uscendo (vedi sopra) |
+| `.sostituire-only` | ✕ | ✕ | ✕ | ✅ | centralizzato a fine `selectWorkflow`: `''` in sostituire, `none` altrove — **corretto 8.4.6** |
 | `.icon-only` | — | — | — | — | non-gating (styling) |
 | `panelScanbodyType` (id) | ✅ | ✅ | ✕ | ✕ | [4617-4618] (fix 8.4.5) |
 
@@ -337,4 +337,4 @@ Più i pannelli per-id nella **matrice di visibilità** della sezione Analizzare
 
 ---
 
-_Fine mappa. Stato: tutte e 5 le viste coperte. Voci marcate **DA CHIARIRE**: (1) leak gemello `.sostituire-only`; (2) handler toolbar Vedere non tracciati per-bottone; (3) "primo click a vuoto" Vedere non verificato._
+_Fine mappa. Stato: tutte e 5 le viste coperte. Voci marcate **DA CHIARIRE**: (1) handler toolbar Vedere non tracciati per-bottone; (2) "primo click a vuoto" Vedere non verificato._
