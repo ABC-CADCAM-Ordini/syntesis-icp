@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.4.8 — **Data:** 2026-06-01
+> **Versione software mappata:** 8.5.0 — **Data:** 2026-06-01
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -15,7 +15,7 @@ Sorgenti primarie:
 
 | Vista | Route | File servito | main.py righe | Scopo sintetico |
 |---|---|---|---|---|
-| (redirect root) | `/` | — (`RedirectResponse` → `/vedere`) | [145-151](../backend/main.py#L145) | Redirect 302 alla home `/vedere` (default = workflow Vedere) |
+| **Home** (splash) | `/` | `synthesis-home.html` | [145-154](../backend/main.py#L145) | Splash pubblica (8.5.0): presentazione + immagine hero + 4 card workflow. Sostituisce il vecchio redirect 302 a `/vedere` (che resta come fallback se il file manca). |
 | **Vedere** (landing) | `/vedere` | `syntesis-icp-vedere.html` | [177-184](../backend/main.py#L177) | Viewer 3D multi-formato (STL/OBJ/PLY/XYZ/PCD/PTS) con strumenti di misura, forme, annotazioni. Home di default. NON è uno dei 4 workflow dell'analyzer. |
 | **Analizzare** | `/analizzare` | `syntesis-analyzer-v3b.html` | [169-174](../backend/main.py#L169) | App di analisi di precisione (~3.87 MB monolite). 4 workflow interni — analizza, accoppia, misurare, sostituire — gestiti da `selectWorkflow`. |
 | **Dashboard** | `/dashboard` | `syntesis-dashboard-v1.html` | [186-192](../backend/main.py#L186) | Area personale utente (mie analisi, profilo). |
@@ -23,7 +23,7 @@ Sorgenti primarie:
 | **Gestione** | `/gestione` | `syntesis-gestione.html` | [203-210](../backend/main.py#L203) | Pannello admin: lista registrati, autorizza (genera chiave) / revoca. API `/admin/*` protette da `require_admin`. |
 
 Note di completezza:
-- I 5 file `.html` in `backend/static/` (`ls`: accedi, analyzer-v3b, dashboard, gestione, icp-vedere) sono **tutti** serviti dalle route sopra — nessun HTML orfano.
+- I 6 file `.html` in `backend/static/` (accedi, analyzer-v3b, dashboard, gestione, icp-vedere, **synthesis-home**) sono **tutti** serviti dalle route sopra — nessun HTML orfano.
 - Le `RedirectResponse` a `backend/main.py` righe 1067-1126 sono i redirect del flusso OAuth Google Drive (`/auth/gdrive/connect` [1048], `/auth/gdrive/callback` [1070]), **non** viste HTML → fuori mappa.
 - `auth.py` / `admin.py` non servono HTML (solo API JSON) — verificato (grep `FileResponse|HTMLResponse|.html` → vuoto).
 
@@ -57,6 +57,22 @@ Oltre alle classi, `selectWorkflow` commuta `style.display` di numerosi pannelli
 
 ---
 
+## Vista: Home / splash (`/` → `synthesis-home.html`)
+
+Splash **pubblica** introdotta in 8.5.0 ([main.py:145-154](../backend/main.py#L145), `FileResponse`, nessun gate; fallback a `/vedere` se il file manca). Sostituisce il vecchio redirect 302. Statica/vanilla, CSS inline, design token riusati da `vedere.html` (`:root`). Righe = `synthesis-home.html`.
+
+| Elemento | Riferimento | Destinazione / effetto |
+|---|---|---|
+| Logo | `<img src="/static/synthesis-logo.png">` (topbar) | il PNG contiene il wordmark "Synthesis"; suffisso "ICP" accanto |
+| Hero testo | H1 "Synthesis-ICP" + tagline + paragrafo | presentazione |
+| Hero immagine | `<img src="/static/assets/padova-17_001.jpeg">` (card arrotondata) | dente reale → mesh con quote |
+| Card **Vedere** | `<a href="/vedere">` + SVG occhio | → `/vedere` |
+| Card **Analizzare** | `<a href="/analizzare">` + SVG goniometro | → `/analizzare` (workflow analizza, default) |
+| Card **Misurare** | `<a href="/analizzare?wf=misurare">` + SVG grafico | → `/analizzare` deep-link workflow misurare |
+| Card **Sostituire** | `<a href="/analizzare?wf=sostituire">` + SVG cubo | → `/analizzare` deep-link workflow sostituire |
+
+Gating: home **pubblica**. Vedere → `/vedere` (pubblica). Analizzare/Misurare/Sostituire → `/analizzare` (gated da `syn-gate.js`): se non autorizzato → `/accedi`, poi ritorno al deep-link — la query `?wf=` è preservata da `rememberDeepLink` ([syn-gate.js:49](../backend/static/ds/syn-gate.js#L49)). Le 4 SVG sono le stesse del menu WorkFlow ([1271-1297] di v3b).
+
 ## Vista: Analizzare (`/analizzare` → `syntesis-analyzer-v3b.html`)
 
 App monolite (~3.87 MB). 4 workflow interni commutati da `selectWorkflow(wf)` ([4565](../backend/static/syntesis-analyzer-v3b.html#L4565)). Tutte le righe di questa sezione si riferiscono a `syntesis-analyzer-v3b.html`.
@@ -86,6 +102,8 @@ App monolite (~3.87 MB). 4 workflow interni commutati da `selectWorkflow(wf)` ([
 | Carica file STL | `#btnLoadFile` | onclick | `syntesisOpenFileDialog` | — | apre file dialog | [1331] | **senza** classe `-only` → di fatto sempre visibile |
 
 > **Doppio sistema di visibilità dei pannelli dx**: `selectWorkflow` li commuta per-workflow (matrice sotto), **ma** il menu **Vista** (`toggleViewPanel`) e i `panel-collapsible` permettono all'utente di mostrarli/nasconderli/collassarli indipendentemente. Le due cose convivono.
+
+> **Deep-link workflow `?wf=` (8.5.0)**: `/analizzare?wf=<wf>` apre direttamente quel workflow al load. Reader al `DOMContentLoaded` (dopo `setMode`, ~[4754](../backend/static/syntesis-analyzer-v3b.html#L4754)) che valida `wf ∈ {analizza,accoppia,misurare,sostituire}` e chiama `selectWorkflow(wf)` via `setTimeout(0)` (default analizza se assente/non valido). Usato dalle card **Misurare**/**Sostituire** della home. La query è preservata dal gate (`syn-gate.js` `rememberDeepLink`).
 
 ### Toolbar per-workflow (classi di visibilità)
 

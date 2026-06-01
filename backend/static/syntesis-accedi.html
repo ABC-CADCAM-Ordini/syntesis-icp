@@ -437,7 +437,21 @@
   $("enter-app").addEventListener("click", function(){
     // il token e' gia' in localStorage('syntesis_token'): /vedere lo legge da li'.
     persistSession();
-    window.location.href = APP_REDIRECT;
+    // 8.5.0: ritorno al deep-link. syn-gate.js (rememberDeepLink) salva pathname+
+    // search in sessionStorage.syn_after_login prima di rimbalzare un utente non
+    // autorizzato su /accedi (es. card Misurare/Sostituire della home ->
+    // /analizzare?wf=...). Qui lo consumiamo una volta: se presente e same-origin
+    // (inizia con "/" ma non "//" e non punta a /accedi) ci torniamo, altrimenti
+    // fallback ad APP_REDIRECT (/vedere) = comportamento storico invariato.
+    var dest = APP_REDIRECT;
+    try {
+      var after = sessionStorage.getItem("syn_after_login");
+      sessionStorage.removeItem("syn_after_login");
+      if(after && after.charAt(0) === "/" && after.charAt(1) !== "/" && after.indexOf("/accedi") !== 0){
+        dest = after;
+      }
+    } catch(e){}
+    window.location.href = dest;
   });
 
   // ---- resume sessione da localStorage all'avvio ----

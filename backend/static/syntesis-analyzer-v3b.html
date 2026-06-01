@@ -11,7 +11,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.4.7</title>
+<title>Syntesis-ICP - Analizzare v8.5.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2270,7 +2270,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.4.7';
+window.ANALIZZA_BUILD = '8.5.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-01';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -4745,6 +4745,20 @@ function setMode(mode){
   if(mode === 'misurare')      return selectWorkflow('misurare');
   if(mode === 'sostituire')    return selectWorkflow('sostituire');
 }
+
+// 8.5.0: deep-link al workflow dalla home (synthesis-home.html). Legge ?wf= dalla
+// query string e, se valido, apre direttamente quel workflow al load. Default
+// 'analizza' (stato di partenza) se assente/non valido. Mirror del pattern
+// ?file_id= di Vedere. setTimeout(0): gira dopo gli altri init DOMContentLoaded.
+document.addEventListener('DOMContentLoaded', function(){
+  try {
+    var wf = new URLSearchParams(location.search).get('wf');
+    var valid = ['analizza','accoppia','misurare','sostituire'];
+    if(wf && valid.indexOf(wf) !== -1 && wf !== 'analizza' && typeof selectWorkflow === 'function'){
+      setTimeout(function(){ try { selectWorkflow(wf); } catch(e){ console.warn('[?wf] selectWorkflow', e); } }, 0);
+    }
+  } catch(e){}
+});
 
 
 // ╔══════════════════════════════════════════════════════════════════╗

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Synthesis-ICP - Home (splash) v8.5.0 -->
+<title>Synthesis-ICP</title>
+<link rel="icon" href="/static/synthesis-logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Design token riusati da syntesis-icp-vedere.html (:root) — nessun nuovo stile */
+:root{
+  --blue:#0065B3; --dark:#0F1923; --gray:#7A90A4;
+  --pearl:#F0F5FA; --light:#F7F9FC; --border:#D6E4F0;
+  --white:#FFFFFF; --green:#0D9E6E; --gold:#F59E0B;
+  --radius:14px;
+  --font:'Source Sans 3','Source Sans Pro',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font); background:var(--pearl); color:var(--dark);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+.wrap{max-width:1100px;margin:0 auto;padding:34px 24px 60px}
+
+/* ── Top: logo (il PNG contiene gia' il wordmark "Synthesis") ── */
+.topbar{display:flex;align-items:center;gap:10px;margin-bottom:40px}
+.topbar img{height:42px;width:auto;display:block}
+.topbar .suffix{font-family:var(--font);font-size:15px;font-weight:800;letter-spacing:.06em;color:var(--blue);align-self:flex-end;margin-bottom:7px}
+
+/* ── Hero: testo a sinistra, immagine a destra ── */
+.hero{display:grid;grid-template-columns:1.05fr 0.95fr;gap:44px;align-items:center;margin-bottom:52px}
+.hero-text h1{font-size:42px;line-height:1.05;font-weight:800;margin:0 0 12px;color:var(--dark);letter-spacing:-0.015em}
+.hero-text .tagline{font-size:21px;font-weight:700;color:var(--blue);margin:0 0 20px;line-height:1.25}
+.hero-text p{font-size:16px;line-height:1.62;color:var(--gray);margin:0;max-width:48ch}
+.hero-img{border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;background:var(--white);box-shadow:0 14px 44px rgba(15,25,35,0.12)}
+.hero-img img{display:block;width:100%;height:auto}
+
+/* ── Card workflow ── */
+.section-label{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin:0 0 14px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.card{
+  display:flex;flex-direction:column;gap:11px;padding:20px;
+  background:var(--white);border:1px solid var(--border);border-radius:var(--radius);
+  text-decoration:none;color:inherit;
+  box-shadow:0 2px 8px rgba(15,25,35,0.05);
+  transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.card:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(15,25,35,0.13);border-color:var(--blue)}
+.card-icon{width:42px;height:42px;border-radius:10px;background:var(--light);display:flex;align-items:center;justify-content:center}
+.card-icon svg{width:24px;height:24px}
+.card-name{font-size:17px;font-weight:800;color:var(--dark)}
+.card-desc{font-size:13.5px;line-height:1.5;color:var(--gray)}
+
+/* ── Responsive 4 → 2 → 1 ── */
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr;gap:32px}
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .hero-text h1{font-size:36px}
+}
+@media (max-width:560px){
+  .cards{grid-template-columns:1fr}
+  .hero-text h1{font-size:30px}
+  .hero-text .tagline{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <img src="/static/synthesis-logo.png" alt="Synthesis-ICP">
+    <span class="suffix">ICP</span>
+  </div>
+
+  <div class="hero">
+    <div class="hero-text">
+      <h1>Synthesis-ICP</h1>
+      <div class="tagline">Dove la connessione implantare diventa misura.</div>
+      <p>Tra il dente e la sua geometria, tra l'atteso e il prodotto, esiste uno scarto che l'occhio non vede. Synthesis-ICP lo rende visibile, e quindi governabile.</p>
+    </div>
+    <div class="hero-img">
+      <img src="/static/assets/padova-17_001.jpeg" alt="Dente reale e relativa mesh con quote">
+    </div>
+  </div>
+
+  <p class="section-label">Strumenti</p>
+  <div class="cards">
+
+    <a class="card" href="/vedere">
+      <span class="card-icon"><svg viewBox="0 0 28 28" fill="none"><path d="M2 14 C5 8 9 5 14 5 C19 5 23 8 26 14 C23 20 19 23 14 23 C9 23 5 20 2 14 Z" stroke="#0065B3" stroke-width="1.6" fill="none"/><circle cx="14" cy="14" r="4" stroke="#0065B3" stroke-width="1.6" fill="none"/><circle cx="14" cy="14" r="1.5" fill="#0065B3"/></svg></span>
+      <span class="card-name">Vedere</span>
+      <span class="card-desc">Visualizza e misura modelli 3D multi-formato: distanze, angoli, sezioni, annotazioni.</span>
+    </a>
+
+    <a class="card" href="/analizzare">
+      <span class="card-icon"><svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="9" stroke="#0065B3" stroke-width="1.6" fill="none"/><line x1="14" y1="5" x2="14" y2="14" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/><line x1="14" y1="14" x2="20" y2="14" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+      <span class="card-name">Analizzare</span>
+      <span class="card-desc">Analisi angolare dei MUA: prima di progettare, sai se esiste la linea di inserzione e se il sistema di produzione scelto è coerente.</span>
+    </a>
+
+    <a class="card" href="/analizzare?wf=misurare">
+      <span class="card-icon"><svg viewBox="0 0 28 28" fill="none"><path d="M5 17 L12 10 L16 14 L23 7" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="10" r="1.6" fill="#0065B3"/><circle cx="16" cy="14" r="1.6" fill="#0065B3"/><circle cx="23" cy="7" r="1.6" fill="#0065B3"/></svg></span>
+      <span class="card-name">Misurare</span>
+      <span class="card-desc">Confronta il prima e il dopo, il virtuale e il reale, l'atteso e il prodotto di una connessione implantare.</span>
+    </a>
+
+    <a class="card" href="/analizzare?wf=sostituire">
+      <span class="card-icon"><svg viewBox="0 0 28 28" fill="none"><path d="M5 10 L14 5 L23 10 L14 15 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M5 15 L14 20 L23 15" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M18 19 L22 23 M22 19 L18 23" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+      <span class="card-name">Sostituire</span>
+      <span class="card-desc">Sostituzione dello scan body con allineamento ICP sulla scansione di partenza.</span>
+    </a>
+
+  </div>
+</div>
+</body>
+</html>

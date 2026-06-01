@@ -144,10 +144,13 @@ _NO_STORE_HEADERS = {"Cache-Control": "no-store, must-revalidate"}
 
 @app.get("/", include_in_schema=False)
 async def serve_frontend():
-    # Redirect 302 a /vedere (Blocco 5j: il workflow Vedere e' il default).
-    # Manteniamo il fallback all'index.html storico se esiste, ma di norma
-    # /vedere e' la prima esperienza utente. Status 302 = temporaneo, cosi'
-    # se in futuro vogliamo cambiare default e' facile.
+    # 8.5.0: splash/home pubblica (presentazione + 4 card workflow) -> serve
+    # synthesis-home.html. Sostituisce il vecchio redirect 302 a /vedere.
+    # PUBBLICA: nessun gate (come lo era il redirect). Fallback a /vedere se il
+    # file manca, per non rompere l'ingresso.
+    _home = _STATIC_DIR / "synthesis-home.html"
+    if _home.exists():
+        return FileResponse(str(_home), headers=_NO_STORE_HEADERS)
     return RedirectResponse(url="/vedere", status_code=302)
 
 # ── Rate limiting semplice in memoria ────────────────────────────────────────
