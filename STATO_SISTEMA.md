@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, home dark 8.6.1 — fix contenuto visibile)
+## Versione live (2026-06-01, home dark 8.6.3 — layout 16:9 una schermata)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.6.1 (live, commit `d8d0890` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.6.1 (live, commit `d8d0890` del 2026-06-01) |
-| / (home pubblica, 8.6.1) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): bordo perimetrale animato **cavo** (`.synt-frame` via `mask`, fixed overlay, `pointer-events:none` — **8.6.1 fix**: interno trasparente → contenuto visibile, prima il riempimento opaco copriva la pagina), logo bianco (invert), hero (eyebrow + headline accent + lead) + immagine in card chiara, 4 tool-card scure; sostituisce il redirect 302 a /vedere (resta fallback) |
+| Backend principale (b7671e12) | 8.6.3 (live, commit `c0515fd` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.6.3 (live, commit `c0515fd` del 2026-06-01) |
+| / (home pubblica, 8.6.3) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
 | /analizzare | v8.5.0 — reader `?wf=` (deep-link workflow misurare/sostituire dalla home); export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
@@ -23,6 +23,18 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.6.3 — fit home 16:9 anche su schermi bassi (2026-06-01)
+
+8.6.2 stava in una schermata sui monitor ampi/alti, ma sui desktop **bassi** (~13", viewport ≤~880px d'altezza) il contenuto sforava ~39px (misurato live; causa: `.hero-img max-height:min(58vh,100%)` col `100%` indefinito → l'immagine non si rimpiccioliva). Fix **additivo** (base 8.6.2 invariata → look generoso intatto sugli schermi ampi): `@media (min-width:901px) and (max-height:900px)` comprime logo/headline/lead/immagine(`max-height:44vh`)/card/padding/gap **solo** sui desktop bassi → stessa composizione, niente scroll. `@media (min-width:901px){.viewport{overflow:hidden}}` azzera la barra per il residuo sub-pixel del flex (clippa solo ~9px di padding di fondo, **nessun contenuto tagliato**).
+
+Deploy verificato live su entrambi (commit `c0515fd`, LEGACY canary → BACKEND, ~48s/24s): `backend_version=8.6.3`, markup col blocco `max-height:900` + `overflow:hidden` servito. **Misura live a 1352×873** (simula 13", compressione attiva): immagine 432→373px, `overflowPx 39→9`, `overflowY:hidden` → nessuna barra di scroll. `/analizzare` 200, gating 403, `app.syntesis-icp.com` 200. Sospesi: nessuno aperto/chiuso.
+
+## 8.6.2 — layout home "una schermata" 16:9 + crop immagine (2026-06-01)
+
+Layout `synthesis-home.html` rivisto perché su desktop 16:9 stia **tutto in una schermata senza scroll** dentro la cornice, e fix del **contenuto che scrollava sotto la cornice fissa**. Architettura: `.viewport` `position:fixed; inset:22px` (= cornice 18 + bordo 4) con `overflow-y:auto` → lo scroll vive DENTRO la cornice (mai sotto l'anello); `.page` flex-column con misure in `vh`/`clamp` (logo, headline, lead, immagine `max-height:min(58vh,100%)`, card) → logo + hero + 4 card in `100vh`. Mobile ≤900px: `.viewport` block (scroll naturale dentro la cornice), verticale (logo→testo→immagine→card; 2 col ≤900 / 1 col ≤560). **Immagine**: sostituito il file col **crop** (1920×1080/774315B → 1233×889/544942B) + `?v=862` sul `src` (cache-busting). Mantenuti: cornice cava animata, tema scuro, logo invert, hover card, link workflow.
+
+Deploy verificato live su entrambi (commit `0580299`, LEGACY canary → BACKEND): `backend_version=8.6.2`, immagine servita 544942 B (crop nuovo), markup layout (`.viewport`, `?v=862`). NB: su desktop bassi restava ~39px di overflow → risolto in 8.6.3.
 
 ## 8.6.1 — fix home dark invisibile (cornice cava) (2026-06-01)
 
