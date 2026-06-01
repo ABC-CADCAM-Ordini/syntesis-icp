@@ -34,6 +34,7 @@ import numpy as np
 # Quando si promuove la Fase A in produzione, il suffisso sparisce -> 8.2.0.
 #
 # History:
+#   8.4.4          (2026-06-01): FEAT pulsante Reset persistente nell'header, tra blocco File e WorkFlow. hardReset() ricarica l'app con cache-bust querystring (?_r=Date.now()) per ripartire con una nuova analisi da zero; confirm() solo se c'è stato corrente (scanMesh o muaObjects.length>0). Markup ~riga 1262 (button.btn + SVG freccia circolare blu #0065B3), funzione ~riga 4213 subito dopo newCase(). Solo frontend: nessun endpoint/API toccato. Bump <title> + window.ANALIZZA_BUILD. Niente CACHEBUST (deploy via serviceInstanceDeploy latestCommit:true).
 #   8.4.3          (2026-05-29): FIX gate accesso reveal() — su /analizzare la pagina restava nera permanente anche per utenti authorized/admin dopo deploy 8.4.2 sul principale. Causa: reveal() faceva style.visibility = "" (stringa vuota) che rimuove l'inline style ma lascia attivo il CSS rule backup <style>html{visibility:hidden}</style> introdotto in 8.4.2; per specificity (inline 1,0,0,0 batte tag-selector 0,0,0,1 solo con valore non vuoto) la rule CSS torna a vincere e la pagina resta hidden. Sintomo confermato in DevTools: console mostrava boot v3b 8.4.2 ma <html> aveva visibility:hidden risolto. Fix: visibility = "visible" (inline non vuoto = override del backup CSS). syn-gate.js, 1 riga modificata. Bug latente anche sul LEGACY: deterministico nel codice, identico tra i due deploy.
 #   8.4.2          (2026-05-29): FEAT gate accesso /analizzare — canary su LEGACY. Aggiunto backend/static/ds/syn-gate.js: nasconde la pagina via visibility:hidden, chiama /auth/me col token, redirige a /accedi (pending/anonimo/errore/rete giù), rivela il body solo per authorized o admin; preserva il deep link in sessionStorage.syn_after_login. Agganciato a syntesis-analyzer-v3b.html nel <head>: backup CSS anti-flash + <script src="/static/ds/syn-gate.js">. /vedere e /dashboard NON ancora agganciati (canary, ci si aggancia nel deploy successivo dopo conferma utente sul comportamento legacy). Server-side require_authorized intoccato (resta la sicurezza vera; il gate JS è solo UX-layer).
 #   8.4.1          (2026-05-29): FIX layout pannello admin /gestione — overflow tabella "Richieste di accesso" clippato da .tablecard{overflow:hidden}, colonna Licenza e bottone Revoca tagliati a destra ("Revoc..."). 3 modifiche CSS: .wrap max-width 1080→1200px; padding celle thead/tbody 18→12px; .tablecard overflow:hidden → overflow-x:auto (safety net, border-radius preservato). Solo CSS, nessuna logica/HTML/JS toccato.
@@ -65,11 +66,11 @@ import numpy as np
 #   8.1.2-A.2   (2026-05-02): aggiunto backend/registry.py + endpoint
 #   8.1.1-A.0   (2026-05-02): rimosso icp_engine_lab.py (copia 1:1)
 #   8.1.0       (2026-05-02): stato pre-Fase A (Analizzare promosso ieri)
-BACKEND_VERSION = "8.4.3"
+BACKEND_VERSION = "8.4.4"
 
 REGISTRY_VERSION = "1.1.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
 REGISTRY_SOURCE = "backend/registry.py"
-LAST_UPDATED = "2026-05-29"
+LAST_UPDATED = "2026-06-01"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SCANBODY: geometrie CAD dei tre tipi di marker

@@ -11,7 +11,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.4.3</title>
+<title>Syntesis-ICP - Analizzare v8.4.4</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1259,6 +1259,10 @@ if (document.readyState === 'loading') {
       </div>
     </div>
   </div>
+  <button class="btn" onclick="hardReset()" title="Ricarica l'applicazione per iniziare una nuova analisi da zero">
+    <svg width="13" height="13" viewBox="0 0 28 28" fill="none" style="margin-right:2px;vertical-align:-2px"><path d="M22 14 a8 8 0 1 1 -2.3 -5.6" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round"/><polyline points="20,3 20,9 14,9" stroke="#0065B3" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Reset
+  </button>
   <div class="workflow-menu-wrapper">
     <button class="btn" onclick="toggleWorkflowMenu(event)" title="Seleziona il workflow attivo">
       WorkFlow <span style="font-size:10px;margin-left:-1px">▾</span>
@@ -2266,8 +2270,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.4.3';
-window.ANALIZZA_BUILD_DATE = '2026-05-29';
+window.ANALIZZA_BUILD = '8.4.4';
+window.ANALIZZA_BUILD_DATE = '2026-06-01';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -4208,6 +4212,16 @@ function newCase(){
   }
   updateRaffinaButtonState();
   showStatus('Nuovo caso: carica una scansione .stl');
+}
+
+// ── HARD RESET (ricarica applicazione) ─────────────────────────
+function hardReset(){
+  var hasState = (typeof scanMesh !== 'undefined' && scanMesh) ||
+                 (typeof muaObjects !== 'undefined' && muaObjects.length > 0);
+  if(hasState && !confirm('Ricaricare l\'applicazione?\nLo stato corrente andrà perso.')) return;
+  var u = new URL(window.location.href);
+  u.searchParams.set('_r', Date.now().toString());
+  window.location.replace(u.toString());
 }
 
 // ── ESPORTA CASO (PNG + JSON) ──────────────────────────────────
