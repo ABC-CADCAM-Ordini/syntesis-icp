@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, fix leak visibilità Box A "Tipo scanbody")
+## Versione live (2026-06-01, fix leak gemello .sostituire-only)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.4.5 (live, commit `a9c11ce` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.4.5 (live, commit `a9c11ce` del 2026-06-01) |
-| /analizzare | v8.4.5 — pannello "Tipo scanbody" (Box A) visibile solo in Analizza/Accoppia; pulsante Reset nell'header; gate accesso attivo (redirect `/accedi` per pending/anonimo; reveal per authorized/admin) |
+| Backend principale (b7671e12) | 8.4.6 (live, commit `284e2ed` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.4.6 (live, commit `284e2ed` del 2026-06-01) |
+| /analizzare | v8.4.6 — bottoni `.sostituire-only` visibili solo in Sostituire (leak gemello corretto); pannello "Tipo scanbody" (Box A) solo in Analizza/Accoppia; pulsante Reset nell'header; gate accesso attivo (redirect `/accedi` per pending/anonimo; reveal per authorized/admin) |
 | /vedere (default home) | v8.0.0-refactor |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
@@ -21,6 +21,15 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.4.6 — fix leak gemello .sostituire-only (2026-06-01)
+
+Bugfix simmetrico al fix `#panelScanbodyType` 8.4.5. I 2 bottoni toolbar `.sostituire-only` (Livelli ~1345, Sezione/cutview ~1408 di `syntesis-analyzer-v3b.html`) avevano `display:none` inline (sicuri al load) ma, una volta mostrati nel ramo sostituire di `selectWorkflow`, nessuno li rinascondeva uscendo (il blocco di uscita nasconde solo `panelSostituire`; i rami analizza/accoppia/misurare settano `analisiBtns`/`misurareBtns` ma mai `sostituireBtns`) → restavano visibili negli altri workflow dopo una visita a Sostituire.
+
+- Fix: gestione centralizzata a fine `selectWorkflow` (`querySelectorAll('.sostituire-only')` + `display` per `wf === 'sostituire'`) — nessun ramo può dimenticarli. Riga inline ridondante invariata. Solo frontend, nessun backend/API. Niente CACHEBUST.
+- `docs/MAPPA_FUNZIONALE.md` aggiornata nello stesso commit (regola CLAUDE.md §4): leak gemello → corretto; corretti anche ~17 riferimenti di riga del cluster `sost*` che erano stale (numeri pre-8.4.5).
+
+Deploy verificato live su entrambi i servizi (commit `284e2ed`, sequenza LEGACY canary → BACKEND): `backend_version=8.4.6`, `/analizzare` HTTP 200 con `<title>` `v8.4.6`, **check markup**: `querySelectorAll('.sostituire-only')` (×2: inline + centralizzato) e la riga `sostBtns … display per wf` presenti nell'HTML servito; gating anonimo `/api/me/analyses` → 403. `app.syntesis-icp.com` escluso (cert SSL pre-esistente). Sospesi: nessuno aperto, nessuno chiuso.
 
 ## 8.4.5 — fix leak visibilità Box A "Tipo scanbody" (2026-06-01)
 
@@ -185,4 +194,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-06-01 — fix leak visibilità Box A "Tipo scanbody" (visibile solo in Analizza/Accoppia) live su entrambi i servizi (8.4.5). Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-01 — fix leak gemello .sostituire-only (visibili solo in Sostituire) live su entrambi i servizi (8.4.6). Aggiornare al prossimo cambio di stato.*
