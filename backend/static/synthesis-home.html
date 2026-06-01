@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Synthesis-ICP</title>
-<!-- Synthesis-ICP - Home (splash) v8.6.3 -->
+<!-- Synthesis-ICP - Home (splash) v8.6.4 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
@@ -72,35 +72,32 @@ body{
 }
 .page{
   width:100%;
-  max-width:1340px;
+  max-width:1600px;           /* 8.6.4: layout piu' ampio (era 1340) -> margini laterali piu' vicini ad alto/basso */
   min-height:100%;            /* riempie l'altezza disponibile (16:9) */
   display:flex;
   flex-direction:column;
+  justify-content:center;     /* 8.6.4: centra hero+tools -> respiro alto/basso simmetrico (desktop alto) */
   padding:clamp(18px,3vh,38px) clamp(22px,3vw,54px);
   gap:clamp(10px,2.4vh,30px);
 }
 
-/* ===== HEADER ===== */
-.topbar{
-  flex:0 0 auto;
-  display:flex;
-  align-items:center;
-}
-/* Logo: il PNG e' NERO su trasparente; su fondo scuro invert(1) brightness(1.9)
-   lo rende bianco pulito (verificato: pixel opachi 100% neri, niente aloni). */
+/* ===== LOGO ===== (in cima alla colonna sinistra, top allineato all'immagine) */
+/* Il PNG e' NERO su trasparente; su fondo scuro invert(1) brightness(1.9) lo
+   rende bianco pulito (verificato: pixel opachi 100% neri, niente aloni). */
 .logo-img{
-  height:clamp(48px,8vh,84px);
+  display:block;                          /* 8.6.4: dentro la colonna sinistra */
+  height:clamp(70px,12vh,124px);          /* 8.6.4: piu' grande (era max 84) */
   width:auto;
   filter:invert(1) brightness(1.9);
+  margin-bottom:clamp(14px,2.6vh,28px);   /* 8.6.4: spaziatura logo -> headline */
 }
 
 /* ===== HERO ===== (occupa lo spazio centrale; misure in vh -> ci sta in una schermata) */
 .hero{
-  flex:1 1 auto;
-  min-height:0;
+  flex:0 0 auto;                  /* 8.6.4: non cresce (era 1 1 auto) -> niente vuoto sotto l'immagine */
   display:grid;
   grid-template-columns:1fr 1.1fr;
-  align-items:center;
+  align-items:start;              /* 8.6.4: top logo (sx) = top immagine (dx), era center */
   gap:clamp(24px,3.5vw,52px);
 }
 .hero-left{min-width:0}
@@ -208,10 +205,12 @@ body{
   .viewport{inset:14px;display:block}        /* 10 + 4: segue la cornice */
   .page{
     min-height:100%;
+    justify-content:flex-start;
     gap:28px;
     padding:30px 26px 40px;
   }
   .hero{display:flex;flex-direction:column;align-items:stretch;gap:24px}
+  .logo-img{height:clamp(52px,8vw,72px);margin-bottom:16px}  /* 8.6.4: mobile invariato */
   .headline{font-size:clamp(30px,7.5vw,42px)}
   .lead{font-size:16px;max-width:none}
   .hero-img{max-height:none;width:100%}      /* in verticale l'immagine prende larghezza piena */
@@ -234,8 +233,8 @@ body{
    flex (clippa solo padding di fondo, mai contenuto). Mobile (<=900px largh.)
    resta verticale con overflow-y:auto (vince per ordine/larghezza). */
 @media (min-width:901px) and (max-height:900px){
-  .page{padding:clamp(12px,2vh,28px) clamp(22px,3vw,54px);gap:clamp(8px,1.6vh,20px)}
-  .logo-img{height:clamp(44px,7vh,72px)}
+  .page{justify-content:flex-start;padding:clamp(12px,2vh,28px) clamp(22px,3vw,54px);gap:clamp(8px,1.6vh,20px)}
+  .logo-img{height:clamp(56px,9.5vh,100px);margin-bottom:clamp(10px,2vh,20px)}
   .headline{font-size:clamp(28px,4.6vh,46px);margin-bottom:clamp(10px,2vh,20px);line-height:1.05}
   .lead{font-size:clamp(13px,1.85vh,16px);line-height:1.5}
   .hero-img{max-height:44vh}
@@ -253,7 +252,6 @@ body{
    chiesto meno movimento -> un'animazione che non parte non puo' mai lasciare
    il contenuto invisibile. */
 @media(prefers-reduced-motion:no-preference){
-  .topbar{animation:fadeDown .8s ease both}
   .hero-left{animation:fadeUp 1s ease .15s both}
   .hero-right{animation:fadeIn 1.4s ease .3s both}
   .tools-section{animation:fadeUp 1s ease .45s both}
@@ -270,13 +268,9 @@ body{
 <div class="viewport">
 <div class="page">
 
-  <header class="topbar">
-    <img class="logo-img" src="/static/synthesis-logo.png" alt="Synthesis">
-  </header>
-
   <section class="hero">
     <div class="hero-left">
-      <p class="eyebrow">Synthesis-ICP</p>
+      <img class="logo-img" src="/static/synthesis-logo.png" alt="Synthesis">
       <h1 class="headline">
         Dove la connessione
         <span class="accent">implantare diventa misura.</span>

@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.6.3 — **Data:** 2026-06-01
+> **Versione software mappata:** 8.6.4 — **Data:** 2026-06-01
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -15,7 +15,7 @@ Sorgenti primarie:
 
 | Vista | Route | File servito | main.py righe | Scopo sintetico |
 |---|---|---|---|---|
-| **Home** (splash) | `/` | `synthesis-home.html` | [145-154](../backend/main.py#L145) | Splash pubblica **dark** (8.6.0): bordo perimetrale animato + hero (headline + immagine in card chiara) + 4 card workflow. Sostituisce il vecchio redirect 302 a `/vedere` (fallback se il file manca). |
+| **Home** (splash) | `/` | `synthesis-home.html` | [145-154](../backend/main.py#L145) | Splash pubblica **dark**: bordo perimetrale animato + hero (logo + headline + immagine in card chiara) + 4 card workflow. **8.6.4**: logo dentro l'hero, top allineato all'immagine, layout più ampio e centrato. Sostituisce il vecchio redirect 302 a `/vedere` (fallback se il file manca). |
 | **Vedere** (landing) | `/vedere` | `syntesis-icp-vedere.html` | [177-184](../backend/main.py#L177) | Viewer 3D multi-formato (STL/OBJ/PLY/XYZ/PCD/PTS) con strumenti di misura, forme, annotazioni. Home di default. NON è uno dei 4 workflow dell'analyzer. |
 | **Analizzare** | `/analizzare` | `syntesis-analyzer-v3b.html` | [169-174](../backend/main.py#L169) | App di analisi di precisione (~3.87 MB monolite). 4 workflow interni — analizza, accoppia, misurare, sostituire — gestiti da `selectWorkflow`. |
 | **Dashboard** | `/dashboard` | `syntesis-dashboard-v1.html` | [186-192](../backend/main.py#L186) | Area personale utente (mie analisi, profilo). |
@@ -59,13 +59,13 @@ Oltre alle classi, `selectWorkflow` commuta `style.display` di numerosi pannelli
 
 ## Vista: Home / splash (`/` → `synthesis-home.html`)
 
-Splash **pubblica** (`FileResponse`, nessun gate; fallback a `/vedere` se il file manca, [main.py:145-154](../backend/main.py#L145)). **Redesign DARK** (8.6.0): tema scuro (`--dark #0F1923`) + bordo perimetrale animato. **Layout "una schermata" (8.6.2)**: il contenuto vive in `.viewport` (`position:fixed`, `inset:22px` = dentro la cornice, `overflow-y:auto`) → lo scroll resta DENTRO la cornice; su desktop 16:9 le misure sono in `vh`/`clamp` → logo + hero + 4 card stanno tutti in `100vh` senza scroll; sotto `900px` il layout diventa verticale con scroll naturale (sempre dentro la cornice). Statica/vanilla, CSS inline. Righe = `synthesis-home.html`.
+Splash **pubblica** (`FileResponse`, nessun gate; fallback a `/vedere` se il file manca, [main.py:145-154](../backend/main.py#L145)). **Redesign DARK** (8.6.0): tema scuro (`--dark #0F1923`) + bordo perimetrale animato. **Layout "una schermata" (8.6.2)**: il contenuto vive in `.viewport` (`position:fixed`, `inset:22px` = dentro la cornice, `overflow-y:auto`) → lo scroll resta DENTRO la cornice; su desktop 16:9 le misure sono in `vh`/`clamp` → logo + hero + 4 card stanno tutti in `100vh` senza scroll; sotto `900px` il layout diventa verticale con scroll naturale (sempre dentro la cornice). **Allineamento desktop ampio (8.6.4)**: logo spostato in `.hero-left` (primo elemento) + `.hero{align-items:start}` → top logo = top immagine; logo più grande (`clamp(70px,12vh,124px)`); `.page{max-width:1600;justify-content:center}` → margini simmetrici (sx=dx, alto=basso); `.hero{flex:0 0 auto}`; eyebrow rimosso; mobile/desktop-basso con `justify-content:flex-start` (invariati). Statica/vanilla, CSS inline. Righe = `synthesis-home.html`.
 
 | Elemento | Riferimento | Destinazione / effetto |
 |---|---|---|
 | Bordo animato | `.synt-frame` (div `position:fixed`, `inset:18px`, `pointer-events:none`, `z-index:9999`) | cornice perimetrale **cava** (8.6.1: `mask-composite:exclude` → interno **trasparente**, il contenuto sotto resta visibile; in 8.6.0 il riempimento `--dark` opaco copriva la pagina) a conic-gradient (rosa/viola/arancio), angolo `--synt-sa` animato via `@property` + `@keyframes syntSpin` 4s linear infinite; **overlay fisso** (fermo allo scroll), **non blocca i click** |
-| Logo | `<img class="logo-img" src="/static/synthesis-logo.png">` (topbar, `height:84px`) | PNG nero → reso **bianco** da `filter:invert(1) brightness(1.9)` (verificato: pixel opachi 100% neri, niente aloni). Nessun suffisso "ICP" |
-| Hero testo | eyebrow "Synthesis-ICP" + `.headline` (con `.accent` blu) + `.lead` | titolo "Dove la connessione **implantare diventa misura.**" + paragrafo di presentazione |
+| Logo | `<img class="logo-img" src="/static/synthesis-logo.png">` (**in `.hero-left`**, primo elemento; `height:clamp(70px,12vh,124px)`, 8.6.4) | PNG nero → reso **bianco** da `filter:invert(1) brightness(1.9)` (verificato: pixel opachi 100% neri, niente aloni). Top allineato all'immagine. Nessun suffisso "ICP" |
+| Hero testo | **logo** + `.headline` (con `.accent` blu) + `.lead` — eyebrow rimosso in 8.6.4 | titolo "Dove la connessione **implantare diventa misura.**" + paragrafo di presentazione |
 | Hero immagine | `<img class="hero-img" src="/static/assets/padova-17_001.jpeg">` dentro `.hero-img-wrap` | dente reale → mesh; tenuta in **card chiara** (`#F0F1F5` + ombra/glow) che la stacca dal fondo scuro |
 | Card **Vedere** | `<a class="tool-card" href="/vedere">` + SVG occhio | → `/vedere` |
 | Card **Analizzare** | `<a class="tool-card" href="/analizzare">` + SVG orologio | → `/analizzare` (workflow analizza, default) |
