@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, pulsante Reset nell'header)
+## Versione live (2026-06-01, fix leak visibilità Box A "Tipo scanbody")
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.4.4 (live, commit `9ca5a68` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.4.4 (live, commit `9ca5a68` del 2026-06-01) |
-| /analizzare | v8.4.4 — pulsante Reset persistente nell'header; gate accesso attivo (redirect `/accedi` per pending/anonimo; reveal per authorized/admin) |
+| Backend principale (b7671e12) | 8.4.5 (live, commit `a9c11ce` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.4.5 (live, commit `a9c11ce` del 2026-06-01) |
+| /analizzare | v8.4.5 — pannello "Tipo scanbody" (Box A) visibile solo in Analizza/Accoppia; pulsante Reset nell'header; gate accesso attivo (redirect `/accedi` per pending/anonimo; reveal per authorized/admin) |
 | /vedere (default home) | v8.0.0-refactor |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
@@ -21,6 +21,15 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.4.5 — fix leak visibilità Box A "Tipo scanbody" (2026-06-01)
+
+Bugfix di leak di visibilità nel pannello destro di `syntesis-analyzer-v3b.html`. Il pannello `#panelScanbodyType` (Box A "Tipo scanbody", che imposta `window._ANALYZE_SBTYPE` per il posizionamento MUA in Analizza via `placeMUA`) non aveva `display:none` di default e non era mai referenziato da `selectWorkflow` → restava visibile in **tutti** i workflow. In Sostituire duplicava visivamente il Box B "SOSTITUIRE SCAN BODY" (`#sostSourceRadio` / `sostSourceTemplate`, tipo di marker presente nella scansione di partenza), generando l'ambiguità "due box per la stessa cosa"; in Misurare era ugualmente inerte.
+
+- Fix additivo e centralizzato in `selectWorkflow` (~riga 4611, dopo le dichiarazioni dei pannelli): `#panelScanbodyType` visibile solo in `analizza`/`accoppia` — gli unici workflow dove `placeMUA` consuma `_ANALYZE_SBTYPE` (il bottone "+ Posiziona" è `.analisi-only`, mostrato in entrambi) — nascosto altrove. Posizionato dopo i `return` anticipati, così uno switch annullato non altera lo stato.
+- Box B (`#sostSourceRadio` / `sostSourceTemplate`) e `placeMUA` non toccati. Solo frontend, nessun backend/API. Niente CACHEBUST.
+
+Deploy verificato live su entrambi i servizi (commit `a9c11ce`, sequenza LEGACY canary → BACKEND): `backend_version=8.4.5`, `/analizzare` HTTP 200 con `<title>` `v8.4.5`, e **check markup nell'HTML servito**: `getElementById('panelScanbodyType')` e il ternary `panSbType ... (wf === 'analizza' || wf === 'accoppia')` presenti (1 occorrenza ciascuno). Gating anonimo `/api/me/analyses` → 403. `app.syntesis-icp.com` escluso (cert SSL pre-esistente, sospeso noto). Sospesi: nessuno aperto, nessuno chiuso.
 
 ## 8.4.4 — pulsante Reset nell'header (2026-06-01)
 
@@ -176,4 +185,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-06-01 — pulsante Reset persistente nell'header live su entrambi i servizi (8.4.4). Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-01 — fix leak visibilità Box A "Tipo scanbody" (visibile solo in Analizza/Accoppia) live su entrambi i servizi (8.4.5). Aggiornare al prossimo cambio di stato.*
