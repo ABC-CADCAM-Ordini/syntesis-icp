@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.5.1 — **Data:** 2026-06-01
+> **Versione software mappata:** 8.6.0 — **Data:** 2026-06-01
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -15,7 +15,7 @@ Sorgenti primarie:
 
 | Vista | Route | File servito | main.py righe | Scopo sintetico |
 |---|---|---|---|---|
-| **Home** (splash) | `/` | `synthesis-home.html` | [145-154](../backend/main.py#L145) | Splash pubblica (8.5.0): presentazione + immagine hero + 4 card workflow. Sostituisce il vecchio redirect 302 a `/vedere` (che resta come fallback se il file manca). |
+| **Home** (splash) | `/` | `synthesis-home.html` | [145-154](../backend/main.py#L145) | Splash pubblica **dark** (8.6.0): bordo perimetrale animato + hero (headline + immagine in card chiara) + 4 card workflow. Sostituisce il vecchio redirect 302 a `/vedere` (fallback se il file manca). |
 | **Vedere** (landing) | `/vedere` | `syntesis-icp-vedere.html` | [177-184](../backend/main.py#L177) | Viewer 3D multi-formato (STL/OBJ/PLY/XYZ/PCD/PTS) con strumenti di misura, forme, annotazioni. Home di default. NON è uno dei 4 workflow dell'analyzer. |
 | **Analizzare** | `/analizzare` | `syntesis-analyzer-v3b.html` | [169-174](../backend/main.py#L169) | App di analisi di precisione (~3.87 MB monolite). 4 workflow interni — analizza, accoppia, misurare, sostituire — gestiti da `selectWorkflow`. |
 | **Dashboard** | `/dashboard` | `syntesis-dashboard-v1.html` | [186-192](../backend/main.py#L186) | Area personale utente (mie analisi, profilo). |
@@ -59,17 +59,18 @@ Oltre alle classi, `selectWorkflow` commuta `style.display` di numerosi pannelli
 
 ## Vista: Home / splash (`/` → `synthesis-home.html`)
 
-Splash **pubblica** introdotta in 8.5.0 ([main.py:145-154](../backend/main.py#L145), `FileResponse`, nessun gate; fallback a `/vedere` se il file manca). Sostituisce il vecchio redirect 302. Statica/vanilla, CSS inline, design token riusati da `vedere.html` (`:root`). Righe = `synthesis-home.html`.
+Splash **pubblica** (`FileResponse`, nessun gate; fallback a `/vedere` se il file manca, [main.py:145-154](../backend/main.py#L145)). **Redesign DARK in 8.6.0**: tema scuro (`--dark #0F1923`) + bordo perimetrale animato. Statica/vanilla, CSS inline. Righe = `synthesis-home.html`.
 
 | Elemento | Riferimento | Destinazione / effetto |
 |---|---|---|
-| Logo | `<img src="/static/synthesis-logo.png">` (topbar, `height:84px`) | marchio "Synthesis" (il PNG contiene il wordmark); **nessun suffisso** — 8.5.1 ha rimosso "ICP" e ingrandito il logo 42px→84px |
-| Hero testo | tagline (headline, blu 30px) + paragrafo | 8.5.1: rimosso l'H1 "Synthesis-ICP" (ridondante col logo); la tagline diventa il titolo |
-| Hero immagine | `<img src="/static/assets/padova-17_001.jpeg">` (no card, ingrandita, `grid 1fr 1.25fr`) | dente reale → mesh con quote; **fusa nel fondo** — sfondo **pagina** (body) unificato a `#F0F1F5` (colore campionato dal JPEG; sostituisce `--pearl`) → fondo continuo, nessuna fascia/bordo (8.5.1) |
-| Card **Vedere** | `<a href="/vedere">` + SVG occhio | → `/vedere` |
-| Card **Analizzare** | `<a href="/analizzare">` + SVG goniometro | → `/analizzare` (workflow analizza, default) |
-| Card **Misurare** | `<a href="/analizzare?wf=misurare">` + SVG grafico | → `/analizzare` deep-link workflow misurare |
-| Card **Sostituire** | `<a href="/analizzare?wf=sostituire">` + SVG cubo | → `/analizzare` deep-link workflow sostituire |
+| Bordo animato | `.synt-frame` (div `position:fixed`, `inset:18px`, `pointer-events:none`, `z-index:9999`) | cornice perimetrale a conic-gradient (rosa/viola/arancio), angolo `--synt-sa` animato via `@property` + `@keyframes syntSpin` 4s linear infinite; **overlay fisso** (fermo allo scroll), **non blocca i click** sulle card |
+| Logo | `<img class="logo-img" src="/static/synthesis-logo.png">` (topbar, `height:84px`) | PNG nero → reso **bianco** da `filter:invert(1) brightness(1.9)` (verificato: pixel opachi 100% neri, niente aloni). Nessun suffisso "ICP" |
+| Hero testo | eyebrow "Synthesis-ICP" + `.headline` (con `.accent` blu) + `.lead` | titolo "Dove la connessione **implantare diventa misura.**" + paragrafo di presentazione |
+| Hero immagine | `<img class="hero-img" src="/static/assets/padova-17_001.jpeg">` dentro `.hero-img-wrap` | dente reale → mesh; tenuta in **card chiara** (`#F0F1F5` + ombra/glow) che la stacca dal fondo scuro |
+| Card **Vedere** | `<a class="tool-card" href="/vedere">` + SVG occhio | → `/vedere` |
+| Card **Analizzare** | `<a class="tool-card" href="/analizzare">` + SVG orologio | → `/analizzare` (workflow analizza, default) |
+| Card **Misurare** | `<a class="tool-card" href="/analizzare?wf=misurare">` + SVG grafico | → `/analizzare` deep-link workflow misurare |
+| Card **Sostituire** | `<a class="tool-card" href="/analizzare?wf=sostituire">` + SVG cubo | → `/analizzare` deep-link workflow sostituire |
 
 Gating: home **pubblica**. Vedere → `/vedere` (pubblica). Analizzare/Misurare/Sostituire → `/analizzare` (gated da `syn-gate.js`): se non autorizzato → `/accedi`, poi ritorno al deep-link — la query `?wf=` è preservata da `rememberDeepLink` ([syn-gate.js:49](../backend/static/ds/syn-gate.js#L49)). Le 4 SVG sono le stesse del menu WorkFlow ([1271-1297] di v3b).
 

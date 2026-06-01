@@ -1,118 +1,261 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<!-- Synthesis-ICP - Home (splash) v8.5.1 -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Synthesis-ICP</title>
-<link rel="icon" href="/static/synthesis-logo.png">
-<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
+<!-- Synthesis-ICP - Home (splash) v8.6.0 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-/* Design token riusati da syntesis-icp-vedere.html (:root) — nessun nuovo stile */
 :root{
-  --blue:#0065B3; --dark:#0F1923; --gray:#7A90A4;
-  --pearl:#F0F5FA; --light:#F7F9FC; --border:#D6E4F0;
-  --white:#FFFFFF; --green:#0D9E6E; --gold:#F59E0B;
+  --dark:#0F1923;
+  --dark-2:#16232F;
+  --blue:#2E9BE6;
+  --blue-soft:#7CC4F0;
+  --gray:#8FA6B8;
+  --pearl:#F0F1F5;
+  --white:#FFFFFF;
   --radius:14px;
-  --font:'Source Sans 3','Source Sans Pro',sans-serif;
+  --font:'Source Sans 3',-apple-system,system-ui,sans-serif;
 }
-*{box-sizing:border-box}
-html,body{margin:0;padding:0}
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+html{background:#000}
+
 body{
-  /* 8.5.1: sfondo pagina #F0F1F5 = colore reale campionato dal fondo di
-     padova-17_001.jpeg, unificato su tutta la pagina -> fondo continuo,
-     l'immagine hero si fonde senza fascia/bordo. Card bianche (--white) restano
-     ben staccate (Δ luminanza ~15 + bordo + ombra). Sostituisce --pearl #F0F5FA. */
-  font-family:var(--font); background:#F0F1F5; color:var(--dark);
-  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  font-family:var(--font);
+  background:var(--dark);
+  color:#E8EFF5;
+  min-height:100vh;
+  overflow-x:hidden;
 }
-.wrap{max-width:1100px;margin:0 auto;padding:34px 24px 60px}
 
-/* ── Top: logo (il PNG contiene gia' il wordmark "Synthesis") ── */
-.topbar{display:flex;align-items:center;gap:10px;margin-bottom:40px}
-.topbar img{height:84px;width:auto;display:block}
-
-/* ── Hero: tagline+testo a sinistra, immagine a destra, fusa nel fondo pagina ──
-   il fondo pagina (#F0F1F5) coincide col fondo dell'immagine -> l'immagine si
-   dissolve senza bordi ne' fascia; per questo .hero-img NON ha card/bordo/ombra. */
-.hero{display:grid;grid-template-columns:1fr 1.25fr;gap:40px;align-items:center;margin-bottom:52px}
-.hero-text .tagline{font-size:30px;font-weight:800;color:var(--blue);margin:0 0 18px;line-height:1.2;letter-spacing:-0.01em}
-.hero-text p{font-size:16px;line-height:1.62;color:var(--gray);margin:0;max-width:48ch}
-.hero-img img{display:block;width:100%;height:auto}
-
-/* ── Card workflow ── */
-.section-label{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin:0 0 14px}
-.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.card{
-  display:flex;flex-direction:column;gap:11px;padding:20px;
-  background:var(--white);border:1px solid var(--border);border-radius:var(--radius);
-  text-decoration:none;color:inherit;
-  box-shadow:0 2px 8px rgba(15,25,35,0.05);
-  transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+/* ===== CORNICE PERIMETRALE ANIMATA (stile software, adattata per pagina che scrolla) =====
+   Frame FISSO in overlay: resta fermo mentre il contenuto scrolla dentro.
+   NB: il software originale la metteva su <body> con overflow:hidden (app a tutto schermo).
+   Qui la home scrolla, quindi usiamo un div position:fixed dedicato. */
+.synt-frame{
+  position:fixed;
+  inset:18px;
+  border:4px solid transparent;
+  border-radius:var(--radius);
+  background-image:
+    linear-gradient(var(--dark),var(--dark)),
+    conic-gradient(from var(--synt-sa,0deg),#FF8C42,#FF4D8D,#FFD166,#C84BFF,#FF6B35,#FF9FC8,#FF8C42);
+  background-origin:padding-box,border-box;
+  background-clip:padding-box,border-box;
+  animation:syntSpin 4s linear infinite;
+  box-shadow:0 0 22px rgba(255,140,66,.32),0 0 52px rgba(200,75,255,.16);
+  pointer-events:none;
+  z-index:9999;
 }
-.card:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(15,25,35,0.13);border-color:var(--blue)}
-.card-icon{width:42px;height:42px;border-radius:10px;background:var(--light);display:flex;align-items:center;justify-content:center}
-.card-icon svg{width:24px;height:24px}
-.card-name{font-size:17px;font-weight:800;color:var(--dark)}
-.card-desc{font-size:13.5px;line-height:1.5;color:var(--gray)}
+@property --synt-sa{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes syntSpin{to{--synt-sa:360deg}}
 
-/* ── Responsive 4 → 2 → 1 ── */
-@media (max-width:900px){
-  .hero{grid-template-columns:1fr;gap:26px}
-  .cards{grid-template-columns:repeat(2,1fr)}
-  .hero-text .tagline{font-size:26px}
+/* contenuto: padding per stare dentro la cornice */
+.page{
+  position:relative;
+  z-index:1;
+  padding:46px 64px 56px;
+  max-width:1240px;
+  margin:0 auto;
 }
-@media (max-width:560px){
-  .cards{grid-template-columns:1fr}
-  .hero-text .tagline{font-size:22px}
+
+/* ===== HEADER ===== */
+.topbar{
+  display:flex;
+  align-items:center;
+  padding:8px 0 0;
+  animation:fadeDown .8s ease both;
+}
+/* Logo: il PNG e' NERO su trasparente; su fondo scuro invert(1) brightness(1.9)
+   lo rende bianco pulito (verificato: pixel opachi 100% neri, niente aloni). */
+.logo-img{
+  height:84px;
+  width:auto;
+  filter:invert(1) brightness(1.9);
+}
+
+/* ===== HERO ===== */
+.hero{
+  display:grid;
+  grid-template-columns:1fr 1.15fr;
+  align-items:center;
+  gap:40px;
+  margin-top:54px;
+  min-height:62vh;
+}
+.hero-left{animation:fadeUp 1s ease .15s both}
+
+.eyebrow{
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color:var(--blue);
+  margin-bottom:22px;
+}
+.headline{
+  font-size:52px;
+  font-weight:700;
+  line-height:1.08;
+  letter-spacing:-1.5px;
+  color:#fff;
+  margin-bottom:26px;
+}
+.headline .accent{color:var(--blue);display:block}
+.lead{
+  font-size:18px;
+  line-height:1.7;
+  color:var(--gray);
+  max-width:440px;
+}
+.lead .name{color:#CFE4F2;font-weight:600}
+
+/* immagine: il suo fondo e' #F0F1F5 chiaro; su fondo scuro la teniamo dentro una
+   card chiara con ombra/glow (.hero-img-wrap) che la stacca elegantemente. */
+.hero-right{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  animation:fadeIn 1.4s ease .3s both;
+}
+.hero-img-wrap{
+  position:relative;
+  width:100%;
+  border-radius:18px;
+  overflow:hidden;
+  background:#F0F1F5;
+  box-shadow:0 30px 80px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.04);
+}
+.hero-img{width:100%;display:block}
+
+/* ===== STRUMENTI ===== */
+.tools-section{margin-top:78px;animation:fadeUp 1s ease .45s both}
+.tools-label{
+  font-size:12px;font-weight:700;letter-spacing:3px;
+  text-transform:uppercase;color:var(--gray);margin-bottom:22px;
+}
+.tools-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:18px;
+}
+.tool-card{
+  background:var(--dark-2);
+  border:1px solid rgba(124,196,240,.12);
+  border-radius:var(--radius);
+  padding:26px 22px 28px;
+  text-decoration:none;
+  color:inherit;
+  display:block;
+  transition:transform .25s ease,border-color .25s ease,background .25s ease;
+  cursor:pointer;
+}
+.tool-card:hover{
+  transform:translateY(-6px);
+  border-color:rgba(46,155,230,.5);
+  background:#1A2A38;
+}
+.tool-icon{
+  width:46px;height:46px;border-radius:12px;
+  background:rgba(46,155,230,.12);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:20px;color:var(--blue);
+}
+.tool-icon svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2}
+.tool-name{font-size:21px;font-weight:700;color:#fff;margin-bottom:10px}
+.tool-desc{font-size:14.5px;line-height:1.6;color:var(--gray)}
+
+/* ===== ANIMAZIONI INGRESSO ===== */
+@keyframes fadeUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:980px){
+  .page{padding:38px 34px 44px}
+  .hero{grid-template-columns:1fr;gap:34px;min-height:auto}
+  .headline{font-size:40px}
+  .tools-grid{grid-template-columns:repeat(2,1fr)}
+  .synt-frame{inset:10px}
+}
+@media(max-width:560px){
+  .headline{font-size:32px}
+  .tools-grid{grid-template-columns:1fr}
+  .logo-img{height:60px}
+}
+@media(prefers-reduced-motion:reduce){
+  .synt-frame{animation:none}
+  .topbar,.hero-left,.hero-right,.tools-section{animation:none}
 }
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <div class="topbar">
-    <img src="/static/synthesis-logo.png" alt="Synthesis-ICP">
-  </div>
+<div class="synt-frame" aria-hidden="true"></div>
 
-  <div class="hero">
-    <div class="hero-text">
-      <div class="tagline">Dove la connessione implantare diventa misura.</div>
-      <p>Tra il dente e la sua geometria, tra l'atteso e il prodotto, esiste uno scarto che l'occhio non vede. Synthesis-ICP lo rende visibile, e quindi governabile.</p>
+<div class="page">
+
+  <header class="topbar">
+    <img class="logo-img" src="/static/synthesis-logo.png" alt="Synthesis">
+  </header>
+
+  <section class="hero">
+    <div class="hero-left">
+      <p class="eyebrow">Synthesis-ICP</p>
+      <h1 class="headline">
+        Dove la connessione
+        <span class="accent">implantare diventa misura.</span>
+      </h1>
+      <p class="lead">
+        Tra il dente e la sua geometria, tra l'atteso e il prodotto, esiste uno scarto che l'occhio non vede.
+        <span class="name">Synthesis-ICP</span> lo rende visibile, e quindi governabile.
+      </p>
     </div>
-    <div class="hero-img">
-      <img src="/static/assets/padova-17_001.jpeg" alt="Dente reale e relativa mesh con quote">
+
+    <div class="hero-right">
+      <div class="hero-img-wrap">
+        <img class="hero-img" src="/static/assets/padova-17_001.jpeg" alt="Dente reale e sua mesh misurata">
+      </div>
     </div>
-  </div>
+  </section>
 
-  <p class="section-label">Strumenti</p>
-  <div class="cards">
+  <section class="tools-section">
+    <p class="tools-label">Strumenti</p>
+    <div class="tools-grid">
 
-    <a class="card" href="/vedere">
-      <span class="card-icon"><svg viewBox="0 0 28 28" fill="none"><path d="M2 14 C5 8 9 5 14 5 C19 5 23 8 26 14 C23 20 19 23 14 23 C9 23 5 20 2 14 Z" stroke="#0065B3" stroke-width="1.6" fill="none"/><circle cx="14" cy="14" r="4" stroke="#0065B3" stroke-width="1.6" fill="none"/><circle cx="14" cy="14" r="1.5" fill="#0065B3"/></svg></span>
-      <span class="card-name">Vedere</span>
-      <span class="card-desc">Visualizza e misura modelli 3D multi-formato: distanze, angoli, sezioni, annotazioni.</span>
-    </a>
+      <a class="tool-card" href="/vedere">
+        <div class="tool-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg></div>
+        <div class="tool-name">Vedere</div>
+        <div class="tool-desc">Visualizza e misura modelli 3D multi-formato: distanze, angoli, sezioni, annotazioni.</div>
+      </a>
 
-    <a class="card" href="/analizzare">
-      <span class="card-icon"><svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="9" stroke="#0065B3" stroke-width="1.6" fill="none"/><line x1="14" y1="5" x2="14" y2="14" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/><line x1="14" y1="14" x2="20" y2="14" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/></svg></span>
-      <span class="card-name">Analizzare</span>
-      <span class="card-desc">Analisi angolare dei MUA: prima di progettare, sai se esiste la linea di inserzione e se il sistema di produzione scelto è coerente.</span>
-    </a>
+      <a class="tool-card" href="/analizzare">
+        <div class="tool-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+        <div class="tool-name">Analizzare</div>
+        <div class="tool-desc">Analisi angolare dei MUA: prima di progettare, sai se esiste la linea di inserzione e se il sistema di produzione scelto &egrave; coerente.</div>
+      </a>
 
-    <a class="card" href="/analizzare?wf=misurare">
-      <span class="card-icon"><svg viewBox="0 0 28 28" fill="none"><path d="M5 17 L12 10 L16 14 L23 7" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="10" r="1.6" fill="#0065B3"/><circle cx="16" cy="14" r="1.6" fill="#0065B3"/><circle cx="23" cy="7" r="1.6" fill="#0065B3"/></svg></span>
-      <span class="card-name">Misurare</span>
-      <span class="card-desc">Confronta il prima e il dopo, il virtuale e il reale, l'atteso e il prodotto di una connessione implantare.</span>
-    </a>
+      <a class="tool-card" href="/analizzare?wf=misurare">
+        <div class="tool-icon"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M21 8v5h-5"/></svg></div>
+        <div class="tool-name">Misurare</div>
+        <div class="tool-desc">Confronta il prima e il dopo, il virtuale e il reale, l'atteso e il prodotto di una connessione implantare.</div>
+      </a>
 
-    <a class="card" href="/analizzare?wf=sostituire">
-      <span class="card-icon"><svg viewBox="0 0 28 28" fill="none"><path d="M5 10 L14 5 L23 10 L14 15 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M5 15 L14 20 L23 15" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M18 19 L22 23 M22 19 L18 23" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/></svg></span>
-      <span class="card-name">Sostituire</span>
-      <span class="card-desc">Sostituzione dello scan body con allineamento ICP sulla scansione di partenza.</span>
-    </a>
+      <a class="tool-card" href="/analizzare?wf=sostituire">
+        <div class="tool-icon"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg></div>
+        <div class="tool-name">Sostituire</div>
+        <div class="tool-desc">Sostituzione dello scan body con allineamento ICP sulla scansione di partenza.</div>
+      </a>
 
-  </div>
+    </div>
+  </section>
+
 </div>
 </body>
 </html>
