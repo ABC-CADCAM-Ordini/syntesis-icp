@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, export Sostituire con dialog nome file)
+## Versione live (2026-06-01, fix primo-click #btnPick su Vedere)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.4.7 (live, commit `76107ef` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.4.7 (live, commit `76107ef` del 2026-06-01) |
-| /analizzare | v8.4.7 — export STL Sostituire chiede il nome file (modale `#sostExportDialog`) prima del download; bottoni `.sostituire-only` solo in Sostituire; pannello "Tipo scanbody" (Box A) solo in Analizza/Accoppia; pulsante Reset nell'header; gate accesso attivo |
-| /vedere (default home) | v8.0.0-refactor |
+| Backend principale (b7671e12) | 8.4.8 (live, commit `6c54bf7` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.4.8 (live, commit `6c54bf7` del 2026-06-01) |
+| /analizzare | v8.4.7 (invariato in 8.4.8) — export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; Reset header; gate accesso attivo |
+| /vedere (default home) | v8.0.0-refactor — fix primo-click `#btnPick` in 8.4.8 (file dialog apre al primo click) |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
 > 8.3.3 fix cutview opacità 100% **confermato risolto a freddo dopo verifica con cache pulita** (2026-05-08). Il fix slider (`material.transparent = true` forzato in /vedere) risolve davvero: ripristina il queue ordering corretto fra layer mesh, stencil meshes e cap plane. Le diagnosi 8.3.4 (angolo camera) e 8.3.5 (collisione cromatica) erano artefatti di test su browser cache stale che continuava a servire 8.3.1. Ticket archiviato in MASTER_DOC §B.8 (CHIUSO). Lezione di processo aggiunta a MASTER_DOC §A.6.2: cache busting esplicito (Cmd+Shift+R o `?v=$(date +%s)`) prima di ogni verifica visiva post-deploy. 8.3.4-5-6 sono doc patch (registry version trail), non deployati.
@@ -21,6 +21,16 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.4.8 — fix primo-click #btnPick su Vedere (2026-06-01)
+
+Bugfix runtime su `syntesis-icp-vedere.html` (Vedere): al primo click su "Aggiungi file" (`#btnPick`) il file dialog di sistema si apriva e si richiudeva subito; al secondo restava. Causa: **doppio trigger** — `#btnPick` aveva sia `onclick` inline (`document.getElementById('filePicker').click()`, ~riga 1020) sia `addEventListener('click', pickFiles)` (~2727, con `pickFiles` = `filePicker.click()`), quindi due `.click()` sincroni per un click utente → la seconda chiamata annullava il dialog appena aperto.
+
+- Fix: rimosso l'`onclick` inline (~1020); `#btnPick` ora ha il solo `addEventListener` → single trigger, coerente con `#btnAdd`/`#btnReset`. Confermato runtime (anteprima + live). Solo Vedere; `v3b`/analyzer non toccato.
+- Versioning: bump in `registry.py BACKEND_VERSION` → 8.4.8 (fonte di verità unica). `ANALIZZA_BUILD`/`<title>` dell'analyzer e il tag Vedere `v8.0.0-refactor` invariati (architetturale).
+- `docs/MAPPA_FUNZIONALE.md` completata su Vedere (handler toolbar per-bottone) + voce primo-click → RISOLTO (regola §4).
+
+Deploy verificato live su entrambi i servizi (commit `6c54bf7`, LEGACY canary → BACKEND): `backend_version=8.4.8`, `/vedere` HTTP 200 con **`#btnPick` senza `onclick` inline nell'HTML servito** (resta solo 1 onclick→filePicker = voce menu Importa), `/analizzare` 200, gating anonimo → 403. `app.syntesis-icp.com` escluso (cert SSL pre-esistente). Sospesi: nessuno aperto, nessuno chiuso.
 
 ## 8.4.7 — export Sostituire: dialog nome file (2026-06-01)
 
@@ -203,4 +213,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-06-01 — export Sostituire con dialog nome file live su entrambi i servizi (8.4.7). Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-01 — fix primo-click #btnPick su Vedere live su entrambi i servizi (8.4.8). Aggiornare al prossimo cambio di stato.*
