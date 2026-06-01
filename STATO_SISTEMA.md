@@ -2,14 +2,16 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, fix primo-click #btnPick su Vedere)
+## Versione live (2026-06-01, home pubblica + deep-link ?wf=)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.4.8 (live, commit `6c54bf7` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.4.8 (live, commit `6c54bf7` del 2026-06-01) |
-| /analizzare | v8.4.7 (invariato in 8.4.8) — export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; Reset header; gate accesso attivo |
-| /vedere (default home) | v8.0.0-refactor — fix primo-click `#btnPick` in 8.4.8 (file dialog apre al primo click) |
+| Backend principale (b7671e12) | 8.5.0 (live, commit `8736299` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.5.0 (live, commit `8736299` del 2026-06-01) |
+| / (home pubblica, 8.5.0) | `synthesis-home.html` — splash presentazione + immagine hero + 4 card workflow; sostituisce il redirect 302 a /vedere (che resta fallback) |
+| /analizzare | v8.5.0 — reader `?wf=` (deep-link workflow misurare/sostituire dalla home); export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
+| /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
+| /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
 > 8.3.3 fix cutview opacità 100% **confermato risolto a freddo dopo verifica con cache pulita** (2026-05-08). Il fix slider (`material.transparent = true` forzato in /vedere) risolve davvero: ripristina il queue ordering corretto fra layer mesh, stencil meshes e cap plane. Le diagnosi 8.3.4 (angolo camera) e 8.3.5 (collisione cromatica) erano artefatti di test su browser cache stale che continuava a servire 8.3.1. Ticket archiviato in MASTER_DOC §B.8 (CHIUSO). Lezione di processo aggiunta a MASTER_DOC §A.6.2: cache busting esplicito (Cmd+Shift+R o `?v=$(date +%s)`) prima di ogni verifica visiva post-deploy. 8.3.4-5-6 sono doc patch (registry version trail), non deployati.
@@ -21,6 +23,17 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.5.0 — home pubblica + deep-link ?wf= + ritorno login (2026-06-01)
+
+Prima esperienza utente su `/`: una **splash pubblica** (`backend/static/synthesis-home.html`, statica/vanilla, CSS inline, design token riusati da `vedere.html`) che sostituisce il vecchio redirect 302 a `/vedere`. Logo + wordmark, hero (testo di presentazione + immagine reale dente→mesh `/static/assets/padova-17_001.jpeg`) e griglia di 4 card workflow (Vedere/Analizzare/Misurare/Sostituire) con le 4 SVG del menu WorkFlow.
+
+- `main.py`: `GET /` ora `FileResponse(synthesis-home.html)`, **pubblica** (nessun gate, com'era il redirect); fallback a `/vedere` se il file manca.
+- Deep-link `?wf=`: le card Misurare/Sostituire puntano a `/analizzare?wf=<wf>`. Reader al `DOMContentLoaded` di `v3b.html` (dopo `setMode`) che valida `wf ∈ {analizza,accoppia,misurare,sostituire}` e apre `selectWorkflow(wf)` via `setTimeout(0)`; default analizza. Bump `<title>`/`ANALIZZA_BUILD` → 8.5.0.
+- Ritorno post-login: `syntesis-accedi.html` (`#enter-app`) ora consuma `sessionStorage.syn_after_login` (salvato dal gate `syn-gate.js`) e torna al deep-link same-origin dopo login (guardie anti open-redirect); fallback `/vedere` invariato quando assente → un utente non autorizzato che clicca Misurare torna su `/analizzare?wf=misurare` dopo l'accesso.
+- `docs/MAPPA_FUNZIONALE.md` aggiornata nello stesso commit (regola §4): vista Home, nota deep-link `?wf=`, versione mappata 8.5.0.
+
+Deploy verificato live su entrambi i servizi (commit `8736299`, sequenza LEGACY canary → BACKEND, build ~24-48s): `backend_version=8.5.0`, `GET /` 200 con `<title>Synthesis-ICP</title>`, immagine hero `/static/assets/padova-17_001.jpeg` 200 (image/jpeg, 774315 B), `/vedere`/`/analizzare`/`/analizzare?wf=misurare` 200, gating anonimo `/api/me/storage` → 403. `app.syntesis-icp.com` (senza H) 200; `app.synthesis-icp.com` (con H) handshake SSL fallito (HTTP 000) — custom domain con cert non ancora provisioned, **non** regressione del deploy. Sospesi: nessuno aperto; aperto follow-up cert dominio-H.
 
 ## 8.4.8 — fix primo-click #btnPick su Vedere (2026-06-01)
 
