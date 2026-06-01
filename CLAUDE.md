@@ -58,6 +58,8 @@ Non prendere iniziativa su questi punti. Se pensi che servano, FERMATI e chiedi.
 10. `git add` specifico per file, MAI `git add .` / `git add -A` (rischio di
     committare credenziali o file sporchi). Niente `git push --force` salvo amend
     di commit NON ancora deployati; preferire `--force-with-lease`.
+11. NON committare una modifica che tocca un elemento UI senza aggiornare
+    `docs/MAPPA_FUNZIONALE.md` nello stesso commit (vedi §4).
 
 ## 4. Pattern tecnici obbligatori
 
@@ -96,6 +98,24 @@ Non prendere iniziativa su questi punti. Se pensi che servano, FERMATI e chiedi.
   `backend_version`), route attese che rispondono 200, e il comportamento di
   gating atteso (es. un utente pending riceve 403 su un endpoint protetto).
 - Dopo la verifica, aggiornare `STATO_SISTEMA.md` (versioni live + sospesi).
+
+### Mappa funzionale (sincronizzazione obbligatoria)
+- `docs/MAPPA_FUNZIONALE.md` mappa viste/route, elementi UI, handler, funzioni
+  collegate e classi di visibilità, verificata per riga. Al rilascio (commit che
+  va in deploy), codice e mappa DEVONO essere allineati: la modifica UI e
+  l'aggiornamento della mappa stanno nello stesso commit.
+- Qualsiasi modifica che aggiunge, rimuove o altera un elemento UI (pulsante, voce
+  di menu, pannello, handler, funzione legata a UI, classe di visibilità) DEVE
+  aggiornare la/le riga/e corrispondenti di `docs/MAPPA_FUNZIONALE.md` nello STESSO
+  commit del codice. È parte della checklist di rilascio (§11), come il bump di
+  versione — non un passo separato.
+- Mantieni la mappa verificata per riga: se i numeri di riga citati shiftano per
+  effetto dell'edit, aggiorna i riferimenti. Localizza con `grep -n`, non a memoria.
+- A ogni rilascio che cambia versione, aggiorna anche la "Versione software
+  mappata" in testa al documento.
+- Le voci marcate **DA CHIARIRE** vanno risolte quando si tocca la parte di codice
+  relativa (es. tracciare gli handler della toolbar Vedere quando si lavora su
+  `syntesis-icp-vedere.html`).
 
 ## 5. Autorizzazione (modello a stati)
 - Endpoint operativi / di prodotto (analisi, ICP, report, leaderboard, scrittura
@@ -196,9 +216,13 @@ Domini live:
    `node --check`. Nota: i numeri di riga del JS estratto non corrispondono a
    quelli del file HTML originale.
 6. `git add` specifico per file (mai `git add .` / `-A`).
+7. Se la patch tocca un elemento UI, aggiorna la/le riga/e corrispondenti di
+   `docs/MAPPA_FUNZIONALE.md` e committale insieme al codice (vedi §4).
 
 ### Deploy
-1. Bump versione in `registry.py` (+ punti frontend se tocchi v3b — vedi §6).
+1. Bump versione in `registry.py` (+ punti frontend se tocchi v3b — vedi §6). Se
+   la modifica tocca elementi UI, aggiorna `docs/MAPPA_FUNZIONALE.md` nello stesso
+   commit (righe corrispondenti + "Versione software mappata") — vedi §4.
 2. `git commit` (corpo descrittivo, NO `Co-Authored-By`), poi `git push origin main`
    (chiedere conferma se non già autorizzato).
 3. Verifica ID servizi su Railway. Deploy via `serviceInstanceDeploy
@@ -225,6 +249,9 @@ Non esiste uno SHA di rollback statico:
 - `STATO_AUTH.md` — stato del flusso di autenticazione (registrazione → autorizzazione)
 - `docs/MERGE_ALBERO_REGISTRY_v1.md`, `docs/MODELLO_CASI_v1.md` — modelli interni
 - `README.md` — entry point onboarding (deploy quickstart Railway)
+- `docs/MAPPA_FUNZIONALE.md` — mappa funzionale UI (route/viste/elementi/handler/
+  classi di visibilità), verificata per riga; sincronizzazione obbligatoria col
+  codice (vedi §4)
 
 ## 13. Roadmap prodotto (alta vista)
 - **Fase A (in corso)**: refactor centralizzazione costanti via `window.SYN`.
