@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Synthesis-ICP</title>
-<!-- Synthesis-ICP - Home (splash) v8.6.1 -->
+<!-- Synthesis-ICP - Home (splash) v8.6.2 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
@@ -29,8 +29,8 @@ body{
   font-family:var(--font);
   background:var(--dark);
   color:#E8EFF5;
-  min-height:100vh;
-  overflow-x:hidden;
+  height:100vh;
+  overflow:hidden;          /* niente scroll di pagina: lo scroll (mobile) vive in .viewport, dentro la cornice */
 }
 
 /* ===== CORNICE PERIMETRALE ANIMATA (stile software, adattata per pagina che scrolla) =====
@@ -57,98 +57,122 @@ body{
 @property --synt-sa{syntax:'<angle>';initial-value:0deg;inherits:false}
 @keyframes syntSpin{to{--synt-sa:360deg}}
 
-/* contenuto: padding per stare dentro la cornice */
-.page{
-  position:relative;
+/* ===== AREA INTERNA ALLA CORNICE =====
+   .viewport: contenitore FISSO che coincide con l'interno della cornice (inset 18 + bordo 4 = 22).
+   Lo scroll (quando serve, es. mobile) avviene QUI -> il contenuto resta sempre dentro la cornice,
+   mai sotto l'anello. Su desktop 16:9 il contenuto e' in vh e ci sta tutto: niente scroll. */
+.viewport{
+  position:fixed;
+  inset:22px;
   z-index:1;
-  padding:46px 64px 56px;
-  max-width:1240px;
-  margin:0 auto;
+  overflow-y:auto;
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+}
+.page{
+  width:100%;
+  max-width:1340px;
+  min-height:100%;            /* riempie l'altezza disponibile (16:9) */
+  display:flex;
+  flex-direction:column;
+  padding:clamp(18px,3vh,38px) clamp(22px,3vw,54px);
+  gap:clamp(10px,2.4vh,30px);
 }
 
 /* ===== HEADER ===== */
 .topbar{
+  flex:0 0 auto;
   display:flex;
   align-items:center;
-  padding:8px 0 0;
 }
 /* Logo: il PNG e' NERO su trasparente; su fondo scuro invert(1) brightness(1.9)
    lo rende bianco pulito (verificato: pixel opachi 100% neri, niente aloni). */
 .logo-img{
-  height:84px;
+  height:clamp(48px,8vh,84px);
   width:auto;
   filter:invert(1) brightness(1.9);
 }
 
-/* ===== HERO ===== */
+/* ===== HERO ===== (occupa lo spazio centrale; misure in vh -> ci sta in una schermata) */
 .hero{
+  flex:1 1 auto;
+  min-height:0;
   display:grid;
-  grid-template-columns:1fr 1.15fr;
+  grid-template-columns:1fr 1.1fr;
   align-items:center;
-  gap:40px;
-  margin-top:54px;
-  min-height:62vh;
+  gap:clamp(24px,3.5vw,52px);
 }
+.hero-left{min-width:0}
 
 .eyebrow{
-  font-size:13px;
+  font-size:clamp(11px,1.5vh,13px);
   font-weight:700;
   letter-spacing:3px;
   text-transform:uppercase;
   color:var(--blue);
-  margin-bottom:22px;
+  margin-bottom:clamp(10px,2vh,22px);
 }
 .headline{
-  font-size:52px;
+  font-size:clamp(30px,5.2vh,54px);
   font-weight:700;
-  line-height:1.08;
+  line-height:1.07;
   letter-spacing:-1.5px;
   color:#fff;
-  margin-bottom:26px;
+  margin-bottom:clamp(12px,2.4vh,26px);
 }
 .headline .accent{color:var(--blue);display:block}
 .lead{
-  font-size:18px;
-  line-height:1.7;
+  font-size:clamp(14px,2vh,18px);
+  line-height:1.6;
   color:var(--gray);
   max-width:440px;
 }
 .lead .name{color:#CFE4F2;font-weight:600}
 
 /* immagine: il suo fondo e' #F0F1F5 chiaro; su fondo scuro la teniamo dentro una
-   card chiara con ombra/glow (.hero-img-wrap) che la stacca elegantemente. */
+   card chiara con ombra/glow (.hero-img-wrap) che la stacca elegantemente.
+   max-height in vh -> non fa traboccare la schermata. */
 .hero-right{
   position:relative;
+  min-height:0;
   display:flex;
   align-items:center;
   justify-content:center;
 }
 .hero-img-wrap{
   position:relative;
-  width:100%;
+  max-width:100%;
+  max-height:100%;
   border-radius:18px;
   overflow:hidden;
   background:#F0F1F5;
-  box-shadow:0 30px 80px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.04);
+  box-shadow:0 24px 60px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.04);
 }
-.hero-img{width:100%;display:block}
+.hero-img{
+  display:block;
+  width:auto;
+  height:auto;
+  max-width:100%;
+  max-height:min(58vh,100%);
+}
 
-/* ===== STRUMENTI ===== */
-.tools-section{margin-top:78px}
+/* ===== STRUMENTI ===== (riga fissa in fondo; misure in vh -> stanno nella schermata) */
+.tools-section{flex:0 0 auto}
 .tools-label{
-  font-size:12px;font-weight:700;letter-spacing:3px;
-  text-transform:uppercase;color:var(--gray);margin-bottom:22px;
+  font-size:clamp(10px,1.4vh,12px);font-weight:700;letter-spacing:3px;
+  text-transform:uppercase;color:var(--gray);margin-bottom:clamp(8px,1.6vh,20px);
 }
 .tools-grid{
   display:grid;
   grid-template-columns:repeat(4,1fr);
-  gap:18px;
+  gap:clamp(12px,1.4vw,18px);
 }
 .tool-card{
   background:var(--dark-2);
   border:1px solid rgba(124,196,240,.12);
   border-radius:var(--radius);
-  padding:26px 22px 28px;
+  padding:clamp(16px,2.3vh,26px) clamp(15px,1.4vw,22px);
   text-decoration:none;
   color:inherit;
   display:block;
@@ -161,32 +185,45 @@ body{
   background:#1A2A38;
 }
 .tool-icon{
-  width:46px;height:46px;border-radius:12px;
+  width:clamp(36px,5vh,46px);height:clamp(36px,5vh,46px);border-radius:12px;
   background:rgba(46,155,230,.12);
   display:flex;align-items:center;justify-content:center;
-  margin-bottom:20px;color:var(--blue);
+  margin-bottom:clamp(10px,1.8vh,20px);color:var(--blue);
 }
-.tool-icon svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2}
-.tool-name{font-size:21px;font-weight:700;color:#fff;margin-bottom:10px}
-.tool-desc{font-size:14.5px;line-height:1.6;color:var(--gray)}
+.tool-icon svg{width:60%;height:60%;stroke:currentColor;fill:none;stroke-width:2}
+.tool-name{font-size:clamp(16px,2.4vh,21px);font-weight:700;color:#fff;margin-bottom:clamp(5px,1vh,10px)}
+.tool-desc{font-size:clamp(12px,1.7vh,14.5px);line-height:1.5;color:var(--gray)}
 
 /* ===== ANIMAZIONI INGRESSO ===== */
 @keyframes fadeUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
 @keyframes fadeDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
 @keyframes fadeIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
 
-/* ===== RESPONSIVE ===== */
-@media(max-width:980px){
-  .page{padding:38px 34px 44px}
-  .hero{grid-template-columns:1fr;gap:34px;min-height:auto}
-  .headline{font-size:40px}
-  .tools-grid{grid-template-columns:repeat(2,1fr)}
+/* ===== RESPONSIVE -> VERTICALE / MOBILE =====
+   Sotto i 900px: layout verticale, SCROLL ammesso (naturale su mobile). Lo scroll
+   vive in .viewport (inset dentro la cornice) -> il contenuto scorre DENTRO la
+   cornice, mai sotto l'anello. .viewport torna a flusso normale (block). */
+@media(max-width:900px){
   .synt-frame{inset:10px}
+  .viewport{inset:14px;display:block}        /* 10 + 4: segue la cornice */
+  .page{
+    min-height:100%;
+    gap:28px;
+    padding:30px 26px 40px;
+  }
+  .hero{display:flex;flex-direction:column;align-items:stretch;gap:24px}
+  .headline{font-size:clamp(30px,7.5vw,42px)}
+  .lead{font-size:16px;max-width:none}
+  .hero-img{max-height:none;width:100%}      /* in verticale l'immagine prende larghezza piena */
+  .hero-img-wrap{width:100%}
+  .tools-grid{grid-template-columns:repeat(2,1fr);gap:16px}
+  .tool-name{font-size:19px}
+  .tool-desc{font-size:14px}
 }
 @media(max-width:560px){
-  .headline{font-size:32px}
   .tools-grid{grid-template-columns:1fr}
-  .logo-img{height:60px}
+  .headline{font-size:clamp(26px,8.5vw,34px)}
+  .logo-img{height:56px}
 }
 /* 8.6.1: animazioni d'ingresso come ENHANCEMENT. Contenuto visibile di default
    (i blocchi NON hanno opacity:0); le fade partono SOLO se l'utente non ha
@@ -207,6 +244,7 @@ body{
 
 <div class="synt-frame" aria-hidden="true"></div>
 
+<div class="viewport">
 <div class="page">
 
   <header class="topbar">
@@ -228,7 +266,7 @@ body{
 
     <div class="hero-right">
       <div class="hero-img-wrap">
-        <img class="hero-img" src="/static/assets/padova-17_001.jpeg" alt="Dente reale e sua mesh misurata">
+        <img class="hero-img" src="/static/assets/padova-17_001.jpeg?v=862" alt="Dente reale e sua mesh misurata">
       </div>
     </div>
   </section>
@@ -264,6 +302,7 @@ body{
     </div>
   </section>
 
+</div>
 </div>
 </body>
 </html>

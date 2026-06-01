@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.6.1 — **Data:** 2026-06-01
+> **Versione software mappata:** 8.6.2 — **Data:** 2026-06-01
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -59,7 +59,7 @@ Oltre alle classi, `selectWorkflow` commuta `style.display` di numerosi pannelli
 
 ## Vista: Home / splash (`/` → `synthesis-home.html`)
 
-Splash **pubblica** (`FileResponse`, nessun gate; fallback a `/vedere` se il file manca, [main.py:145-154](../backend/main.py#L145)). **Redesign DARK in 8.6.0**: tema scuro (`--dark #0F1923`) + bordo perimetrale animato. Statica/vanilla, CSS inline. Righe = `synthesis-home.html`.
+Splash **pubblica** (`FileResponse`, nessun gate; fallback a `/vedere` se il file manca, [main.py:145-154](../backend/main.py#L145)). **Redesign DARK** (8.6.0): tema scuro (`--dark #0F1923`) + bordo perimetrale animato. **Layout "una schermata" (8.6.2)**: il contenuto vive in `.viewport` (`position:fixed`, `inset:22px` = dentro la cornice, `overflow-y:auto`) → lo scroll resta DENTRO la cornice; su desktop 16:9 le misure sono in `vh`/`clamp` → logo + hero + 4 card stanno tutti in `100vh` senza scroll; sotto `900px` il layout diventa verticale con scroll naturale (sempre dentro la cornice). Statica/vanilla, CSS inline. Righe = `synthesis-home.html`.
 
 | Elemento | Riferimento | Destinazione / effetto |
 |---|---|---|
