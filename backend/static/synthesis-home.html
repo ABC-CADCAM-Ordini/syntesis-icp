@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<!-- Synthesis-ICP - Home (splash) v8.5.0 -->
+<!-- Synthesis-ICP - Home (splash) v8.5.1 -->
 <title>Synthesis-ICP</title>
 <link rel="icon" href="/static/synthesis-logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -19,22 +19,25 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
-  font-family:var(--font); background:var(--pearl); color:var(--dark);
+  /* 8.5.1: sfondo pagina #F0F1F5 = colore reale campionato dal fondo di
+     padova-17_001.jpeg, unificato su tutta la pagina -> fondo continuo,
+     l'immagine hero si fonde senza fascia/bordo. Card bianche (--white) restano
+     ben staccate (Δ luminanza ~15 + bordo + ombra). Sostituisce --pearl #F0F5FA. */
+  font-family:var(--font); background:#F0F1F5; color:var(--dark);
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
 }
 .wrap{max-width:1100px;margin:0 auto;padding:34px 24px 60px}
 
 /* ── Top: logo (il PNG contiene gia' il wordmark "Synthesis") ── */
 .topbar{display:flex;align-items:center;gap:10px;margin-bottom:40px}
-.topbar img{height:42px;width:auto;display:block}
-.topbar .suffix{font-family:var(--font);font-size:15px;font-weight:800;letter-spacing:.06em;color:var(--blue);align-self:flex-end;margin-bottom:7px}
+.topbar img{height:84px;width:auto;display:block}
 
-/* ── Hero: testo a sinistra, immagine a destra ── */
-.hero{display:grid;grid-template-columns:1.05fr 0.95fr;gap:44px;align-items:center;margin-bottom:52px}
-.hero-text h1{font-size:42px;line-height:1.05;font-weight:800;margin:0 0 12px;color:var(--dark);letter-spacing:-0.015em}
-.hero-text .tagline{font-size:21px;font-weight:700;color:var(--blue);margin:0 0 20px;line-height:1.25}
+/* ── Hero: tagline+testo a sinistra, immagine a destra, fusa nel fondo pagina ──
+   il fondo pagina (#F0F1F5) coincide col fondo dell'immagine -> l'immagine si
+   dissolve senza bordi ne' fascia; per questo .hero-img NON ha card/bordo/ombra. */
+.hero{display:grid;grid-template-columns:1fr 1.25fr;gap:40px;align-items:center;margin-bottom:52px}
+.hero-text .tagline{font-size:30px;font-weight:800;color:var(--blue);margin:0 0 18px;line-height:1.2;letter-spacing:-0.01em}
 .hero-text p{font-size:16px;line-height:1.62;color:var(--gray);margin:0;max-width:48ch}
-.hero-img{border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;background:var(--white);box-shadow:0 14px 44px rgba(15,25,35,0.12)}
 .hero-img img{display:block;width:100%;height:auto}
 
 /* ── Card workflow ── */
@@ -55,14 +58,13 @@ body{
 
 /* ── Responsive 4 → 2 → 1 ── */
 @media (max-width:900px){
-  .hero{grid-template-columns:1fr;gap:32px}
+  .hero{grid-template-columns:1fr;gap:26px}
   .cards{grid-template-columns:repeat(2,1fr)}
-  .hero-text h1{font-size:36px}
+  .hero-text .tagline{font-size:26px}
 }
 @media (max-width:560px){
   .cards{grid-template-columns:1fr}
-  .hero-text h1{font-size:30px}
-  .hero-text .tagline{font-size:18px}
+  .hero-text .tagline{font-size:22px}
 }
 </style>
 </head>
@@ -71,12 +73,10 @@ body{
 
   <div class="topbar">
     <img src="/static/synthesis-logo.png" alt="Synthesis-ICP">
-    <span class="suffix">ICP</span>
   </div>
 
   <div class="hero">
     <div class="hero-text">
-      <h1>Synthesis-ICP</h1>
       <div class="tagline">Dove la connessione implantare diventa misura.</div>
       <p>Tra il dente e la sua geometria, tra l'atteso e il prodotto, esiste uno scarto che l'occhio non vede. Synthesis-ICP lo rende visibile, e quindi governabile.</p>
     </div>

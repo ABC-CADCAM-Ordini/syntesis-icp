@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.5.0 — **Data:** 2026-06-01
+> **Versione software mappata:** 8.5.1 — **Data:** 2026-06-01
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -63,9 +63,9 @@ Splash **pubblica** introdotta in 8.5.0 ([main.py:145-154](../backend/main.py#L1
 
 | Elemento | Riferimento | Destinazione / effetto |
 |---|---|---|
-| Logo | `<img src="/static/synthesis-logo.png">` (topbar) | il PNG contiene il wordmark "Synthesis"; suffisso "ICP" accanto |
-| Hero testo | H1 "Synthesis-ICP" + tagline + paragrafo | presentazione |
-| Hero immagine | `<img src="/static/assets/padova-17_001.jpeg">` (card arrotondata) | dente reale → mesh con quote |
+| Logo | `<img src="/static/synthesis-logo.png">` (topbar, `height:84px`) | marchio "Synthesis" (il PNG contiene il wordmark); **nessun suffisso** — 8.5.1 ha rimosso "ICP" e ingrandito il logo 42px→84px |
+| Hero testo | tagline (headline, blu 30px) + paragrafo | 8.5.1: rimosso l'H1 "Synthesis-ICP" (ridondante col logo); la tagline diventa il titolo |
+| Hero immagine | `<img src="/static/assets/padova-17_001.jpeg">` (no card, ingrandita, `grid 1fr 1.25fr`) | dente reale → mesh con quote; **fusa nel fondo** — sfondo **pagina** (body) unificato a `#F0F1F5` (colore campionato dal JPEG; sostituisce `--pearl`) → fondo continuo, nessuna fascia/bordo (8.5.1) |
 | Card **Vedere** | `<a href="/vedere">` + SVG occhio | → `/vedere` |
 | Card **Analizzare** | `<a href="/analizzare">` + SVG goniometro | → `/analizzare` (workflow analizza, default) |
 | Card **Misurare** | `<a href="/analizzare?wf=misurare">` + SVG grafico | → `/analizzare` deep-link workflow misurare |
