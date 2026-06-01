@@ -2,13 +2,13 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, fix leak gemello .sostituire-only)
+## Versione live (2026-06-01, export Sostituire con dialog nome file)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.4.6 (live, commit `284e2ed` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.4.6 (live, commit `284e2ed` del 2026-06-01) |
-| /analizzare | v8.4.6 — bottoni `.sostituire-only` visibili solo in Sostituire (leak gemello corretto); pannello "Tipo scanbody" (Box A) solo in Analizza/Accoppia; pulsante Reset nell'header; gate accesso attivo (redirect `/accedi` per pending/anonimo; reveal per authorized/admin) |
+| Backend principale (b7671e12) | 8.4.7 (live, commit `76107ef` del 2026-06-01) |
+| Legacy syntesis-icp (7ac922ce) | 8.4.7 (live, commit `76107ef` del 2026-06-01) |
+| /analizzare | v8.4.7 — export STL Sostituire chiede il nome file (modale `#sostExportDialog`) prima del download; bottoni `.sostituire-only` solo in Sostituire; pannello "Tipo scanbody" (Box A) solo in Analizza/Accoppia; pulsante Reset nell'header; gate accesso attivo |
 | /vedere (default home) | v8.0.0-refactor |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
@@ -21,6 +21,15 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.4.7 — export Sostituire: dialog nome file (2026-06-01)
+
+Il pulsante "Esporta STL" del workflow Sostituire (`#sostBtnExport` → `sostExportSTL`) ora chiede il **nome del file** con un modale in-app (`#sostExportDialog`, ricalca `#groupDialog`) **prima** del download — opzione A (niente API di sistema → funziona su tutti i browser). Prima il nome era costruito automaticamente e scaricato senza chiedere.
+
+- `sostExportSTL` refattorizzato in 5 funzioni: valida + nome di default (base scan + componenti attivi) + apre il modale precompilato (focus+select); `confirmSostExport` sanifica (`.stl` strip, caratteri illegali → `_`, niente spazi/punti ai bordi, fallback al default se vuoto) e lancia l'export via `_sostDoExport` (pipeline build/serialize/download invariata, nome iniettato in `a.download`); Annulla non scarica. Invio=Conferma, Esc=Annulla; niente click-fuori (coerente con `#groupDialog`/`#settingsDialog`). Solo frontend.
+- `docs/MAPPA_FUNZIONALE.md` aggiornata nello stesso commit (regola §4): riga `#sostBtnExport` + nuova riga Funzioni chiave (5 funzioni export) + 2 ref bumpati ai valori reali.
+
+Deploy verificato live su entrambi i servizi (commit `76107ef`, sequenza LEGACY canary → BACKEND; build ~200-225s, più lenti del solito ma SUCCESS): `backend_version=8.4.7`, `/analizzare` HTTP 200 con `<title>` `v8.4.7`, **check markup**: `#sostExportDialog`, `#sostExportName`, `confirmSostExport`, `_sostDoExport` presenti nell'HTML servito; gating anonimo → 403. `app.syntesis-icp.com` escluso (cert SSL pre-esistente). Sospesi: nessuno aperto, nessuno chiuso.
 
 ## 8.4.6 — fix leak gemello .sostituire-only (2026-06-01)
 
@@ -194,4 +203,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-06-01 — fix leak gemello .sostituire-only (visibili solo in Sostituire) live su entrambi i servizi (8.4.6). Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-01 — export Sostituire con dialog nome file live su entrambi i servizi (8.4.7). Aggiornare al prossimo cambio di stato.*
