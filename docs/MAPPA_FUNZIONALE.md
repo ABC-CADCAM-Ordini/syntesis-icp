@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.4.6 — **Data:** 2026-06-01
+> **Versione software mappata:** 8.4.7 — **Data:** 2026-06-01
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -180,7 +180,7 @@ Sostituzione scan body con ICP. Pannello `panelSostituire` [1876]:
 | Upload custom | `#sostInputCustom` | onchange | `sostOnCustomPicked` | — | template custom | [1895] |
 | + Posiziona | `#sostBtnPlace` | onclick | `sostStartPlacement` | — | placement marker | [1899] |
 | Raffina | `#sostBtnRefine` | onclick | `sostAlignAll` | — | ICP sostituzione | [1900] | disabled di default |
-| Esporta STL | `#sostBtnExport` | onclick | `sostExportSTL` | — | scarica risultato | [1907] | `display:none` default |
+| Esporta STL | `#sostBtnExport` | onclick | `sostExportSTL` | `_sostExportPending` | apre **`#sostExportDialog`** (nome file precompilato) → Conferma scarica col nome scelto (sanificato, `.stl` auto); Annulla non scarica | [1907] | `display:none` default; dialog nome file (8.4.7) |
 
 > **Box B vs Box A**: Box B (`sostSourceTemplate`) = tipo di marker **già presente** nella scansione di partenza, per la registrazione (`SOSTITUIRE_TEMPLATE_INFO`, `BBOX_LOCAL`, `T_ROOT` — [15106]/[15276]/[15286]). NON è ridondante con Box A (`_ANALYZE_SBTYPE`, che guida `placeMUA` in Analizza). Vedi fix 8.4.5 e 8.4.6 sopra.
 
@@ -283,20 +283,21 @@ Pannello admin (~390 righe). **Wiring via `addEventListener`**; righe utente gen
 |---|---|---|---|
 | `selectWorkflow` | v3b [4565] | Commuta workflow analyzer e gestisce visibilità pannelli/toolbar | menu WorkFlow, `setMode` [4742] |
 | `placeMUA` | v3b [2753] | Posiziona un MUA (legge `_ANALYZE_SBTYPE` → radius/searchR) | click viewport quando `placementMode` [2547] |
-| `startPlacement` | v3b [2534] | Attiva `placementMode` | btn Posiziona [1353], tasto P [17119] |
+| `startPlacement` | v3b [2534] | Attiva `placementMode` | btn Posiziona [1353], tasto P [17176] |
 | `alignAll` | v3b [2912] | Raffina con ICP tutti i MUA | btn Raffina [1363] |
 | `loadScan` / `loadScanFile` | v3b [2511] / [2512] | Carica STL della scansione in `scanMesh` | `#inputScan` [1930], File→Importa |
 | `hardReset` | v3b [4218] | Ricarica l'app con cache-bust `?_r=` | btn Reset [1262] |
 | `newCase` | v3b [4165] | Reset del caso corrente (confirm se stato) | File→Nuovo [1222] |
 | `setAnalyzeSbType` / `getAnalyzeSbType` / `getAnalyzeSbCfg` | v3b [1967] / [1986] / [1987] | Scrive/legge `_ANALYZE_SBTYPE` e cfg CAD | radio Box A [1666-1669]; `placeMUA` |
 | `sostStartPlacement` / `sostAlignAll` | v3b [14960] / [15417] | Placement marker / ICP nel workflow Sostituire | btn `#sostBtnPlace` [1899] / `#sostBtnRefine` [1900] |
+| `sostExportSTL` / `openSostExportNameDialog` / `closeSostExportNameDialog` / `confirmSostExport` / `_sostDoExport` | v3b [15718] / [15757] / [15765] / [15771] / [15787] | Export STL Sostituire con dialog nome file (8.4.7): valida + nome default → apre `#sostExportDialog` → Annulla / Conferma (sanifica) → `_sostDoExport` scarica | btn `#sostBtnExport` [1907]; `#sostExportDialog` |
 | `sostOnSourceChange` | v3b [14812] | Scrive `sostSourceTemplate`/`sostActiveTemplate` (Box B) | radio Box B [1889-1892] |
 | `_hardResetSostituire` | v3b [4503] | Reset stato Sostituire all'uscita | `selectWorkflow` [4592] |
 | `misICP_run` | v3b [6264] | ICP di confronto fra 2 STL (Misurare) | btn `#misBtnRun` [1849] |
 | `toggleLayersPanel` | v3b [3491] | Toggle albero scena (`layersPanel`) | btn Livelli [1337] |
 | `openFresability` / `exportComponents` / `openCutView` / `openGroupDialog` / `openSettings` | v3b [5419] / [10095] / [10683] / [11501] / [12444] | Pannelli/dialog: fresabilità, export STL, cutview, gruppi, impostazioni | toolbar/pannelli Analizza/Accoppia |
 | `saveCase` / `exportCase` / `undoLastMUA` / `clearAllMUA` / `toggleAxes` | v3b [3414] / [4228] / [4104] / [4111] / [3365] | Salva, esporta, annulla, reset MUA, toggle assi | menu File / toolbar |
-| `syntesisOpenFileDialog` | v3b [17132] | Apre file dialog STL | btn Carica file [1331] |
+| `syntesisOpenFileDialog` | v3b [17189] | Apre file dialog STL | btn Carica file [1331] |
 | `switchTab` | dashboard [1461] | Cambia sezione della dashboard | sidebar [975-1043] |
 | `render` / `onAuthorize` / `onRevoke` | gestione [262] / [332] / [343] | Render lista / autorizza (genera chiave) / revoca | filtri, righe utente |
 | `setTab` / `checkStatus` / `logout` | accedi [263] / [359] / [421] | Tab login/reg / polling stato / logout | tabs, pannello pending |

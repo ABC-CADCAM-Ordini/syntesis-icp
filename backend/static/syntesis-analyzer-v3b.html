@@ -11,7 +11,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.4.6</title>
+<title>Syntesis-ICP - Analizzare v8.4.7</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2270,7 +2270,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.4.6';
+window.ANALIZZA_BUILD = '8.4.7';
 window.ANALIZZA_BUILD_DATE = '2026-06-01';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15710,6 +15710,11 @@ var SOSTITUIRE_CULL_CYL = {
   'OS':  { radius: 2.080, zMin: -2.000, zMax: 6.000 }
 };
 
+// 8.4.7: l'export chiede il nome file con un modale in-app (opzione A, niente
+// API di sistema). sostExportSTL valida + calcola il nome di default + apre il
+// modale; confirmSostExport sanifica e lancia _sostDoExport; annulla = niente.
+var _sostExportPending = null;
+
 function sostExportSTL(){
   if(!sostMesh || sostPlaced.length === 0){
     sostShowStatus('Serve Multi-A caricata e almeno un marker posizionato.', true);
@@ -15731,14 +15736,61 @@ function sostExportSTL(){
     return;
   }
 
+  var includeScan = !!sostMesh.visible;
+
+  // Nome file di default (come storicamente: base scan + componenti attivi)
+  var defaultBase = 'sostituire_export';
+  var slot = document.getElementById('sostSlotScan');
+  if(slot){
+    var fname = slot.querySelector('.fname');
+    var base = fname ? fname.textContent.replace(/\.stl$/i, '') : 'sost';
+    var parts = [];
+    if(!includeScan) parts.push('scanbody');
+    if(activeTypes.length > 0) parts.push(activeTypes.join('-'));
+    defaultBase = base + (parts.length > 0 ? '_' + parts.join('_') : '_export');
+  }
+
+  _sostExportPending = { activeTypes: activeTypes, includeScan: includeScan, defaultBase: defaultBase };
+  openSostExportNameDialog(defaultBase);
+}
+
+function openSostExportNameDialog(defaultBase){
+  var inp = document.getElementById('sostExportName');
+  if(inp) inp.value = defaultBase;
+  var dlg = document.getElementById('sostExportDialog');
+  if(dlg) dlg.style.display = 'flex';
+  if(inp){ inp.focus(); inp.select(); }
+}
+
+function closeSostExportNameDialog(){
+  var dlg = document.getElementById('sostExportDialog');
+  if(dlg) dlg.style.display = 'none';
+  _sostExportPending = null;
+}
+
+function confirmSostExport(){
+  if(!_sostExportPending) return;
+  var ctx = _sostExportPending;
+  var inp = document.getElementById('sostExportName');
+  // Sanifica: toglie .stl digitato, caratteri illegali -> _, niente spazi/punti
+  // ai bordi; campo vuoto -> torna al default. L'estensione .stl e' aggiunta dopo.
+  var base = (inp ? inp.value : '')
+    .replace(/\.stl$/i, '')
+    .replace(/[^a-zA-Z0-9._ -]+/g, '_')
+    .replace(/^[ .]+|[ .]+$/g, '');
+  base = base.trim();
+  if(!base) base = ctx.defaultBase;
+  closeSostExportNameDialog();
+  _sostDoExport(base, ctx.activeTypes, ctx.includeScan);
+}
+
+function _sostDoExport(chosenBase, activeTypes, includeScan){
   var btn = document.getElementById('sostBtnExport');
   if(btn){
     btn.disabled = true;
     btn.style.opacity = '0.6';
     btn.textContent = 'Generazione STL...';
   }
-
-  var includeScan = !!sostMesh.visible;
 
   // Pre-carica le geometrie di tutti i tipi attivi (cached)
   var loads = activeTypes.map(function(k){ return sostDecodeTemplate(k); });
@@ -15765,22 +15817,11 @@ function sostExportSTL(){
         var outTris = sostBuildExportTriangles(destGeos, activeTypes, includeScan);
         var nTris = outTris.length / 9;
         var stlBuffer = sostSerializeBinarySTL(outTris);
-        // Nome file
-        var scanName = 'sostituire_export';
-        var slot = document.getElementById('sostSlotScan');
-        if(slot){
-          var fname = slot.querySelector('.fname');
-          var base = fname ? fname.textContent.replace(/\.stl$/i, '') : 'sost';
-          var parts = [];
-          if(!includeScan) parts.push('scanbody');
-          if(activeTypes.length > 0) parts.push(activeTypes.join('-'));
-          scanName = base + (parts.length > 0 ? '_' + parts.join('_') : '_export');
-        }
         var blob = new Blob([stlBuffer], {type: 'application/octet-stream'});
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
         a.href = url;
-        a.download = scanName + '.stl';
+        a.download = chosenBase + '.stl';
         document.body.appendChild(a);
         a.click();
         setTimeout(function(){
@@ -16515,6 +16556,22 @@ window.addEventListener('DOMContentLoaded',init);
   </div>
 </div>
 
+
+<!-- Dialog nome file export Sostituire (8.4.7) — ricalca #groupDialog; niente click-fuori (come gli altri dialog) -->
+<div id="sostExportDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+    <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Esporta STL</div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-bottom:16px">Nome del file da scaricare. L'estensione <b>.stl</b> viene aggiunta automaticamente.</div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:18px">
+      <input type="text" id="sostExportName" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmSostExport();}else if(event.key==='Escape'){event.preventDefault();closeSostExportNameDialog();}" style="flex:1;padding:8px 10px;font-family:var(--mono);font-size:13px;border:1px solid var(--border);border-radius:6px;color:var(--dark)">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--gray)">.stl</span>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="closeSostExportNameDialog()" style="padding:6px 14px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:13px;cursor:pointer">Annulla</button>
+      <button onclick="confirmSostExport()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Scarica</button>
+    </div>
+  </div>
+</div>
 
 <!-- Dialog impostazioni -->
 <div id="settingsDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
