@@ -11,7 +11,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.6.7</title>
+<title>Syntesis-ICP - Analizzare v8.6.8</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2270,7 +2270,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.6.7';
+window.ANALIZZA_BUILD = '8.6.8';
 window.ANALIZZA_BUILD_DATE = '2026-06-02';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2509,7 +2509,7 @@ function animate(){requestAnimationFrame(animate);controls.update();updateDiverg
 
 // Load scan
 function loadScan(input){if(input.files.length>0)loadScanFile(input.files[0])}
-function loadScanFile(file){var reader=new FileReader();reader.onload=function(e){if(scanMesh){scene.remove(scanMesh)}var r=parseSTL(e.target.result);r.geometry.computeBoundingSphere();var mat=new THREE.MeshPhongMaterial({color:new THREE.Color(envSettings.scanColor),specular:0x111111,shininess:30,transparent:true,opacity:0.85,depthWrite:false,side:THREE.DoubleSide});scanMesh=new THREE.Mesh(r.geometry,mat);scanMesh.renderOrder=1;
+function loadScanFile(file){var reader=new FileReader();reader.onload=function(e){if(scanMesh){scene.remove(scanMesh)}var r=parseSTL(e.target.result);r.geometry.computeBoundingSphere();var mat=new THREE.MeshPhongMaterial({color:new THREE.Color(envSettings.scanColor),specular:0x111111,shininess:30,transparent:true,opacity:0.85,side:THREE.DoubleSide});scanMesh=new THREE.Mesh(r.geometry,mat);
   scanOriginalGeo = scanMesh.geometry.clone(); // backup per ricostruzione con cilindri
   scene.add(scanMesh);if(typeof applyRenderModeToMesh === 'function') applyRenderModeToMesh(scanMesh);var c=r.geometry.boundingSphere.center,rad=r.geometry.boundingSphere.radius;controls.target.copy(c);camera.position.set(c.x+rad*1.5,c.y+rad,c.z+rad*1.5);document.getElementById('emptyState').classList.add('hidden');var slot=document.getElementById('slotScan');slot.classList.add('loaded');slot.innerHTML='<div class="fname">'+file.name+'</div><div class="finfo">'+r.triangles.toLocaleString()+' triangoli</div>';document.getElementById('triScan').textContent=r.triangles.toLocaleString();
   // ── BRIDGE Synthesis Core (Fase 1, non-invasivo): registro la scansione ───
@@ -2781,15 +2781,15 @@ function placeMUA(rawPoint,rawNormal){
   var group=new THREE.Group();group.name=id;
 
   // Scanbody (visibile, toggleable)
-  var sbMat=new THREE.MeshPhongMaterial({color:sbCfg.color,specular:0x222222,shininess:40,transparent:false,opacity:1.0,side:THREE.FrontSide});
+  var sbMat=new THREE.MeshPhongMaterial({color:sbCfg.color,specular:0x222222,shininess:40,transparent:false,opacity:1.0,side:THREE.DoubleSide});
   var sbMesh=new THREE.Mesh(sbResult.geometry,sbMat);sbMesh.name='scanbody';group.add(sbMesh);
 
   // Matematica (solida, coerente con gli altri componenti)
-  var matMat3d=new THREE.MeshPhongMaterial({color:color,specular:0x222222,shininess:60,transparent:true,opacity:0.8,side:THREE.FrontSide});
+  var matMat3d=new THREE.MeshPhongMaterial({color:color,specular:0x222222,shininess:60,transparent:true,opacity:0.8,side:THREE.DoubleSide});
   var matMesh=new THREE.Mesh(matResult.geometry,matMat3d);matMesh.name='matematica';group.add(matMesh);
 
   // Analogo (visibile, solido)
-  var anMat=new THREE.MeshPhongMaterial({color:color,specular:0x222222,shininess:60,transparent:true,opacity:0.8,side:THREE.FrontSide});
+  var anMat=new THREE.MeshPhongMaterial({color:color,specular:0x222222,shininess:60,transparent:true,opacity:0.8,side:THREE.DoubleSide});
   var anMesh=new THREE.Mesh(anResult.geometry,anMat);anMesh.name='analogo';group.add(anMesh);
 
   group.position.copy(point);
@@ -3762,7 +3762,6 @@ function treeUnified_setScanOpacity(val){
       }
       mat.transparent = v < 1.0 || mat._origTransparent;
       mat.opacity = v;
-      mat.depthWrite = (v >= 1.0);
       mat.needsUpdate = true;
     });
   }
@@ -3788,7 +3787,6 @@ function treeUnified_ghostAll(){
       }
       mat.transparent = true;
       mat.opacity = ghostOp;
-      mat.depthWrite = (ghostOp >= 1.0);
       mat.needsUpdate = true;
     });
   }
