@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-01, home dark 8.6.4 — allineamento desktop ampio)
+## Versione live (2026-06-02, 8.6.8 — rendering viewport /analizzare revertito a 8.6.4)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.6.4 (live, commit `7cc5151` del 2026-06-01) |
-| Legacy syntesis-icp (7ac922ce) | 8.6.4 (live, commit `7cc5151` del 2026-06-01) |
+| Backend principale (b7671e12) | 8.6.8 (live, commit `8c39afa` del 2026-06-02) |
+| Legacy syntesis-icp (7ac922ce) | 8.6.8 (live, commit `8c39afa` del 2026-06-02) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.5.0 — reader `?wf=` (deep-link workflow misurare/sostituire dalla home); export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
+| /analizzare | v8.6.8 — **rendering viewport = stato 8.6.4** (tentativo fix Solid-transparency 8.6.5-8.6.7 revertito in 8.6.8; vedi Sospesi → Bug rendering viewport); reader `?wf=`; export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
@@ -23,6 +23,12 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.6.8 — revert stack rendering viewport /analizzare (2026-06-02)
+
+Rollback completo dello stack rendering del viewport principale di `/analizzare` allo stato **8.6.4**. I tre fix tentati (8.6.5 culling MUA `FrontSide`, 8.6.6 `depthWrite` accoppiato all'opacità, 8.6.7 `scanMesh.renderOrder=1`) risolvevano ognuno un pezzo scoprendone un altro; il cumulato in Solid era **meno leggibile** dell'originale, quindi ritorno alla base conosciuta. Metodo: `git revert` dei 3 commit (`ab4b2c4`, `b8a54f2`, `99ef34e`) in ordine inverso (no reset/force, storia preservata). Codice viewport **byte-identico a 8.6.4** (verificato: diff netto 0 vs `99ef34e^`; MUA di nuovo `side:THREE.DoubleSide`, `depthWrite` coupling rimosso dai 3 punti, `scanMesh.renderOrder` rimosso; camera/renderer mai toccati). Solo i marker di versione cambiano (8.6.4 → 8.6.8, monotono). Problema rendering ancora **aperto come design**: vedi Sospesi → "Bug rendering viewport /analizzare". Il Fix A (culling MUA) era di per sé corretto e potrà essere ririprovato a parte.
+
+Deploy verificato live su entrambi (commit `8c39afa`, sequenza LEGACY canary → BACKEND): `backend_version=8.6.8`, `/analizzare` 200, gating `/api/me/storage` → 403, HTML servito = stato 8.6.4 (MUA `side:THREE.DoubleSide` ×3, FrontSide×0 sui MUA, depthWrite coupling 0, `scanMesh.renderOrder` 0). `app.syntesis-icp.com` (no-h) → 200. Sospesi: aperto "Bug rendering viewport /analizzare" (design); chiuso il tentativo 8.6.5-8.6.7.
 
 ## 8.6.4 — allineamento home desktop ampio (2026-06-01)
 
@@ -213,6 +219,14 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 
 ## Sospesi
 
+**Bug rendering viewport `/analizzare` (Solid transparency)**: aperto 2026-06-02, da ripensare come DESIGN, non incident.
+- **Sintomo**: la mesh scansione semitrasparente, in modalità Solid, oscura o rende confusi i MUA che ha dietro; la forma si legge bene solo in modalità "Entrambi".
+- **Cosa è stato provato** (8.6.5 -> 8.6.7, poi revertito in 8.6.8): (A) culling MUA `DoubleSide->FrontSide`; (B) `depthWrite` accoppiato all'opacità sulla scansione; (C) `renderOrder=1` sulla scansione. Ogni fix risolveva un pezzo scoprendone un altro; il risultato cumulativo era meno leggibile dell'originale, quindi rollback completo allo stato 8.6.4.
+- **Causa profonda**: la mesh scansione è grande, avvolgente, concava. Il rendering trasparente standard di Three.js r128 è order-dependent e non gestisce bene questa geometria: è un limite della tecnica, non un flag mancante.
+- **Cosa NON funziona**: patch incrementali sulla transparency pipeline.
+- **Direzione futura** (sessione dedicata, non a fine giornata): ripensare il "vedere dentro" come problema di design: valutare clipping/sezione (depthWrite-safe) invece della trasparenza dell'intera mesh, oppure order-independent transparency.
+- **Da tenere**: il Fix A (culling MUA `FrontSide`) era di per sé corretto e risolveva il foro-che-mostra-l'interno; è ririprovabile e riverificabile a parte, separato dalla questione trasparenza.
+
 **Gate accesso — completamento rollout** (aperti in 8.4.3)
 - Agganciare il gate `syn-gate.js` anche a `/vedere` e `/dashboard` (oggi protegge solo `/analizzare`).
 - Rimuovere l'endpoint `/api/analyze-public`: finché esiste è un bypass del gate (analisi senza utente autorizzato).
@@ -220,7 +234,7 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 
 **Alta priorità**
 1. Fase 0 stabilizzazione: split v3b.html, scripts/, pytest base
-2. **Dominio brand con-h `app.synthesis-icp.com`**: il no-h `app.syntesis-icp.com` è **sano** (HTTP 200, cert VALID — la vecchia voce "404 + cert mismatch" del 2026-05-21 era stale, archiviata). Il con-h (brand corretto "Synthesis", CON la h) aveva il cert Railway incagliato in `VALIDATING_OWNERSHIP` nonostante DNS corretto: il 2026-06-01 delete+recreate del custom domain sul backend (nuovo id `e3c276f8`) → nuovo target CNAME `wcu5nq5m.up.railway.app`; CNAME aggiornato su register.it (zona synthesis-icp.com) e propagato (~30 min, nameserver register.it inizialmente incoerenti). Cert in validazione finale, atteso `VALID` + HTTP 200 a breve.
+2. **[CHIUSO 2026-06-02] Dominio brand con-h `app.synthesis-icp.com`** → **live** (HTTP 200, cert `VALID`/`COMPLETE`). Entrambi i domini ok: no-h `app.syntesis-icp.com` 200 (era già sano; la vecchia voce "404 + cert mismatch" del 2026-05-21 era stale) e con-h `app.synthesis-icp.com` (brand corretto "Synthesis", con la h) 200. **Causa del blocco**: il con-h restava in `VALIDATING_OWNERSHIP` (`verified:False`) per il **record TXT di ownership mancante** (CNAME `wcu5nq5m.up.railway.app` corretto, nessun CAA, nameserver coerenti, nessun errore CA). **Diagnosi**: Railway atteso TXT host `_railway-verify.app` (FQDN `_railway-verify.app.synthesis-icp.com`, zona synthesis-icp.com), valore `railway-verify=fcb8c2cfa9f853b272635c64a77273198eb5584ffe9513576f664d49627971dd`. **Fix** (azione manuale Francesco su register.it, 2026-06-02 ~17:33): aggiunto quel TXT → Railway ha verificato l'ownership (`verified:True`) → cert Let's Encrypt emesso → con-h a 200. (Antefatto: il 2026-06-01 delete+recreate del custom domain con nuovo target CNAME `wcu5nq5m`; da solo non bastava senza il TXT.)
 3. Audit 2026-05-06 finding open: C1 (JWT in query), C4 (Google access-token client) — diventano critici al lancio Fase 1 SaaS (sharing folder cross-utente, free-tier registration)
 
 **Media**
@@ -245,6 +259,7 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 - **Fase 0 stabilizzazione** (corso): split v3b.html, infra scripts/, test base
 - **Fase 1 SaaS** (Q3 2026): multi-tenant Clerk, pagamenti (TBD), email Resend, dashboard cliente
 - **Fase 2 lancio** (Q4 2026): rete LifeDental, paper JIPD, espansione laboratori e studi
+- **Rendering viewport `/analizzare` (tech, da valutare)**: upgrade Three.js r128 → ultima + clipping/sezione invece della trasparenza dell'intera mesh. Metodo deciso: **POC standalone** (input STL reale, criterio di successo definito a priori), fuori dal repo di produzione, prima di stimare la migrazione. Contesto: vedi Sospesi → "Bug rendering viewport /analizzare".
 
 ## Hardening proposto (non eseguito)
 
@@ -266,4 +281,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-06-01 — home 8.6.4 (allineamento desktop ampio) live su entrambi i servizi. Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-02 — 8.6.8 live su entrambi i servizi (rendering viewport /analizzare revertito a 8.6.4; tentativo 8.6.5-8.6.7 annullato). Aggiornare al prossimo cambio di stato.*
