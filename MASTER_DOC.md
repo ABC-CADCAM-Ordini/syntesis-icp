@@ -9,7 +9,25 @@
 ---
 
 # SYNTESIS-ICP — DOCUMENTO MAESTRO DI PROGETTO
-## Versione v7.4.0.001 - Ultimo aggiornamento: 2026-04-28
+## Versione 8.6.4 - Ultimo aggiornamento: 2026-06-02
+
+> ## STATO CORRENTE (8.6.4, 2026-06-02)
+>
+> **Questo documento è stratificato storicamente.** Le sezioni concettuali (algoritmi, PDF, alignment manager, contesto) restano valide; le sezioni operative **§4 Infra, §5 Deploy, §6 Struttura, §8 Versioning** sono state rifatte a 8.6.4 (callout in testa a ciascuna). Le note datate più in basso (2026-04-28 e precedenti) e le Appendici A/B/C sono cronologia, non lo stato attuale.
+>
+> **Documenti canonici (vincono su qualunque divergenza qui dentro):**
+> - `CLAUDE.md` - regole permanenti, divieti, deploy, versioning, costanti cliniche.
+> - `STATO_SISTEMA.md` - versioni live, sospesi, incident log, runbook Postgres-first, TODO.
+> - `docs/MAPPA_FUNZIONALE.md` - mappa per-riga di route/viste/elementi/handler (5 viste).
+> - `HANDOVER_8.6.4.md` - sintesi di handover (architettura + struttura + stato).
+>
+> **Cosa è cambiato dal 2026-04-28 (v7.4.0.001) a oggi (8.6.4):**
+> - Promozione a schema **semver 8.x** (Fase A chiusa in 8.2.0; suffisso `-A.B.C` abbandonato).
+> - **Gate di accesso** su `/analizzare` (`syn-gate.js`, 8.4.3) + gating server-side `require_authorized`.
+> - **Home pubblica** su `/` (`synthesis-home.html`, dalla 8.5.0): splash dark con cornice animata, deep-link `?wf=`, redesign 8.6.0-8.6.4. Sostituisce il vecchio redirect a `/vedere`.
+> - **Deploy**: `serviceInstanceDeploy(latestCommit:true)` su **due** servizi Railway (BACKEND + LEGACY). Niente più delete/recreate del servizio; niente più `_HTML_B64` (l'HTML è servito da disco via `FileResponse`).
+> - **Incident 2026-05-20** (Postgres freeze) + **Runbook Postgres-first restart**: in `STATO_SISTEMA.md`.
+> - Brand: il nome corretto è **"Synthesis"** (con la h); dominio brand `app.synthesis-icp.com` con cert in finalizzazione.
 
 
 > **Aggiornamento 2026-04-28 — Vedere v7.4.0.001 cutview completa (deploy serale):**
@@ -187,7 +205,9 @@ diagnostica e analisi statistica futura.
 
 ## 4. INFRASTRUTTURA E CREDENZIALI
 
-**⚠️ ATTENZIONE: Non condividere queste credenziali pubblicamente**
+**⚠️ ATTENZIONE: Non condividere queste credenziali pubblicamente.** Valori reali SOLO in `scripts/.env.local` (gitignored). Setup corrente e ID servizi: `CLAUDE.md` §10.
+
+> **AGGIORNATO 8.6.4 - infra a DUE servizi Railway** che servono lo stesso backend: **BACKEND** principale (`syntesis-icp-production.up.railway.app`, alias `app.syntesis-icp.com`) e **LEGACY** (`syntesis-icp-production-40e1.up.railway.app`), più **Postgres** (interno) e un servizio `frontend` inattivo. Ogni release va su **entrambi** i servizi attivi. Railway deploya via **GitHub App** (il repo può essere privato senza rompere i deploy). Token GitHub in `scripts/.env.local` come `GH_TOKEN`, push one-shot (mai nel remote URL).
 
 ### GitHub
 - Repository: `https://github.com/ABC-CADCAM-Ordini/syntesis-icp`
@@ -215,8 +235,17 @@ diagnostica e analisi statistica futura.
 
 ## 5. COME FARE IL DEPLOY
 
-Il deploy avviene **sempre** cancellando il servizio esistente e ricreandolo (Railway non supporta
-update in-place stabili con il nostro workflow).
+> **⚠️ AGGIORNATO 8.6.4 - il metodo qui sotto (delete/recreate del servizio + `_HTML_B64`) è OBSOLETO e pericoloso, NON usarlo.** Metodo corrente:
+>
+> 1. Bump versione: `registry.BACKEND_VERSION` (+ `<title>`/`window.ANALIZZA_BUILD` SOLO se tocchi `syntesis-analyzer-v3b.html`). Commit + push `origin main`.
+> 2. Deploy su **entrambi** i servizi via `serviceInstanceDeploy(serviceId, environmentId, latestCommit:true)` (mai `serviceInstanceRedeploy` per cambi di codice; **mai** `serviceDelete`). Header `User-Agent: Mozilla/5.0`.
+> 3. Sequenza: LEGACY (canary) → verifica → BACKEND. Poll `deployments(first:1){status}` fino a `SUCCESS`.
+> 4. Verifica live (`curl -sL`): `/api/registry/constants` versione attesa, route 200, utente pending → 403.
+> 5. L'HTML è servito **da disco via `FileResponse`** (niente `_HTML_B64`: rimosso nel commit `06adfd7`). Modifichi il file `.html` e basta.
+>
+> Procedura autorevole: `CLAUDE.md` §4/§11 + skill `syntesis-deploy`. Quanto segue è cronologia del workflow v7.3.x.
+
+Il deploy avveniva (v7.3.x, STORICO/OBSOLETO) cancellando il servizio esistente e ricreandolo:
 
 ```python
 # Pattern standard di deploy (Python)
@@ -268,6 +297,12 @@ html_b64 = base64.b64encode(gzip.compress(html_bytes)).decode('ascii')
 ---
 
 ## 6. STRUTTURA DEL CODICE
+
+> **⚠️ AGGIORNATO 8.6.4 - mappa autorevole della struttura: `docs/MAPPA_FUNZIONALE.md`** (per-riga, 5 viste). Sintesi corrente:
+> - **Frontend = file HTML statici serviti da `backend/main.py` via `FileResponse`** (niente build step, niente npm). Viste: `/` → `synthesis-home.html` (splash), `/vedere` → `syntesis-icp-vedere.html`, `/analizzare` → **`syntesis-analyzer-v3b.html`** (monolite 3.88 MB, 19.289 righe, 4 workflow interni via `selectWorkflow`), `/dashboard` → `syntesis-dashboard-v1.html`, `/accedi` → `syntesis-accedi.html`, `/gestione` → `syntesis-gestione.html`.
+> - **`frontend/index.html` (descritto sotto) è la vecchia single-page v7.2: STORICO, non più la struttura attuale.**
+> - `backend/registry.py` = single source of truth costanti (scanbody, soglie, palette, `BACKEND_VERSION`). `backend/static/ds/` = design system + `syn-gate.js`.
+> - `GET /` non serve più da `_HTML_B64`: serve `synthesis-home.html` da disco.
 
 ### `backend/icp_engine.py` — Il cuore del sistema (44KB)
 
@@ -411,7 +446,11 @@ Renderizza un cilindro scanbody in una vista 2D (XY/XZ/YZ).
 
 ## 8. VERSIONING
 
-Schema: `V7.MAJOR.MINOR.BUILD`
+> **⚠️ AGGIORNATO 8.6.4.** Schema corrente: **semver `MAJOR.MINOR.PATCH`** (era 8.x = post-unificazione v3b). Lo schema storico `MAJOR.MINOR.BUILD-FASE.STEP` (es. `8.1.7-A.5.1`) aveva il suffisso `-FASE.STEP` per il refactor in corso, abbandonato alla promozione della Fase A in **8.2.0**. Regola: feature retrocompatibile = MINOR, bugfix = PATCH. Dettagli in `CLAUDE.md` §6.
+>
+> Sorgente di verità: **`backend/registry.py` → `BACKEND_VERSION`** (esposto da `/api/registry/constants`). Se la modifica tocca il monolite `syntesis-analyzer-v3b.html`, bump anche `<title>` (~r.9) e `window.ANALIZZA_BUILD`/`_DATE` (~r.2251). Gli altri file statici non hanno marker propri: il canonico è `registry.BACKEND_VERSION`. Versione live attuale: **8.6.4**.
+
+_(storico v7.x, OBSOLETO:)_ Schema `V7.MAJOR.MINOR.BUILD`
 - **7** = versione maggiore (STL Cylinder Comparator v7 heritage)
 - **2** = pipeline ICP completa con normali cap + alignment manager
 - **0** = minor release corrente
