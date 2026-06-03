@@ -11,7 +11,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.7.0</title>
+<title>Syntesis-ICP - Analizzare v8.7.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2287,7 +2287,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.7.0';
+window.ANALIZZA_BUILD = '8.7.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-03';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2670,8 +2670,11 @@ function onViewportClick(event){
   var mouse=new THREE.Vector2(((event.clientX-rect.left)/rect.width)*2-1,-((event.clientY-rect.top)/rect.height)*2+1);
   var raycaster=new THREE.Raycaster();
   raycaster.setFromCamera(mouse,camera);
-  var hits=raycaster.intersectObject(scanMesh);
-  if(hits.length>0){placeMUA(hits[0].point,hits[0].face.normal);placementMode=false;renderer.domElement.style.cursor='default'}
+  // recursive=false: interseca SOLO la geometria di scanMesh, non i figli. In "Entrambi" l'overlay
+  // wireframe (LineSegments figlio) veniva colpito per primo (piu' vicino, soglia linea) e non ha .face
+  // -> hits[0].face.normal lanciava TypeError e il placement moriva. Guardia .face come cintura.
+  var hits=raycaster.intersectObject(scanMesh, false);
+  if(hits.length>0 && hits[0].face){placeMUA(hits[0].point,hits[0].face.normal);placementMode=false;renderer.domElement.style.cursor='default'}
 }
 
 

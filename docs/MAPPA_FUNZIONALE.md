@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.7.0 — **Data:** 2026-06-03
+> **Versione software mappata:** 8.7.1 — **Data:** 2026-06-03
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -160,6 +160,8 @@ Default all'avvio. Posizionamento e analisi angolare MUA. Elementi UI specifici 
 | Indietro (fresabilità) | | onclick | `closeFresability` | — | chiude pannello | [1737] |
 
 Consumo stato: `placeMUA` ([2753]) legge `getAnalyzeSbType()`/`getAnalyzeSbCfg()`; `alignAll` rifà ICP per-MUA (ogni MUA ricorda `mua.sbType`, [2933]).
+
+> **Fix 8.7.1 (Posiziona in "Entrambi"):** `onViewportClick` [v3b ~2673] usa `raycaster.intersectObject(scanMesh, false)` (non ricorsivo) + guardia `hits[0].face`. Prima, in modalità "Entrambi", il raycast ricorsivo (default) colpiva per primo l'overlay wireframe (`LineSegments` figlio di scanMesh, senza `.face`) → `hits[0].face.normal` lanciava → placement morto **solo** in Entrambi (Solid/Wireframe ok). Non tocca il motore clip/stencil.
 
 ### Sotto-sezione — Motore rendering viewport: clipping + stencil cap (8.7.0)
 
