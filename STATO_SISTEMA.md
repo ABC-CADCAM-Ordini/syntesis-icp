@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-02, 8.6.8 — rendering viewport /analizzare revertito a 8.6.4)
+## Versione live (2026-06-03, 8.7.0 — motore rendering /analizzare: r169 + clipping/stencil)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.6.8 (live, commit `8c39afa` del 2026-06-02) |
-| Legacy syntesis-icp (7ac922ce) | 8.6.8 (live, commit `8c39afa` del 2026-06-02) |
+| Backend principale (b7671e12) | 8.7.0 (live, commit `b20fb00` del 2026-06-03, deploy `4b1c4d2f`) |
+| Legacy syntesis-icp (7ac922ce) | 8.7.0 (live, commit `b20fb00` del 2026-06-03, deploy `7bd1376b`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.6.8 — **rendering viewport = stato 8.6.4** (tentativo fix Solid-transparency 8.6.5-8.6.7 revertito in 8.6.8; vedi Sospesi → Bug rendering viewport); reader `?wf=`; export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
+| /analizzare | v8.7.0 — **motore rendering r169 + clipping/stencil cap** (sostituisce la trasparenza della scansione per il "vedere dentro"; pannello "Sezione" provvisorio; debito UX consapevole: slider opacità/ghost da integrare come profondità-taglio); reader `?wf=`; export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
@@ -24,9 +24,9 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
-## 8.7.0 — migrazione motore rendering /analizzare: r169 + clipping/stencil (branch `dev-three-upgrade`, NON deployato) (2026-06-03)
+## 8.7.0 — migrazione motore rendering /analizzare: r169 + clipping/stencil (LIVE su entrambi i servizi) (2026-06-03)
 
-Migrazione del **motore di rendering** del viewport `/analizzare` (`backend/static/syntesis-analyzer-v3b.html`): Three.js **r128 → r169** + **clipping plane + stencil cap** che **sostituisce la trasparenza** della scansione per il "vedere dentro". Risolve il sospeso "Bug rendering viewport" (prima design aperto). Lavoro su branch **dev-three-upgrade**, **NON ancora deployato né mergiato in main** (turno separato, su autorizzazione esplicita). La "Versione live" resta **8.6.8**.
+Migrazione del **motore di rendering** del viewport `/analizzare` (`backend/static/syntesis-analyzer-v3b.html`): Three.js **r128 → r169** + **clipping plane + stencil cap** che **sostituisce la trasparenza** della scansione per il "vedere dentro". Risolve il sospeso "Bug rendering viewport" (prima design aperto). Mergiato in **main** (merge no-ff `b20fb00`, feature `dc4c049`) e **DEPLOYATO LIVE su entrambi i servizi** il 2026-06-03 (LEGACY 7ac922ce deploy `7bd1376b`, BACKEND b7671e12 deploy `4b1c4d2f`; sequenza canary LEGACY → BACKEND, `serviceInstanceDeploy latestCommit:true`). Verifica live: `backend_version=8.7.0` su entrambi, `/analizzare` 200 col frontend r169 servito (importmap + 0.169.0, zero r128), gate `/api/me/storage` 403, `app.syntesis-icp.com` (no-h) e `app.synthesis-icp.com` (con-h) 200.
 
 - **Loader**: r169 non ha build globale/UMD → `<script type="importmap">` + `<script type="module">` con bridge `window.THREE = Object.assign({}, THREE)` ([1993-2010]). Il namespace ESM è immutabile: la copia estensibile permette `THREE.OrbitControls=…` (altrimenti no-op silenzioso). OrbitControls e parser STL restano custom-inline (zero dipendenze addon). OrbitControls IIFE auto-deferita su evento `three-ready`; `init()` con guardia `three-ready`.
 - **Clipping + stencil cap**: pattern ufficiale `createPlaneStencilGroup` (back-face incr / front-face decr, renderOrder 1) + cap plane (`NotEqual` + `renderer.clearStencil()` in `onAfterRender`, renderOrder 1.1) + mesh visibile renderOrder 6. `renderer.localClippingEnabled=true`, `stencil:true`. Scansione ora **opaca** + `polygonOffset(1,1)` (reticolo nitido in "Entrambi"). Clip **solo sulla scansione**: MUA interi e leggibili. Blocco "CLIP ENGINE" [2528-2636]; (ri)costruito in `loadScanFile` [2641] e in `rebuildScanMeshGeometry` [11493],[11531].
@@ -233,7 +233,7 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 
 ## Sospesi
 
-**Bug rendering viewport `/analizzare` (Solid transparency)** — **RISOLTO** sul branch `dev-three-upgrade` (8.7.0, **non ancora deployato**). Aperto 2026-06-02, chiuso 2026-06-03. Soluzione: upgrade Three.js **r169** + **clipping plane + stencil cap** che sostituisce la trasparenza della scansione (vedi version-trail "## 8.7.0"). Debito UX consapevole aperto (slider opacità/ghost convivono ancora col clipping → step UX: riuso slider come profondità-taglio). Sotto, la diagnosi storica per record.
+**Bug rendering viewport `/analizzare` (Solid transparency)** — **RISOLTO e LIVE** in 8.7.0 su entrambi i servizi (deploy verificato 2026-06-03: LEGACY `7bd1376b`, BACKEND `4b1c4d2f`). Aperto 2026-06-02, chiuso 2026-06-03. Soluzione: upgrade Three.js **r169** + **clipping plane + stencil cap** che sostituisce la trasparenza della scansione (vedi version-trail "## 8.7.0"). Debito UX consapevole aperto (slider opacità/ghost convivono ancora col clipping → step UX: riuso slider come profondità-taglio). Sotto, la diagnosi storica per record.
 - **Sintomo**: la mesh scansione semitrasparente, in modalità Solid, oscura o rende confusi i MUA che ha dietro; la forma si legge bene solo in modalità "Entrambi".
 - **Cosa è stato provato** (8.6.5 -> 8.6.7, poi revertito in 8.6.8): (A) culling MUA `DoubleSide->FrontSide`; (B) `depthWrite` accoppiato all'opacità sulla scansione; (C) `renderOrder=1` sulla scansione. Ogni fix risolveva un pezzo scoprendone un altro; il risultato cumulativo era meno leggibile dell'originale, quindi rollback completo allo stato 8.6.4.
 - **Causa profonda**: la mesh scansione è grande, avvolgente, concava. Il rendering trasparente standard di Three.js r128 è order-dependent e non gestisce bene questa geometria: è un limite della tecnica, non un flag mancante.
