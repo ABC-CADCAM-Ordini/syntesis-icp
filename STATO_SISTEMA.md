@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-03, 8.7.2 — fix resa colore r169 SRGBColorSpace; include 8.7.1 Posiziona + 8.7.0 r169/clipping)
+## Versione live (2026-06-03, 8.8.0 — pannello Taglio /analizzare + compensazione luci 1.3/1.3; include 8.7.2 colore SRGBColorSpace + 8.7.1 Posiziona + 8.7.0 r169/clipping)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.7.2 (live, commit `7d61d0f` del 2026-06-03, deploy `66b306bf`) |
-| Legacy syntesis-icp (7ac922ce) | 8.7.2 (live, commit `7d61d0f` del 2026-06-03, deploy `4238bcf1`) |
+| Backend principale (b7671e12) | 8.8.0 (live, commit `f75d012` del 2026-06-03, deploy `a90f1437`) |
+| Legacy syntesis-icp (7ac922ce) | 8.8.0 (live, commit `f75d012` del 2026-06-03, deploy `b72adf77`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.7.2 (fix resa colore SRGBColorSpace + Posiziona "Entrambi") — base **motore rendering r169 + clipping/stencil cap** (sostituisce la trasparenza della scansione per il "vedere dentro"; pannello "Sezione" provvisorio; debito UX consapevole: slider opacità/ghost da integrare come profondità-taglio); reader `?wf=`; export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
+| /analizzare | v8.8.0 (pannello **Taglio** di prodotto + compensazione luci 1.3/1.3 → scan ambra luminoso ≈ target v8.5.0; include fix colore SRGBColorSpace 8.7.2 + Posiziona "Entrambi" 8.7.1) — base **motore rendering r169 + clipping/stencil cap**; il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti) che sostituisce il provvisorio `#synClipUI`; convivenza "opacità comanda" (**debito 8.7.0 CHIUSO**); reader `?wf=`; export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
@@ -24,9 +24,9 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
-## 8.8.0 — pannello "Taglio" di prodotto su /analizzare (branch `feat-pannello-taglio`, NON deployato) (2026-06-03)
+## 8.8.0 — pannello "Taglio" di prodotto su /analizzare + compensazione luci (LIVE su entrambi i servizi + custom domain) (2026-06-03)
 
-Sostituisce il pannello flottante **provvisorio** `#synClipUI` (scaffolding di 8.7.0) con un **pannello di prodotto** `#panelTaglio`, integrato nel design system e aperto dal pulsante `#btnOpenTaglio` nella view-mode bar (modello Fresabilità: `openTaglio`/`closeTaglio`, swap dei pannelli destri, `tagState.isOpen`, NON tocca `analysisMode`). **Rinominato da "Sezione" a "Taglio"** per non collidere col cutview per-MUA esistente (`openCutView`/`misICP_toggleCutview`/`sostOpenCutView` + PiP `#btnSection` di /vedere). Branch **feat-pannello-taglio** (ex `dev-sezione-ui`, riallineato sopra 8.7.2 via rebase), **NON deployato né mergiato**; la "Versione live" resta **8.7.2**.
+Sostituisce il pannello flottante **provvisorio** `#synClipUI` (scaffolding di 8.7.0) con un **pannello di prodotto** `#panelTaglio`, integrato nel design system e aperto dal pulsante `#btnOpenTaglio` nella view-mode bar (modello Fresabilità: `openTaglio`/`closeTaglio`, swap dei pannelli destri, `tagState.isOpen`, NON tocca `analysisMode`). **Rinominato da "Sezione" a "Taglio"** per non collidere col cutview per-MUA esistente (`openCutView`/`misICP_toggleCutview`/`sostOpenCutView` + PiP `#btnSection` di /vedere). Branch **feat-pannello-taglio** (ex `dev-sezione-ui`, riallineato sopra 8.7.2 via rebase), **mergiato in main** (merge no-ff `f75d012`, commit feature `d636f74`) e **DEPLOYATO LIVE su entrambi i servizi** il 2026-06-03 (sequenza **canary LEGACY → BACKEND**, `serviceInstanceDeploy latestCommit:true`: LEGACY 7ac922ce deploy `b72adf77`, BACKEND b7671e12 deploy `a90f1437`). **Verifica live (curl -sL):** `backend_version=8.8.0` su BACKEND + LEGACY + `app.syntesis-icp.com`, `/analizzare` 200, gating `/api/me/storage` → 403.
 
 - **Stile**: classi/token già usati dai pannelli analyzer (`.panel-section`, `.panel-label`, `.comp-radio` per asse X/Y/Z, `.export-checkbox` per i toggle, range stile `.tree-opacity-slider`) + `var(--*)`. **Zero hex hardcoded** (coerenza con Fresabilità).
 - **Controlli** (taglio attivo / asse / posizione / inverti) pilotano i globali del **motore clip** (`synClipEnabled/Axis/Pos/Flip` + `synUpdateClipPlane`): il **motore r169 clipping/stencil/polygonOffset è INVARIATO**.
@@ -317,4 +317,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-06-02 — 8.6.8 live su entrambi i servizi (rendering viewport /analizzare revertito a 8.6.4; tentativo 8.6.5-8.6.7 annullato). Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-03 — 8.8.0 live su entrambi i servizi + custom domain (pannello Taglio /analizzare + compensazione luci 1.3/1.3, su base 8.7.2). Aggiornare al prossimo cambio di stato.*
