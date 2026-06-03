@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-03, 8.7.1 — fix Posiziona MUA in "Entrambi"; base 8.7.0 r169 + clipping/stencil)
+## Versione live (2026-06-03, 8.7.2 — fix resa colore r169 SRGBColorSpace; include 8.7.1 Posiziona + 8.7.0 r169/clipping)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.7.1 (live, commit `75f2f61` del 2026-06-03, deploy `bc53367a`) |
-| Legacy syntesis-icp (7ac922ce) | 8.7.1 (live, commit `75f2f61` del 2026-06-03, deploy `ed996f29`) |
+| Backend principale (b7671e12) | 8.7.2 (live, commit `7d61d0f` del 2026-06-03, deploy `66b306bf`) |
+| Legacy syntesis-icp (7ac922ce) | 8.7.2 (live, commit `7d61d0f` del 2026-06-03, deploy `4238bcf1`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.7.1 (fix Posiziona MUA in "Entrambi") — base **motore rendering r169 + clipping/stencil cap** (sostituisce la trasparenza della scansione per il "vedere dentro"; pannello "Sezione" provvisorio; debito UX consapevole: slider opacità/ghost da integrare come profondità-taglio); reader `?wf=`; export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
+| /analizzare | v8.7.2 (fix resa colore SRGBColorSpace + Posiziona "Entrambi") — base **motore rendering r169 + clipping/stencil cap** (sostituisce la trasparenza della scansione per il "vedere dentro"; pannello "Sezione" provvisorio; debito UX consapevole: slider opacità/ghost da integrare come profondità-taglio); reader `?wf=`; export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
@@ -24,9 +24,9 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
-## 8.7.2 — fix resa colore r169 (SRGBColorSpace) (branch `fix-colore-r169`, NON deployato) (2026-06-03)
+## 8.7.2 — fix resa colore r169 (SRGBColorSpace) (LIVE su entrambi i servizi + custom domain) (2026-06-03)
 
-Fix di una regressione **cromatica** r169: la scansione appariva **marrone scuro e desaturata** invece dell'**arancione caldo e luminoso** di v8.5.0 (r128). Causa: in 8.7.0 il renderer usa `outputColorSpace = **LinearSRGBColorSpace**` (output lineare crudo, nessun encoding sRGB per il display) → midtoni schiacciati (superficie scan V≈22% vs ≈63% in r128). **NON** era il toneMapping (`NoToneMapping` in entrambi) né l'input colore (`material.color` identico `(0.722,0.627,0.565)`, ColorManagement off). **Fix:** una riga, `outputColorSpace = **SRGBColorSpace**` (v3b ~2459) → V 22%→50%, S 17%→8% (verso il 6% del target), arancione ripristinato. Verificato che il cambio (globale) non rompe gli altri colori: i MUA **non** diventano fluo (l'OETF sRGB desatura leggermente, non sovrasatura), lo sfondo regge. **Residuo consapevole** (V 50% vs 63%, tinta 24° vs 11°) = modello di illuminazione THREE legacy→fisico, **NON compensato** (luci 0.4/0.6/0.25 invariate, scelta esplicita; eventuale STEP 2 futuro). Misurato su mock (scan.stl 219k tri, solid, camera home, 1400×900). Branch **fix-colore-r169**, **NON deployato né mergiato**; la "Versione live" resta 8.7.1.
+Fix di una regressione **cromatica** r169: la scansione appariva **marrone scuro e desaturata** invece dell'**arancione caldo e luminoso** di v8.5.0 (r128). Causa: in 8.7.0 il renderer usa `outputColorSpace = **LinearSRGBColorSpace**` (output lineare crudo, nessun encoding sRGB per il display) → midtoni schiacciati (superficie scan V≈22% vs ≈63% in r128). **NON** era il toneMapping (`NoToneMapping` in entrambi) né l'input colore (`material.color` identico `(0.722,0.627,0.565)`, ColorManagement off). **Fix:** una riga, `outputColorSpace = **SRGBColorSpace**` (v3b ~2459) → V 22%→50%, S 17%→8% (verso il 6% del target), arancione ripristinato. Verificato che il cambio (globale) non rompe gli altri colori: i MUA **non** diventano fluo (l'OETF sRGB desatura leggermente, non sovrasatura), lo sfondo regge. **Residuo consapevole** (V 50% vs 63%, tinta 24° vs 11°) = modello di illuminazione THREE legacy→fisico, **NON compensato** (luci 0.4/0.6/0.25 invariate, scelta esplicita; eventuale STEP 2 futuro). Misurato su mock (scan.stl 219k tri, solid, camera home, 1400×900). Mergiato in **main** (merge no-ff `7d61d0f`, fix `37aada4`) e **DEPLOYATO LIVE su entrambi i servizi** il 2026-06-03 (LEGACY 7ac922ce deploy `4238bcf1`, BACKEND b7671e12 deploy `66b306bf`; sequenza **canary LEGACY → BACKEND**, `serviceInstanceDeploy latestCommit:true`, poll sulla versione live). **Verifica live (curl -sL):** `backend_version=8.7.2` su BACKEND + LEGACY + `app.syntesis-icp.com`, `/analizzare` 200 (title v8.7.2), gating `/api/me/storage` → 403. Include anche il fix 8.7.1 Posiziona (`b97323d`).
 
 ## 8.7.1 — fix Posiziona MUA in "Entrambi" (LIVE su entrambi i servizi + custom domain) (2026-06-03)
 
