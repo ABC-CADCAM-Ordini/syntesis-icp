@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.7.1 — **Data:** 2026-06-03
+> **Versione software mappata:** 8.7.2 — **Data:** 2026-06-03
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -166,6 +166,8 @@ Consumo stato: `placeMUA` ([2753]) legge `getAnalyzeSbType()`/`getAnalyzeSbCfg()
 ### Sotto-sezione — Motore rendering viewport: clipping + stencil cap (8.7.0)
 
 Three.js **r169** (ES module + bridge `window.THREE = Object.assign({}, THREE)`, importmap+module [1993-2010]). Il "vedere dentro" è ora un **clipping plane + stencil cap** sulla scansione, che **sostituisce la trasparenza** (scansione opaca + `polygonOffset(1,1)`). Clip **solo sulla scansione** (MUA interi). Blocco "CLIP ENGINE" [2528-2636].
+
+> **Fix 8.7.2 (resa colore):** `renderer.outputColorSpace = THREE.SRGBColorSpace` [v3b ~2459] — era `LinearSRGBColorSpace` in 8.7.0 (output lineare crudo → scansione scura/desaturata vs r128). SRGB ripristina l'encoding sRGB per il display (arancione caldo). `ColorManagement.enabled = false` e materiale letterale invariati. Residuo di luminosità (V 50% vs 63% di r128) = modello luci THREE legacy→fisico, non compensato.
 
 | Elemento | id | Evento | Funzione | Effetto | Righe |
 |---|---|---|---|---|---|

@@ -11,7 +11,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.7.1</title>
+<title>Syntesis-ICP - Analizzare v8.7.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1995,8 +1995,8 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 </script>
 <script type="module">
   // Bridge r169: THREE caricato come ES module e ri-esposto a window per il monolite (stile global r128).
-  // ColorManagement OFF + LinearSRGBColorSpace => replica il comportamento "linear, no color mgmt" di r128
-  // (colori identici). I blocchi <script> classici girano a parse-time; questo module e' deferred e gira
+  // ColorManagement OFF; outputColorSpace = SRGBColorSpace (encoding sRGB per il display, settato nel renderer in init()).
+  // NB 8.7.2: era LinearSRGBColorSpace (output lineare crudo) -> scansione scura/desaturata vs r128; SRGB ripristina la resa calda. I blocchi <script> classici girano a parse-time; questo module e' deferred e gira
   // prima di DOMContentLoaded -> window.THREE pronto quando init() parte. Vedi guardia three-ready in init().
   import * as THREE from 'three';
   THREE.ColorManagement.enabled = false;
@@ -2287,7 +2287,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.7.1';
+window.ANALIZZA_BUILD = '8.7.2';
 window.ANALIZZA_BUILD_DATE = '2026-06-03';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2456,7 +2456,7 @@ function init(){
   }
   vp.style.background = envBgCss();
   camera=new THREE.PerspectiveCamera(28,w/h,0.01,1000);camera.position.set(30,30,50);
-  renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true,stencil:true});renderer.setSize(w,h);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));renderer.localClippingEnabled=true;renderer.outputColorSpace=THREE.LinearSRGBColorSpace;vp.appendChild(renderer.domElement);
+  renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true,stencil:true});renderer.setSize(w,h);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));renderer.localClippingEnabled=true;renderer.outputColorSpace=THREE.SRGBColorSpace;vp.appendChild(renderer.domElement);
   controls=new THREE.OrbitControls(camera,renderer.domElement);
   // Blocco 7b: rotazione completa senza limiti (anche vista da sotto e giri completi)
   controls.minPolarAngle = -Infinity;
