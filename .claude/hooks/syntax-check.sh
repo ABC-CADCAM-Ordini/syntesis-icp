@@ -3,7 +3,10 @@
 # PostToolUse su Write|Edit|MultiEdit.
 # Dopo ogni modifica valida la sintassi:
 #  - .py  -> python -m py_compile
-#  - .html-> estrae i blocchi <script> e li passa a node --check
+#  - .html-> estrae i blocchi <script> e li passa a node --check:
+#            * classici            -> CommonJS (.js)  come da sempre
+#            * type="module"       -> ESM (.mjs), check separato (import/export validi)
+#            * type="importmap"    -> SALTATO (e' JSON, non JS) + application/json
 # PostToolUse NON puo' annullare l'edit (e' gia' avvenuto), ma se qualcosa e'
 # rotto scrive su stderr e Code lo riceve come feedback per correggere subito.
 # Usiamo exit 2 per dare il segnale piu' forte possibile a Code.
@@ -37,27 +40,48 @@ case "$FILE_PATH" in
       echo "Nota: node non disponibile, salto il check JS di '$FILE_PATH'." >&2
       exit 0
     fi
-    # Estrae il contenuto di tutti i blocchi <script> ... </script> in un file
-    # temporaneo e lo passa a node --check. Estrazione semplice riga-based.
-    TMP=$(mktemp /tmp/synt-script-XXXXXX.js)
-    awk '
-      /<script[^>]*>/ { inscript=1; sub(/.*<script[^>]*>/, ""); }
-      inscript {
-        if ($0 ~ /<\/script>/) { sub(/<\/script>.*/, ""); print; inscript=0; }
-        else { print }
+    # Estrae il contenuto dei blocchi <script> separando per tipo. Estrazione
+    # semplice riga-based: i blocchi classici vanno in un .js (check CommonJS),
+    # i type="module" in un .mjs (check ESM), gli importmap/json sono saltati.
+    CLASSIC=$(mktemp /tmp/synt-classic-XXXXXX.js)
+    MODULE=$(mktemp /tmp/synt-module-XXXXXX.mjs)
+    awk -v classic="$CLASSIC" -v module="$MODULE" '
+      !inscript && match($0, /<script[^>]*>/) {
+        tag = substr($0, RSTART, RLENGTH);
+        if (tag ~ /type="importmap"/ || tag ~ /application\/json/) { mode="skip"; }
+        else if (tag ~ /type="module"/) { mode="module"; }
+        else { mode="classic"; }
+        inscript=1;
+        sub(/.*<script[^>]*>/, "");
       }
-    ' "$FILE_PATH" > "$TMP"
+      inscript {
+        line=$0; closing=0;
+        if (line ~ /<\/script>/) { sub(/<\/script>.*/, "", line); closing=1; }
+        if (mode=="classic") print line >> classic;
+        else if (mode=="module") print line >> module;
+        if (closing) { inscript=0; mode=""; }
+      }
+    ' "$FILE_PATH"
 
-    if [ -s "$TMP" ]; then
-      if ! ERR=$(node --check "$TMP" 2>&1); then
-        echo "SINTASSI JS ROTTA nei blocchi <script> di '$FILE_PATH':" >&2
+    RC=0
+    if [ -s "$CLASSIC" ]; then
+      if ! ERR=$(node --check "$CLASSIC" 2>&1); then
+        echo "SINTASSI JS ROTTA nei blocchi <script> classici di '$FILE_PATH':" >&2
         echo "$ERR" >&2
         echo "Nota: i numeri di riga si riferiscono al JS estratto, non al file HTML. Correggi prima di proseguire o committare." >&2
-        rm -f "$TMP"
-        exit 2
+        RC=2
       fi
     fi
-    rm -f "$TMP"
+    if [ -s "$MODULE" ]; then
+      if ! ERR=$(node --check "$MODULE" 2>&1); then
+        echo "SINTASSI JS ROTTA nei blocchi <script type=\"module\"> di '$FILE_PATH':" >&2
+        echo "$ERR" >&2
+        echo "Nota: i numeri di riga si riferiscono al JS estratto, non al file HTML. Correggi prima di proseguire o committare." >&2
+        RC=2
+      fi
+    fi
+    rm -f "$CLASSIC" "$MODULE"
+    if [ "$RC" -ne 0 ]; then exit "$RC"; fi
     ;;
 esac
 

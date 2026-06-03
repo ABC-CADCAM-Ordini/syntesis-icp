@@ -23,7 +23,7 @@ try:
 except Exception:
     _BRAND = {"blue": "#0052A3", "dark": "#0D1B2A", "gray": "#64748B"}
 
-VERSION = "7.3.9.093"
+VERSION = "8.7.0"
 SCORE_MODEL_VERSION = "Syntesis Score v1.0"
 
 
