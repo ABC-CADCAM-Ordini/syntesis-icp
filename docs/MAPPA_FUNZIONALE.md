@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.7.2 — **Data:** 2026-06-03
+> **Versione software mappata:** 8.8.0 — **Data:** 2026-06-03
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -163,23 +163,24 @@ Consumo stato: `placeMUA` ([2753]) legge `getAnalyzeSbType()`/`getAnalyzeSbCfg()
 
 > **Fix 8.7.1 (Posiziona in "Entrambi"):** `onViewportClick` [v3b ~2673] usa `raycaster.intersectObject(scanMesh, false)` (non ricorsivo) + guardia `hits[0].face`. Prima, in modalità "Entrambi", il raycast ricorsivo (default) colpiva per primo l'overlay wireframe (`LineSegments` figlio di scanMesh, senza `.face`) → `hits[0].face.normal` lanciava → placement morto **solo** in Entrambi (Solid/Wireframe ok). Non tocca il motore clip/stencil.
 
-### Sotto-sezione — Motore rendering viewport: clipping + stencil cap (8.7.0)
+### Sotto-sezione — Taglio: clipping + stencil cap (motore r169) + pannello di prodotto (8.8.0)
 
-Three.js **r169** (ES module + bridge `window.THREE = Object.assign({}, THREE)`, importmap+module [1993-2010]). Il "vedere dentro" è ora un **clipping plane + stencil cap** sulla scansione, che **sostituisce la trasparenza** (scansione opaca + `polygonOffset(1,1)`). Clip **solo sulla scansione** (MUA interi). Blocco "CLIP ENGINE" [2528-2636].
+Three.js **r169** (ES module + bridge `window.THREE = Object.assign({}, THREE)`, importmap+module [2026]). Il "vedere dentro" è un **clipping plane + stencil cap** sulla scansione, che **sostituisce la trasparenza** (scansione opaca + `polygonOffset(1,1)`). Clip **solo sulla scansione** (MUA interi). Pilotato dal **pannello "Taglio"** di prodotto (8.8.0), aperto da un pulsante nella view-mode bar (modello Fresabilità). Default taglio **OFF** (scansione carica intera/opaca).
 
-> **Fix 8.7.2 (resa colore):** `renderer.outputColorSpace = THREE.SRGBColorSpace` [v3b ~2459] — era `LinearSRGBColorSpace` in 8.7.0 (output lineare crudo → scansione scura/desaturata vs r128). SRGB ripristina l'encoding sRGB per il display (arancione caldo). `ColorManagement.enabled = false` e materiale letterale invariati. Residuo di luminosità (V 50% vs 63% di r128) = modello luci THREE legacy→fisico, non compensato.
+> **Fix 8.7.2 (resa colore):** `renderer.outputColorSpace = THREE.SRGBColorSpace` [v3b ~2459] — era `LinearSRGBColorSpace` in 8.7.0 (output lineare crudo → scansione scura/desaturata vs r128). SRGB ripristina l'encoding sRGB per il display (arancione caldo). `ColorManagement.enabled = false` e materiale letterale invariati. Residuo di luminosità (V 50% vs 63% di r128, modello luci THREE legacy→fisico) **compensato in 8.8.0** alzando le sole intensità luci (`AmbientLight` 0.4→1.3, key bianca `DirectionalLight` 0.6→1.3 [v3b ~2503-2504]; fill bluastra 0.25 invariata per non virare la tinta) → scanMeanLum ~100→~150 (≈ target v8.5.0), clip highlight 0%, ambra preservata. `SRGBColorSpace`/`NoToneMapping` invariati.
 
 | Elemento | id | Evento | Funzione | Effetto | Righe |
 |---|---|---|---|---|---|
-| Pannello "Sezione · provvisorio" (creato a runtime) | `#synClipUI` | — | `synAddProvisionalClipUI` | floating bottom-right; **provvisorio** (solo verifica motore) | [2617-2634] |
-| Taglio attivo | `#synClipOn` | onchange | `synUpdateClipPlane` | on/off clip + stencil + cap | [2617-2634] |
-| Asse piano X/Y/Z | `#synClipAxisSel` | onchange | `synUpdateClipPlane` | normale del piano | [2617-2634] |
-| Posizione | `#synClipPosR` | oninput | `synUpdateClipPlane` | offset lungo l'asse | [2617-2634] |
-| Inverti lato | `#synClipFlipC` | onchange | `synUpdateClipPlane` | nega la normale | [2617-2634] |
+| Pulsante Taglio (view-mode bar) | `#btnOpenTaglio` | onclick | `openTaglio` | apre `#panelTaglio` (nasconde gli altri pannelli destri); `disabled` finché no scansione | [17092] |
+| Pannello Taglio (`.panel-section`) | `#panelTaglio` | — | `openTaglio`/`closeTaglio` | swap-in stile Fresabilità; `tagState.isOpen` | [1768] |
+| Taglio attivo (`.export-checkbox`) | `#tagToggle` | onchange | `tagOnToggle` | on/off clip+stencil+cap; ON forza scansione opaca | [1768] |
+| Asse piano X/Y/Z (`.comp-radio`) | `#tagAxisRadio` | onchange | `tagOnAxis` | normale del piano (`synClipAxis`) | [1781] |
+| Posizione (range) | `#tagPos` | oninput | `tagOnPos` | offset lungo l'asse (`synClipPos`); bounds da `synClipDiag` | [1791] |
+| Inverti lato (`.export-checkbox`) | `#tagFlip` | onchange | `tagOnFlip` | nega la normale (`synClipFlip`) | [1768] |
 
-Funzioni (v3b): `synRebuildClip` [2587] ((ri)costruisce stencil group + cap dalla geometria corrente; chiamata in `loadScanFile` [2641] e in `rebuildScanMeshGeometry` [11493],[11531]); `synMakeStencilGroup` [2546] (back/front incr/decr, renderOrder 1); `synUpdateClipPlane` [2571] (propaga `clippingPlanes` a scansione + overlay "Entrambi" + stencil group); `synPositionCap` [2562]; `window.__synClip(...)` [2635] (hook console). Cap plane renderOrder 1.1 (`clearStencil` in `onAfterRender`), mesh visibile renderOrder 6.
+Handler pannello (v3b): `openTaglio` [2654] / `closeTaglio` [2669] (clone di open/closeFresability, swap pannelli destri, NON tocca `analysisMode`); `tagSyncUI` [2680] (allinea i controlli ai globali del clip); `tagForceScanOpaque` [2698] (taglio ON → scansione opaca + slider opacità 100% via `rebuildTree`). I controlli settano i globali del **motore clip** (`synClipEnabled/Axis/Pos/Flip`) e chiamano `synUpdateClipPlane` [2604] — **motore INVARIATO**: `synMakeStencilGroup` [2579] (back/front incr/decr, renderOrder 1), `synPositionCap` [2595], `synRebuildClip` [2620] ((ri)build da `loadScanFile` [2710] e `rebuildScanMeshGeometry` [11574],[11612]; abilita `#btnOpenTaglio`). Cap plane renderOrder 1.1 (`clearStencil` in `onAfterRender`), mesh visibile renderOrder 6.
 
-> **Debito UX aperto (8.7.0, consapevole — non un bug):** lo slider opacità scansione (`treeUnified_setScanOpacity`) e il ghost-mode (`treeUnified_ghostAll`) **esistenti** convivono ancora col clipping e, se usati, rimettono la trasparenza. Integrazione prevista (riuso slider come **profondità di taglio**) in step UX successivo.
+> **Convivenza "opacità comanda" (8.8.0 — debito 8.7.0 CHIUSO):** opacità <100% (`treeUnified_setScanOpacity` [3950]) o ghost (`treeUnified_ghostAll` [3980]) **disattivano** il taglio (trasparenza e clip+cap non coesistono → cap mai rotto). Riattivare il taglio dal pannello forza la scansione opaca + slider opacità a 100%. Lo slider opacità torna a fare **solo opacità**.
 
 ### Sotto-sezione — workflow **accoppia** (`analysisMode='accoppia'`, ramo [4658])
 
