@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.6.8 — **Data:** 2026-06-02
+> **Versione software mappata:** 8.7.0 — **Data:** 2026-06-03
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -160,6 +160,22 @@ Default all'avvio. Posizionamento e analisi angolare MUA. Elementi UI specifici 
 | Indietro (fresabilità) | | onclick | `closeFresability` | — | chiude pannello | [1737] |
 
 Consumo stato: `placeMUA` ([2753]) legge `getAnalyzeSbType()`/`getAnalyzeSbCfg()`; `alignAll` rifà ICP per-MUA (ogni MUA ricorda `mua.sbType`, [2933]).
+
+### Sotto-sezione — Motore rendering viewport: clipping + stencil cap (8.7.0)
+
+Three.js **r169** (ES module + bridge `window.THREE = Object.assign({}, THREE)`, importmap+module [1993-2010]). Il "vedere dentro" è ora un **clipping plane + stencil cap** sulla scansione, che **sostituisce la trasparenza** (scansione opaca + `polygonOffset(1,1)`). Clip **solo sulla scansione** (MUA interi). Blocco "CLIP ENGINE" [2528-2636].
+
+| Elemento | id | Evento | Funzione | Effetto | Righe |
+|---|---|---|---|---|---|
+| Pannello "Sezione · provvisorio" (creato a runtime) | `#synClipUI` | — | `synAddProvisionalClipUI` | floating bottom-right; **provvisorio** (solo verifica motore) | [2617-2634] |
+| Taglio attivo | `#synClipOn` | onchange | `synUpdateClipPlane` | on/off clip + stencil + cap | [2617-2634] |
+| Asse piano X/Y/Z | `#synClipAxisSel` | onchange | `synUpdateClipPlane` | normale del piano | [2617-2634] |
+| Posizione | `#synClipPosR` | oninput | `synUpdateClipPlane` | offset lungo l'asse | [2617-2634] |
+| Inverti lato | `#synClipFlipC` | onchange | `synUpdateClipPlane` | nega la normale | [2617-2634] |
+
+Funzioni (v3b): `synRebuildClip` [2587] ((ri)costruisce stencil group + cap dalla geometria corrente; chiamata in `loadScanFile` [2641] e in `rebuildScanMeshGeometry` [11493],[11531]); `synMakeStencilGroup` [2546] (back/front incr/decr, renderOrder 1); `synUpdateClipPlane` [2571] (propaga `clippingPlanes` a scansione + overlay "Entrambi" + stencil group); `synPositionCap` [2562]; `window.__synClip(...)` [2635] (hook console). Cap plane renderOrder 1.1 (`clearStencil` in `onAfterRender`), mesh visibile renderOrder 6.
+
+> **Debito UX aperto (8.7.0, consapevole — non un bug):** lo slider opacità scansione (`treeUnified_setScanOpacity`) e il ghost-mode (`treeUnified_ghostAll`) **esistenti** convivono ancora col clipping e, se usati, rimettono la trasparenza. Integrazione prevista (riuso slider come **profondità di taglio**) in step UX successivo.
 
 ### Sotto-sezione — workflow **accoppia** (`analysisMode='accoppia'`, ramo [4658])
 
