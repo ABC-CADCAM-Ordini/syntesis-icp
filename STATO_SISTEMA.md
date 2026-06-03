@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-03, 8.7.0 — motore rendering /analizzare: r169 + clipping/stencil)
+## Versione live (2026-06-03, 8.7.1 — fix Posiziona MUA in "Entrambi"; base 8.7.0 r169 + clipping/stencil)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.7.0 (live, commit `b20fb00` del 2026-06-03, deploy `4b1c4d2f`) |
-| Legacy syntesis-icp (7ac922ce) | 8.7.0 (live, commit `b20fb00` del 2026-06-03, deploy `7bd1376b`) |
+| Backend principale (b7671e12) | 8.7.1 (live, commit `75f2f61` del 2026-06-03, deploy `bc53367a`) |
+| Legacy syntesis-icp (7ac922ce) | 8.7.1 (live, commit `75f2f61` del 2026-06-03, deploy `ed996f29`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.7.0 — **motore rendering r169 + clipping/stencil cap** (sostituisce la trasparenza della scansione per il "vedere dentro"; pannello "Sezione" provvisorio; debito UX consapevole: slider opacità/ghost da integrare come profondità-taglio); reader `?wf=`; export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
+| /analizzare | v8.7.1 (fix Posiziona MUA in "Entrambi") — base **motore rendering r169 + clipping/stencil cap** (sostituisce la trasparenza della scansione per il "vedere dentro"; pannello "Sezione" provvisorio; debito UX consapevole: slider opacità/ghost da integrare come profondità-taglio); reader `?wf=`; export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
@@ -24,9 +24,9 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
-## 8.7.1 — fix Posiziona MUA in "Entrambi" (branch `fix-posiziona-r169`, NON deployato) (2026-06-03)
+## 8.7.1 — fix Posiziona MUA in "Entrambi" (LIVE su entrambi i servizi + custom domain) (2026-06-03)
 
-Fix di una regressione r169: "Posiziona" MUA era morto **solo in modalità "Entrambi"** (in Solid/Wireframe funzionava; bug **live** in 8.7.0, beta). Causa: `onViewportClick` [v3b ~2673] faceva `raycaster.intersectObject(scanMesh)` senza 2° arg → `recursive` default **true** → intersecava anche l'**overlay wireframe** (`LineSegments` figlio di scanMesh, presente solo in "Entrambi"), colpito per primo (più vicino, soglia linea 1mm) e senza `.face` → `placeMUA(hits[0].point, hits[0].face.normal)` lanciava TypeError → nessun MUA (errore console non notato). **Fix:** `intersectObject(scanMesh, false)` (non ricorsivo) + guardia `hits[0].face`. Non tocca il motore clip/stencil. **Verificato (mock r169):** placement OK in Solid/Wireframe/**Entrambi** + Raffina (`alignAll`), console pulita. Branch **fix-posiziona-r169**, **NON deployato né mergiato**; la "Versione live" resta 8.7.0. **NB:** `dev-sezione-ui` (8.8.0) è costruito sulla r169 PRE-fix → al disgelo va portato dentro questo fix.
+Fix di una regressione r169: "Posiziona" MUA era morto **solo in modalità "Entrambi"** (in Solid/Wireframe funzionava; bug **live** in 8.7.0, beta). Causa: `onViewportClick` [v3b ~2673] faceva `raycaster.intersectObject(scanMesh)` senza 2° arg → `recursive` default **true** → intersecava anche l'**overlay wireframe** (`LineSegments` figlio di scanMesh, presente solo in "Entrambi"), colpito per primo (più vicino, soglia linea 1mm) e senza `.face` → `placeMUA(hits[0].point, hits[0].face.normal)` lanciava TypeError → nessun MUA (errore console non notato). **Fix:** `intersectObject(scanMesh, false)` (non ricorsivo) + guardia `hits[0].face`. Non tocca il motore clip/stencil. **Verificato (mock r169):** placement OK in Solid/Wireframe/**Entrambi** + Raffina (`alignAll`), console pulita. Mergiato in **main** (merge no-ff `75f2f61`, fix `b97323d`) e **DEPLOYATO LIVE su entrambi i servizi** il 2026-06-03 (LEGACY 7ac922ce deploy `ed996f29`, BACKEND b7671e12 deploy `bc53367a`; sequenza **canary LEGACY → BACKEND**, `serviceInstanceDeploy latestCommit:true`). **Verifica live (curl -sL):** `backend_version=8.7.1` su BACKEND + LEGACY + `app.syntesis-icp.com`, `/analizzare` 200 (title `v8.7.1`), gating `/api/me/storage` → 403. **NB:** `dev-sezione-ui` (8.8.0) è costruito sulla r169 PRE-fix → al disgelo va portato dentro questo fix.
 
 ## 8.7.0 — migrazione motore rendering /analizzare: r169 + clipping/stencil (LIVE su entrambi i servizi) (2026-06-03)
 
