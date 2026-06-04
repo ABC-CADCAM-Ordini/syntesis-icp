@@ -12,6 +12,7 @@
      sui suoi selettori, mentre le classi .syn-* portano regole nuove. -->
 <link rel="stylesheet" href="/static/ds/tokens.css">
 <link rel="stylesheet" href="/static/ds/components.css">
+<script src="/static/ds/syn-render.js"></script>
 <style>
 html{background:#000;margin:0;padding:0}
 body{
@@ -2044,22 +2045,9 @@ function initThree(){
 
 // Sfondo identico a Analizzare: gradient lineare 180° (top->bottom) da #438DD6 a #89B2E0
 function makeGradientTexture(c1, c2, angleDeg) {
-  const size = 256;
-  const cnv = document.createElement('canvas');
-  cnv.width = size; cnv.height = size;
-  const ctx = cnv.getContext('2d');
-  const rad = angleDeg * Math.PI / 180;
-  const cx = size/2, cy = size/2;
-  const dx = Math.sin(rad) * size/2;
-  const dy = -Math.cos(rad) * size/2;
-  const grd = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy);
-  grd.addColorStop(0, c1);
-  grd.addColorStop(1, c2);
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(cnv);
-  tex.needsUpdate = true;
-  return tex;
+  // Delega alla fonte unica: marca la texture SRGBColorSpace (necessario con CM ON,
+  // altrimenti il canvas sRGB viene letto come lineare e lo sfondo si brucia). Era non marcata.
+  return SynRender.makeGradientTexture(THREE, c1, c2, angleDeg);
 }
 scene.background = makeGradientTexture('#438DD6', '#89B2E0', 180);
 
@@ -2071,6 +2059,7 @@ camera.layers.enable(1); // GIZMO_LAYER: la camera vede i gizmi (deferito da ~49
 
 renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, stencil: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+SynRender.applyRendererPipeline(THREE, renderer); // target /analizzare: CM ON + SRGBColorSpace + NoToneMapping + localClipping
 
 controls = new THREE.TrackballControls(camera, canvas);
 // Blocco 7e: TrackballControls per rotazione completa senza limiti polari.
@@ -2244,19 +2233,14 @@ function installAltClickPivot(controls, camera, renderer, scene){
 }
 installAltClickPivot(controls, camera, renderer, scene);
 
-// Illuminazione fissa sulla camera (ruota col punto di vista) - identica ad Analizzare
-sceneAmbient = new THREE.AmbientLight(0xffffff, 0.4);
+// Illuminazione dalla fonte unica: target /analizzare (Ambient 1.2 / key 1.8 / fill bluastra 0.75, CM ON).
+// addCameraLightRig fa anche scene.add(camera). Layer 1 (GIZMO_LAYER) ri-abilitato sulle 3 luci:
+// specifico di /vedere (illumina i gizmi sul layer 1), NON nel core.
+var _rig = SynRender.addCameraLightRig(THREE, scene, camera);
+sceneAmbient = _rig.ambient; camL1 = _rig.key; camL2 = _rig.fill;
 sceneAmbient.layers.enable(1);
-scene.add(sceneAmbient);
-camL1 = new THREE.DirectionalLight(0xffffff, 0.6);
-camL1.position.set(1, 1, 1);
 camL1.layers.enable(1);
-camera.add(camL1);
-camL2 = new THREE.DirectionalLight(0x6688aa, 0.25);
-camL2.position.set(-1, -0.5, -1);
 camL2.layers.enable(1);
-camera.add(camL2);
-scene.add(camera);
 
 // Griglia e assi rimossi su richiesta - nessun riferimento globale in scena
 
@@ -6000,6 +5984,7 @@ sectionScene.background = new THREE.Color(0x0F1923);
 sectionCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, -1000, 1000);
 sectionRenderer = new THREE.WebGLRenderer({ canvas: sectionCanvas, antialias: true });
 sectionRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+SynRender.applyRendererPipeline(THREE, sectionRenderer); // stessa pipeline colore del main (la sezione gestisce localClipping a parte, step 4)
 }
 
 // Pending durante "piazza sezione" (preview tra primo e secondo click)
