@@ -11,7 +11,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.8.1</title>
+<title>Syntesis-ICP - Analizzare v8.9.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -247,6 +247,10 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .tree-node{display:flex;align-items:center;gap:6px;padding:3px 0}
 .tree-node input[type=checkbox]{accent-color:var(--blue);margin:0;cursor:pointer}
 .tree-node .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.tree-color,.mis-tree .tree-color{width:13px;height:13px;border:none;border-radius:50%;padding:0;margin:0;flex-shrink:0;cursor:pointer;background:none;-webkit-appearance:none;appearance:none;vertical-align:middle}
+.tree-color::-webkit-color-swatch-wrapper{padding:0}
+.tree-color::-webkit-color-swatch{border:1px solid rgba(0,0,0,0.18);border-radius:50%}
+.tree-color::-moz-color-swatch{border:1px solid rgba(0,0,0,0.18);border-radius:50%}
 .tree-node .lbl{flex:1;color:var(--dark)}
 .tree-node.sub{padding-left:18px;font-size:11px}
 .tree-node.sub .lbl{color:var(--gray)}
@@ -1541,7 +1545,7 @@ if (document.readyState === 'loading') {
           <div class="mis-tree-leaf">
             <div class="mis-tree-leaf-row">
               <input type="checkbox" id="layChkBgA" checked onchange="misICP_applyLayerVis('bgA', this.checked)">
-              <span class="mis-tree-dot" style="background:#b8a090"></span>
+              <input type="color" class="tree-color" value="#b8a090" title="Colore Arcata A" onchange="setSceneObjectColor('icp:bgA', this.value)">
               <label class="mis-tree-leaf-name" for="layChkBgA">Arcata</label>
             </div>
             <div class="mis-tree-slider-row">
@@ -1552,7 +1556,7 @@ if (document.readyState === 'loading') {
           <div class="mis-tree-leaf">
             <div class="mis-tree-leaf-row">
               <input type="checkbox" id="layChkScbA" checked onchange="misICP_applyLayerVis('scbA', this.checked)">
-              <span class="mis-tree-dot" style="background:#F59E0B"></span>
+              <input type="color" class="tree-color" value="#F59E0B" title="Colore Dischi A" onchange="setSceneObjectColor('icp:scbA', this.value)">
               <label class="mis-tree-leaf-name" for="layChkScbA">Dischi</label>
             </div>
             <div class="mis-tree-slider-row">
@@ -1574,7 +1578,7 @@ if (document.readyState === 'loading') {
           <div class="mis-tree-leaf">
             <div class="mis-tree-leaf-row">
               <input type="checkbox" id="layChkBgB" checked onchange="misICP_applyLayerVis('bgB', this.checked)">
-              <span class="mis-tree-dot" style="background:#b8a090"></span>
+              <input type="color" class="tree-color" value="#b8a090" title="Colore Arcata B" onchange="setSceneObjectColor('icp:bgB', this.value)">
               <label class="mis-tree-leaf-name" for="layChkBgB">Arcata</label>
             </div>
             <div class="mis-tree-slider-row">
@@ -1585,7 +1589,7 @@ if (document.readyState === 'loading') {
           <div class="mis-tree-leaf">
             <div class="mis-tree-leaf-row">
               <input type="checkbox" id="layChkScbB" checked onchange="misICP_applyLayerVis('scbB', this.checked)">
-              <span class="mis-tree-dot" style="background:#0065B3"></span>
+              <input type="color" class="tree-color" value="#0065B3" title="Colore Dischi B" onchange="setSceneObjectColor('icp:scbB', this.value)">
               <label class="mis-tree-leaf-name" for="layChkScbB">Dischi</label>
             </div>
             <div class="mis-tree-slider-row">
@@ -2325,7 +2329,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.8.1';
+window.ANALIZZA_BUILD = '8.9.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-03';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -3873,7 +3877,7 @@ function rebuildTree(){
     } catch(e){}
     h += '<div class="tree-node">'+
       '<input type="checkbox" '+(scanMesh.visible?'checked':'')+' onchange="toggleLayer(\'scan\',this.checked)">'+
-      '<span class="dot" style="background:#889aad"></span>'+
+      '<input type="color" class="tree-color" value="'+((typeof envSettings!=="undefined"&&envSettings.scanColor)?envSettings.scanColor:"#b8a090")+'" title="Colore scansione" onchange="setSceneObjectColor(\'scan\',this.value)" onclick="event.stopPropagation()">'+
       '<span class="lbl">Scansione</span>'+
       (triCount ? '<span class="mua-rmsd">'+triCount+'</span>' : '')+
       '</div>'+
@@ -3897,7 +3901,7 @@ function rebuildTree(){
       
       h += '<div class="tree-node mua-header">'+
         '<span class="chevron" onclick="toggleMuaExpand('+m.num+')">'+chev+'</span>'+
-        '<span class="dot" style="background:'+ch+'"></span>'+
+        '<input type="color" class="tree-color" value="'+ch+'" title="Colore MUA #'+m.num+'" onchange="setSceneObjectColor(\'mua:'+i+'\',this.value)" onclick="event.stopPropagation()">'+
         groupBadge+
         '<span class="lbl" onclick="toggleMuaExpand('+m.num+')">MUA #'+m.num+'</span>'+
         '<span class="mua-rmsd">'+rmsdText+'</span>'+
@@ -3957,6 +3961,50 @@ function rebuildTree(){
   }
   
   document.getElementById('layerTree').innerHTML = h;
+}
+
+// 8.9.0: GESTIONE COLORE UNIFICATA per gli oggetti di TUTTI gli alberi scena (analizzare / misurare ICP / sostituire).
+// Un'unica funzione setSceneObjectColor(target, hex). target uniforme:
+//   'scan'           -> scansione /analizzare (scanMesh + envSettings.scanColor)
+//   'mua:'+idx       -> MUA i-esimo: m.color + connessione mtMesh / analogo anMesh / asse axisLine
+//                       (un colore per MUA; lo scanbody mantiene il colore-brand per tipo 1T3/OS/SR = codice clinico)
+//   'icp:'+group     -> layer ICP (bgA/scbA/bgB/scbB) via misICP_groupMeshes; storage misICP_layerColors
+//   'sostscan'       -> scansione Multi-A (sostMesh)
+//   'sosttype:'+key  -> tutti i marker del tipo key (1T3/SR/OS): gruppi sostPlaced + SOSTITUIRE_TEMPLATE_INFO
+// __synApplyColor applica il colore a una mesh / array / group THREE in modo uniforme (stessa logica ovunque).
+function __synApplyColor(x, col){
+  if(!x) return;
+  if(x.traverse){ x.traverse(function(o){ if(o.material && o.material.color){ o.material.color.copy(col); o.material.needsUpdate=true; } }); }
+  else if(Array.isArray(x)){ x.forEach(function(o){ __synApplyColor(o, col); }); }
+  else if(x.material && x.material.color){ x.material.color.copy(col); x.material.needsUpdate=true; }
+}
+function setSceneObjectColor(target, hex){
+  try{
+    var col = new THREE.Color(hex);
+    var p = String(target).split(':'); var kind = p[0];
+    if(kind === 'scan'){
+      if(typeof scanMesh!=='undefined' && scanMesh) __synApplyColor(scanMesh, col);
+      if(typeof envSettings!=='undefined') envSettings.scanColor = hex;
+    } else if(kind === 'mua'){
+      var m = (typeof muaObjects!=='undefined') ? muaObjects[parseInt(p[1],10)] : null;
+      if(m){
+        m.color = parseInt(hex.replace('#',''),16);
+        __synApplyColor(m.mtMesh, col); __synApplyColor(m.anMesh, col); __synApplyColor(m.axisLine, col);
+        if(typeof updateDivergenceLabels==='function') updateDivergenceLabels();
+      }
+    } else if(kind === 'icp'){
+      var g = p[1];
+      if(typeof misICP_layerColors!=='undefined') misICP_layerColors[g] = hex;
+      if(typeof misICP_groupMeshes==='function') __synApplyColor(misICP_groupMeshes(g), col);
+    } else if(kind === 'sostscan'){
+      if(typeof sostMesh!=='undefined' && sostMesh) __synApplyColor(sostMesh, col);
+      if(typeof sostScanUI!=='undefined') sostScanUI.color = hex;
+    } else if(kind === 'sosttype'){
+      var key = p[1];
+      if(typeof SOSTITUIRE_TEMPLATE_INFO!=='undefined' && SOSTITUIRE_TEMPLATE_INFO[key]) SOSTITUIRE_TEMPLATE_INFO[key].color = parseInt(hex.replace('#',''),16);
+      (typeof sostPlaced!=='undefined' ? sostPlaced : []).forEach(function(pp){ if(pp.groups && pp.groups[key]){ pp.color = parseInt(hex.replace('#',''),16); __synApplyColor(pp.groups[key], col); } });
+    }
+  }catch(e){ console.warn('setSceneObjectColor', e); }
 }
 
 // === Blocco 7a: helper per slider opacità e bottoni globali ===
@@ -9942,6 +9990,9 @@ function misICP_groupMeshes(group){
   if(group === 'scbB') return misICP_meshesB.filter(function(m){return m;});
   return [];
 }
+
+// 8.9.0: storage colori layer ICP (bgA/scbA/bgB/scbB); applicati dalla gestione unica setSceneObjectColor('icp:'+group).
+var misICP_layerColors = { bgA:'#b8a090', scbA:'#F59E0B', bgB:'#b8a090', scbB:'#0065B3' };
 
 function misICP_applyLayerVis(group, visible){
   if(group === 'labels'){
@@ -16354,6 +16405,9 @@ function _setSostituireArtifactsVisible(on){
   });
 }
 
+// 8.9.0: colore Sostituire (scansione Multi-A + per tipo 1T3/SR/OS) gestito dalla funzione unica
+// setSceneObjectColor('sostscan' | 'sosttype:'+key) — vedi gestione colore unificata sopra rebuildTree.
+
 // ═══════════════════════════════════════════════════════════════════
 // SOSTITUIRE: albero scena
 // Renderizza dentro #layerTree (stesso container usato da Analizza)
@@ -16368,7 +16422,7 @@ function sostRebuildTree(){
          '<span style="width:12px"></span>' +   // spacer per allineare alla freccia dei gruppi
          '<input type="checkbox" ' + (sostMesh.visible ? 'checked' : '') +
          ' onchange="sostToggleScanVisibility(this.checked)">' +
-         '<span class="dot" style="background:#c4a48c"></span>' +
+         '<input type="color" class="tree-color" value="' + ((typeof sostMesh!=="undefined"&&sostMesh&&sostMesh.material)?("#"+sostMesh.material.color.getHexString()):"#c4a48c") + '" title="Colore scansione" onchange="setSceneObjectColor(\'sostscan\', this.value)" onclick="event.stopPropagation()">' +
          '<span class="lbl" style="flex:1">Scansione (Multi-A)</span>' +
          '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:26px;text-align:right" id="sostOpLblScan">' + Math.round(sostScanUI.opacity * 100) + '%</span>' +
          '</div>';
@@ -16430,7 +16484,7 @@ function sostRebuildTree(){
            '<input type="checkbox" ' + (masterChecked ? 'checked' : '') +
            ' onchange="sostToggleGroupVisibility(\'' + tpl.key + '\', this.checked)"' +
            (masterIndeterminate ? ' data-indet="1"' : '') + '>' +
-           '<span class="dot" style="background:' + tpl.color + '"></span>' +
+           '<input type="color" class="tree-color" value="' + tpl.color + '" title="Colore ' + tpl.label + '" onchange="setSceneObjectColor(\'sosttype:' + tpl.key + '\', this.value)" onclick="event.stopPropagation()">' +
            '<span class="lbl" style="font-weight:700;flex:1">' + tpl.label + '</span>' +
            '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:26px;text-align:right" id="sostOpLbl_' + tpl.key + '">' + Math.round(ui.opacity * 100) + '%</span>' +
            '</div>';
