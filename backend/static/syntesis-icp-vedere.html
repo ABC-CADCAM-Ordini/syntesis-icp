@@ -12,6 +12,7 @@
      sui suoi selettori, mentre le classi .syn-* portano regole nuove. -->
 <link rel="stylesheet" href="/static/ds/tokens.css">
 <link rel="stylesheet" href="/static/ds/components.css">
+<script src="/static/ds/syn-render.js"></script>
 <style>
 html{background:#000;margin:0;padding:0}
 body{
@@ -387,6 +388,11 @@ body{
 }
 .props-color-swatch:hover{transform:scale(1.15)}
 .props-color-swatch.active{box-shadow:0 0 0 2px var(--mario-green)}
+/* Picker colore nativo unificato (come /analizzare): pallino tondo che apre l'OS picker */
+.tree-color{width:13px;height:13px;border:none;border-radius:50%;padding:0;margin:0;flex-shrink:0;cursor:pointer;background:none;-webkit-appearance:none;appearance:none;vertical-align:middle}
+.tree-color::-webkit-color-swatch-wrapper{padding:0}
+.tree-color::-webkit-color-swatch{border:1px solid rgba(0,0,0,0.18);border-radius:50%}
+.tree-color::-moz-color-swatch{border:1px solid rgba(0,0,0,0.18);border-radius:50%}
 
 /* Azioni in fondo: ogni bottone ha il suo accent color */
 .props-actions{
@@ -1190,13 +1196,33 @@ input[type="file"]{display:none}
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TrackballControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/PLYLoader.js"></script>
+<!-- Loader Three.js r169 (era r128 UMD + examples/js). importmap ESM + bridge a window.THREE. -->
+<!-- OrbitControls e STLLoader rimossi: /vedere usa TrackballControls + parseSTLCustom. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+  // Namespace ESM immutabile -> copia estensibile (Object.assign), poi ri-espongo gli addon
+  // come proprieta' di window.THREE (il codice classico usa new THREE.TrackballControls ecc.).
+  // Pipeline colore/luci: applicata in initThree via SynRender (step 2), NON qui.
+  import * as THREE from 'three';
+  import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
+  import { TransformControls } from 'three/addons/controls/TransformControls.js';
+  import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+  import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+  const T = Object.assign({}, THREE);
+  T.TrackballControls = TrackballControls;
+  T.TransformControls = TransformControls;
+  T.OBJLoader = OBJLoader;
+  T.PLYLoader = PLYLoader;
+  window.THREE = T;
+  window.dispatchEvent(new Event('three-ready'));
+</script>
 
 <!-- ================================================================
      SYNTHESIS CORE - Modulo fondazionale (inline)
@@ -2013,40 +2039,34 @@ const state = {
   sectionRulerFirstPoint: null,
 };
 
-// Three.js init
-const canvas = document.getElementById('canvas');
-const scene = new THREE.Scene();
+// Three.js init — r169: setup THREE differito a three-ready (era eager a parse-time).
+// Globali assegnati in initThree() perche' l'intera app referenzia scene/camera/renderer/controls/ecc.
+var scene, camera, renderer, controls, transformControls, sceneAmbient, camL1, camL2,
+    raycaster, mouseNDC, _eraserRaycaster, _eraserNDC, sectionScene, sectionCamera, sectionRenderer;
+const canvas = document.getElementById('canvas');  // DOM ref: resta top-level (usato da listener top-level), NON e' THREE
+function initThree(){
+  if(!window.THREE){ window.addEventListener('three-ready', initThree, {once:true}); return; }
+  scene = new THREE.Scene();
 
 // Sfondo identico a Analizzare: gradient lineare 180° (top->bottom) da #438DD6 a #89B2E0
 function makeGradientTexture(c1, c2, angleDeg) {
-  const size = 256;
-  const cnv = document.createElement('canvas');
-  cnv.width = size; cnv.height = size;
-  const ctx = cnv.getContext('2d');
-  const rad = angleDeg * Math.PI / 180;
-  const cx = size/2, cy = size/2;
-  const dx = Math.sin(rad) * size/2;
-  const dy = -Math.cos(rad) * size/2;
-  const grd = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy);
-  grd.addColorStop(0, c1);
-  grd.addColorStop(1, c2);
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(cnv);
-  tex.needsUpdate = true;
-  return tex;
+  // Delega alla fonte unica: marca la texture SRGBColorSpace (necessario con CM ON,
+  // altrimenti il canvas sRGB viene letto come lineare e lo sfondo si brucia). Era non marcata.
+  return SynRender.makeGradientTexture(THREE, c1, c2, angleDeg);
 }
 scene.background = makeGradientTexture('#438DD6', '#89B2E0', 180);
 
 // === SETUP SCENA 3D — copiato identico da Analizzare ===
-const camera = new THREE.PerspectiveCamera(28, 1, 0.01, 1000);
+camera = new THREE.PerspectiveCamera(28, 1, 0.01, 1000);
 camera.up.set(0, 0, 1);
 camera.position.set(30, 30, 50);
+camera.layers.enable(1); // GIZMO_LAYER: la camera vede i gizmi (deferito da ~4994 top-level, r169)
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, stencil: true });
+renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, stencil: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+SynRender.applyRendererPipeline(THREE, renderer); // target /analizzare: CM ON + SRGBColorSpace + NoToneMapping + localClipping
 
-const controls = new THREE.TrackballControls(camera, canvas);
+controls = new THREE.TrackballControls(camera, canvas);
 // Blocco 7e: TrackballControls per rotazione completa senza limiti polari.
 // Blocco 7f: velocita base alzate + tasto Shift = turbo (raddoppia tutto)
 const SPEED_BASE = {
@@ -2094,11 +2114,11 @@ window.addEventListener('blur', function(){
 });
 // I limiti polari NON ESISTONO in TrackballControls: rotazione completamente libera in 3D.
 
-const transformControls = new THREE.TransformControls(camera, canvas);
+transformControls = new THREE.TransformControls(camera, canvas);
 transformControls.setMode('translate');
 transformControls.setSize(0.85);
 transformControls.addEventListener('dragging-changed', e => { controls.enabled = !e.value; });
-scene.add(transformControls);
+scene.add(transformControls.getHelper());
 
 // === Blocco 7c: Alt+click pivot (target rotation su punto cliccato) ===
 // Stessa logica di Analizza. Funzione + chiamata immediata.
@@ -2218,19 +2238,14 @@ function installAltClickPivot(controls, camera, renderer, scene){
 }
 installAltClickPivot(controls, camera, renderer, scene);
 
-// Illuminazione fissa sulla camera (ruota col punto di vista) - identica ad Analizzare
-const sceneAmbient = new THREE.AmbientLight(0xffffff, 0.4);
+// Illuminazione dalla fonte unica: target /analizzare (Ambient 1.2 / key 1.8 / fill bluastra 0.75, CM ON).
+// addCameraLightRig fa anche scene.add(camera). Layer 1 (GIZMO_LAYER) ri-abilitato sulle 3 luci:
+// specifico di /vedere (illumina i gizmi sul layer 1), NON nel core.
+var _rig = SynRender.addCameraLightRig(THREE, scene, camera);
+sceneAmbient = _rig.ambient; camL1 = _rig.key; camL2 = _rig.fill;
 sceneAmbient.layers.enable(1);
-scene.add(sceneAmbient);
-const camL1 = new THREE.DirectionalLight(0xffffff, 0.6);
-camL1.position.set(1, 1, 1);
 camL1.layers.enable(1);
-camera.add(camL1);
-const camL2 = new THREE.DirectionalLight(0x6688aa, 0.25);
-camL2.position.set(-1, -0.5, -1);
 camL2.layers.enable(1);
-camera.add(camL2);
-scene.add(camera);
 
 // Griglia e assi rimossi su richiesta - nessun riferimento globale in scena
 
@@ -2257,6 +2272,15 @@ animate();
 if (controls && typeof controls.handleResize === 'function') {
   controls.handleResize();
 }
+// Blocchi THREE lontani: sub-init chiamati da initThree (erano top-level a parse-time).
+initRuler();
+initEraser();
+initSection();
+hookAnimate();        // wrap renderer.render: scaling gizmi (deferito r169)
+hookSectionRender();  // wrap renderer.render: render PIP sezione (deferito r169)
+}
+// Avvio r169: la guardia in cima a initThree differisce a three-ready (loader importmap+bridge nel body).
+initThree();
 
 // Parser STL custom — identico a quello di Analizzare/Sostituire.
 // Non estrae vertex colors: solo position + normal. Garantisce uniformità di rendering
@@ -2536,6 +2560,7 @@ function removeLayer(id) {
   if (l.object.geometry) l.object.geometry.dispose();
   if (l.material) l.material.dispose();
   if (l.highlight && l.highlight.material) l.highlight.material.dispose();
+  if (l.wireframeOverlay) { if (l.wireframeOverlay.geometry) l.wireframeOverlay.geometry.dispose(); if (l.wireframeOverlay.material) l.wireframeOverlay.material.dispose(); }
   // Bridge: rimuovi dal registry
   if (l.synId) window.SynRegistry.remove(l.synId);
   state.layers.splice(idx, 1);
@@ -2595,6 +2620,31 @@ function setLayerColor(id, hex) {
     l.highlight.material.color.setHex(colorHexToInt(hex));
   }
   renderLayerList();
+}
+
+// === Gestione colore unificata (copiata da /analizzare 8.9.0): __synApplyColor + setSceneObjectColor ===
+// In /vedere il target generico e' 'layer:'+synId (o id layer). Preserva i due bit Vedere di
+// setLayerColor: vertex-color attivo -> NON sovrascrive il bianco; highlight del layer selezionato.
+function __synApplyColor(x, col){
+  if(!x) return;
+  if(x.traverse){ x.traverse(function(o){ if(o.material && o.material.color){ o.material.color.copy(col); o.material.needsUpdate=true; } }); }
+  else if(Array.isArray(x)){ x.forEach(function(o){ __synApplyColor(o, col); }); }
+  else if(x.material && x.material.color){ x.material.color.copy(col); x.material.needsUpdate=true; }
+}
+function setSceneObjectColor(target, hex){
+  try{
+    var col = new THREE.Color(hex);
+    var p = String(target).split(':'); var kind = p[0];
+    if(kind === 'layer'){
+      var l = state.layers.find(function(x){ return String(x.synId) === p[1] || String(x.id) === p[1]; });
+      if(!l) return;
+      l.color = hex;
+      if(!(l.hasColor && l.showColor)){ __synApplyColor(l.object, col); }                                  // vertex-color preservato
+      if(state.selectedId === l.id && l.highlight && l.highlight.material){ l.highlight.material.color.copy(col); }  // highlight preservato
+      if(l.synId && window.SynRegistry) window.SynRegistry.update(l.synId, { 'visual.color': hex });
+      renderLayerList();
+    }
+  }catch(e){ console.warn('setSceneObjectColor', e); }
 }
 
 function selectLayer(id) {
@@ -2856,10 +2906,13 @@ function updateEmptyHint() {
 // ============================================================
 // RIGHELLO - misurazione tra triangoli
 // ============================================================
-const raycaster = new THREE.Raycaster();
+function initRuler(){
+raycaster = new THREE.Raycaster();
 raycaster.layers.enable(1);  // intercetta anche oggetti sul GIZMO_LAYER
 raycaster.params.Points = { threshold: 0.5 };
-const mouseNDC = new THREE.Vector2();
+mouseNDC = new THREE.Vector2();
+hoverMarker = buildHoverMarker();  // era chiamato top-level a parse-time (deferito r169)
+}
 
 let hoverMarker = null;       // sferetta che segue il mouse sul triangolo
 let pendingLine = null;       // linea temporanea durante il piazzamento secondo punto
@@ -2877,8 +2930,6 @@ function buildHoverMarker() {
   scene.add(m);
   return m;
 }
-hoverMarker = buildHoverMarker();
-
 function buildPointMarker(colorHex) {
   const geo = new THREE.SphereGeometry(0.18, 16, 12);
   const mat = new THREE.MeshBasicMaterial({
@@ -3437,8 +3488,10 @@ function setEraserActive(on) {
 }
 
 // Raycaster e Vector2 riusabili (no allocazioni nel hot path)
-const _eraserRaycaster = new THREE.Raycaster();
-const _eraserNDC = new THREE.Vector2();
+function initEraser(){
+_eraserRaycaster = new THREE.Raycaster();
+_eraserNDC = new THREE.Vector2();
+}
 
 // Cancella un triangolo collassandolo: tutti i 3 vertici diventano uguali
 // al primo. Cosi' ha area zero e non viene renderizzato. Reversibile salvando
@@ -4955,7 +5008,7 @@ function startTechDimEdit(circle, techValueEl) {
 const GIZMO_LAYER = 1;
 
 // La camera deve rendere entrambi i layer
-camera.layers.enable(GIZMO_LAYER);
+// camera.layers.enable(GIZMO_LAYER) -> deferito in initThree (r169, era top-level a parse-time)
 
 function buildHandleGizmo(colorHex, axisDirs) {
   // Gizmo 3D ombreggiato: sfera centrale + frecce coniche con asta cilindrica.
@@ -5815,9 +5868,8 @@ bindShapeButton('btnOct',    'oct');
 bindShapeButton('btnTorx',   'torx');
 
 // Aggiorna labels ad ogni frame
-const _origAnimate = animate;
-// Hook nel loop esistente: aggiorno label nella render call
-(function hookAnimate() {
+// Hook nel loop esistente: aggiorno label nella render call (chiamato da initThree, deferito r169)
+function hookAnimate() {
   const oldRender = renderer.render.bind(renderer);
   renderer.render = function(s, c) {
     // Pre-render: scaling screen-space dei gizmi
@@ -5858,7 +5910,7 @@ const _origAnimate = animate;
     if (state.measures.length > 0) updateMeasureLabels();
     if (state.circles.length > 0) updateCircleLabels();
   };
-})();
+}
 
 // ESC esce dalla modalità righello/cerchio
 document.addEventListener('keydown', e => {
@@ -5956,12 +6008,15 @@ document.addEventListener('keydown', e => {
 // ============================================================
 
 // --- Setup scena 2D per la PIP ---
-const sectionScene = new THREE.Scene();
+const sectionCanvas = document.getElementById('sectionCanvas');  // DOM ref: top-level (listener top-level), NON e' THREE
+function initSection(){
+sectionScene = new THREE.Scene();
 sectionScene.background = new THREE.Color(0x0F1923);
-const sectionCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, -1000, 1000);
-const sectionCanvas = document.getElementById('sectionCanvas');
-const sectionRenderer = new THREE.WebGLRenderer({ canvas: sectionCanvas, antialias: true });
+sectionCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, -1000, 1000);
+sectionRenderer = new THREE.WebGLRenderer({ canvas: sectionCanvas, antialias: true });
 sectionRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+SynRender.applyRendererPipeline(THREE, sectionRenderer); // stessa pipeline colore del main (la sezione gestisce localClipping a parte, step 4)
+}
 
 // Pending durante "piazza sezione" (preview tra primo e secondo click)
 let pendingSectionRect = null;
@@ -7204,8 +7259,7 @@ window.addEventListener('resize', () => {
 });
 
 // Render loop PIP: si aggancia al render principale
-const _origSecRender = renderer.render;
-(function hookSectionRender(){
+function hookSectionRender(){
   const old = renderer.render.bind(renderer);
   renderer.render = function(s, c) {
     old(s, c);
@@ -7214,7 +7268,7 @@ const _origSecRender = renderer.render;
       updateSectionMeasureLabels();
     }
   };
-})();
+}
 
 // Scorciatoia tastiera S = sezione
 document.addEventListener('keydown', e => {
@@ -7312,7 +7366,9 @@ setStatus('Pronto');
     const color = colorForObj(obj);
     return `<div class="slp-item${sel}${hidden}${child}" data-id="${obj.id}">
       <button class="slp-eye${eyeClass}" data-action="toggle-visible" data-tooltip="Mostra/nascondi">${eyeIcon}</button>
-      <span class="slp-color-dot" style="background:${color}" data-action="color"></span>
+      ${(obj.type === 'mesh' || obj.type === 'pointcloud')
+        ? `<input type="color" class="tree-color" value="${color}" title="Colore" onclick="event.stopPropagation()" onchange="setSceneObjectColor('layer:${obj.id}', this.value)">`
+        : `<span class="slp-color-dot" style="background:${color}"></span>`}
       <span class="slp-name">${escapeHtml(obj.name)}</span>
       ${meta ? `<span class="slp-meta">${escapeHtml(meta)}</span>` : ''}
       <span class="slp-item-actions">
@@ -7728,7 +7784,7 @@ if (window.SynCutViewManager) {
       <div class="props-section">
         <div class="props-section-title">Colore</div>
         <div class="props-colors">
-          ${SWATCH_COLORS.map(c => `<div class="props-color-swatch ${(obj.visual.color || (layer && layer.color)) === c ? 'active' : ''}" style="background:${c}" data-action="color" data-color="${c}"></div>`).join('')}
+          <input type="color" class="tree-color" value="${obj.visual.color || (layer && layer.color) || '#7A90A4'}" title="Colore" onchange="setSceneObjectColor('layer:${obj.id}', this.value)">
         </div>
       </div>
 
@@ -7995,6 +8051,7 @@ if (window.SynCutViewManager) {
           // Rimuovo eventuale overlay wireframe creato in modalita' "both"
           if (layer.wireframeOverlay) {
             layer.group.remove(layer.wireframeOverlay);
+            if (layer.wireframeOverlay.geometry) layer.wireframeOverlay.geometry.dispose();
             if (layer.wireframeOverlay.material) layer.wireframeOverlay.material.dispose();
             layer.wireframeOverlay = null;
           }
@@ -8012,6 +8069,7 @@ if (window.SynCutViewManager) {
           }
           if (layer.wireframeOverlay) {
             layer.group.remove(layer.wireframeOverlay);
+            if (layer.wireframeOverlay.geometry) layer.wireframeOverlay.geometry.dispose();
             if (layer.wireframeOverlay.material) layer.wireframeOverlay.material.dispose();
             layer.wireframeOverlay = null;
           }
@@ -8024,21 +8082,19 @@ if (window.SynCutViewManager) {
             layer.material.transparent = (sel.meta.original.opacity < 1.0);
           }
           if (!layer.wireframeOverlay) {
-            // Opacity dell'overlay scala con la densita' della mesh:
-            // scansioni dentali tipiche (300k+ tri) → overlay quasi invisibile
-            // ma comunque presente, per dare il "feel" del wireframe
-            let overlayOpacity = 0.18;
-            if (isVeryDense) overlayOpacity = 0.05;
-            else if (isDense) overlayOpacity = 0.10;
-            const overlayMat = new THREE.MeshBasicMaterial({
-              color: 0x2a4060,
-              wireframe: true,
+            // Reticolo "Entrambi" uniformato a /analizzare: WireframeGeometry + LineSegments
+            // (bordi unici -> opacita' uniforme) con LineBasicMaterial nero opacita' 0.35.
+            // (Era: MeshBasicMaterial wireframe blu 0x2a4060 con opacita' scalata per densita'
+            //  0.18/0.10/0.05 -> su scansioni dense quasi invisibile e bordi condivisi
+            //  disegnati due volte. Ora reticolo netto e uniforme come /analizzare.)
+            const wireGeo = new THREE.WireframeGeometry(layer.geometry);
+            const overlayMat = new THREE.LineBasicMaterial({
+              color: 0x000000,
               transparent: true,
-              opacity: overlayOpacity,
+              opacity: 0.35,
               depthTest: true,
-              depthWrite: false,
             });
-            const overlay = new THREE.Mesh(layer.geometry, overlayMat);
+            const overlay = new THREE.LineSegments(wireGeo, overlayMat);
             overlay.renderOrder = 1;
             layer.group.add(overlay);
             layer.wireframeOverlay = overlay;
@@ -8056,6 +8112,7 @@ if (window.SynCutViewManager) {
         const layer = state.layers.find(l => l.synId === sel.id);
         if (layer && layer.wireframeOverlay) {
           layer.group.remove(layer.wireframeOverlay);
+          if (layer.wireframeOverlay.geometry) layer.wireframeOverlay.geometry.dispose();
           if (layer.wireframeOverlay.material) layer.wireframeOverlay.material.dispose();
           layer.wireframeOverlay = null;
         }

@@ -7,6 +7,7 @@
      backend/static/ds/syn-gate.js. -->
 <style>html{visibility:hidden}</style>
 <script src="/static/ds/syn-gate.js"></script>
+<script src="/static/ds/syn-render.js"></script>
 <!-- Syntesis-ICP - Analizzare v2
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
@@ -2498,7 +2499,7 @@ function init(){
   }
   vp.style.background = envBgCss();
   camera=new THREE.PerspectiveCamera(28,w/h,0.01,1000);camera.position.set(30,30,50);
-  renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true,stencil:true});renderer.setSize(w,h);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));renderer.localClippingEnabled=true;renderer.outputColorSpace=THREE.SRGBColorSpace;vp.appendChild(renderer.domElement);
+  renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true,stencil:true});renderer.setSize(w,h);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));SynRender.applyRendererPipeline(THREE, renderer);vp.appendChild(renderer.domElement);
   controls=new THREE.OrbitControls(camera,renderer.domElement);
   // Blocco 7b: rotazione completa senza limiti (anche vista da sotto e giri completi)
   controls.minPolarAngle = -Infinity;
@@ -2514,10 +2515,8 @@ function init(){
   //   ambient piu' alto appiattisce (8.8.0 era 1.3/1.3 -> piatto), direzionale piu' alta lava la tinta con lo
   //   specular bianco. CM ON scurisce l'input -> il x3 compensa. Risultato (mock): scanMeanLum ~133, contrasto
   //   std ~12 (vs ~8 piatto), tinta fedele R/G 1.88 = scanColor, clip 0. NoToneMapping + SRGBColorSpace invariati.
-  scene.add(new THREE.AmbientLight(0xffffff,1.2));
-  var camL1=new THREE.DirectionalLight(0xffffff,1.8);camL1.position.set(1,1,1);camera.add(camL1);
-  var camL2=new THREE.DirectionalLight(0x6688aa,0.75);camL2.position.set(-1,-0.5,-1);camera.add(camL2);
-  scene.add(camera);
+  // Rig luci dalla fonte unica ds/syn-render.js (valori invariati: Ambient 1.2 / key 1.8 / fill 0.75).
+  SynRender.addCameraLightRig(THREE, scene, camera);
   // GridHelper rimosso (piano di riferimento non necessario)scene.add(new THREE.AxesHelper(15));
   window.addEventListener('resize',function(){var w2=vp.clientWidth,h2=vp.clientHeight;camera.aspect=w2/h2;camera.updateProjectionMatrix();renderer.setSize(w2,h2)});
   // Drop su tutto il documento (il canvas Three.js copre il viewport div)
@@ -12311,27 +12310,8 @@ function applyRenderModeToScene(){
 
 // Crea una CanvasTexture lineare con due colori e angolo
 function makeGradientTexture(c1, c2, angleDeg){
-  var size = 256;
-  var cnv = document.createElement('canvas');
-  cnv.width = size; cnv.height = size;
-  var ctx = cnv.getContext('2d');
-  // Angolo in radianti (0=top, 90=right, 180=bottom, 270=left)
-  // Converto in coordinate canvas: x=sin, y=-cos (0=top → y negativa)
-  var rad = angleDeg * Math.PI / 180;
-  var cx = size/2, cy = size/2;
-  var dx = Math.sin(rad) * size/2;
-  var dy = -Math.cos(rad) * size/2;
-  var x1 = cx - dx, y1 = cy - dy;
-  var x2 = cx + dx, y2 = cy + dy;
-  var grd = ctx.createLinearGradient(x1, y1, x2, y2);
-  grd.addColorStop(0, c1);
-  grd.addColorStop(1, c2);
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, size, size);
-  var tex = new THREE.CanvasTexture(cnv);
-  tex.colorSpace = THREE.SRGBColorSpace;  // 8.8.1 CM=true: il canvas 2D e' sRGB -> marca la texture sRGB, altrimenti viene letta come lineare e lo sfondo si schiarisce/brucia
-  tex.needsUpdate = true;
-  return tex;
+  // Delega alla fonte unica ds/syn-render.js (logica identica: canvas 2D sRGB, stesso angolo/colori).
+  return SynRender.makeGradientTexture(THREE, c1, c2, angleDeg);
 }
 
 // Genera CSS background per il viewport (<div>) -- stesso risultato della texture Three

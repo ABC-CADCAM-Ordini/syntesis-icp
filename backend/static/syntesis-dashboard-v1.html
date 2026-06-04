@@ -912,6 +912,11 @@ body{
   .sf-grid{grid-template-columns:1fr}
 }
 </style>
+<!-- Three.js r169: importmap (per import('three') dinamico nella preview STL) + fonte unica colore -->
+<script type="importmap">
+{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.169.0/three.module.min.js" } }
+</script>
+<script src="/static/ds/syn-render.js"></script>
 </head>
 <body>
   <div id="toast" class="toast"></div>
@@ -3473,6 +3478,7 @@ function renderSTL(blob, body){
     var renderer = new THREE.WebGLRenderer({antialias:true});
     renderer.setSize(w, h);
     renderer.setPixelRatio(window.devicePixelRatio || 1);
+    SynRender.applyRendererPipeline(THREE, renderer); // coerenza colore: CM ON + SRGBColorSpace + NoToneMapping (no clip/gizmo/gradiente: e' una preview)
     container.appendChild(renderer.domElement);
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
     var dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(1,1,1); scene.add(dir);
@@ -3525,13 +3531,14 @@ function renderSTL(blob, body){
     };
     fr.readAsArrayBuffer(blob);
   }
-  if(typeof THREE !== 'undefined'){ ready(); }
+  if(window.THREE){ ready(); }
   else {
-    var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-    s.onload = ready;
-    s.onerror = function(){ body.innerHTML = '<div style="color:#dc2626;padding:30px">Errore caricamento Three.js</div>'; };
-    document.head.appendChild(s);
+    // r169: import ESM dinamico (risolve 'three' via importmap nel <head>) + bridge a window.THREE
+    // (namespace ESM immutabile -> copia estensibile). Resta lazy: THREE si scarica solo all'apertura preview.
+    import('three').then(function(mod){
+      window.THREE = Object.assign({}, mod);
+      ready();
+    }).catch(function(){ body.innerHTML = '<div style="color:#dc2626;padding:30px">Errore caricamento Three.js</div>'; });
   }
 }
 
@@ -3575,7 +3582,6 @@ function parseSTLAscii(ab){
   } catch(e){ return null; }
 }
 
-async 
 async function downloadFileById(fileId, fileName){
   showToast('Preparazione download...');
   try {
