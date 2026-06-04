@@ -2560,6 +2560,7 @@ function removeLayer(id) {
   if (l.object.geometry) l.object.geometry.dispose();
   if (l.material) l.material.dispose();
   if (l.highlight && l.highlight.material) l.highlight.material.dispose();
+  if (l.wireframeOverlay) { if (l.wireframeOverlay.geometry) l.wireframeOverlay.geometry.dispose(); if (l.wireframeOverlay.material) l.wireframeOverlay.material.dispose(); }
   // Bridge: rimuovi dal registry
   if (l.synId) window.SynRegistry.remove(l.synId);
   state.layers.splice(idx, 1);
@@ -8050,6 +8051,7 @@ if (window.SynCutViewManager) {
           // Rimuovo eventuale overlay wireframe creato in modalita' "both"
           if (layer.wireframeOverlay) {
             layer.group.remove(layer.wireframeOverlay);
+            if (layer.wireframeOverlay.geometry) layer.wireframeOverlay.geometry.dispose();
             if (layer.wireframeOverlay.material) layer.wireframeOverlay.material.dispose();
             layer.wireframeOverlay = null;
           }
@@ -8067,6 +8069,7 @@ if (window.SynCutViewManager) {
           }
           if (layer.wireframeOverlay) {
             layer.group.remove(layer.wireframeOverlay);
+            if (layer.wireframeOverlay.geometry) layer.wireframeOverlay.geometry.dispose();
             if (layer.wireframeOverlay.material) layer.wireframeOverlay.material.dispose();
             layer.wireframeOverlay = null;
           }
@@ -8079,21 +8082,19 @@ if (window.SynCutViewManager) {
             layer.material.transparent = (sel.meta.original.opacity < 1.0);
           }
           if (!layer.wireframeOverlay) {
-            // Opacity dell'overlay scala con la densita' della mesh:
-            // scansioni dentali tipiche (300k+ tri) → overlay quasi invisibile
-            // ma comunque presente, per dare il "feel" del wireframe
-            let overlayOpacity = 0.18;
-            if (isVeryDense) overlayOpacity = 0.05;
-            else if (isDense) overlayOpacity = 0.10;
-            const overlayMat = new THREE.MeshBasicMaterial({
-              color: 0x2a4060,
-              wireframe: true,
+            // Reticolo "Entrambi" uniformato a /analizzare: WireframeGeometry + LineSegments
+            // (bordi unici -> opacita' uniforme) con LineBasicMaterial nero opacita' 0.35.
+            // (Era: MeshBasicMaterial wireframe blu 0x2a4060 con opacita' scalata per densita'
+            //  0.18/0.10/0.05 -> su scansioni dense quasi invisibile e bordi condivisi
+            //  disegnati due volte. Ora reticolo netto e uniforme come /analizzare.)
+            const wireGeo = new THREE.WireframeGeometry(layer.geometry);
+            const overlayMat = new THREE.LineBasicMaterial({
+              color: 0x000000,
               transparent: true,
-              opacity: overlayOpacity,
+              opacity: 0.35,
               depthTest: true,
-              depthWrite: false,
             });
-            const overlay = new THREE.Mesh(layer.geometry, overlayMat);
+            const overlay = new THREE.LineSegments(wireGeo, overlayMat);
             overlay.renderOrder = 1;
             layer.group.add(overlay);
             layer.wireframeOverlay = overlay;
@@ -8111,6 +8112,7 @@ if (window.SynCutViewManager) {
         const layer = state.layers.find(l => l.synId === sel.id);
         if (layer && layer.wireframeOverlay) {
           layer.group.remove(layer.wireframeOverlay);
+          if (layer.wireframeOverlay.geometry) layer.wireframeOverlay.geometry.dispose();
           if (layer.wireframeOverlay.material) layer.wireframeOverlay.material.dispose();
           layer.wireframeOverlay = null;
         }
