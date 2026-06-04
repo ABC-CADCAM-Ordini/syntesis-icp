@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-03, 8.8.1 — fix resa colore: ColorManagement ON + luci r128 1.2/1.8/0.75 + sfondo sRGB; include 8.8.0 pannello Taglio + 8.7.x r169)
+## Versione live (2026-06-03, 8.9.0 — color picker per-oggetto negli alberi scena (gestione unica); include 8.8.1 colore CM/luci/sfondo + 8.8.0 pannello Taglio)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.8.1 (live, commit `236d49c` del 2026-06-03, deploy `0c37cd8d`) |
-| Legacy syntesis-icp (7ac922ce) | 8.8.1 (live, commit `236d49c` del 2026-06-03, deploy `7b1b6642`) |
+| Backend principale (b7671e12) | 8.9.0 (live, commit `37a99f7` del 2026-06-03, deploy `5ff3216d`) |
+| Legacy syntesis-icp (7ac922ce) | 8.9.0 (live, commit `37a99f7` del 2026-06-03, deploy `cb67bb38`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.8.1 (**resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. _Follow-up aperto: ombre di contatto (AO) per resa più "scolpita" — vedi Sospesi._ |
+| /analizzare | v8.8.1 (**resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. **Color picker per-oggetto** in tutti gli alberi scena (8.9.0, gestione unica `setSceneObjectColor`). _Follow-up aperti: ombre di contatto AO (#6) + persistenza colori "apri caso" (#7) — vedi Sospesi._ |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
@@ -24,9 +24,9 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
-## 8.9.0 — color picker per-oggetto negli alberi scena (branch `feat-colori-albero`, NON deployato) (2026-06-03)
+## 8.9.0 — color picker per-oggetto negli alberi scena (LIVE su entrambi i servizi + custom domain) (2026-06-03)
 
-Feature: nei **3 alberi scena** ogni oggetto ha un selettore colore (il pallino diventa `<input type="color" class="tree-color">`), per modificare i colori assegnati on-the-fly. **NON deployato**; la "Versione live" resta **8.8.1**.
+Feature: nei **3 alberi scena** ogni oggetto ha un selettore colore (il pallino diventa `<input type="color" class="tree-color">`), per modificare i colori assegnati on-the-fly. **DEPLOYATO LIVE su entrambi i servizi** il 2026-06-03 (merge no-ff `37a99f7`, commit feature `503d8f7`; canary LEGACY 7ac922ce deploy `cb67bb38` → BACKEND b7671e12 deploy `5ff3216d`). **Verifica live (curl -sL):** `backend_version=8.9.0` su BACKEND + LEGACY + `app.syntesis-icp.com`, `/analizzare` 200, gating `/api/me/storage` → 403.
 
 - **Gestione UNICA** `setSceneObjectColor(target, hex)` + helper `__synApplyColor` (applica il colore a mesh/array/group THREE in modo uniforme): **stesso meccanismo per tutti gli alberi**, dispatch sul `target`. Le 4 funzioni ad-hoc iniziali (setLayerColor / misICP_setLayerColor / sostSetScanColor / sostSetTemplateColor) sono state **rimosse e consolidate**.
 - **/analizzare** (`rebuildTree`): `setSceneObjectColor('scan')` → `scanMesh.material.color` + `envSettings.scanColor` (il pallino ora mostra il colore reale, prima era grigio fisso); `setSceneObjectColor('mua:'+idx)` → `m.color` + connessione `mtMesh` / analogo `anMesh` / asse `axisLine`. **Un colore per MUA**; lo **scanbody mantiene il colore-brand del tipo** (1T3 ambra / OS verde / SR blu = codice clinico, non sovrascritto).
@@ -341,4 +341,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-06-03 — 8.8.1 live su entrambi i servizi + custom domain (fix resa colore: ColorManagement ON + luci r128 1.2/1.8/0.75 + sfondo sRGB; su base 8.8.0 pannello Taglio). Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-03 — 8.9.0 live su entrambi i servizi + custom domain (color picker per-oggetto negli alberi scena, gestione unica setSceneObjectColor; su base 8.8.1 colore + 8.8.0 pannello Taglio). Aggiornare al prossimo cambio di stato.*
