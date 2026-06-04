@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.8.0 — **Data:** 2026-06-03
+> **Versione software mappata:** 8.8.1 — **Data:** 2026-06-03
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -167,7 +167,7 @@ Consumo stato: `placeMUA` ([2753]) legge `getAnalyzeSbType()`/`getAnalyzeSbCfg()
 
 Three.js **r169** (ES module + bridge `window.THREE = Object.assign({}, THREE)`, importmap+module [2026]). Il "vedere dentro" è un **clipping plane + stencil cap** sulla scansione, che **sostituisce la trasparenza** (scansione opaca + `polygonOffset(1,1)`). Clip **solo sulla scansione** (MUA interi). Pilotato dal **pannello "Taglio"** di prodotto (8.8.0), aperto da un pulsante nella view-mode bar (modello Fresabilità). Default taglio **OFF** (scansione carica intera/opaca).
 
-> **Fix 8.7.2 (resa colore):** `renderer.outputColorSpace = THREE.SRGBColorSpace` [v3b ~2459] — era `LinearSRGBColorSpace` in 8.7.0 (output lineare crudo → scansione scura/desaturata vs r128). SRGB ripristina l'encoding sRGB per il display (arancione caldo). `ColorManagement.enabled = false` e materiale letterale invariati. Residuo di luminosità (V 50% vs 63% di r128, modello luci THREE legacy→fisico) **compensato in 8.8.0** alzando le sole intensità luci (`AmbientLight` 0.4→1.3, key bianca `DirectionalLight` 0.6→1.3 [v3b ~2503-2504]; fill bluastra 0.25 invariata per non virare la tinta) → scanMeanLum ~100→~150 (≈ target v8.5.0), clip highlight 0%, ambra preservata. `SRGBColorSpace`/`NoToneMapping` invariati.
+> **Fix resa colore (8.7.2 → 8.8.1):** `renderer.outputColorSpace = THREE.SRGBColorSpace` [v3b ~2492] (8.7.2: era `LinearSRGBColorSpace` → scura/desaturata). **8.8.1**: `ColorManagement.enabled = true` [v3b ~2035] (era `false` da 8.7.0) → pipeline coerente: i colori materiale (scanColor/MUA/sfondo) decodificati sRGB→lineare in input e ri-encodati in output → niente più viraggio verso il giallo/chiaro (scanColor reso R/G 1.43 → 1.88 = colore scelto). Luci ri-tarate al **rapporto r128** 0.4:0.6:0.25 ×3 = **Ambient 1.2 / key 1.8 / fill bluastra 0.75** [v3b ~2512-2514] (8.8.0 era 1.3/1.3, ambient-gonfiato → immagine piatta) → chiaroscuro/tridimensionalità recuperati (contrasto std ~8 → ~13); direzionale:ambient = 1.5 è il limite oltre cui lo specular bianco lava la tinta. `makeGradientTexture` [v3b ~12279]: `tex.colorSpace = SRGBColorSpace` (la CanvasTexture sRGB era letta come lineare → sfondo schiarito; ora fedele). `NoToneMapping` invariato. Misurato su mock: scanMeanLum ~133, clip 0, scan + MUA non slavati.
 
 | Elemento | id | Evento | Funzione | Effetto | Righe |
 |---|---|---|---|---|---|
