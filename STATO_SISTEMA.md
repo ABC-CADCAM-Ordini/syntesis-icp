@@ -2,15 +2,15 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-04, 8.10.0 — allineamento motori rendering r169 su TUTTE le superfici 3D via fonte unica `ds/syn-render.js` (/vedere + /dashboard portati a r169, /analizzare retrofittato Δ0); color picker /vedere nativo; reticolo /vedere uniformato. Include 8.9.0 color picker alberi + 8.8.x colore/Taglio + 8.7.x base r169)
+## Versione live (2026-06-04, 8.10.1 — logo brand bianco su /accedi [PATCH]. Base 8.10.0: allineamento motori rendering r169 su TUTTE le superfici 3D via fonte unica `ds/syn-render.js` (/vedere + /dashboard portati a r169, /analizzare retrofittato Δ0); color picker /vedere nativo; reticolo /vedere uniformato)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.10.0 (live, commit `b78fa8a` del 2026-06-04, deploy `bfcfe7be`) |
-| Legacy syntesis-icp (7ac922ce) | 8.10.0 (live, commit `b78fa8a` del 2026-06-04, deploy `2dcf031c`) |
+| Backend principale (b7671e12) | 8.10.1 (live, commit `fd2ebeb` del 2026-06-04, deploy `0e4d724b`) |
+| Legacy syntesis-icp (7ac922ce) | 8.10.1 (live, commit `fd2ebeb` del 2026-06-04, deploy `16b911af`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
 | /analizzare | v8.10.0 (**motori r169 via fonte unica** `ds/syn-render.js`, retrofit a comportamento invariato Δ0; **resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. **Color picker per-oggetto** in tutti gli alberi scena (8.9.0, gestione unica `setSceneObjectColor`). _Follow-up aperti: ombre di contatto AO (#6) + persistenza colori "apri caso" (#7) — vedi Sospesi._ |
-| /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
+| /accedi | **logo brand bianco** (8.10.1: `<img src="/static/synthesis-logo.png">` reso bianco via `filter:invert`, al posto del wordmark testo "Syntesis ICP"; corregge anche "Syntesis"→"Synthesis"). Ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor (**r169 dal 8.10.0**: loader importmap+bridge, init differito a three-ready, addon jsm Trackball/Transform[getHelper]/OBJ/PLY, clip/stencil+PiP; **color picker nativo** `setSceneObjectColor`; **reticolo "Entrambi"** uniformato a /analizzare WireframeGeometry nero 0.35; colore Δ0 vs /analizzare) — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | /dashboard | preview STL **r169 dal 8.10.0** (`import('three')` dinamico lazy + `applyRendererPipeline`); fix bug `async` orfano pre-esistente (riga ~3585). Zero r128 residuo nel codebase |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
@@ -24,6 +24,10 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.10.1 — logo brand bianco su /accedi (LIVE su entrambi i servizi + custom domain) (2026-06-04)
+
+Fix UI sulla pagina di login `/accedi`: il logo in alto a sinistra passa dal wordmark testuale "Syntesis ICP" al **logo brand reale** `/static/synthesis-logo.png` (lo stesso usato in home + header del software), reso **bianco** sul pannello scuro via `filter:invert(1) brightness(1.9)`, altezza 66px. Corregge anche l'incoerenza "**Syntesis**" (senza-h) del testo → branding corretto "**Synthesis**". Solo `syntesis-accedi.html` (markup `.brand` + CSS `.brand-logo`). **Bump solo `registry.BACKEND_VERSION` 8.10.0→8.10.1** (PATCH): v3b `<title>`/`ANALIZZA_BUILD` e `pdf_gen` NON toccati → restano 8.10.0 (cambio non-v3b, come pattern 8.6.4 home-only). Branch `fix-accedi-logo`, merge no-ff `786501e`, bump `fd2ebeb`. **DEPLOYATO LIVE** il 2026-06-04 (canary LEGACY→BACKEND): LEGACY deploy `16b911af`, BACKEND deploy `0e4d724b`. **Verifica live (curl -sL):** `backend_version=8.10.1` su BACKEND + LEGACY + `app.syntesis-icp.com`, `/accedi` 200 + logo brand servito (height 66px); `/analizzare` title resta `v8.10.0` (v3b non ribumpato, atteso).
 
 ## 8.10.0 — allineamento motori rendering r169 (tutte le superfici 3D) + color picker /vedere + reticolo (LIVE su entrambi i servizi + custom domain) (2026-06-04)
 
