@@ -1190,13 +1190,33 @@ input[type="file"]{display:none}
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TrackballControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/PLYLoader.js"></script>
+<!-- Loader Three.js r169 (era r128 UMD + examples/js). importmap ESM + bridge a window.THREE. -->
+<!-- OrbitControls e STLLoader rimossi: /vedere usa TrackballControls + parseSTLCustom. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+  // Namespace ESM immutabile -> copia estensibile (Object.assign), poi ri-espongo gli addon
+  // come proprieta' di window.THREE (il codice classico usa new THREE.TrackballControls ecc.).
+  // Pipeline colore/luci: applicata in initThree via SynRender (step 2), NON qui.
+  import * as THREE from 'three';
+  import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
+  import { TransformControls } from 'three/addons/controls/TransformControls.js';
+  import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+  import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+  const T = Object.assign({}, THREE);
+  T.TrackballControls = TrackballControls;
+  T.TransformControls = TransformControls;
+  T.OBJLoader = OBJLoader;
+  T.PLYLoader = PLYLoader;
+  window.THREE = T;
+  window.dispatchEvent(new Event('three-ready'));
+</script>
 
 <!-- ================================================================
      SYNTHESIS CORE - Modulo fondazionale (inline)
@@ -2013,9 +2033,14 @@ const state = {
   sectionRulerFirstPoint: null,
 };
 
-// Three.js init
-const canvas = document.getElementById('canvas');
-const scene = new THREE.Scene();
+// Three.js init — r169: setup THREE differito a three-ready (era eager a parse-time).
+// Globali assegnati in initThree() perche' l'intera app referenzia scene/camera/renderer/controls/ecc.
+var scene, camera, renderer, controls, transformControls, sceneAmbient, camL1, camL2,
+    raycaster, mouseNDC, _eraserRaycaster, _eraserNDC, sectionScene, sectionCamera, sectionRenderer;
+const canvas = document.getElementById('canvas');  // DOM ref: resta top-level (usato da listener top-level), NON e' THREE
+function initThree(){
+  if(!window.THREE){ window.addEventListener('three-ready', initThree, {once:true}); return; }
+  scene = new THREE.Scene();
 
 // Sfondo identico a Analizzare: gradient lineare 180° (top->bottom) da #438DD6 a #89B2E0
 function makeGradientTexture(c1, c2, angleDeg) {
@@ -2039,14 +2064,15 @@ function makeGradientTexture(c1, c2, angleDeg) {
 scene.background = makeGradientTexture('#438DD6', '#89B2E0', 180);
 
 // === SETUP SCENA 3D — copiato identico da Analizzare ===
-const camera = new THREE.PerspectiveCamera(28, 1, 0.01, 1000);
+camera = new THREE.PerspectiveCamera(28, 1, 0.01, 1000);
 camera.up.set(0, 0, 1);
 camera.position.set(30, 30, 50);
+camera.layers.enable(1); // GIZMO_LAYER: la camera vede i gizmi (deferito da ~4994 top-level, r169)
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, stencil: true });
+renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, stencil: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-const controls = new THREE.TrackballControls(camera, canvas);
+controls = new THREE.TrackballControls(camera, canvas);
 // Blocco 7e: TrackballControls per rotazione completa senza limiti polari.
 // Blocco 7f: velocita base alzate + tasto Shift = turbo (raddoppia tutto)
 const SPEED_BASE = {
@@ -2094,11 +2120,11 @@ window.addEventListener('blur', function(){
 });
 // I limiti polari NON ESISTONO in TrackballControls: rotazione completamente libera in 3D.
 
-const transformControls = new THREE.TransformControls(camera, canvas);
+transformControls = new THREE.TransformControls(camera, canvas);
 transformControls.setMode('translate');
 transformControls.setSize(0.85);
 transformControls.addEventListener('dragging-changed', e => { controls.enabled = !e.value; });
-scene.add(transformControls);
+scene.add(transformControls.getHelper());
 
 // === Blocco 7c: Alt+click pivot (target rotation su punto cliccato) ===
 // Stessa logica di Analizza. Funzione + chiamata immediata.
@@ -2219,14 +2245,14 @@ function installAltClickPivot(controls, camera, renderer, scene){
 installAltClickPivot(controls, camera, renderer, scene);
 
 // Illuminazione fissa sulla camera (ruota col punto di vista) - identica ad Analizzare
-const sceneAmbient = new THREE.AmbientLight(0xffffff, 0.4);
+sceneAmbient = new THREE.AmbientLight(0xffffff, 0.4);
 sceneAmbient.layers.enable(1);
 scene.add(sceneAmbient);
-const camL1 = new THREE.DirectionalLight(0xffffff, 0.6);
+camL1 = new THREE.DirectionalLight(0xffffff, 0.6);
 camL1.position.set(1, 1, 1);
 camL1.layers.enable(1);
 camera.add(camL1);
-const camL2 = new THREE.DirectionalLight(0x6688aa, 0.25);
+camL2 = new THREE.DirectionalLight(0x6688aa, 0.25);
 camL2.position.set(-1, -0.5, -1);
 camL2.layers.enable(1);
 camera.add(camL2);
@@ -2257,6 +2283,15 @@ animate();
 if (controls && typeof controls.handleResize === 'function') {
   controls.handleResize();
 }
+// Blocchi THREE lontani: sub-init chiamati da initThree (erano top-level a parse-time).
+initRuler();
+initEraser();
+initSection();
+hookAnimate();        // wrap renderer.render: scaling gizmi (deferito r169)
+hookSectionRender();  // wrap renderer.render: render PIP sezione (deferito r169)
+}
+// Avvio r169: la guardia in cima a initThree differisce a three-ready (loader importmap+bridge nel body).
+initThree();
 
 // Parser STL custom — identico a quello di Analizzare/Sostituire.
 // Non estrae vertex colors: solo position + normal. Garantisce uniformità di rendering
@@ -2856,10 +2891,13 @@ function updateEmptyHint() {
 // ============================================================
 // RIGHELLO - misurazione tra triangoli
 // ============================================================
-const raycaster = new THREE.Raycaster();
+function initRuler(){
+raycaster = new THREE.Raycaster();
 raycaster.layers.enable(1);  // intercetta anche oggetti sul GIZMO_LAYER
 raycaster.params.Points = { threshold: 0.5 };
-const mouseNDC = new THREE.Vector2();
+mouseNDC = new THREE.Vector2();
+hoverMarker = buildHoverMarker();  // era chiamato top-level a parse-time (deferito r169)
+}
 
 let hoverMarker = null;       // sferetta che segue il mouse sul triangolo
 let pendingLine = null;       // linea temporanea durante il piazzamento secondo punto
@@ -2877,8 +2915,6 @@ function buildHoverMarker() {
   scene.add(m);
   return m;
 }
-hoverMarker = buildHoverMarker();
-
 function buildPointMarker(colorHex) {
   const geo = new THREE.SphereGeometry(0.18, 16, 12);
   const mat = new THREE.MeshBasicMaterial({
@@ -3437,8 +3473,10 @@ function setEraserActive(on) {
 }
 
 // Raycaster e Vector2 riusabili (no allocazioni nel hot path)
-const _eraserRaycaster = new THREE.Raycaster();
-const _eraserNDC = new THREE.Vector2();
+function initEraser(){
+_eraserRaycaster = new THREE.Raycaster();
+_eraserNDC = new THREE.Vector2();
+}
 
 // Cancella un triangolo collassandolo: tutti i 3 vertici diventano uguali
 // al primo. Cosi' ha area zero e non viene renderizzato. Reversibile salvando
@@ -4955,7 +4993,7 @@ function startTechDimEdit(circle, techValueEl) {
 const GIZMO_LAYER = 1;
 
 // La camera deve rendere entrambi i layer
-camera.layers.enable(GIZMO_LAYER);
+// camera.layers.enable(GIZMO_LAYER) -> deferito in initThree (r169, era top-level a parse-time)
 
 function buildHandleGizmo(colorHex, axisDirs) {
   // Gizmo 3D ombreggiato: sfera centrale + frecce coniche con asta cilindrica.
@@ -5815,9 +5853,8 @@ bindShapeButton('btnOct',    'oct');
 bindShapeButton('btnTorx',   'torx');
 
 // Aggiorna labels ad ogni frame
-const _origAnimate = animate;
-// Hook nel loop esistente: aggiorno label nella render call
-(function hookAnimate() {
+// Hook nel loop esistente: aggiorno label nella render call (chiamato da initThree, deferito r169)
+function hookAnimate() {
   const oldRender = renderer.render.bind(renderer);
   renderer.render = function(s, c) {
     // Pre-render: scaling screen-space dei gizmi
@@ -5858,7 +5895,7 @@ const _origAnimate = animate;
     if (state.measures.length > 0) updateMeasureLabels();
     if (state.circles.length > 0) updateCircleLabels();
   };
-})();
+}
 
 // ESC esce dalla modalità righello/cerchio
 document.addEventListener('keydown', e => {
@@ -5956,12 +5993,14 @@ document.addEventListener('keydown', e => {
 // ============================================================
 
 // --- Setup scena 2D per la PIP ---
-const sectionScene = new THREE.Scene();
+const sectionCanvas = document.getElementById('sectionCanvas');  // DOM ref: top-level (listener top-level), NON e' THREE
+function initSection(){
+sectionScene = new THREE.Scene();
 sectionScene.background = new THREE.Color(0x0F1923);
-const sectionCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, -1000, 1000);
-const sectionCanvas = document.getElementById('sectionCanvas');
-const sectionRenderer = new THREE.WebGLRenderer({ canvas: sectionCanvas, antialias: true });
+sectionCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, -1000, 1000);
+sectionRenderer = new THREE.WebGLRenderer({ canvas: sectionCanvas, antialias: true });
 sectionRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+}
 
 // Pending durante "piazza sezione" (preview tra primo e secondo click)
 let pendingSectionRect = null;
@@ -7204,8 +7243,7 @@ window.addEventListener('resize', () => {
 });
 
 // Render loop PIP: si aggancia al render principale
-const _origSecRender = renderer.render;
-(function hookSectionRender(){
+function hookSectionRender(){
   const old = renderer.render.bind(renderer);
   renderer.render = function(s, c) {
     old(s, c);
@@ -7214,7 +7252,7 @@ const _origSecRender = renderer.render;
       updateSectionMeasureLabels();
     }
   };
-})();
+}
 
 // Scorciatoia tastiera S = sezione
 document.addEventListener('keydown', e => {
