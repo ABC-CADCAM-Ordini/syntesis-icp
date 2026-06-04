@@ -24,6 +24,18 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
+## 8.9.0 — color picker per-oggetto negli alberi scena (branch `feat-colori-albero`, NON deployato) (2026-06-03)
+
+Feature: nei **3 alberi scena** ogni oggetto ha un selettore colore (il pallino diventa `<input type="color" class="tree-color">`), per modificare i colori assegnati on-the-fly. **NON deployato**; la "Versione live" resta **8.8.1**.
+
+- **Gestione UNICA** `setSceneObjectColor(target, hex)` + helper `__synApplyColor` (applica il colore a mesh/array/group THREE in modo uniforme): **stesso meccanismo per tutti gli alberi**, dispatch sul `target`. Le 4 funzioni ad-hoc iniziali (setLayerColor / misICP_setLayerColor / sostSetScanColor / sostSetTemplateColor) sono state **rimosse e consolidate**.
+- **/analizzare** (`rebuildTree`): `setSceneObjectColor('scan')` → `scanMesh.material.color` + `envSettings.scanColor` (il pallino ora mostra il colore reale, prima era grigio fisso); `setSceneObjectColor('mua:'+idx)` → `m.color` + connessione `mtMesh` / analogo `anMesh` / asse `axisLine`. **Un colore per MUA**; lo **scanbody mantiene il colore-brand del tipo** (1T3 ambra / OS verde / SR blu = codice clinico, non sovrascritto).
+- **Misurare ICP** (HTML statico): `setSceneObjectColor('icp:'+group)` sui **4 layer** bgA/scbA/bgB/scbB (`misICP_groupMeshes`; storage `misICP_layerColors`).
+- **Sostituire** (`sostRebuildTree`): `setSceneObjectColor('sostscan')` (Multi-A) + `setSceneObjectColor('sosttype:'+key)` **per tipo marker** 1T3/SR/OS (ricolora i gruppi `sostPlaced` + `SOSTITUIRE_TEMPLATE_INFO`).
+- **Verifica** (mock): /analizzare verificato a fondo (picker scansione+MUA applicano al material); ICP/Sostituire verificati in modo leggero (picker presenti, funzioni non lanciano — logica identica a /analizzare). `node --check` OK.
+- **PERSISTENZA**: i colori vivono nello stato della scena ma **non sopravvivono al refresh** — il salvataggio/ripristino "nel caso" è demandato al **progetto dedicato "apri caso"** (vedi Sospesi #7): oggi il viewer NON ricarica un caso salvato (`saveCase`/`exportCase` sono export JSON, nessun load).
+- Bump 8.8.1 → 8.9.0 (MINOR): `registry.BACKEND_VERSION`, v3b `<title>`+`ANALIZZA_BUILD`, `pdf_gen.py VERSION`.
+
 ## 8.8.1 — fix resa colore /analizzare: ColorManagement ON + ri-taratura luci r128 + sfondo sRGB (LIVE su entrambi i servizi + custom domain) (2026-06-03)
 
 Fix di **resa colore** della pipeline r169 (3 cause indipendenti), su segnalazione utente "colori strani / poco tridimensionale / sfondo bruciato". **DEPLOYATO LIVE su entrambi i servizi** il 2026-06-03 (merge no-ff `236d49c`, commit feature `cf08ca7`; sequenza **canary LEGACY → BACKEND**: LEGACY 7ac922ce deploy `7b1b6642`, BACKEND b7671e12 deploy `0c37cd8d`). **Verifica live (curl -sL):** `backend_version=8.8.1` su BACKEND + LEGACY + `app.syntesis-icp.com`, `/analizzare` 200, gating `/api/me/storage` → 403.
@@ -287,6 +299,7 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 4. Merge Albero Scena + Scene Registry in /analizzare (lista lineare con RMSD/gruppo/opacità)
 5. Test pytest sul motore ICP (set base: 16 MUA reali validati clinicamente in v8.1.0)
 6. **Ombre di contatto / Ambient Occlusion su /analizzare** (richiesto 2026-06-03): la resa 8.8.1 ha colore fedele + chiaroscuro r128 ma manca l'occlusione negli interstizi (look "scolpito" del riferimento dentale offline). Prototipo SSAO/GTAO fatto: import addon r169 OK + istanza THREE condivisa OK, MA integrazione = **progetto a sé** — il composer di post-processing sostituisce il render-path e interagisce col clipping/stencil cap del pannello Taglio (rischio di rottura del "vedere dentro") + costo real-time su ~2M px (primo render 459ms). Valutare alternativa **AO bakeato per-vertice al load** (un calcolo all'apertura file, niente pass real-time, zero rischio clipping). Da fare come step dedicato con validazione (taglio attivo, performance, resize, export PDF).
+7. **"Apri caso" nel viewer /analizzare** (richiesto 2026-06-03; abilita la persistenza dei colori 8.9.0): oggi il viewer **NON ricarica** un caso salvato — `saveCase`/`exportCase` esportano un JSON (con MUA + colori) ma nessuna funzione lo ri-importa per ricostruire la scena 3D. **Blocco chiave**: il JSON **non** contiene la geometria STL (solo `filename`+`triangoli`) → l'apri-caso deve decidere come recuperare la mesh (ri-caricamento STL manuale + JSON sovrapposto, oppure dal backend `/api/me/analyses` se conserva l'STL). Progetto dedicato: ricostruzione scansione + MUA + colori (scan/MUA/ICP/Sostituire) + stato. I color picker 8.9.0 tengono già i colori nello stato, pronti da serializzare qui.
 
 > Sospeso #6 "Cleanup syntesis-analyzer-lab.html" chiuso il 2026-05-08 in 8.2.5 con cancellazione del file e della route /lab.
 

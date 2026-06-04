@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.8.1 — **Data:** 2026-06-03
+> **Versione software mappata:** 8.9.0 — **Data:** 2026-06-03
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -103,6 +103,8 @@ App monolite (~3.87 MB). 4 workflow interni commutati da `selectWorkflow(wf)` ([
 | Carica file STL | `#btnLoadFile` | onclick | `syntesisOpenFileDialog` | — | apre file dialog | [1331] | **senza** classe `-only` → di fatto sempre visibile |
 
 > **Doppio sistema di visibilità dei pannelli dx**: `selectWorkflow` li commuta per-workflow (matrice sotto), **ma** il menu **Vista** (`toggleViewPanel`) e i `panel-collapsible` permettono all'utente di mostrarli/nasconderli/collassarli indipendentemente. Le due cose convivono.
+
+> **Color picker per-oggetto (8.9.0)**: nei 3 alberi scena ogni oggetto ha un `<input type="color" class="tree-color">` al posto del pallino statico. **Gestione UNICA** `setSceneObjectColor(target, hex)` [v3b ~3962] + helper `__synApplyColor` (mesh/array/group THREE), stesso meccanismo per tutti gli alberi. Target: `'scan'` (scanMesh + envSettings.scanColor), `'mua:'+idx` (m.color + mtMesh/anMesh/axisLine; scanbody resta colore-brand 1T3/OS/SR = codice clinico), `'icp:'+group` (bgA/scbA/bgB/scbB via misICP_groupMeshes; storage misICP_layerColors), `'sostscan'` (Multi-A), `'sosttype:'+key` (marker per tipo 1T3/SR/OS: gruppi sostPlaced + SOSTITUIRE_TEMPLATE_INFO). Persistenza colori "nel caso" = demandata al progetto **"apri caso"** (vedi STATO Sospesi #7).
 
 > **Deep-link workflow `?wf=` (8.5.0)**: `/analizzare?wf=<wf>` apre direttamente quel workflow al load. Reader al `DOMContentLoaded` (dopo `setMode`, ~[4754](../backend/static/syntesis-analyzer-v3b.html#L4754)) che valida `wf ∈ {analizza,accoppia,misurare,sostituire}` e chiama `selectWorkflow(wf)` via `setTimeout(0)` (default analizza se assente/non valido). Usato dalle card **Misurare**/**Sostituire** della home. La query è preservata dal gate (`syn-gate.js` `rememberDeepLink`).
 
