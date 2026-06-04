@@ -34,6 +34,8 @@
   .brand{display:flex;align-items:baseline;gap:12px}
   .brand .mark{font-family:'Fraunces',serif;font-weight:500;font-size:30px;letter-spacing:-.01em}
   .brand .icp{font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:.32em;color:#7FB3DE;padding-bottom:3px}
+  /* Logo brand reale (synthesis-logo.png) reso bianco sul pannello scuro, come la home (PNG nero su trasparente -> invert) */
+  .brand-logo{height:66px;width:auto;filter:invert(1) brightness(1.9)}
   .lead{max-width:30ch}
   .lead .kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.28em;
     text-transform:uppercase;color:#7FB3DE;margin-bottom:22px;display:block}
@@ -121,7 +123,7 @@
 <body>
   <aside class="stage">
     <div class="grid-lines"></div>
-    <div class="brand"><span class="mark">Syntesis</span><span class="icp">ICP</span></div>
+    <div class="brand"><img class="brand-logo" src="/static/synthesis-logo.png" alt="Synthesis-ICP"></div>
     <div class="lead">
       <span class="kicker">Analisi del posizionamento implantare</span>
       <h1>La precisione<br>diventa <em>misura</em>.</h1>
