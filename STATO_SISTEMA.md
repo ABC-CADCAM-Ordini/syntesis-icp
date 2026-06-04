@@ -2,16 +2,17 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-03, 8.9.0 — color picker per-oggetto negli alberi scena (gestione unica); include 8.8.1 colore CM/luci/sfondo + 8.8.0 pannello Taglio)
+## Versione live (2026-06-04, 8.10.0 — allineamento motori rendering r169 su TUTTE le superfici 3D via fonte unica `ds/syn-render.js` (/vedere + /dashboard portati a r169, /analizzare retrofittato Δ0); color picker /vedere nativo; reticolo /vedere uniformato. Include 8.9.0 color picker alberi + 8.8.x colore/Taglio + 8.7.x base r169)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.9.0 (live, commit `37a99f7` del 2026-06-03, deploy `5ff3216d`) |
-| Legacy syntesis-icp (7ac922ce) | 8.9.0 (live, commit `37a99f7` del 2026-06-03, deploy `cb67bb38`) |
+| Backend principale (b7671e12) | 8.10.0 (live, commit `b78fa8a` del 2026-06-04, deploy `bfcfe7be`) |
+| Legacy syntesis-icp (7ac922ce) | 8.10.0 (live, commit `b78fa8a` del 2026-06-04, deploy `2dcf031c`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.8.1 (**resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. **Color picker per-oggetto** in tutti gli alberi scena (8.9.0, gestione unica `setSceneObjectColor`). _Follow-up aperti: ombre di contatto AO (#6) + persistenza colori "apri caso" (#7) — vedi Sospesi._ |
+| /analizzare | v8.10.0 (**motori r169 via fonte unica** `ds/syn-render.js`, retrofit a comportamento invariato Δ0; **resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. **Color picker per-oggetto** in tutti gli alberi scena (8.9.0, gestione unica `setSceneObjectColor`). _Follow-up aperti: ombre di contatto AO (#6) + persistenza colori "apri caso" (#7) — vedi Sospesi._ |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
-| /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
+| /vedere | v8.0.0-refactor (**r169 dal 8.10.0**: loader importmap+bridge, init differito a three-ready, addon jsm Trackball/Transform[getHelper]/OBJ/PLY, clip/stencil+PiP; **color picker nativo** `setSceneObjectColor`; **reticolo "Entrambi"** uniformato a /analizzare WireframeGeometry nero 0.35; colore Δ0 vs /analizzare) — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
+| /dashboard | preview STL **r169 dal 8.10.0** (`import('three')` dinamico lazy + `applyRendererPipeline`); fix bug `async` orfano pre-esistente (riga ~3585). Zero r128 residuo nel codebase |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
 
 > 8.3.3 fix cutview opacità 100% **confermato risolto a freddo dopo verifica con cache pulita** (2026-05-08). Il fix slider (`material.transparent = true` forzato in /vedere) risolve davvero: ripristina il queue ordering corretto fra layer mesh, stencil meshes e cap plane. Le diagnosi 8.3.4 (angolo camera) e 8.3.5 (collisione cromatica) erano artefatti di test su browser cache stale che continuava a servire 8.3.1. Ticket archiviato in MASTER_DOC §B.8 (CHIUSO). Lezione di processo aggiunta a MASTER_DOC §A.6.2: cache busting esplicito (Cmd+Shift+R o `?v=$(date +%s)`) prima di ogni verifica visiva post-deploy. 8.3.4-5-6 sono doc patch (registry version trail), non deployati.
@@ -23,6 +24,19 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.10.0 — allineamento motori rendering r169 (tutte le superfici 3D) + color picker /vedere + reticolo (LIVE su entrambi i servizi + custom domain) (2026-06-04)
+
+Tutte le superfici 3D portate a Three.js **r169** con la stessa pipeline, via la **fonte unica** `backend/static/ds/syn-render.js` (`applyRendererPipeline` = CM ON + SRGBColorSpace + NoToneMapping + localClipping; `addCameraLightRig` = Ambient 1.2 / key 1.8 / fill 0.75; `makeGradientTexture` sRGB). Catena `feat-render-core`→`dev-three-vedere`→`dev-three-dashboard`→`feat-color-picker-vedere`→`fix-reticolo-vedere`, **mergiata no-ff** in main (`fb77cbf`), bump `b78fa8a`. **DEPLOYATO LIVE su entrambi i servizi** il 2026-06-04 (canary **LEGACY → BACKEND**, `serviceInstanceDeploy latestCommit:true`): LEGACY 7ac922ce deploy `2dcf031c`, BACKEND b7671e12 deploy `bfcfe7be`. **Verifica live (curl -sL):** `backend_version=8.10.0` su BACKEND + LEGACY + `app.syntesis-icp.com`; `<title> v8.10.0`; `/`, `/analizzare`, `/vedere`, `/dashboard` tutte 200; gating `/api/me/storage` → 403; `/vedere` importmap r169 + `/dashboard` `import('three')` + **zero r128 residuo** nel codebase.
+
+- **F1**: estratto il core `ds/syn-render.js` + retrofit /analizzare a comportamento **INVARIATO** (gate pixel: diffPixels 0/262144, scanMeanLum/tint/contrast identici; il colore approvato 8.8.1 non si muove di un pixel).
+- **F2** /vedere r128→r169: loader importmap+bridge `window.THREE`, init eager→differito a `three-ready`; addon jsm (TrackballControls, **TransformControls** con `scene.add(getHelper())` per il breaking r163, OBJLoader, PLYLoader); clip/stencil sezione+PiP riconciliati. Colore **Δ=0** vs /analizzare a parità di input.
+- **F3** /dashboard preview STL r128→r169 (`import('three')` dinamico lazy + `applyRendererPipeline`).
+- **Fix** bug `async` orfano pre-esistente /dashboard (ReferenceError a ogni load, interrompeva l'init top-level a valle: var/setInterval/keydown ora eseguono).
+- **Color picker /vedere** nativo (`<input type="color" class="tree-color">` + `setSceneObjectColor` copiato; vertex-color/highlight Vedere preservati).
+- **Reticolo "Entrambi" /vedere** uniformato a /analizzare (WireframeGeometry+LineSegments nero 0.35).
+- Misurare ICP + Sostituire erano già r169 (workflow dentro /analizzare). Verifica visiva utente OK su /vedere. /vedere resta tag `v8.0.0-refactor` (architetturale). Bump registry/v3b/pdf_gen + MAPPA versione mappata 8.10.0.
+- _Follow-up aperti: issue #2 barra vista globale (solido/reticolo/entrambi) su /vedere — rimandata. Dead code orfano da cleanup dedicato: /vedere `changeObjectColor` + handler 'color' + popup `#colorPop`; /dashboard popup `#colorPop`._
 
 ## 8.9.0 — color picker per-oggetto negli alberi scena (LIVE su entrambi i servizi + custom domain) (2026-06-03)
 
