@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.9.0 — **Data:** 2026-06-03
+> **Versione software mappata:** 8.10.0 — **Data:** 2026-06-04
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
