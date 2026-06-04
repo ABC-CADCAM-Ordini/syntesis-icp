@@ -388,6 +388,11 @@ body{
 }
 .props-color-swatch:hover{transform:scale(1.15)}
 .props-color-swatch.active{box-shadow:0 0 0 2px var(--mario-green)}
+/* Picker colore nativo unificato (come /analizzare): pallino tondo che apre l'OS picker */
+.tree-color{width:13px;height:13px;border:none;border-radius:50%;padding:0;margin:0;flex-shrink:0;cursor:pointer;background:none;-webkit-appearance:none;appearance:none;vertical-align:middle}
+.tree-color::-webkit-color-swatch-wrapper{padding:0}
+.tree-color::-webkit-color-swatch{border:1px solid rgba(0,0,0,0.18);border-radius:50%}
+.tree-color::-moz-color-swatch{border:1px solid rgba(0,0,0,0.18);border-radius:50%}
 
 /* Azioni in fondo: ogni bottone ha il suo accent color */
 .props-actions{
@@ -2614,6 +2619,31 @@ function setLayerColor(id, hex) {
     l.highlight.material.color.setHex(colorHexToInt(hex));
   }
   renderLayerList();
+}
+
+// === Gestione colore unificata (copiata da /analizzare 8.9.0): __synApplyColor + setSceneObjectColor ===
+// In /vedere il target generico e' 'layer:'+synId (o id layer). Preserva i due bit Vedere di
+// setLayerColor: vertex-color attivo -> NON sovrascrive il bianco; highlight del layer selezionato.
+function __synApplyColor(x, col){
+  if(!x) return;
+  if(x.traverse){ x.traverse(function(o){ if(o.material && o.material.color){ o.material.color.copy(col); o.material.needsUpdate=true; } }); }
+  else if(Array.isArray(x)){ x.forEach(function(o){ __synApplyColor(o, col); }); }
+  else if(x.material && x.material.color){ x.material.color.copy(col); x.material.needsUpdate=true; }
+}
+function setSceneObjectColor(target, hex){
+  try{
+    var col = new THREE.Color(hex);
+    var p = String(target).split(':'); var kind = p[0];
+    if(kind === 'layer'){
+      var l = state.layers.find(function(x){ return String(x.synId) === p[1] || String(x.id) === p[1]; });
+      if(!l) return;
+      l.color = hex;
+      if(!(l.hasColor && l.showColor)){ __synApplyColor(l.object, col); }                                  // vertex-color preservato
+      if(state.selectedId === l.id && l.highlight && l.highlight.material){ l.highlight.material.color.copy(col); }  // highlight preservato
+      if(l.synId && window.SynRegistry) window.SynRegistry.update(l.synId, { 'visual.color': hex });
+      renderLayerList();
+    }
+  }catch(e){ console.warn('setSceneObjectColor', e); }
 }
 
 function selectLayer(id) {
@@ -7335,7 +7365,9 @@ setStatus('Pronto');
     const color = colorForObj(obj);
     return `<div class="slp-item${sel}${hidden}${child}" data-id="${obj.id}">
       <button class="slp-eye${eyeClass}" data-action="toggle-visible" data-tooltip="Mostra/nascondi">${eyeIcon}</button>
-      <span class="slp-color-dot" style="background:${color}" data-action="color"></span>
+      ${(obj.type === 'mesh' || obj.type === 'pointcloud')
+        ? `<input type="color" class="tree-color" value="${color}" title="Colore" onclick="event.stopPropagation()" onchange="setSceneObjectColor('layer:${obj.id}', this.value)">`
+        : `<span class="slp-color-dot" style="background:${color}"></span>`}
       <span class="slp-name">${escapeHtml(obj.name)}</span>
       ${meta ? `<span class="slp-meta">${escapeHtml(meta)}</span>` : ''}
       <span class="slp-item-actions">
@@ -7751,7 +7783,7 @@ if (window.SynCutViewManager) {
       <div class="props-section">
         <div class="props-section-title">Colore</div>
         <div class="props-colors">
-          ${SWATCH_COLORS.map(c => `<div class="props-color-swatch ${(obj.visual.color || (layer && layer.color)) === c ? 'active' : ''}" style="background:${c}" data-action="color" data-color="${c}"></div>`).join('')}
+          <input type="color" class="tree-color" value="${obj.visual.color || (layer && layer.color) || '#7A90A4'}" title="Colore" onchange="setSceneObjectColor('layer:${obj.id}', this.value)">
         </div>
       </div>
 
