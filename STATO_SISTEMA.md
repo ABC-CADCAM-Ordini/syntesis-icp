@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-03, 8.8.0 — pannello Taglio /analizzare + compensazione luci 1.3/1.3; include 8.7.2 colore SRGBColorSpace + 8.7.1 Posiziona + 8.7.0 r169/clipping)
+## Versione live (2026-06-03, 8.8.1 — fix resa colore: ColorManagement ON + luci r128 1.2/1.8/0.75 + sfondo sRGB; include 8.8.0 pannello Taglio + 8.7.x r169)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.8.0 (live, commit `f75d012` del 2026-06-03, deploy `a90f1437`) |
-| Legacy syntesis-icp (7ac922ce) | 8.8.0 (live, commit `f75d012` del 2026-06-03, deploy `b72adf77`) |
+| Backend principale (b7671e12) | 8.8.1 (live, commit `236d49c` del 2026-06-03, deploy `0c37cd8d`) |
+| Legacy syntesis-icp (7ac922ce) | 8.8.1 (live, commit `236d49c` del 2026-06-03, deploy `7b1b6642`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.8.0 (pannello **Taglio** di prodotto + compensazione luci 1.3/1.3 → scan ambra luminoso ≈ target v8.5.0; include fix colore SRGBColorSpace 8.7.2 + Posiziona "Entrambi" 8.7.1) — base **motore rendering r169 + clipping/stencil cap**; il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti) che sostituisce il provvisorio `#synClipUI`; convivenza "opacità comanda" (**debito 8.7.0 CHIUSO**); reader `?wf=`; export STL Sostituire con dialog nome file; `.sostituire-only` solo in Sostituire; "Tipo scanbody" (Box A) solo in Analizza/Accoppia; gate accesso attivo |
+| /analizzare | v8.8.1 (**resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. _Follow-up aperto: ombre di contatto (AO) per resa più "scolpita" — vedi Sospesi._ |
 | /accedi | ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | Design system | introdotto in 8.3.0, attivo in prod dal 8.3.1, pilota su /vedere |
@@ -24,9 +24,9 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
-## 8.8.1 — fix resa colore /analizzare: ColorManagement ON + ri-taratura luci r128 + sfondo sRGB (branch `feat-colore-cm`, NON deployato) (2026-06-03)
+## 8.8.1 — fix resa colore /analizzare: ColorManagement ON + ri-taratura luci r128 + sfondo sRGB (LIVE su entrambi i servizi + custom domain) (2026-06-03)
 
-Fix di **resa colore** della pipeline r169 (3 cause indipendenti), su segnalazione utente "colori strani / poco tridimensionale / sfondo bruciato". **NON deployato**; la "Versione live" resta **8.8.0**.
+Fix di **resa colore** della pipeline r169 (3 cause indipendenti), su segnalazione utente "colori strani / poco tridimensionale / sfondo bruciato". **DEPLOYATO LIVE su entrambi i servizi** il 2026-06-03 (merge no-ff `236d49c`, commit feature `cf08ca7`; sequenza **canary LEGACY → BACKEND**: LEGACY 7ac922ce deploy `7b1b6642`, BACKEND b7671e12 deploy `0c37cd8d`). **Verifica live (curl -sL):** `backend_version=8.8.1` su BACKEND + LEGACY + `app.syntesis-icp.com`, `/analizzare` 200, gating `/api/me/storage` → 403.
 
 - **Viraggio tinta verso il giallo/chiaro** → `ColorManagement.enabled = true` (era `false` da 8.7.0). Con CM off i colori sRGB del materiale **non** venivano decodificati in lineare in input, ma l'output era encodato sRGB (pipeline asimmetrica) → `scanColor #fb883c` reso con R/G 1.43 invece di 1.85. CM on = pipeline coerente (decode in input, encode in output) → **R/G 1.43 → 1.88** (= colore scelto). Vale per scanColor, MUA, sfondo.
 - **Poca tridimensionalità/contrasto** → ri-taratura luci. 8.8.0 aveva gonfiato l'**ambient** (0.4→1.3) per la luminosità, appiattendo il chiaroscuro (std ~8). Ripristinato il **rapporto r128** `0.4:0.6:0.25` scalato ×3 → **Ambient 1.2 / key 1.8 / fill bluastra 0.75**. Contrasto **std ~8 → ~13**. Il rapporto direzionale:ambient = 1.5 è il limite oltre cui lo specular bianco lava la tinta (perciò non si può alzare di più la direzionale).
@@ -286,6 +286,7 @@ Promozione `8.1.13-A.5.2 → 8.2.0`: suffisso `-A.x.y` sparisce, MINOR bump come
 **Media**
 4. Merge Albero Scena + Scene Registry in /analizzare (lista lineare con RMSD/gruppo/opacità)
 5. Test pytest sul motore ICP (set base: 16 MUA reali validati clinicamente in v8.1.0)
+6. **Ombre di contatto / Ambient Occlusion su /analizzare** (richiesto 2026-06-03): la resa 8.8.1 ha colore fedele + chiaroscuro r128 ma manca l'occlusione negli interstizi (look "scolpito" del riferimento dentale offline). Prototipo SSAO/GTAO fatto: import addon r169 OK + istanza THREE condivisa OK, MA integrazione = **progetto a sé** — il composer di post-processing sostituisce il render-path e interagisce col clipping/stencil cap del pannello Taglio (rischio di rottura del "vedere dentro") + costo real-time su ~2M px (primo render 459ms). Valutare alternativa **AO bakeato per-vertice al load** (un calcolo all'apertura file, niente pass real-time, zero rischio clipping). Da fare come step dedicato con validazione (taglio attivo, performance, resize, export PDF).
 
 > Sospeso #6 "Cleanup syntesis-analyzer-lab.html" chiuso il 2026-05-08 in 8.2.5 con cancellazione del file e della route /lab.
 
@@ -327,4 +328,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-06-03 — 8.8.0 live su entrambi i servizi + custom domain (pannello Taglio /analizzare + compensazione luci 1.3/1.3, su base 8.7.2). Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-03 — 8.8.1 live su entrambi i servizi + custom domain (fix resa colore: ColorManagement ON + luci r128 1.2/1.8/0.75 + sfondo sRGB; su base 8.8.0 pannello Taglio). Aggiornare al prossimo cambio di stato.*
