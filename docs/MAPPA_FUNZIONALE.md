@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.10.0 — **Data:** 2026-06-04
+> **Versione software mappata:** 8.11.0 — **Data:** 2026-06-05
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -165,24 +165,24 @@ Consumo stato: `placeMUA` ([2753]) legge `getAnalyzeSbType()`/`getAnalyzeSbCfg()
 
 > **Fix 8.7.1 (Posiziona in "Entrambi"):** `onViewportClick` [v3b ~2673] usa `raycaster.intersectObject(scanMesh, false)` (non ricorsivo) + guardia `hits[0].face`. Prima, in modalità "Entrambi", il raycast ricorsivo (default) colpiva per primo l'overlay wireframe (`LineSegments` figlio di scanMesh, senza `.face`) → `hits[0].face.normal` lanciava → placement morto **solo** in Entrambi (Solid/Wireframe ok). Non tocca il motore clip/stencil.
 
-### Sotto-sezione — Taglio: clipping + stencil cap (motore r169) + pannello di prodotto (8.8.0)
+### Sotto-sezione — Taglio: clipping + stencil cap (motore r169) + pannello di prodotto (8.8.0) — **motore estratto in `ds/syn-clip.js` (8.11.0)**
 
-Three.js **r169** (ES module + bridge `window.THREE = Object.assign({}, THREE)`, importmap+module [2026]). Il "vedere dentro" è un **clipping plane + stencil cap** sulla scansione, che **sostituisce la trasparenza** (scansione opaca + `polygonOffset(1,1)`). Clip **solo sulla scansione** (MUA interi). Pilotato dal **pannello "Taglio"** di prodotto (8.8.0), aperto da un pulsante nella view-mode bar (modello Fresabilità). Default taglio **OFF** (scansione carica intera/opaca).
+Three.js **r169** (ES module + bridge `window.THREE = Object.assign({}, THREE)`, importmap+module [2026]). Il "vedere dentro" è un **clipping plane + stencil cap** sulla scansione, che **sostituisce la trasparenza** (scansione opaca + `polygonOffset(1,1)`). Clip **solo sulla scansione** (MUA interi). Pilotato dal **pannello "Taglio"** di prodotto (8.8.0), aperto da un pulsante nella view-mode bar (modello Fresabilità). Default taglio **OFF** (scansione carica intera/opaca). **Dal 8.11.0 il motore (clipping/stencil + pannello "Taglio") vive in `backend/static/ds/syn-clip.js`** (`<script src>` classico, stile `syn-render.js`/`syn-gate.js`): stato su `window.synClip*`, funzioni ri-esposte coi nomi bare → call-site del monolite e handler inline INVARIATI. Gate di equivalenza in `scripts/gate/clip` (golden verbatim ≡ modulo, 0 scostamenti).
 
 > **Fix resa colore (8.7.2 → 8.8.1):** `renderer.outputColorSpace = THREE.SRGBColorSpace` [v3b ~2492] (8.7.2: era `LinearSRGBColorSpace` → scura/desaturata). **8.8.1**: `ColorManagement.enabled = true` [v3b ~2035] (era `false` da 8.7.0) → pipeline coerente: i colori materiale (scanColor/MUA/sfondo) decodificati sRGB→lineare in input e ri-encodati in output → niente più viraggio verso il giallo/chiaro (scanColor reso R/G 1.43 → 1.88 = colore scelto). Luci ri-tarate al **rapporto r128** 0.4:0.6:0.25 ×3 = **Ambient 1.2 / key 1.8 / fill bluastra 0.75** [v3b ~2512-2514] (8.8.0 era 1.3/1.3, ambient-gonfiato → immagine piatta) → chiaroscuro/tridimensionalità recuperati (contrasto std ~8 → ~13); direzionale:ambient = 1.5 è il limite oltre cui lo specular bianco lava la tinta. `makeGradientTexture` [v3b ~12279]: `tex.colorSpace = SRGBColorSpace` (la CanvasTexture sRGB era letta come lineare → sfondo schiarito; ora fedele). `NoToneMapping` invariato. Misurato su mock: scanMeanLum ~133, clip 0, scan + MUA non slavati.
 
 | Elemento | id | Evento | Funzione | Effetto | Righe |
 |---|---|---|---|---|---|
-| Pulsante Taglio (view-mode bar) | `#btnOpenTaglio` | onclick | `openTaglio` | apre `#panelTaglio` (nasconde gli altri pannelli destri); `disabled` finché no scansione | [17092] |
-| Pannello Taglio (`.panel-section`) | `#panelTaglio` | — | `openTaglio`/`closeTaglio` | swap-in stile Fresabilità; `tagState.isOpen` | [1768] |
-| Taglio attivo (`.export-checkbox`) | `#tagToggle` | onchange | `tagOnToggle` | on/off clip+stencil+cap; ON forza scansione opaca | [1768] |
-| Asse piano X/Y/Z (`.comp-radio`) | `#tagAxisRadio` | onchange | `tagOnAxis` | normale del piano (`synClipAxis`) | [1781] |
-| Posizione (range) | `#tagPos` | oninput | `tagOnPos` | offset lungo l'asse (`synClipPos`); bounds da `synClipDiag` | [1791] |
-| Inverti lato (`.export-checkbox`) | `#tagFlip` | onchange | `tagOnFlip` | nega la normale (`synClipFlip`) | [1768] |
+| Pulsante Taglio (view-mode bar) | `#btnOpenTaglio` | onclick | `openTaglio` | apre `#panelTaglio` (nasconde gli altri pannelli destri); `disabled` finché no scansione | [16997] |
+| Pannello Taglio (`.panel-section`) | `#panelTaglio` | — | `openTaglio`/`closeTaglio` | swap-in stile Fresabilità; `tagState.isOpen` | [1774] |
+| Taglio attivo (`.export-checkbox`) | `#tagToggle` | onchange | `tagOnToggle` | on/off clip+stencil+cap; ON forza scansione opaca | [1782] |
+| Asse piano X/Y/Z (`.comp-radio`) | `#tagAxisRadio` | onchange | `tagOnAxis` | normale del piano (`synClipAxis`) | [1787] |
+| Posizione (range) | `#tagPos` | oninput | `tagOnPos` | offset lungo l'asse (`synClipPos`); bounds da `synClipDiag` | [1797] |
+| Inverti lato (`.export-checkbox`) | `#tagFlip` | onchange | `tagOnFlip` | nega la normale (`synClipFlip`) | [1803] |
 
-Handler pannello (v3b): `openTaglio` [2654] / `closeTaglio` [2669] (clone di open/closeFresability, swap pannelli destri, NON tocca `analysisMode`); `tagSyncUI` [2680] (allinea i controlli ai globali del clip); `tagForceScanOpaque` [2698] (taglio ON → scansione opaca + slider opacità 100% via `rebuildTree`). I controlli settano i globali del **motore clip** (`synClipEnabled/Axis/Pos/Flip`) e chiamano `synUpdateClipPlane` [2604] — **motore INVARIATO**: `synMakeStencilGroup` [2579] (back/front incr/decr, renderOrder 1), `synPositionCap` [2595], `synRebuildClip` [2620] ((ri)build da `loadScanFile` [2710] e `rebuildScanMeshGeometry` [11574],[11612]; abilita `#btnOpenTaglio`). Cap plane renderOrder 1.1 (`clearStencil` in `onAfterRender`), mesh visibile renderOrder 6.
+Handler pannello e **motore** in **`backend/static/ds/syn-clip.js`** (estratto da v3b in 8.11.0; nomi ri-esposti su `window`, call-site INVARIATI): `openTaglio` [syn-clip.js 119] / `closeTaglio` [134] (clone di open/closeFresability, swap pannelli destri, NON tocca `analysisMode`); `tagSyncUI` [145] (allinea i controlli ai globali del clip); `tagForceScanOpaque` [163] (taglio ON → scansione opaca + slider opacità 100% via `rebuildTree`). I controlli settano i globali del **motore clip** (`window.synClipEnabled/Axis/Pos/Flip`) e chiamano `synUpdateClipPlane` [70] — **motore INVARIATO**: `synMakeStencilGroup` [43] (back/front incr/decr, renderOrder 1), `synPositionCap` [60], `synRebuildClip` [87] ((ri)build chiamato da `loadScanFile` [v3b 2580] e `rebuildScanMeshGeometry` [v3b 11494],[11532]; abilita `#btnOpenTaglio`). Cap plane renderOrder 1.1 (`clearStencil` in `onAfterRender`), mesh visibile renderOrder 6.
 
-> **Convivenza "opacità comanda" (8.8.0 — debito 8.7.0 CHIUSO):** opacità <100% (`treeUnified_setScanOpacity` [3950]) o ghost (`treeUnified_ghostAll` [3980]) **disattivano** il taglio (trasparenza e clip+cap non coesistono → cap mai rotto). Riattivare il taglio dal pannello forza la scansione opaca + slider opacità a 100%. Lo slider opacità torna a fare **solo opacità**.
+> **Convivenza "opacità comanda" (8.8.0 — debito 8.7.0 CHIUSO):** opacità <100% (`treeUnified_setScanOpacity` [3867]) o ghost (`treeUnified_ghostAll` [3897]) **disattivano** il taglio scrivendo `window.synClipEnabled = false` (trasparenza e clip+cap non coesistono → cap mai rotto) — è il motivo per cui lo stato del motore resta su `window`: così questi call-site esterni sono rimasti INVARIATI nell'estrazione 8.11.0. Riattivare il taglio dal pannello forza la scansione opaca + slider opacità a 100%. Lo slider opacità torna a fare **solo opacità**.
 
 ### Sotto-sezione — workflow **accoppia** (`analysisMode='accoppia'`, ramo [4658])
 
