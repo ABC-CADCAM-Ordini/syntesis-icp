@@ -28,9 +28,12 @@ licenses_generated.txt
 .DS_Store
 Thumbs.db
 
-# Gate harness — artefatti effimeri/riproducibili (il template .mjs/.py resta tracciato)
+# Gate harness — artefatti effimeri/riproducibili (il template resta tracciato)
 scripts/gate/**/vendor/
-scripts/gate/**/clip-old.js
-scripts/gate/**/clip-golden.json
-scripts/gate/**/clip-after.json
+scripts/gate/**/*-old.js
+scripts/gate/**/*-golden.json
+scripts/gate/**/*-after.json
 scripts/gate/**/*.err
+
+# Preview/launch config — locale, mai committato (vincolo utente "no launch.json")
+.claude/launch.json

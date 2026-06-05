@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>panel gate harness</title>
+<style>
+  body { font-family: monospace; }
+  .panel-collapsible.collapsed { outline: 1px dashed #999; }
+  .panel-hidden { display: none; }
+  #viewMenu { display: none; }
+  #viewMenu.open { display: block; }
+  #rightPanel.panel-rail-collapsed { width: 24px; }
+  #dragPanel { position: absolute; left: 0; top: 0; width: 120px; height: 120px; background: #eee; }
+  .syn-drag-handle { height: 20px; background: #ccc; cursor: move; }
+  .syn-resize-handle { position: absolute; right: 0; bottom: 0; width: 12px; height: 12px; }
+</style>
+</head>
+<body>
+  <!-- view menu (G4) -->
+  <div class="view-menu-wrapper">
+    <button onclick="toggleViewMenu(event)">Vista</button>
+    <div id="viewMenu">
+      <div class="view-menu-item" data-vmi-target="panelScanLoad"><span>·</span><span>Scan</span></div>
+      <div class="view-menu-item" data-vmi-target="panelClinicalStatus"><span>·</span><span>Clinico</span></div>
+      <div class="view-menu-item" data-vmi-target="panelMuaList"><span>·</span><span>MUA</span></div>
+      <div class="view-menu-item" data-vmi-target="panelAngleList"><span>·</span><span>Angoli</span></div>
+      <div class="view-menu-item" data-vmi-target="panelAxisInfo"><span>·</span><span>Assi</span></div>
+      <div class="view-menu-item" id="viewMenuRailToggle"><span>·</span><span>rail</span></div>
+      <div class="view-menu-item" onclick="resetViewPanels()"><span>·</span><span>reset</span></div>
+    </div>
+  </div>
+
+  <!-- right column + collapsible panels (G2/G3) -->
+  <div id="rightPanel">
+    <div class="panel-rail-icon" data-rail-target="panelMuaList"></div>
+    <div class="panel-rail-icon" data-rail-target="panelClinicalStatus"></div>
+    <div id="panelScanLoad" class="panel-collapsible"><div class="panel-collapsible-head">Scan</div></div>
+    <div id="panelClinicalStatus" class="panel-collapsible"><div class="panel-collapsible-head">Clinico</div></div>
+    <div id="panelMuaList" class="panel-collapsible"><div class="panel-collapsible-head">MUA</div></div>
+    <div id="panelAngleList" class="panel-collapsible"><div class="panel-collapsible-head">Angoli</div></div>
+    <div id="panelAxisInfo" class="panel-collapsible"><div class="panel-collapsible-head">Assi</div></div>
+  </div>
+
+  <!-- tooltip button (G6) -->
+  <button class="btn icon-only" title="Test tooltip">T</button>
+  <button id="btnLoadFile" class="btn icon-only btn-load-file" title="Carica file" onclick="syntesisOpenFileDialog()">L</button>
+  <input type="file" id="filePicker" style="display:none">
+
+  <!-- draggable test panel (G5) -->
+  <div id="dragPanel"><div class="syn-drag-handle">drag</div><div class="syn-resize-handle"></div></div>
+
+  <script>
+  window.__gateErrors = [];
+  window.addEventListener('error', function(e){ window.__gateErrors.push(String((e && e.message) || e)); });
+  function __param(n){ try { return new URLSearchParams(location.search).get(n); } catch(e){ return null; } }
+
+  window.__runScenario = function(){
+    var out = { exposures: {}, steps: {}, loadErrors: window.__gateErrors.slice() };
+    var fns = ['onSyntesisViewModeChange','synMakePanelDraggable','toggleViewPanel','hidePanel',
+      'showPanel','toggleViewMenu','closeViewMenu','toggleRightColumnRail','resetViewPanels',
+      'syntesisOpenFileDialog','toggleCollapsedPanel','applyViewState','applyRightColumnRail',
+      'toggleAngleListPanel','syntesisRefreshLoadFileButton','_refreshViewMenu'];
+    fns.forEach(function(f){ out.exposures[f] = typeof window[f]; });
+
+    function cls(id){ var el=document.getElementById(id); return el ? Array.prototype.slice.call(el.classList).sort().join(' ') : '(missing)'; }
+    function ls(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+    function snap(){ return { scanLoad:cls('panelScanLoad'), clin:cls('panelClinicalStatus'),
+      mua:cls('panelMuaList'), angle:cls('panelAngleList'), axis:cls('panelAxisInfo'),
+      menuItemMua: (function(){ var i=document.querySelector('.view-menu-item[data-vmi-target="panelMuaList"]'); return i?Array.prototype.slice.call(i.classList).sort().join(' '):'(missing)'; })(),
+      view: ls('syntesis_analizza_view') }; }
+
+    try {
+      localStorage.clear();
+      // G2 — view-state
+      window.applyViewState();                                   out.steps.afterApply = snap();
+      window.hidePanel('panelMuaList');                          out.steps.afterHide = snap();
+      window.showPanel('panelMuaList');                          out.steps.afterShow = snap();
+      window.toggleViewPanel('panelAngleList');                  out.steps.afterToggleHide = snap();
+      window.toggleViewPanel('panelAngleList');                  out.steps.afterToggleShow = snap();
+      window.toggleCollapsedPanel('panelAxisInfo');              out.steps.afterCollapse = snap();
+      window.resetViewPanels();                                  out.steps.afterReset = snap();
+      // G3 — rail
+      window.toggleRightColumnRail();   out.steps.railOn  = { col: cls('rightPanel'), rail: ls('syntesis_analizza_rail') };
+      window.toggleRightColumnRail();   out.steps.railOff = { col: cls('rightPanel'), rail: ls('syntesis_analizza_rail') };
+      // G4 — view menu
+      window.toggleViewMenu();   out.steps.menuOpen  = cls('viewMenu');
+      window.closeViewMenu();    out.steps.menuClosed = cls('viewMenu');
+      // G6 — tooltip (migrateTitles ha già girato al load)
+      var tb = document.querySelector('button.btn.icon-only:not(.btn-load-file)');
+      out.steps.tooltip = tb ? { tip: tb.getAttribute('data-tip'), title: tb.getAttribute('title'), migrated: tb.dataset.tipMigrated } : '(missing)';
+      // G5 — drag (best-effort)
+      try {
+        var dp = document.getElementById('dragPanel'), dh = dp.querySelector('.syn-drag-handle');
+        window.synMakePanelDraggable(dp, dh, 'gateTestPanel', { minWidth: 50, minHeight: 50 });
+        function fire(target, type, x, y){ target.dispatchEvent(new MouseEvent(type, { bubbles:true, cancelable:true, clientX:x, clientY:y, button:0 })); }
+        fire(dh, 'mousedown', 10, 10); fire(window, 'mousemove', 70, 50); fire(window, 'mouseup', 70, 50);
+        out.steps.drag = { left: dp.style.left, top: dp.style.top, ls: ls('syntesis_panel_gateTestPanel') };
+      } catch(e){ out.steps.drag = 'ERR:' + (e && e.message); }
+    } catch(e){ out.scenarioError = String((e && e.stack) || e); }
+
+    out.runtimeErrors = window.__gateErrors.slice();
+    return out;
+  };
+
+  // Stub minimo dell'ambiente monolite: nel monolite reale scanMesh è dichiarato
+  // (var scanMesh in script #4, che gira PRIMA del blocco panel a riga 17062), quindi
+  // il riferimento bare in syntesisRefreshLoadFileButton non lancia. Stato iniziale fedele (null).
+  window.scanMesh = null;
+
+  // carica lo script panel scelto da ?v=old|new e lancia lo scenario al load
+  (function(){
+    var v = __param('v') || 'new';
+    var src = (v === 'old') ? '/scripts/gate/panel/panel-old.js' : '/backend/static/ds/syn-panel.js';
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = function(){ try { window.__gateResult = window.__runScenario(); } catch(e){ window.__gateResult = { fatal: String(e) }; } window.__gateVariant = v; try { sessionStorage.setItem('gate_' + v, JSON.stringify(window.__gateResult)); } catch(e){} window.__gateDone = true; };
+    s.onerror = function(){ window.__gateResult = { loadError: src }; window.__gateDone = true; };
+    document.body.appendChild(s);
+  })();
+  </script>
+</body>
+</html>

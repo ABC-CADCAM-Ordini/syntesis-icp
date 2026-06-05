@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.11.0 — **Data:** 2026-06-05
+> **Versione software mappata:** 8.12.0 — **Data:** 2026-06-05
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -101,6 +101,8 @@ App monolite (~3.87 MB). 4 workflow interni commutati da `selectWorkflow(wf)` ([
 | → Collassa colonna dx | `#viewMenuRailToggle` | onclick | `toggleRightColumnRail` | — | collassa colonna destra | [1322] | |
 | → Mostra tutti | | onclick | `resetViewPanels` | — | ripristina pannelli | [1325] | |
 | Carica file STL | `#btnLoadFile` | onclick | `syntesisOpenFileDialog` | — | apre file dialog | [1331] | **senza** classe `-only` → di fatto sempre visibile |
+
+> **Infra pannelli (8.12.0) estratta in `backend/static/ds/syn-panel.js`** (relocazione in-place verbatim del blocco `<script>` di fine body; markup invariato, funzioni globali per gli handler inline): view-menu/pannelli/rail `toggleViewMenu` [syn-panel.js 675] · `toggleViewPanel` [504] · `hidePanel` [482]/`showPanel` [493] · `toggleRightColumnRail` [534] · `resetViewPanels` [511] · `syntesisOpenFileDialog` [284] · `applyViewState` [447]; drag/resize pannelli `synMakePanelDraggable` [169]; persistenza `syntesis_analizza_view`/`_rail` + tooltip `data-tip`. Nessun link cross-modulo. Gate `scripts/gate/panel` (browser DOM A/B, inline ≡ modulo, diff 0).
 
 > **Doppio sistema di visibilità dei pannelli dx**: `selectWorkflow` li commuta per-workflow (matrice sotto), **ma** il menu **Vista** (`toggleViewPanel`) e i `panel-collapsible` permettono all'utente di mostrarli/nasconderli/collassarli indipendentemente. Le due cose convivono.
 
@@ -345,7 +347,7 @@ Pannello admin (~390 righe). **Wiring via `addEventListener`**; righe utente gen
 | `toggleLayersPanel` | v3b [3491] | Toggle albero scena (`layersPanel`) | btn Livelli [1337] |
 | `openFresability` / `exportComponents` / `openCutView` / `openGroupDialog` / `openSettings` | v3b [5419] / [10095] / [10683] / [11501] / [12444] | Pannelli/dialog: fresabilità, export STL, cutview, gruppi, impostazioni | toolbar/pannelli Analizza/Accoppia |
 | `saveCase` / `exportCase` / `undoLastMUA` / `clearAllMUA` / `toggleAxes` | v3b [3414] / [4228] / [4104] / [4111] / [3365] | Salva, esporta, annulla, reset MUA, toggle assi | menu File / toolbar |
-| `syntesisOpenFileDialog` | v3b [17189] | Apre file dialog STL | btn Carica file [1331] |
+| `syntesisOpenFileDialog` | ds/syn-panel.js [284] | Apre file dialog STL | btn Carica file [1331] |
 | `switchTab` | dashboard [1461] | Cambia sezione della dashboard | sidebar [975-1043] |
 | `render` / `onAuthorize` / `onRevoke` | gestione [262] / [332] / [343] | Render lista / autorizza (genera chiave) / revoca | filtri, righe utente |
 | `setTab` / `checkStatus` / `logout` | accedi [263] / [359] / [421] | Tab login/reg / polling stato / logout | tabs, pannello pending |
