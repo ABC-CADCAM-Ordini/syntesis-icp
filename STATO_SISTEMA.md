@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-04, 8.10.1 — logo brand bianco su /accedi [PATCH]. Base 8.10.0: allineamento motori rendering r169 su TUTTE le superfici 3D via fonte unica `ds/syn-render.js` (/vedere + /dashboard portati a r169, /analizzare retrofittato Δ0); color picker /vedere nativo; reticolo /vedere uniformato)
+## Versione live (2026-06-05, 8.11.0 — estrazione **clip engine** /analizzare in modulo `ds/syn-clip.js` [1° modulo della campagna di modularizzazione del monolite v3b; comportamento INVARIATO via gate di equivalenza]. Base 8.10.1/8.10.0: motori r169 via fonte unica `ds/syn-render.js`, color picker + reticolo /vedere)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.10.1 (live, commit `fd2ebeb` del 2026-06-04, deploy `0e4d724b`) |
-| Legacy syntesis-icp (7ac922ce) | 8.10.1 (live, commit `fd2ebeb` del 2026-06-04, deploy `16b911af`) |
+| Backend principale (b7671e12) | 8.11.0 (live, commit `5185d54` del 2026-06-05, deploy `482ba95c`) |
+| Legacy syntesis-icp (7ac922ce) | 8.11.0 (live, commit `5185d54` del 2026-06-05, deploy `681d90ca`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.10.0 (**motori r169 via fonte unica** `ds/syn-render.js`, retrofit a comportamento invariato Δ0; **resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. **Color picker per-oggetto** in tutti gli alberi scena (8.9.0, gestione unica `setSceneObjectColor`). _Follow-up aperti: ombre di contatto AO (#6) + persistenza colori "apri caso" (#7) — vedi Sospesi._ |
+| /analizzare | v8.11.0 (**motori r169 via fonte unica** `ds/syn-render.js`, retrofit a comportamento invariato Δ0; **resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 — **motore clip + pannello estratti in modulo `ds/syn-clip.js`** dal 8.11.0 (comportamento INVARIATO via gate equivalenza) — + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. **Color picker per-oggetto** in tutti gli alberi scena (8.9.0, gestione unica `setSceneObjectColor`). _Follow-up aperti: ombre di contatto AO (#6) + persistenza colori "apri caso" (#7) — vedi Sospesi._ |
 | /accedi | **logo brand bianco** (8.10.1: `<img src="/static/synthesis-logo.png">` reso bianco via `filter:invert`, al posto del wordmark testo "Syntesis ICP"; corregge anche "Syntesis"→"Synthesis"). Ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor (**r169 dal 8.10.0**: loader importmap+bridge, init differito a three-ready, addon jsm Trackball/Transform[getHelper]/OBJ/PLY, clip/stencil+PiP; **color picker nativo** `setSceneObjectColor`; **reticolo "Entrambi"** uniformato a /analizzare WireframeGeometry nero 0.35; colore Δ0 vs /analizzare) — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | /dashboard | preview STL **r169 dal 8.10.0** (`import('three')` dinamico lazy + `applyRendererPipeline`); fix bug `async` orfano pre-esistente (riga ~3585). Zero r128 residuo nel codebase |
@@ -24,6 +24,14 @@
 > Cleanup 2026-05-08 (8.2.1): rimosso `backend/static/syntesis-statistiche-v7.4.0.001.html` (146KB, 1089 righe). Era dead code: zero referenze nel repo (CI, scripts, Dockerfile, href HTML, .py); sostituito da `v7.4.0.002` servito su `/statistiche`.
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
+
+## 8.11.0 — estrazione clip engine /analizzare in modulo ds/syn-clip.js (LIVE su entrambi i servizi + custom domain) (2026-06-05)
+
+Primo modulo della **campagna di modularizzazione** del monolite `syntesis-analyzer-v3b.html`. Il **clip engine** di /analizzare (clipping plane + stencil cap "vedere dentro" + pannello "Taglio") estratto dal monolite (ex righe 2574-2717, 144 righe) nel modulo **`backend/static/ds/syn-clip.js`** (`<script src>` classico, stile `syn-render.js`/`syn-gate.js`; parse-safe: legge `window.THREE` solo a call-time dopo `three-ready`). **Meccanismo**: stato su `window.synClip*` + funzioni ri-esposte coi nomi bare → i call-site del monolite (`loadScanFile`, `rebuildScanMeshGeometry`, la regola "opacità comanda" `treeUnified_setScanOpacity`/`ghostAll` che scrivono `synClipEnabled`, gli handler inline `#panelTaglio`) restano **INVARIATI**. Diff v3b: +1 (`<script src>`) / −144 (blocco). **Motore INVARIATO.**
+
+**Gate di equivalenza** (`scripts/gate/clip`, harness Node A/B con THREE reale headless, scanMesh sintetica): G1 numerico/strutturale (piano normale/const, centro/diag, stencil group, cap pos/quat/material) + G2 DOM pannello → golden(verbatim) ≡ after(modulo), **0 scostamenti a precisione piena** (Object.is). `node --check` OK su tutti gli 8 `<script>` inline del monolite. Bump 8.11.0 (registry + v3b `<title>`/`ANALIZZA_BUILD`); `docs/MAPPA_FUNZIONALE.md` sezione Taglio → sorgente `ds/syn-clip.js`. Infra: gate template riusabile in `scripts/gate/`. Branch `refactor-extract-clip-engine`, merge no-ff `5185d54`.
+
+**DEPLOYATO LIVE** il 2026-06-05 (canary **LEGACY → BACKEND**, `serviceInstanceDeploy latestCommit:true`): LEGACY `7ac922ce` deploy `681d90ca`, BACKEND `b7671e12` deploy `482ba95c`. **Verifica live (curl -sL):** `backend_version=8.11.0` + `<title>`/`ANALIZZA_BUILD` `8.11.0` + **`/static/ds/syn-clip.js` 200 (11526 byte)** + gating `/api/me/storage` → 403, su BACKEND + LEGACY + `app.syntesis-icp.com`.
 
 ## 8.10.1 — logo brand bianco su /accedi (LIVE su entrambi i servizi + custom domain) (2026-06-04)
 
@@ -359,4 +367,4 @@ Ipotesi di riduzione blast-radius per ripetizione dell'incident 2026-05-21. Da v
 - [docs/AUDIT_2026-05-06.md](docs/AUDIT_2026-05-06.md) — audit codebase pre-promozione
 
 ---
-*Snapshot 2026-06-03 — 8.9.0 live su entrambi i servizi + custom domain (color picker per-oggetto negli alberi scena, gestione unica setSceneObjectColor; su base 8.8.1 colore + 8.8.0 pannello Taglio). Aggiornare al prossimo cambio di stato.*
+*Snapshot 2026-06-05 — 8.11.0 live su entrambi i servizi + custom domain (estrazione clip engine /analizzare in modulo ds/syn-clip.js, 1° modulo della modularizzazione del monolite v3b; comportamento INVARIATO via gate di equivalenza). Aggiornare al prossimo cambio di stato.*
