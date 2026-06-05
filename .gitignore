@@ -27,3 +27,10 @@ licenses_generated.txt
 # OS
 .DS_Store
 Thumbs.db
+
+# Gate harness — artefatti effimeri/riproducibili (il template .mjs/.py resta tracciato)
+scripts/gate/**/vendor/
+scripts/gate/**/clip-old.js
+scripts/gate/**/clip-golden.json
+scripts/gate/**/clip-after.json
+scripts/gate/**/*.err
