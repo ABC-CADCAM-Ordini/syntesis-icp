@@ -8,11 +8,12 @@
 <style>html{visibility:hidden}</style>
 <script src="/static/ds/syn-gate.js"></script>
 <script src="/static/ds/syn-render.js"></script>
+<script src="/static/ds/syn-clip.js"></script>
 <!-- Syntesis-ICP - Analizzare v2
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.10.0</title>
+<title>Syntesis-ICP - Analizzare v8.11.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2330,8 +2331,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.10.0';
-window.ANALIZZA_BUILD_DATE = '2026-06-04';
+window.ANALIZZA_BUILD = '8.11.0';
+window.ANALIZZA_BUILD_DATE = '2026-06-05';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -2571,150 +2572,6 @@ function init(){
 }
 function animate(){requestAnimationFrame(animate);controls.update();updateDivergenceLabels();if(typeof sostEnsureLabelElements==='function')sostEnsureLabelElements();if(typeof sostUpdateLabels==='function')sostUpdateLabels();renderer.render(scene,camera);if(typeof fresOverlayRender==='function')fresOverlayRender();}
 
-// ═══════════════════════════════════════════════════════════════════
-//  CLIP ENGINE (r169) — clipping plane + stencil cap per la scansione.
-//  Sostituisce la trasparenza della scansione per il "vedere dentro".
-//  Pattern ufficiale webgl_clipping_stencil: stencil group (back-face incr /
-//  front-face decr, renderOrder 1) + cap plane (NotEqual + renderer.clearStencil()
-//  in onAfterRender, renderOrder 1.1) + mesh visibile (renderOrder 6).
-//  Clip applicato SOLO alla scansione: i MUA restano interi e leggibili.
-//  NB: la UI di controllo e' il pannello "Taglio" (#panelTaglio, apri/chiudi con #btnOpenTaglio
-//  e openTaglio/closeTaglio; handler sez*). Convivenza con lo slider opacita': "opacita' comanda".
-// ═══════════════════════════════════════════════════════════════════
-var synClipPlane=null, synClipEnabled=false, synClipAxis='y', synClipPos=0, synClipFlip=false;
-var synStencilGroup=null, synCapMesh=null;
-// NB: synClipCenter lazy (no new THREE.* a parse-time: il module r169 e' deferred, window.THREE non c'e' ancora).
-var synClipCenter=null, synClipDiag=100;
-
-function synClipArr(){ return (synClipEnabled && synClipPlane) ? [synClipPlane] : []; }
-
-// Stencil group: back-face incrementa, front-face decrementa (solo stencil, no colore/profondita').
-function synMakeStencilGroup(geometry){
-  var group=new THREE.Group();
-  var base=new THREE.MeshBasicMaterial();
-  base.depthWrite=false; base.depthTest=false; base.colorWrite=false;
-  base.stencilWrite=true; base.stencilFunc=THREE.AlwaysStencilFunc;
-  var back=base.clone(); back.side=THREE.BackSide; back.clippingPlanes=[synClipPlane];
-  back.stencilFail=THREE.IncrementWrapStencilOp; back.stencilZFail=THREE.IncrementWrapStencilOp; back.stencilZPass=THREE.IncrementWrapStencilOp;
-  var mBack=new THREE.Mesh(geometry,back); mBack.renderOrder=1;
-  var front=base.clone(); front.side=THREE.FrontSide; front.clippingPlanes=[synClipPlane];
-  front.stencilFail=THREE.DecrementWrapStencilOp; front.stencilZFail=THREE.DecrementWrapStencilOp; front.stencilZPass=THREE.DecrementWrapStencilOp;
-  var mFront=new THREE.Mesh(geometry,front); mFront.renderOrder=1;
-  group.add(mBack,mFront);
-  return group;
-}
-
-// Allinea il piano-tappo al clip plane (orientamento + posizione coplanare).
-function synPositionCap(){
-  if(!synCapMesh||!synClipPlane) return;
-  var n=synClipPlane.normal.clone();
-  var q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),n);
-  synCapMesh.quaternion.copy(q);
-  synCapMesh.position.copy(n.multiplyScalar(-synClipPlane.constant));
-}
-
-// Ricalcola normale/costante del piano da asse+posizione+flip e propaga ai materiali clippabili.
-function synUpdateClipPlane(){
-  if(!synClipPlane) synClipPlane=new THREE.Plane(new THREE.Vector3(0,-1,0),0);
-  if(!synClipCenter) synClipCenter=new THREE.Vector3();
-  var n=new THREE.Vector3(synClipAxis==='x'?1:0, synClipAxis==='y'?1:0, synClipAxis==='z'?1:0);
-  if(synClipFlip) n.negate();
-  var pt=synClipCenter.clone().add(n.clone().multiplyScalar(synClipPos));
-  synClipPlane.setFromNormalAndCoplanarPoint(n,pt);
-  var arr=synClipArr();
-  if(scanMesh&&scanMesh.material) scanMesh.material.clippingPlanes=arr;
-  if(scanMesh&&scanMesh.userData&&scanMesh.userData.wireframeOverlay&&scanMesh.userData.wireframeOverlay.material) scanMesh.userData.wireframeOverlay.material.clippingPlanes=arr;
-  if(synStencilGroup){ synStencilGroup.visible=synClipEnabled; synStencilGroup.children.forEach(function(m){ m.material.clippingPlanes=(synClipEnabled?[synClipPlane]:[]); }); }
-  if(synCapMesh){ synCapMesh.visible=synClipEnabled; synPositionCap(); }
-}
-
-// (Ri)costruisce stencil group + cap dalla geometria CORRENTE della scansione.
-// Da chiamare quando scanMesh viene creata (loadScanFile) o la sua geometria cambia (rebuildScanMeshGeometry).
-function synRebuildClip(){
-  if(!scanMesh||!scene) return;
-  if(!synClipCenter) synClipCenter=new THREE.Vector3();
-  scanMesh.geometry.computeBoundingBox();
-  var bb=scanMesh.geometry.boundingBox;
-  bb.getCenter(synClipCenter);
-  synClipDiag=bb.getSize(new THREE.Vector3()).length();
-  if(!synClipPlane) synClipPlane=new THREE.Plane(new THREE.Vector3(0,-1,0),0);
-  if(synStencilGroup){ scene.remove(synStencilGroup); synStencilGroup.traverse(function(o){ if(o.material)o.material.dispose(); }); synStencilGroup=null; }
-  if(synCapMesh){ scene.remove(synCapMesh); synCapMesh.geometry.dispose(); synCapMesh.material.dispose(); synCapMesh=null; }
-  synStencilGroup=synMakeStencilGroup(scanMesh.geometry);
-  scene.add(synStencilGroup);
-  // Cap solido: look Phong come la scansione (stesso colore/specular/shininess), disegnato dove stencil!=0.
-  var capMat=new THREE.MeshPhongMaterial({
-    color:new THREE.Color(envSettings.scanColor), specular:0x111111, shininess:30, side:THREE.DoubleSide,
-    stencilWrite:true, stencilRef:0, stencilFunc:THREE.NotEqualStencilFunc,
-    stencilFail:THREE.ReplaceStencilOp, stencilZFail:THREE.ReplaceStencilOp, stencilZPass:THREE.ReplaceStencilOp
-  });
-  synCapMesh=new THREE.Mesh(new THREE.PlaneGeometry(synClipDiag*2.5, synClipDiag*2.5), capMat);
-  synCapMesh.renderOrder=1.1;
-  synCapMesh.onAfterRender=function(r){ r.clearStencil(); };
-  scene.add(synCapMesh);
-  scanMesh.renderOrder=6;
-  var bs=document.getElementById('btnOpenTaglio'); if(bs) bs.disabled=false;
-  var posR=document.getElementById('tagPos');
-  if(posR){ var h=Math.ceil(synClipDiag/2); posR.min=-h; posR.max=h; }
-  synUpdateClipPlane();
-}
-
-// ── Pannello "Taglio" (UI di prodotto del clip engine; sostituisce il provvisorio #synClipUI) ──
-// Pilota i globali del motore clip (synClipEnabled/Axis/Pos/Flip) + synUpdateClipPlane: il MOTORE non cambia.
-// Apri/chiudi sul modello di openFresability/closeFresability.
-var tagState = { isOpen:false };
-
-function openTaglio(){
-  if(typeof scanMesh==='undefined' || !scanMesh){ if(typeof showStatus==='function') showStatus('Carica prima una scansione'); return; }
-  if(typeof fresState!=='undefined' && fresState.isOpen && typeof closeFresability==='function') closeFresability();
-  var panMua=document.getElementById('panelMuaList'), panAng=document.getElementById('panelAngleList'), panAx=document.getElementById('panelAxisInfo'), panFres=document.getElementById('panelFresabilita'), panSez=document.getElementById('panelTaglio');
-  if(panMua) panMua.style.display='none';
-  if(panAng) panAng.style.display='none';
-  if(panAx) panAx.style.display='none';
-  if(panFres) panFres.style.display='none';
-  if(panSez) panSez.style.display='';
-  tagState.isOpen=true;
-  var b=document.getElementById('btnOpenTaglio'); if(b) b.classList.add('active');
-  tagSyncUI();
-  if(typeof showStatus==='function') showStatus('Taglio: taglia la scansione per vedere dentro');
-}
-
-function closeTaglio(){
-  var panMua=document.getElementById('panelMuaList'), panAng=document.getElementById('panelAngleList'), panAx=document.getElementById('panelAxisInfo'), panSez=document.getElementById('panelTaglio');
-  if(panMua) panMua.style.display='';
-  if(panAng) panAng.style.display='';
-  if(panAx) panAx.style.display='';
-  if(panSez) panSez.style.display='none';
-  tagState.isOpen=false;
-  var b=document.getElementById('btnOpenTaglio'); if(b) b.classList.remove('active');
-}
-
-// Allinea i controlli del pannello ai globali correnti del motore clip.
-function tagSyncUI(){
-  var t=document.getElementById('tagToggle'); if(t) t.checked=!!synClipEnabled;
-  var f=document.getElementById('tagFlip'); if(f) f.checked=!!synClipFlip;
-  var p=document.getElementById('tagPos'); if(p) p.value=synClipPos;
-  var pv=document.getElementById('tagPosVal'); if(pv) pv.textContent=synClipPos;
-  var radios=document.querySelectorAll('#tagAxisRadio input[name="sezAxis"]');
-  for(var i=0;i<radios.length;i++){ var r=radios[i]; r.checked=(r.value===synClipAxis); var lab=r.closest('label'); if(lab) lab.classList.toggle('active', r.value===synClipAxis); }
-}
-
-function tagOnToggle(on){
-  if(on){ tagForceScanOpaque(); synClipEnabled=true; } else { synClipEnabled=false; }
-  if(typeof synUpdateClipPlane==='function') synUpdateClipPlane();
-}
-function tagOnAxis(ax){ synClipAxis=ax; if(typeof synUpdateClipPlane==='function') synUpdateClipPlane(); tagSyncUI(); }
-function tagOnPos(v){ synClipPos=parseFloat(v); var pv=document.getElementById('tagPosVal'); if(pv) pv.textContent=v; if(typeof synUpdateClipPlane==='function') synUpdateClipPlane(); }
-function tagOnFlip(on){ synClipFlip=!!on; if(typeof synUpdateClipPlane==='function') synUpdateClipPlane(); }
-
-// Il cap stencil richiede la scansione OPACA: abilitare il taglio forza opaco e riallinea lo slider opacita' a 100%.
-function tagForceScanOpaque(){
-  if(scanMesh && scanMesh.material){
-    var mats=Array.isArray(scanMesh.material)?scanMesh.material:[scanMesh.material];
-    mats.forEach(function(mat){ mat.opacity=1.0; mat.transparent=false; mat._origOpacity=1.0; mat._origTransparent=false; mat.needsUpdate=true; });
-  }
-  if(typeof rebuildTree==='function') rebuildTree();
-}
 
 // Load scan
 function loadScan(input){if(input.files.length>0)loadScanFile(input.files[0])}
