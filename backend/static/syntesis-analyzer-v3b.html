@@ -14795,6 +14795,16 @@ var sostCustomStlBuffer = null;  // Uint8Array del template custom
 var sostTemplateBuffers = {};    // cache {'1T3': Uint8Array, ...} decompressi
 var sostPlacementMode = false;   // true quando siamo in attesa di clic
 var sostPlaced = [];             // [{id, num, group, clickPoint, clickNormal, position, axisDir, templateKey, color, rmsd, axisLine}]
+// ── Diagnostica click grezzi (flag window.SYN_CLICKLOG, OFF di default) ──
+// Helper di dump: stampa window.SYN_CLICKS come JSON pretty, raggruppato per lato.
+// Inerte finche' non viene chiamato; nessun effetto a flag spento.
+window.synDumpClicks = function(){
+  var arr = window.SYN_CLICKS || [];
+  var byLato = { A: [], B: [] };
+  arr.forEach(function(r){ (byLato[r.lato] || (byLato[r.lato] = [])).push(r); });
+  console.log('[SYN_CLICKLOG] ' + arr.length + ' click:\n' + JSON.stringify(byLato, null, 2));
+  return byLato;
+};
 // Stato UI per la scansione Multi-A: opacita' 0..1
 var sostScanUI = { opacity: 1.0, cutOnMarkers: false };
 // Stato UI per le etichette numeriche 3D
@@ -15505,6 +15515,27 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       rmsd: null,
       axisLine: axisLine
     });
+
+    // ── Diagnostica click grezzi (flag window.SYN_CLICKLOG === true) ──
+    // point/normal nel frame NATIVO della mesh, pre-fit e pre-ICP.
+    // Oggi sostMesh ha matrice identita' (nessun transform) -> mondo == locale,
+    // si logga il raw direttamente. Se un domani sostMesh avesse un transform:
+    //   - point arriva in coordinate MONDO -> applicare sostMesh.matrixWorld.clone().invert()
+    //     (mondo -> locale);
+    //   - normal (hits[].face.normal) e' SEMPRE in spazio LOCALE della mesh anche
+    //     col transform -> NON trasformarla (sarebbe gia' locale: l'inverse-transpose
+    //     la ritrasformerebbe due volte). A identita' entrambe le distinzioni sono inerti.
+    // A flag spento: zero effetti. Lato = window.SYN_CLICKLOG_SIDE (default 'A').
+    if(window.SYN_CLICKLOG === true){
+      var __clkRec = {
+        lato: (window.SYN_CLICKLOG_SIDE === 'B' ? 'B' : 'A'),
+        idx: sostPlaced.length - 1,
+        point: [rawPoint.x, rawPoint.y, rawPoint.z],
+        normal: [rawNormal.x, rawNormal.y, rawNormal.z]
+      };
+      (window.SYN_CLICKS = window.SYN_CLICKS || []).push(__clkRec);
+      console.log('[SYN_CLICKLOG]', JSON.stringify(__clkRec));
+    }
 
     var activeInfo = SOSTITUIRE_TEMPLATE_INFO[activeKey] || {label: activeKey};
     sostRenderPlacedList();
