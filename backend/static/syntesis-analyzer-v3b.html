@@ -2668,6 +2668,7 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   // --- STEP 1: trova punti della faccia piatta -> asse ---
   var flatPts = [], flatNorms = [];
   var allNearPts = []; // tutti i punti vicini al click (per fitting cilindro)
+  var allNearNorms = [], allNearAreas = []; // normali+aree triangoli laterali (motore asse lateral-wall)
   
   for(var i = 0; i < nTri; i++){
     var ni = i * 9;
@@ -2694,6 +2695,13 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
     var axialDist = dx*cnx + dy*cny + dz*cnz;
     if(Math.abs(dot) < 0.5 && axialDist < 0.3 && axialDist > -3.0){
       allNearPts.push([cx, cy, cz]);
+      // Motore asse "lateral-wall": accumula normale (gia' normalizzata) + area
+      // del triangolo, per il fit dell'asse dalla parete laterale.
+      var _e1x=pos[ni+3]-pos[ni], _e1y=pos[ni+4]-pos[ni+1], _e1z=pos[ni+5]-pos[ni+2];
+      var _e2x=pos[ni+6]-pos[ni], _e2y=pos[ni+7]-pos[ni+1], _e2z=pos[ni+8]-pos[ni+2];
+      var _crx=_e1y*_e2z-_e1z*_e2y, _cry=_e1z*_e2x-_e1x*_e2z, _crz=_e1x*_e2y-_e1y*_e2x;
+      allNearNorms.push([nx, ny, nz]);
+      allNearAreas.push(0.5*Math.sqrt(_crx*_crx+_cry*_cry+_crz*_crz));
     }
   }
   
@@ -2707,6 +2715,49 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   var avgLen = Math.sqrt(avgN[0]*avgN[0] + avgN[1]*avgN[1] + avgN[2]*avgN[2]);
   if(avgLen < 0.01) return { center: clickPos.clone(), axis: clickNormal.clone() };
   var axis = [avgN[0]/avgLen, avgN[1]/avgLen, avgN[2]/avgLen];
+
+  // ─── MOTORE ASSE ALTERNATIVO "lateral-wall" (setting syntesis_axis_engine) ───
+  // Default 'cap': asse = cap-media (sopra), invariato. Con 'lateralwall' l'asse
+  // cap-media resta come SEED grezzo e viene RAFFINATO dalla parete laterale —
+  // piu' stabile per scanbody con un solo cap pieno + parete (base aperta):
+  //   1. tieni i laterali con |n . asse_grezzo| < 0.35 (scarta cap/disco)
+  //   2. asse = minor eigenvector di S = Σ area_i (n_i n_iᵀ)  [= minor singular
+  //      vector delle normali pesate √area], via misICP_jacobi3 (eigensolver 3x3)
+  //   3. riorienta concorde con l'asse grezzo
+  // I due motori coesistono; tutto a valle (centro, [CylFit], return) usa 'axis'.
+  var _axisEngine = 'cap';
+  try { _axisEngine = localStorage.getItem('syntesis_axis_engine') || 'cap'; } catch(e){}
+  if(_axisEngine === 'lateralwall' && allNearNorms.length >= 8){
+    // Crop r=2.5mm attorno al CLICK (= seed sullo scanbody, come il POC che
+    // croppa attorno al centro-seed). Robusto: un centroide "cap-media"
+    // verrebbe inquinato da superfici piatte complanari al cap (es. il fondo
+    // piatto di una barra isolata), spostando il crop fuori dallo scanbody.
+    var _S = [[0,0,0],[0,0,0],[0,0,0]], _usedLat = 0;
+    for(var _li = 0; _li < allNearNorms.length; _li++){
+      var _ln = allNearNorms[_li], _lp = allNearPts[_li];
+      var _dcx=_lp[0]-cpx, _dcy=_lp[1]-cpy, _dcz=_lp[2]-cpz;
+      if(_dcx*_dcx+_dcy*_dcy+_dcz*_dcz > 6.25) continue;   // crop r=2.5mm dal click (POC)
+      if(Math.abs(_ln[0]*axis[0] + _ln[1]*axis[1] + _ln[2]*axis[2]) >= 0.35) continue;
+      var _w = allNearAreas[_li]; // peso area (= (√area)^2)
+      _S[0][0]+=_w*_ln[0]*_ln[0]; _S[0][1]+=_w*_ln[0]*_ln[1]; _S[0][2]+=_w*_ln[0]*_ln[2];
+      _S[1][1]+=_w*_ln[1]*_ln[1]; _S[1][2]+=_w*_ln[1]*_ln[2]; _S[2][2]+=_w*_ln[2]*_ln[2];
+      _usedLat++;
+    }
+    if(_usedLat >= 8){
+      _S[1][0]=_S[0][1]; _S[2][0]=_S[0][2]; _S[2][1]=_S[1][2];
+      var _eig = misICP_jacobi3(_S);
+      var _mi = 0;
+      if(_eig.vals[1] < _eig.vals[_mi]) _mi = 1;
+      if(_eig.vals[2] < _eig.vals[_mi]) _mi = 2;
+      var _la = [_eig.vecs[0][_mi], _eig.vecs[1][_mi], _eig.vecs[2][_mi]];
+      var _ll = Math.sqrt(_la[0]*_la[0]+_la[1]*_la[1]+_la[2]*_la[2]);
+      if(_ll > 1e-6){
+        _la[0]/=_ll; _la[1]/=_ll; _la[2]/=_ll;
+        if(_la[0]*axis[0]+_la[1]*axis[1]+_la[2]*axis[2] < 0){ _la[0]=-_la[0]; _la[1]=-_la[1]; _la[2]=-_la[2]; }
+        axis = _la;
+      }
+    }
+  }
   
   // SECONDO PASSO (solo se opts passato, cioe' chiamato da Sostituire):
   // rifiltra i flat pts tenendo solo quelli vicini al CLICK lungo l'asse
@@ -3222,6 +3273,20 @@ function onAlgoChange(value){
     optC.style.background = (value === 'client') ? '#F0F9FF' : '#fff';
     optS.style.borderColor = (value === 'server') ? 'var(--blue)' : 'var(--border)';
     optS.style.background = (value === 'server') ? '#F0F9FF' : '#fff';
+  }
+}
+
+// Motore asse cilindro: cap-media (default) vs lateral-wall. Stesso pattern di onAlgoChange.
+function onAxisEngineChange(value){
+  if(value !== 'cap' && value !== 'lateralwall') return;
+  try { localStorage.setItem('syntesis_axis_engine', value); } catch(e){}
+  var optC = document.getElementById('axisEngineOptCap');
+  var optL = document.getElementById('axisEngineOptLateral');
+  if(optC && optL){
+    optC.style.borderColor = (value === 'cap') ? 'var(--blue)' : 'var(--border)';
+    optC.style.background = (value === 'cap') ? '#F0F9FF' : '#fff';
+    optL.style.borderColor = (value === 'lateralwall') ? 'var(--blue)' : 'var(--border)';
+    optL.style.background = (value === 'lateralwall') ? '#F0F9FF' : '#fff';
   }
 }
 
@@ -12430,6 +12495,10 @@ function switchSettingsTab(which){
       var saved = localStorage.getItem('syntesis_mua_algorithm') || 'client';
       var radios = document.querySelectorAll('input[name="algoOpt"]');
       radios.forEach(function(r){ r.checked = (r.value === saved); });
+      // Motore asse cilindro (syntesis_axis_engine): riallinea radio + stile
+      var savedAx = localStorage.getItem('syntesis_axis_engine') || 'cap';
+      document.querySelectorAll('input[name="axisEngineOpt"]').forEach(function(r){ r.checked = (r.value === savedAx); });
+      if(typeof onAxisEngineChange === 'function') onAxisEngineChange(savedAx);
     } catch(e){}
     if(typeof refreshAlgoDiagnostics === 'function') refreshAlgoDiagnostics();
   }
@@ -16949,6 +17018,31 @@ window.addEventListener('DOMContentLoaded',init);
         </div>
         <div style="margin-top:12px;padding:10px 12px;background:#FFF7E6;border:1.5px solid #FCD34D;border-radius:7px;font-family:var(--mono);font-size:12px;color:#92400E;line-height:1.6">
           <b>Modalit&agrave; A/B testing.</b> Stiamo confrontando i due algoritmi su casi reali. Cambia algoritmo, riposiziona gli stessi MUA, e confronta i risultati nel pannello Diagnostica sotto. I dati ci aiutano a decidere quale metodo mantenere in futuro.
+        </div>
+      </div>
+
+      <!-- Motore asse cilindro (syntesis_axis_engine): cap-media (A) vs lateral-wall (B) -->
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-family:var(--mono);font-size:12px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Motore asse cilindro</label>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="axisEngineOptCap">
+            <input type="radio" name="axisEngineOpt" value="cap" checked onchange="onAxisEngineChange(this.value)" style="margin-top:2px">
+            <div style="flex:1">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Cap-media (default)</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
+                Asse = media delle normali della faccia/cap. Metodo storico.
+              </div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="axisEngineOptLateral">
+            <input type="radio" name="axisEngineOpt" value="lateralwall" onchange="onAxisEngineChange(this.value)" style="margin-top:2px">
+            <div style="flex:1">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Lateral-wall (parete laterale)</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
+                Asse raffinato dalle normali della parete laterale (|n&middot;asse| &lt; 0.35), minor eigenvector pesato &radic;area. Piu&apos; stabile per scanbody con un solo cap. Sperimentale (A/B vs Cap-media).
+              </div>
+            </div>
+          </label>
         </div>
       </div>
 
