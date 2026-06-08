@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.12.0 — **Data:** 2026-06-05
+> **Versione software mappata:** 8.12.1 — **Data:** 2026-06-08
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -175,7 +175,7 @@ Three.js **r169** (ES module + bridge `window.THREE = Object.assign({}, THREE)`,
 
 | Elemento | id | Evento | Funzione | Effetto | Righe |
 |---|---|---|---|---|---|
-| Pulsante Taglio (view-mode bar) | `#btnOpenTaglio` | onclick | `openTaglio` | apre `#panelTaglio` (nasconde gli altri pannelli destri); `disabled` finché no scansione | [16997] |
+| Pulsante Taglio (view-mode bar) | `#btnOpenTaglio` | onclick | `openTaglio` | apre `#panelTaglio` (nasconde gli altri pannelli destri); `disabled` finché no scansione | [17012] |
 | Pannello Taglio (`.panel-section`) | `#panelTaglio` | — | `openTaglio`/`closeTaglio` | swap-in stile Fresabilità; `tagState.isOpen` | [1774] |
 | Taglio attivo (`.export-checkbox`) | `#tagToggle` | onchange | `tagOnToggle` | on/off clip+stencil+cap; ON forza scansione opaca | [1782] |
 | Asse piano X/Y/Z (`.comp-radio`) | `#tagAxisRadio` | onchange | `tagOnAxis` | normale del piano (`synClipAxis`) | [1787] |
@@ -215,18 +215,18 @@ Confronto ICP fra 2 STL, viewport dedicato (`misICP_mountViewport` [4701]). Pann
 
 ### Sotto-sezione — workflow **sostituire** (`analysisMode='sostituire'`, ramo [4704])
 
-Sostituzione scan body con ICP. Pannello `panelSostituire` [1876]:
+Sostituzione scan body con ICP. Pannello `panelSostituire` [1915]:
 
 | Elemento | id | Evento | Funzione | Stato | Effetto | Righe |
 |---|---|---|---|---|---|---|
-| Drop scansione partenza | `#sostSlotScan` / `#sostInputScan` | onclick/onchange | `sostInputScan.click()` / `sostOnScanPicked` | — | carica STL partenza | [1883-1886] |
-| **Radio "Scansione di partenza" 1T3/SR/OS (Box B)** | `#sostSourceRadio` | onchange | `sostOnSourceChange` | `sostSourceTemplate`, `sostActiveTemplate` | tipo marker presente (allineamento) | [1889-1892] |
-| Upload custom | `#sostInputCustom` | onchange | `sostOnCustomPicked` | — | template custom | [1895] |
-| + Posiziona | `#sostBtnPlace` | onclick | `sostStartPlacement` | — | placement marker | [1899] |
-| Raffina | `#sostBtnRefine` | onclick | `sostAlignAll` | — | ICP sostituzione | [1900] | disabled di default |
-| Esporta STL | `#sostBtnExport` | onclick | `sostExportSTL` | `_sostExportPending` | apre **`#sostExportDialog`** (nome file precompilato) → Conferma scarica col nome scelto (sanificato, `.stl` auto); Annulla non scarica | [1907] | `display:none` default; dialog nome file (8.4.7) |
+| Drop scansione partenza | `#sostSlotScan` / `#sostInputScan` | onclick/onchange | `sostInputScan.click()` / `sostOnScanPicked` | — | carica STL partenza | [1922-1925] |
+| **Radio "Scansione di partenza" 1T3/SR/OS (Box B)** | `#sostSourceRadio` | onchange | `sostOnSourceChange` | `sostSourceTemplate`, `sostActiveTemplate` | tipo marker presente (allineamento) | [1928-1931] |
+| Upload custom | `#sostInputCustom` | onchange | `sostOnCustomPicked` | — | template custom | [1934] |
+| + Posiziona | `#sostBtnPlace` | onclick | `sostStartPlacement` | — | placement marker | [1938] |
+| Raffina | `#sostBtnRefine` | onclick | `sostAlignAll` | — | ICP sostituzione | [1939] | disabled di default |
+| Esporta STL | `#sostBtnExport` | onclick | `sostExportSTL` | `_sostExportPending` | apre **`#sostExportDialog`** (nome file precompilato) → Conferma scarica col nome scelto (sanificato, `.stl` auto); Annulla non scarica | [1946] | `display:none` default; dialog nome file (8.4.7) |
 
-> **Box B vs Box A**: Box B (`sostSourceTemplate`) = tipo di marker **già presente** nella scansione di partenza, per la registrazione (`SOSTITUIRE_TEMPLATE_INFO`, `BBOX_LOCAL`, `T_ROOT` — [15106]/[15276]/[15286]). NON è ridondante con Box A (`_ANALYZE_SBTYPE`, che guida `placeMUA` in Analizza). Vedi fix 8.4.5 e 8.4.6 sopra.
+> **Box B vs Box A**: Box B (`sostSourceTemplate`) = tipo di marker **già presente** nella scansione di partenza, per la registrazione (`SOSTITUIRE_TEMPLATE_INFO`, `BBOX_LOCAL`, `T_ROOT` — [14849]/[15354]/[15353]). NON è ridondante con Box A (`_ANALYZE_SBTYPE`, che guida `placeMUA` in Analizza). Vedi fix 8.4.5 e 8.4.6 sopra.
 
 ---
 
@@ -339,10 +339,10 @@ Pannello admin (~390 righe). **Wiring via `addEventListener`**; righe utente gen
 | `hardReset` | v3b [4218] | Ricarica l'app con cache-bust `?_r=` | btn Reset [1262] |
 | `newCase` | v3b [4165] | Reset del caso corrente (confirm se stato) | File→Nuovo [1222] |
 | `setAnalyzeSbType` / `getAnalyzeSbType` / `getAnalyzeSbCfg` | v3b [1967] / [1986] / [1987] | Scrive/legge `_ANALYZE_SBTYPE` e cfg CAD | radio Box A [1666-1669]; `placeMUA` |
-| `sostStartPlacement` / `sostAlignAll` | v3b [14960] / [15417] | Placement marker / ICP nel workflow Sostituire | btn `#sostBtnPlace` [1899] / `#sostBtnRefine` [1900] |
-| `sostExportSTL` / `openSostExportNameDialog` / `closeSostExportNameDialog` / `confirmSostExport` / `_sostDoExport` | v3b [15718] / [15757] / [15765] / [15771] / [15787] | Export STL Sostituire con dialog nome file (8.4.7): valida + nome default → apre `#sostExportDialog` → Annulla / Conferma (sanifica) → `_sostDoExport` scarica | btn `#sostBtnExport` [1907]; `#sostExportDialog` |
-| `sostOnSourceChange` | v3b [14812] | Scrive `sostSourceTemplate`/`sostActiveTemplate` (Box B) | radio Box B [1889-1892] |
-| `_hardResetSostituire` | v3b [4503] | Reset stato Sostituire all'uscita | `selectWorkflow` [4592] |
+| `sostStartPlacement` / `sostAlignAll` | v3b [15086] / [15543] | Placement marker / ICP nel workflow Sostituire | btn `#sostBtnPlace` [1938] / `#sostBtnRefine` [1939] |
+| `sostExportSTL` / `openSostExportNameDialog` / `closeSostExportNameDialog` / `confirmSostExport` / `_sostDoExport` | v3b [15859] / [15898] / [15906] / [15912] / [15928] | Export STL Sostituire con dialog nome file (8.4.7): valida + nome default → apre `#sostExportDialog` → Annulla / Conferma (sanifica) → `_sostDoExport` scarica | btn `#sostBtnExport` [1946]; `#sostExportDialog` |
+| `sostOnSourceChange` | v3b [14938] | Scrive `sostSourceTemplate`/`sostActiveTemplate` (Box B) | radio Box B [1928-1931] |
+| `_hardResetSostituire` | v3b [4628] | Reset stato Sostituire all'uscita | `selectWorkflow` [4592] |
 | `misICP_run` | v3b [6264] | ICP di confronto fra 2 STL (Misurare) | btn `#misBtnRun` [1849] |
 | `toggleLayersPanel` | v3b [3491] | Toggle albero scena (`layersPanel`) | btn Livelli [1337] |
 | `openFresability` / `exportComponents` / `openCutView` / `openGroupDialog` / `openSettings` | v3b [5419] / [10095] / [10683] / [11501] / [12444] | Pannelli/dialog: fresabilità, export STL, cutview, gruppi, impostazioni | toolbar/pannelli Analizza/Accoppia |
