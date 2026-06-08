@@ -15747,6 +15747,21 @@ function sostAlignAll(){
 
         var R = Racc, t = tAcc;
 
+        // Guard di idempotenza (Strada A): se la trasformazione TOTALE accumulata
+        // dall'ICP e' sotto soglia di rigidita', il marker e' gia' a convergenza.
+        // Scarta la trasformazione (no-op) cosi' un Raffina ripetuto non muove il
+        // marker. Soglie in unita' fisiche: rotazione < 0.01 deg, traslazione < 1 um.
+        var IDEMP_ROT_DEG = 0.01;
+        var IDEMP_TRANS_MM = 0.001; // 1 um
+        var trace = R[0][0] + R[1][1] + R[2][2];
+        var rotRad = Math.acos(Math.min(1, Math.max(-1, (trace - 1) / 2)));
+        var rotDeg = rotRad * 180 / Math.PI;
+        var transMag = Math.hypot(t[0], t[1], t[2]);
+        if(rotDeg < IDEMP_ROT_DEG && transMag < IDEMP_TRANS_MM){
+          // gia' convergente: non applicare nulla, lascia posa invariata
+          return;
+        }
+
         // 4. Matrice rigida
         var Rm = new THREE.Matrix4().set(
           R[0][0], R[0][1], R[0][2], t[0],
