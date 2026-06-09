@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.17.0 — **Data:** 2026-06-09
+> **Versione software mappata:** 8.18.0 — **Data:** 2026-06-09
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -17,7 +17,7 @@ Sorgenti primarie:
 |---|---|---|---|---|
 | **Home** (splash) | `/` | `synthesis-home.html` | [145-154](../backend/main.py#L145) | Splash pubblica **dark**: bordo perimetrale animato + hero (logo + headline + immagine in card chiara) + 4 card workflow. **8.6.4**: logo dentro l'hero, top allineato all'immagine, layout più ampio e centrato. Sostituisce il vecchio redirect 302 a `/vedere` (fallback se il file manca). |
 | **Vedere** (landing) | `/vedere` | `syntesis-icp-vedere.html` | [177-184](../backend/main.py#L177) | Viewer 3D multi-formato (STL/OBJ/PLY/XYZ/PCD/PTS) con strumenti di misura, forme, annotazioni. Home di default. NON è uno dei 4 workflow dell'analyzer. |
-| **Analizzare** | `/analizzare` | `syntesis-analyzer-v3b.html` | [169-174](../backend/main.py#L169) | App di analisi di precisione (~3.87 MB monolite). 4 workflow interni — analizza, accoppia, misurare, sostituire — gestiti da `selectWorkflow`. |
+| **Analizzare** | `/analizzare` | `syntesis-analyzer-v3b.html` | [169-174](../backend/main.py#L169) | App di analisi di precisione (~3.87 MB monolite). 5 workflow interni — analizza, accoppia, misurare, sostituire, **replace (Replace-iT, 8.18.0)** — gestiti da `selectWorkflow`. |
 | **Dashboard** | `/dashboard` | `syntesis-dashboard-v1.html` | [186-192](../backend/main.py#L186) | Area personale utente (mie analisi, profilo). |
 | **Accedi** | `/accedi` | `syntesis-accedi.html` | [194-201](../backend/main.py#L194) | Accesso a 3 stati: login, registrazione senza licenza (utente pending), pannello attesa con polling `/auth/me` + vista autorizzato. |
 | **Gestione** | `/gestione` | `syntesis-gestione.html` | [203-210](../backend/main.py#L203) | Pannello admin: lista registrati, autorizza (genera chiave) / revoca. **8.16.0**: sezione "Librerie Replace-iT" (ingest/lista/verifica/attivazione librerie scanbody Exocad). API `/admin/*` e `/admin/rit/*` protette da `require_admin`. |
@@ -37,6 +37,7 @@ Non sono route: sono stati interni di `syntesis-analyzer-v3b.html`, commutati da
 | accoppia | [4658](../backend/static/syntesis-analyzer-v3b.html#L4658) | `'accoppia'` | Esporta/confronta accoppiamenti. |
 | misurare | [4678](../backend/static/syntesis-analyzer-v3b.html#L4678) | `'misurare'` | Monta viewport ICP dedicato (2 STL). |
 | sostituire | [4704](../backend/static/syntesis-analyzer-v3b.html#L4704) | `'sostituire'` | Posizionamento marker su scansione di partenza. |
+| **replace** | [~5030](../backend/static/syntesis-analyzer-v3b.html#L5030) | `'replace'` | **Replace-iT (8.18.0, slice 2b-1)**: workflow NUOVO SEPARATO (Sostituisci resta bit-identico). `WORKFLOWS['replace']` [~4599]. Mostra `#panelReplace` [~1964], nasconde tutti gli altri pannelli/toolbar. Vedi sezione dedicata sotto. |
 
 ---
 
@@ -49,7 +50,28 @@ Classi CSS che `selectWorkflow` usa per mostrare/nascondere i pulsanti di toolba
 | `.analisi-only` | 11 | [4609](../backend/static/syntesis-analyzer-v3b.html#L4609) | mostra `''` [4647] | mostra `''` [4669] | nascondi `none` [4694] | nascondi `none` [4719] | Bottoni Analizza/Accoppia (es. "+ Posiziona", "Raffina"). |
 | `.misurare-only` | 2 | [4610](../backend/static/syntesis-analyzer-v3b.html#L4610) | nascondi `none` [4648] | nascondi `none` [4670] | mostra `''` [4695] | nascondi `none` [4720] | |
 | `.sostituire-only` | 4 | [4721](../backend/static/syntesis-analyzer-v3b.html#L4721) inline + gestione centralizzata a fine `selectWorkflow` | nascondi `none` | nascondi `none` | nascondi `none` | mostra `''` | **Corretto in 8.4.6**: gestione centralizzata in `selectWorkflow` (`querySelectorAll('.sostituire-only')` + display per `wf === 'sostituire'`), simmetrica al fix `#panelScanbodyType` 8.4.5. Visibili solo in sostituire, nascosti altrove. |
+| `.sostituire-only` colonna replace → nascondi `none` | — | — | — | — | — | — | (per la riga `.sostituire-only` sopra: in `replace` resta `none`, gestita dal blocco centralizzato `wf === 'sostituire'`). |
+| `.replace-only` | 1 (8.18.0) | [~5064](../backend/static/syntesis-analyzer-v3b.html#L5064) gestione centralizzata a fine `selectWorkflow` | nascondi `none` | nascondi `none` | nascondi `none` | nascondi `none` (replace → mostra `''`) | **8.18.0**: gemello di `.sostituire-only` (`querySelectorAll('.replace-only')` + display per `wf === 'replace'`). Marca il bottone "+ Posiziona" di `#panelReplace`. |
 | `.icon-only` | 26 | — | n/a | n/a | n/a | n/a | **Non** è gating per-workflow: styling per bottoni a sola icona. Citata per completezza. |
+
+### Workflow Replace-iT (`replace`, 8.18.0 — slice 2b-1: UI + fetch marker + piazzamento)
+
+Quinto workflow, **NUOVO e SEPARATO**: clona i mattoni di Sostituire — che resta **bit-identico** (nessun `if(replace)` nelle sue funzioni) — e riusa i **mattoni puri** `parseSTL` (scan), `sostParseSTLToGeometry` (marker), `findScanbodyCenter` (solo l'**asse**). Consuma la superficie 2a `/api/rit/*` (`require_authorized`, Bearer da `localStorage['syntesis_token']`). **NON** include match/Raffina (slice 2b-2).
+
+| Elemento | id / selettore | Evento | Funzione | Effetto | Riga |
+|---|---|---|---|---|---|
+| Voce menu | `[data-wf="replace"]` | click | `selectWorkflow('replace')` | attiva il workflow | [~1304] markup |
+| Pannello | `#panelReplace` | — | — | scan + dropdown libreria/type + lista marker + avviso "allineamento grezzo" | [~1964] |
+| File scan | `#replaceInputScan` / `#replaceSlotScan` | change | `replaceOnScanPicked` → `replaceLoadScanToScene` | carica STL scansione in `replaceMesh` (≠ `sostMesh`) | [~15xxx] |
+| Dropdown libreria | `#replaceLibSelect` | change | `replaceOnLibChange` → `GET /api/rit/libraries/{id}` | popola type | [~15xxx] |
+| Dropdown type | `#replaceTypeSelect` | change | `replaceOnTypeChange` | seleziona type (click_center/axis_asymmetric/marker_sha256) | [~15xxx] |
+| + Posiziona | `#replaceBtnPlace` `.replace-only` | click | `replaceStartPlacement` → `replaceOnViewportClick` → `replacePlaceTemplate` | piazza il marker al click | [~15634/15655] |
+| Lista marker | `#replacePlacedList` | — | `replaceRebuildPlacedList` | elenco multi-marker piazzati | [~15xxx] |
+| Label 2D | `.replace-label` | loop `animate` | `replaceEnsureLabelElements` / `replaceUpdateLabels` | numeri `#N` proiettati | loop `animate` |
+
+**Piazzamento `replacePlaceTemplate`** [~15655]: riconciliazione CAD↔click **senza match** — `A` = asse-mondo da `findScanbodyCenter().axis` × `REPLACE_AXIS_SIGN` (segno **isolato/invertibile** se i marker risultano capovolti); `P` = `rawPoint` (click grezzo, **niente** center radius-dipendente → 2b-2); `q` = quaternion (+Z locale → `A`); `t` = `P − q·click_center` (il `click_center` del CAD cade su `P`). Roll attorno ad `A` **libero**; `axis_asymmetric` **memorizzato** in `replacePlaced` per 2b-2, **non applicato**. Fetch marker via `replaceFetchMarkerGeo` (`GET /api/rit/markers/{sha}` → ArrayBuffer → `sostParseSTLToGeometry`, cache). Reset `_hardResetReplace` [~15772]. Stato `replace*` separato da `sost*`.
+
+> **Albero scena (layersPanel) in `replace`:** **nascosto** in 8.18.0. `rebuildTree()` ha un ramo dedicato solo per `sostituire` (`sostRebuildTree`); per `replace` non esiste ancora un `replaceRebuildTree`, quindi il pannello albero verrebbe vuoto/incoerente → il ramo `replace` imposta `layPan='none'`. La lista dei marker piazzati vive in `#replacePlacedList` (`replaceRebuildPlacedList`, etichetta da `typeLabel` **catturata al piazzamento** così resta corretta col multi-marker cross-libreria). L'albero scena dedicato di Replace-iT è rimandato alla slice **2b-2**.
 
 ### Pannelli a visibilità per-id (non per-classe)
 
