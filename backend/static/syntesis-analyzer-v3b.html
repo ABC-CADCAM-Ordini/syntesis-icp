@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.13.0</title>
+<title>Syntesis-ICP - Analizzare v8.14.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2331,7 +2331,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.13.0';
+window.ANALIZZA_BUILD = '8.14.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-09';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2726,8 +2726,14 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   //   3. riorienta concorde con l'asse grezzo
   // I due motori coesistono; tutto a valle (centro, [CylFit], return) usa 'axis'.
   var _axisEngine = 'cap';
-  try { _axisEngine = localStorage.getItem('syntesis_axis_engine') || 'cap'; } catch(e){}
-  if(_axisEngine === 'lateralwall' && allNearNorms.length >= 8){
+  try { _axisEngine = localStorage.getItem('syntesis_axis_engine') || 'auto'; } catch(e){}
+  // 'auto' (default): lateral-wall solo per SR (radius ~ 2.03). opts.radius arriva
+  // dai call-site sia Sostituire (SOSTITUIRE_TEMPLATE_INFO[...].radius) sia Analizza
+  // (SCANBODY_CFG[...].radius): SR=2.03 -> lateral; 1T3=2.515/OS=1.78 (e opts assente
+  // -> default 2.515) -> cap-media. 'lateralwall'/'cap' espliciti = invariati (8.13.0).
+  var _isSR = (opts && typeof opts.radius === 'number' && Math.abs(opts.radius - 2.03) < 0.1);
+  var _useLateral = (_axisEngine === 'lateralwall') || (_axisEngine === 'auto' && _isSR);
+  if(_useLateral && allNearNorms.length >= 8){
     // Crop r=2.5mm attorno al CLICK (= seed sullo scanbody, come il POC che
     // croppa attorno al centro-seed). Robusto: un centroide "cap-media"
     // verrebbe inquinato da superfici piatte complanari al cap (es. il fondo
@@ -3278,10 +3284,15 @@ function onAlgoChange(value){
 
 // Motore asse cilindro: cap-media (default) vs lateral-wall. Stesso pattern di onAlgoChange.
 function onAxisEngineChange(value){
-  if(value !== 'cap' && value !== 'lateralwall') return;
+  if(value !== 'cap' && value !== 'lateralwall' && value !== 'auto') return;
   try { localStorage.setItem('syntesis_axis_engine', value); } catch(e){}
+  var optA = document.getElementById('axisEngineOptAuto');
   var optC = document.getElementById('axisEngineOptCap');
   var optL = document.getElementById('axisEngineOptLateral');
+  if(optA){
+    optA.style.borderColor = (value === 'auto') ? 'var(--blue)' : 'var(--border)';
+    optA.style.background = (value === 'auto') ? '#F0F9FF' : '#fff';
+  }
   if(optC && optL){
     optC.style.borderColor = (value === 'cap') ? 'var(--blue)' : 'var(--border)';
     optC.style.background = (value === 'cap') ? '#F0F9FF' : '#fff';
@@ -6370,8 +6381,12 @@ function misICP_cylAxis(tris){
   //      √area in senso SVD], via misICP_jacobi3 (eigensolver 3x3, nessuna dep)
   //   4. riorienta concorde col seed. Fallback al seed se < 8 laterali validi.
   var _axisEngine = 'cap';
-  try { _axisEngine = localStorage.getItem('syntesis_axis_engine') || 'cap'; } catch(e){}
-  if(_axisEngine === 'lateralwall'){
+  try { _axisEngine = localStorage.getItem('syntesis_axis_engine') || 'auto'; } catch(e){}
+  // 'auto' (default): lateral-wall solo per cilindro ALTO (H = altezza lungo l'asse
+  // PCA, calcolata sopra come pmax-pmin). SR ~3.0mm -> H>2.4 -> lateral; 1T3 ~1.9 /
+  // OS ~1.1 -> cap-media. 'lateralwall'/'cap' espliciti = invariati (8.13.0).
+  var _useLateral = (_axisEngine === 'lateralwall') || (_axisEngine === 'auto' && H > 2.4);
+  if(_useLateral){
     var _M=[[0,0,0],[0,0,0],[0,0,0]], _usedLat=0;
     for(var _ti=0; _ti<tris.length; _ti++){
       var _t=tris[_ti], _v0=_t[0], _v1=_t[1], _v2=_t[2];
@@ -12543,7 +12558,7 @@ function switchSettingsTab(which){
       var radios = document.querySelectorAll('input[name="algoOpt"]');
       radios.forEach(function(r){ r.checked = (r.value === saved); });
       // Motore asse cilindro (syntesis_axis_engine): riallinea radio + stile
-      var savedAx = localStorage.getItem('syntesis_axis_engine') || 'cap';
+      var savedAx = localStorage.getItem('syntesis_axis_engine') || 'auto';
       document.querySelectorAll('input[name="axisEngineOpt"]').forEach(function(r){ r.checked = (r.value === savedAx); });
       if(typeof onAxisEngineChange === 'function') onAxisEngineChange(savedAx);
     } catch(e){}
@@ -15963,7 +15978,12 @@ function sostAlignAll(){
         // di degrado) ma dal fit lateral-wall (minor eigenvector di wallM, robusto,
         // = Exocad). Poi ri-orientiamo il marker attorno a p.position con la delta
         // rotazione che porta nAx sull'asse parete, propagandola ai gruppi (export).
-        if(wallN >= 8){
+        // Motore asse: 'auto' (default) applica il fit lateral-wall solo a SR;
+        // 'lateralwall' sempre (= 8.13.0); 'cap' mai. sourceKey e' il tipo template.
+        var _ae = 'auto';
+        try { _ae = localStorage.getItem('syntesis_axis_engine') || 'auto'; } catch(e){}
+        var _useLateral = (_ae === 'lateralwall') || (_ae === 'auto' && sourceKey === 'SR');
+        if(wallN >= 8 && _useLateral){
           var ejW = misICP_jacobi3(wallM);
           var miW = 0;
           if(ejW.vals[1] < ejW.vals[miW]) miW = 1;
@@ -17133,10 +17153,19 @@ window.addEventListener('DOMContentLoaded',init);
       <div style="margin-bottom:14px">
         <label style="display:block;font-family:var(--mono);font-size:12px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Motore asse cilindro</label>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="axisEngineOptCap">
-            <input type="radio" name="axisEngineOpt" value="cap" checked onchange="onAxisEngineChange(this.value)" style="margin-top:2px">
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="axisEngineOptAuto">
+            <input type="radio" name="axisEngineOpt" value="auto" checked onchange="onAxisEngineChange(this.value)" style="margin-top:2px">
             <div style="flex:1">
-              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Cap-media (default)</div>
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Auto (consigliato)</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
+                Lateral-wall per scanbody SR (validato), cap-media per 1T3/OS. Sceglie il motore per tipo.
+              </div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="axisEngineOptCap">
+            <input type="radio" name="axisEngineOpt" value="cap" onchange="onAxisEngineChange(this.value)" style="margin-top:2px">
+            <div style="flex:1">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Cap-media</div>
               <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
                 Asse = media delle normali della faccia/cap. Metodo storico.
               </div>

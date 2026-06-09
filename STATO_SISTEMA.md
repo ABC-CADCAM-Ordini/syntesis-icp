@@ -25,6 +25,16 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
+## 8.14.0 — motore asse "auto" (nuovo default) (in rilascio) (2026-06-09)
+
+`syntesis_axis_engine` passa da binario a **3 stati**: `auto` (nuovo default) | `cap` | `lateralwall`. `auto` sceglie il motore **per tipo di scanbody**: lateral-wall per **SR** (validato), cap-media per **1T3/OS** (non ancora validati). Risolto nei 3 path: placement `findScanbodyCenter` (SR via `opts.radius`~2.03), report `misICP_cylAxis` (SR via altezza cilindro `H`>2.4mm), Raffina `sostAlignAll` (SR via `sostSourceTemplate`). UI: 3ª opzione radio "Auto (consigliato)" nel tab Algoritmo.
+
+I valori espliciti `cap`/`lateralwall` restano **identici a 8.13.0** (la logica `auto` è un ramo OR separato). Cambio default: 8.13.0 era `cap` → 8.14.0 `auto`; il Raffina (incondizionato-lateral in 8.13.0) sotto `auto` diventa **SR-only** → per 1T3/OS torna al point-ICP (più conservativo).
+
+Smoke test su **codice vero** (mock): `auto`+SR(r2.03) ≡ `lateralwall` (0.0°), `auto`+1T3(r2.515) ≡ `cap` (0.0°). Design+verifica 4-lensi (workflow sola-lettura, allSound), `node --check` PASS, gate sintassi OK. Bump 8.13.0→8.14.0. `docs/MAPPA_FUNZIONALE.md` aggiornata (radio auto + 3 gate; corretta la riga Raffina che descriveva male 8.13.0 come gated).
+
+(deploy in corso — esiti sotto a verifica)
+
 ## 8.13.0 — motore asse "lateral-wall" robusto (Sostituire + Misurare) (LIVE su entrambi i servizi + custom domain) (2026-06-09)
 
 Chiude il gap angolare con **Exocad** sul fit dell'asse cilindro. Root dimostrato sui dati reali (barra ID 2161): l'errore è nella **stima dell'asse**, NON nell'allineamento ICP (centroidi/RMSD ottimi, è l'asse a sballare).
