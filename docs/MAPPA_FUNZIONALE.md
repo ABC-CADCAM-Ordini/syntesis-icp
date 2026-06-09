@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.16.1 — **Data:** 2026-06-09
+> **Versione software mappata:** 8.17.0 — **Data:** 2026-06-09
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -342,6 +342,17 @@ Aggiunta sotto il pannello utenti, **stessa IIFE e stesso wiring `addEventListen
 **Comportamento ingest** (server): salta `__MACOSX/` e `._*`, ignora subtype/`.sdfa`/firme RSA; **validazione bloccante** = ogni `MarkerFilename` deve esistere come STL nello ZIP (altrimenti 400, rollback totale); dedup STL per `sha256` del contenuto (`rit_marker_stl` globale); `active=FALSE` di default; `uploaded_by` = email admin dal JWT. Conflitto keyword senza `mode` → **409** con `existing[]`, nessuna scrittura.
 
 > **Empty-state e visibilità (`.hidden`)** — gli empty-state `#rit-empty` ("Nessuna libreria importata") e `#empty` (tabella utenti), più il pannello dettaglio `#rit-detail`, si nascondono/mostrano via toggle JS della classe `.hidden` (`ritRender` `.classList.add/remove("hidden")`, `render` utenti, close/open `#rit-detail`). **Fix 8.16.1**: la classe `.hidden` non aveva regola CSS nel `<style>` → il toggle non aveva effetto visivo e `#rit-empty` restava visibile a lista popolata (e `#empty` latente, mascherato dalla tabella sempre popolata). Aggiunta `.hidden{display:none}` (dopo `.empty`): il toggle ora funziona per tutti e tre. Solo CSS, nessuna modifica JS.
+
+### API pubblica di lettura `/api/rit/*` (8.17.0 — Replace-iT Passo 2a, senza UI)
+
+Endpoint **solo backend** in `backend/main.py`, dietro `require_authorized` (admin passa; utente serve `active`+`license_key`; pending → 403), che espongono **solo le librerie `active=TRUE`**. È la superficie che il workflow Replace-iT del monolite (Passo 2b, ancora da costruire) consumerà; **nessun elemento UI in questo passo**. Le scritture restano in `/admin/rit/*` (`require_admin`). Helper in `database.py`: `rit_list_active_libraries` (NEW), `rit_get_marker_bytes` (NEW), `rit_get_library_detail`/`rit_get_library_image` (estesi con `active_only`).
+
+| Metodo · rotta | main.py | Ritorna | 404 / note |
+|---|---|---|---|
+| `GET /api/rit/libraries` | [rit_public_list_libraries](../backend/main.py) | librerie attive: id, import_name, keyword, display, supplier, supplier_version, n_type | solo `active=TRUE`; omette metadati admin |
+| `GET /api/rit/libraries/{id}` | [rit_public_library_detail](../backend/main.py) | root-params (rotation_lock_count, ref_rotation_offset, axis_occlusal) + connection_id/supplier + `types[]` (display, keyword, marker_filename, marker_sha256, click_center, axis_asymmetric, is_eng, ord) | **404** se non esiste o non attiva; omette uploaded_by/uploaded_at/logo |
+| `GET /api/rit/markers/{sha256}` | [rit_public_marker_stl](../backend/main.py) | bytes STL marker, `application/octet-stream`, `ETag=sha256` + `Cache-Control: immutable` | **404** se sha non valido (non 64-hex) o assente; `If-None-Match` → **304**; servito per sha puro (nessun filtro attivazione) |
+| `GET /api/rit/libraries/{id}/preview` | [rit_public_library_preview](../backend/main.py) | preview PNG (`image/png`) | **404** se non attiva o senza preview |
 
 ---
 

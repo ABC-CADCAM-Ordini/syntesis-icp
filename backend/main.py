@@ -6,7 +6,7 @@ Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, RedirectResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import asyncio
@@ -718,6 +718,85 @@ async def registry_constants():
     """
     from registry import to_dict
     return to_dict()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Replace-iT (Passo 2a) - superficie pubblica di LETTURA delle librerie scanbody.
+# Solo librerie ATTIVE (active=TRUE). Gate require_authorized (admin passa;
+# utente serve active+license; pending -> 403), come gli altri /api/* dati. Le
+# SCRITTURE restano in /admin/rit/* (require_admin). Nessuna modifica a v3b.
+# Consumata dal workflow Replace-iT (Passo 2b, monolite) ancora da costruire.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/rit/libraries")
+async def rit_public_list_libraries(current_user: dict = Depends(require_authorized)):
+    """Elenco delle librerie ATTIVE (campi clinici, niente metadati admin)."""
+    from database import rit_list_active_libraries
+    return {"libraries": await rit_list_active_libraries()}
+
+
+@app.get("/api/rit/libraries/{library_id}")
+async def rit_public_library_detail(library_id: int,
+                                    current_user: dict = Depends(require_authorized)):
+    """Dettaglio di una libreria ATTIVA: root-params + type con i parametri
+    per-type. 404 se non esiste o non e' attiva. Omette i metadati admin
+    (uploaded_by/uploaded_at) e il logo."""
+    from database import rit_get_library_detail
+    d = await rit_get_library_detail(library_id, active_only=True)
+    if d is None:
+        raise HTTPException(404, detail="Libreria non trovata o non attiva.")
+    return {
+        "id": d["id"],
+        "import_name": d["import_name"],
+        "keyword": d["keyword"],
+        "display": d["display"],
+        "connection_id": d["connection_id"],
+        "supplier": d["supplier"],
+        "supplier_version": d["supplier_version"],
+        "rotation_lock_count": d["rotation_lock_count"],
+        "ref_rotation_offset": d["ref_rotation_offset"],
+        "axis_occlusal": d["axis_occlusal"],
+        "has_preview": d["has_preview"],
+        "types": d["types"],
+    }
+
+
+@app.get("/api/rit/markers/{sha256}")
+async def rit_public_marker_stl(sha256: str,
+                                if_none_match: Optional[str] = Header(None),
+                                current_user: dict = Depends(require_authorized)):
+    """Bytes STL di un marker per sha256. 404 se assente. ETag=sha256 (contenuto
+    immutabile, indirizzato per contenuto) -> If-None-Match ritorna 304. Servito
+    per sha puro (nessun filtro sull'attivazione: lo sha si scopre solo dal
+    detail di una libreria attiva, la mesh marker non e' dato sensibile)."""
+    sha = (sha256 or "").lower()
+    if len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha):
+        raise HTTPException(404, detail="Marker non trovato.")
+    etag = '"' + sha + '"'
+    cache_headers = {"ETag": etag, "Cache-Control": "private, max-age=31536000, immutable"}
+    inm = (if_none_match or "").strip()
+    if inm.startswith("W/"):
+        inm = inm[2:].strip()
+    if inm.strip('"') == sha:
+        return Response(status_code=304, headers=cache_headers)
+    from database import rit_get_marker_bytes
+    data = await rit_get_marker_bytes(sha)
+    if data is None:
+        raise HTTPException(404, detail="Marker non trovato.")
+    headers = dict(cache_headers)
+    headers["Content-Disposition"] = 'inline; filename="' + sha + '.stl"'
+    return Response(content=data, media_type="application/octet-stream", headers=headers)
+
+
+@app.get("/api/rit/libraries/{library_id}/preview")
+async def rit_public_library_preview(library_id: int,
+                                     current_user: dict = Depends(require_authorized)):
+    """Preview PNG di una libreria ATTIVA. 404 se non attiva o senza preview."""
+    from database import rit_get_library_image
+    png = await rit_get_library_image(library_id, "preview", active_only=True)
+    if png is None:
+        raise HTTPException(404, detail="Anteprima non disponibile.")
+    return Response(content=png, media_type="image/png")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

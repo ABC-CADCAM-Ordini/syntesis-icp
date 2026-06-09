@@ -1490,19 +1490,46 @@ async def rit_list_libraries() -> list[dict]:
     return out
 
 
-async def rit_get_library_detail(library_id: int) -> Optional[dict]:
-    """Dettaglio read-only: root-params + lista type con TUTTI i parametri.
-    Esclude i BYTEA (preview/logo serviti a parte). None se non esiste."""
+async def rit_list_active_libraries() -> list[dict]:
+    """Superficie clinica (/api/rit): solo librerie ATTIVE e soli campi clinici
+    (niente uploaded_by/uploaded_at). Conteggio type incluso come `n_type`."""
     pool = await get_pool()
     async with pool.acquire() as conn:
-        lib = await conn.fetchrow("""
+        rows = await conn.fetch("""
+            SELECT l.id, l.import_name, l.keyword, l.display, l.supplier,
+                   l.supplier_version,
+                   (SELECT COUNT(*) FROM rit_scanbody_type t WHERE t.library_id = l.id) AS n_types
+            FROM rit_library l
+            WHERE l.active = TRUE
+            ORDER BY l.display NULLS LAST, l.import_name
+        """)
+    return [{
+        "id": r["id"],
+        "import_name": r["import_name"],
+        "keyword": r["keyword"],
+        "display": r["display"],
+        "supplier": r["supplier"],
+        "supplier_version": r["supplier_version"],
+        "n_type": int(r["n_types"] or 0),
+    } for r in rows]
+
+
+async def rit_get_library_detail(library_id: int, active_only: bool = False) -> Optional[dict]:
+    """Dettaglio read-only: root-params + lista type con TUTTI i parametri.
+    Esclude i BYTEA (preview/logo serviti a parte). None se non esiste.
+    active_only=True (superficie clinica /api/rit): None anche se la libreria
+    esiste ma non e' attiva."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        _act = " AND active = TRUE" if active_only else ""
+        lib = await conn.fetchrow(f"""
             SELECT id, import_name, keyword, display, connection_id,
                    rotation_lock_count, ref_rotation_offset,
                    axis_occlusal_x, axis_occlusal_y, axis_occlusal_z,
                    supplier, supplier_version, active, uploaded_by, uploaded_at,
                    (preview_png IS NOT NULL) AS has_preview,
                    (logo_png IS NOT NULL) AS has_logo
-            FROM rit_library WHERE id = $1
+            FROM rit_library WHERE id = $1{_act}
         """, library_id)
         if lib is None:
             return None
@@ -1545,12 +1572,26 @@ async def rit_get_library_detail(library_id: int) -> Optional[dict]:
     }
 
 
-async def rit_get_library_image(library_id: int, which: str) -> Optional[bytes]:
-    """Ritorna i bytes di preview_png o logo_png; None se assenti."""
+async def rit_get_library_image(library_id: int, which: str, active_only: bool = False) -> Optional[bytes]:
+    """Ritorna i bytes di preview_png o logo_png; None se assenti.
+    active_only=True (superficie clinica): None anche se la libreria non e' attiva."""
     col = "preview_png" if which == "preview" else "logo_png"
     pool = await get_pool()
     async with pool.acquire() as conn:
-        val = await conn.fetchval(f"SELECT {col} FROM rit_library WHERE id = $1", library_id)
+        _act = " AND active = TRUE" if active_only else ""
+        val = await conn.fetchval(f"SELECT {col} FROM rit_library WHERE id = $1{_act}", library_id)
+    return bytes(val) if val is not None else None
+
+
+async def rit_get_marker_bytes(sha256: str) -> Optional[bytes]:
+    """Bytes STL di un marker per sha256 (globale, /api/rit/markers). None se lo
+    sha non esiste. Nessun filtro sull'attivazione (lo sha si scopre solo dal
+    detail di una libreria attiva; la mesh marker non e' dato sensibile)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        val = await conn.fetchval(
+            "SELECT content FROM rit_marker_stl WHERE sha256 = $1", sha256
+        )
     return bytes(val) if val is not None else None
 
 
