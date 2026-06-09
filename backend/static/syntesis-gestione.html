@@ -108,6 +108,35 @@
     tbody tr{display:block;border-bottom:1px solid var(--line);padding:12px 0}
     .actcell{text-align:left;padding-top:12px}
   }
+  /* ===== Replace-iT: librerie scanbody ===== */
+  .ritsep{height:1px;background:var(--line);margin:46px 0 0}
+  .rit-upload{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .rit-upload input[type=file]{font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;color:var(--ink)}
+  .rit-msg{font-size:13px;color:var(--ink-soft)}
+  .rit-msg.err{color:var(--err)} .rit-msg.ok{color:var(--ok)}
+  .rit-mono{font-family:'IBM Plex Mono',monospace;font-size:12.5px}
+  .pill.eng{background:#EAF7F1;color:var(--ok)}
+  .pill.neng{background:#EEF2F6;color:var(--ink-soft)}
+  .toggle{cursor:pointer;border:1.5px solid var(--line);background:#fff;border-radius:20px;
+    padding:6px 13px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.04em}
+  .toggle:disabled{opacity:.55;cursor:not-allowed}
+  .toggle.on{background:#EAF7F1;border-color:#C5E8D8;color:var(--ok)}
+  .toggle.off{color:var(--ink-soft)}
+  .rit-detail{background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px 26px;margin-top:18px}
+  .rit-detail h4{font-family:'Fraunces',serif;font-weight:500;font-size:19px;margin-bottom:4px}
+  .rit-detail .sub{color:var(--ink-soft);font-size:13px;margin-bottom:16px}
+  .rit-root{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px 22px;margin-bottom:20px}
+  .rit-root .f b{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-soft);margin-bottom:3px;font-weight:600}
+  .rit-root .f span{font-size:13.5px;color:var(--ink)}
+  .rit-prev{float:right;max-width:160px;border:1px solid var(--line);border-radius:10px;margin:0 0 12px 16px}
+  .rit-modal{max-width:580px;text-align:left}
+  .rit-modal h3{text-align:left;margin-bottom:10px}
+  .rit-modal p{text-align:left}
+  .rit-existing{border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:11px}
+  .rit-existing .nm{font-weight:600;color:var(--ink)}
+  .rit-existing .meta{font-size:12.5px;color:var(--ink-soft);margin-top:4px}
+  .rit-modal .row{display:flex;gap:8px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -158,6 +187,31 @@
       </table>
       <div class="empty hidden" id="empty">Nessun utente in questa categoria.</div>
     </div>
+
+    <!-- ===== Replace-iT: librerie scanbody (Passo 1) ===== -->
+    <div class="ritsep"></div>
+    <div class="pagehead" style="margin-top:30px">
+      <h1>Librerie Replace-iT</h1>
+      <p>Importa una libreria Exocad (ZIP), verifica i parametri e attivala. L'attivazione è manuale, dopo il controllo.</p>
+    </div>
+
+    <div class="rit-upload">
+      <input type="file" id="rit-file" accept=".zip,application/zip,application/x-zip-compressed">
+      <button class="btn authorize" id="rit-upload-btn">Carica libreria</button>
+      <span class="rit-msg" id="rit-msg"></span>
+    </div>
+
+    <div class="tablecard">
+      <table>
+        <thead>
+          <tr><th>Import name</th><th>Keyword</th><th>Display</th><th>Fornitore</th><th>Type</th><th>Caricata</th><th>Stato</th><th></th></tr>
+        </thead>
+        <tbody id="rit-rows"></tbody>
+      </table>
+      <div class="empty hidden" id="rit-empty">Nessuna libreria importata.</div>
+    </div>
+
+    <div class="rit-detail hidden" id="rit-detail"></div>
   </div>
 
   <!-- modal chiave generata -->
@@ -174,6 +228,11 @@
       </div>
       <button class="close" id="m-close">Chiudi</button>
     </div>
+  </div>
+
+  <!-- modal conflitto keyword Replace-iT (riempito da JS) -->
+  <div class="overlay" id="rit-overlay">
+    <div class="modal rit-modal" id="rit-conflict"></div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -381,8 +440,208 @@
   $("search").addEventListener("input", function(){ searchTerm=this.value; render(); });
   $("sort").addEventListener("change", function(){ sortMode=this.value; render(); });
 
+  // ========== Replace-iT: librerie scanbody ==========
+  var ritLibs = [];
+
+  function ritMsg(t, cls){
+    var el=$("rit-msg"); el.textContent=t||"";
+    el.className="rit-msg"+(cls?(" "+cls):"");
+  }
+
+  function ritLoad(){
+    // GET /admin/rit/libraries -> { libraries:[...] }
+    fetch(API+"/admin/rit/libraries",{headers:adminHeaders()})
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(d){ ritLibs=(d.libraries||[]); ritRender(); })
+      .catch(function(status){ if(status!==401 && status!==403){ toast("Errore nel caricamento delle librerie."); } });
+  }
+
+  function ritRender(){
+    var tb=$("rit-rows"); tb.innerHTML="";
+    if(!ritLibs.length){ $("rit-empty").classList.remove("hidden"); return; }
+    $("rit-empty").classList.add("hidden");
+    ritLibs.forEach(function(L){
+      var tr=document.createElement("tr");
+      tr.innerHTML =
+        '<td class="uname">'+escapeHtml(L.import_name)+'</td>'+
+        '<td class="umeta rit-mono">'+escapeHtml(L.keyword||"—")+'</td>'+
+        '<td class="umeta">'+escapeHtml(L.display||"—")+'</td>'+
+        '<td class="umeta">'+escapeHtml(L.supplier||"—")+(L.supplier_version?' · '+escapeHtml(L.supplier_version):'')+'</td>'+
+        '<td class="umeta num">'+(L.n_types!=null?L.n_types:0)+'</td>'+
+        '<td class="umeta">'+fmtDate(L.uploaded_at)+(L.uploaded_by?'<br><span class="uemail">'+escapeHtml(L.uploaded_by)+'</span>':'')+'</td>'+
+        '<td>'+(L.active
+            ? '<span class="pill ok"><span class="dot"></span>Attiva</span>'
+            : '<span class="pill wait"><span class="dot"></span>Non attiva</span>')+'</td>'+
+        '<td class="actcell"></td>';
+      var act=tr.querySelector(".actcell");
+      var det=document.createElement("button");
+      det.className="btn revoke"; det.textContent="Dettagli"; det.style.marginRight="8px";
+      det.addEventListener("click", function(){ ritDetail(L.id); });
+      act.appendChild(det);
+      var tg=document.createElement("button");
+      tg.className="toggle "+(L.active?"on":"off");
+      tg.textContent=L.active?"Disattiva":"Attiva";
+      tg.addEventListener("click", function(){ ritToggle(L, tg); });
+      act.appendChild(tg);
+      tb.appendChild(tr);
+    });
+  }
+
+  function ritToggle(L, btn){
+    var next=!L.active;
+    btn.disabled=true;
+    fetch(API+"/admin/rit/libraries/"+L.id+"/active",
+      {method:"PATCH",
+       headers:{"Authorization":"Bearer "+ADMIN_TOKEN,"Content-Type":"application/json"},
+       body:JSON.stringify({active:next})})
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(){ L.active=next; ritRender(); toast(next?"Libreria attivata.":"Libreria disattivata."); })
+      .catch(function(){ btn.disabled=false; toast("Errore nel cambio stato."); });
+  }
+
+  function ritUpload(opts){
+    opts = opts || {};
+    var f=$("rit-file").files[0];
+    if(!f){ ritMsg("Seleziona un file ZIP.","err"); return; }
+    var fd=new FormData(); fd.append("file", f);
+    if(opts.mode){ fd.append("mode", opts.mode); }
+    if(opts.import_name){ fd.append("import_name", opts.import_name); }
+    if(opts.target_library_id!=null){ fd.append("target_library_id", String(opts.target_library_id)); }
+    $("rit-upload-btn").disabled=true; ritMsg("Caricamento…");
+    // NB: niente Content-Type manuale -> il browser imposta il boundary multipart.
+    fetch(API+"/admin/rit/libraries",{method:"POST",headers:adminHeaders(),body:fd})
+      .then(function(r){ return r.json().then(function(j){ return {status:r.status, body:j}; },
+                                              function(){ return {status:r.status, body:{}}; }); })
+      .then(function(res){
+        $("rit-upload-btn").disabled=false;
+        if(res.status===200 && res.body.status==="ok"){
+          $("rit-file").value="";
+          ritMsg('Importata "'+res.body.import_name+'" ('+res.body.n_types+' type, '+res.body.n_markers+' STL). Verifica i parametri, poi attivala.',"ok");
+          ritLoad();
+          return;
+        }
+        if(res.status===409 && res.body.status==="keyword_conflict"){ ritShowConflict(res.body); ritMsg(""); return; }
+        if(res.status===409 && res.body.status==="import_name_taken"){
+          ritMsg('Nome import già in uso: "'+res.body.import_name+'". Scegline un altro.',"err"); return;
+        }
+        ritMsg("Errore: "+(res.body.detail||res.body.message||("HTTP "+res.status)),"err");
+      })
+      .catch(function(){ $("rit-upload-btn").disabled=false; ritMsg("Errore di rete durante il caricamento.","err"); });
+  }
+
+  // 409 keyword_conflict: mostra ESPLICITAMENTE ogni libreria sovrascrivibile
+  // (import_name, caricata, n. type, uploaded_by) da existing[]; scelta per riga.
+  function ritShowConflict(body){
+    var box=$("rit-conflict");
+    var p=body.parsed||{};
+    var html='<h3>Keyword già presente</h3>'+
+      '<p>Il pacchetto ha keyword <strong>'+escapeHtml(body.keyword)+'</strong> ('+
+        escapeHtml(p.display||"—")+' · '+(p.n_types!=null?p.n_types:"?")+' type). '+
+        'Esiste già '+((body.existing||[]).length>1?'più di una libreria':'una libreria')+
+        ' con questa keyword. Scegli quale sostituire, oppure importa come libreria distinta.</p>';
+    (body.existing||[]).forEach(function(e){
+      html+='<div class="rit-existing">'+
+        '<div class="nm">'+escapeHtml(e.import_name)+
+          (e.active?' <span class="pill ok"><span class="dot"></span>attiva</span>':'')+'</div>'+
+        '<div class="meta">'+escapeHtml(e.display||"—")+' · '+(e.n_types!=null?e.n_types:0)+' type · '+
+          'caricata '+fmtDate(e.uploaded_at)+(e.uploaded_by?' da '+escapeHtml(e.uploaded_by):'')+'</div>'+
+        '<div class="row"><button class="btn revoke" data-ow="'+e.id+'">Sovrascrivi questa</button></div>'+
+      '</div>';
+    });
+    html+='<div class="row" style="margin-top:16px">'+
+      '<button class="btn authorize" id="rit-asnew">Importa come nuova…</button>'+
+      '<button class="btn revoke" id="rit-cancel">Annulla</button></div>';
+    box.innerHTML=html;
+    box.querySelectorAll("[data-ow]").forEach(function(b){
+      b.addEventListener("click", function(){
+        var id=parseInt(b.getAttribute("data-ow"),10);
+        var e=(body.existing||[]).filter(function(x){ return x.id===id; })[0];
+        var nm=e?e.import_name:String(id);
+        if(!confirm('Sovrascrivere la libreria "'+nm+'"?\nI suoi type verranno sostituiti. Gli STL deduplicati restano in archivio.')) return;
+        ritCloseConflict();
+        ritUpload({mode:"overwrite", target_library_id:id});
+      });
+    });
+    box.querySelector("#rit-asnew").addEventListener("click", function(){
+      var nm=prompt("Nome import per la nuova libreria (univoco):", (body.keyword||"libreria")+"-2");
+      if(nm==null) return;
+      nm=String(nm).trim(); if(!nm){ return; }
+      ritCloseConflict();
+      ritUpload({mode:"new", import_name:nm});
+    });
+    box.querySelector("#rit-cancel").addEventListener("click", ritCloseConflict);
+    $("rit-overlay").classList.add("show");
+  }
+  function ritCloseConflict(){ $("rit-overlay").classList.remove("show"); }
+
+  function ritFld(lbl, val){
+    var v=(val==null || val==="") ? "—" : val;
+    return '<div class="f"><b>'+escapeHtml(lbl)+'</b><span>'+escapeHtml(v)+'</span></div>';
+  }
+  function ritVec(v){
+    if(!v) return "—";
+    function n(x){ return (x==null) ? "·" : (Math.round(x*1000)/1000); }
+    return "("+n(v.x)+", "+n(v.y)+", "+n(v.z)+")";
+  }
+
+  function ritDetail(id){
+    fetch(API+"/admin/rit/libraries/"+id,{headers:adminHeaders()})
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(ritRenderDetail)
+      .catch(function(){ toast("Errore nel caricamento del dettaglio."); });
+  }
+
+  function ritRenderDetail(d){
+    var el=$("rit-detail");
+    var html='<h4>'+escapeHtml(d.import_name)+'</h4>'+
+      '<div class="sub">Parametri letti dal config.xml (sola lettura). '+
+        (d.active?'Libreria attiva.':'Non ancora attiva.')+'</div>'+
+      '<div class="rit-root">'+
+        ritFld("Keyword", d.keyword)+
+        ritFld("Display", d.display)+
+        ritFld("Connection ID", d.connection_id)+
+        ritFld("Rotation lock", d.rotation_lock_count)+
+        ritFld("Ref rotation offset", d.ref_rotation_offset)+
+        ritFld("Axis occlusal", ritVec(d.axis_occlusal))+
+        ritFld("Fornitore", (d.supplier||"")+(d.supplier_version?(" "+d.supplier_version):""))+
+        ritFld("Caricata da", d.uploaded_by)+
+      '</div>'+
+      '<div class="tablecard"><table><thead><tr>'+
+        '<th>#</th><th>Display</th><th>Keyword</th><th>Marker</th>'+
+        '<th>Click center</th><th>Axis asym.</th><th>ENG</th></tr></thead><tbody>';
+    (d.types||[]).forEach(function(t){
+      html+='<tr>'+
+        '<td class="umeta num">'+(t.ord!=null?t.ord:"")+'</td>'+
+        '<td class="umeta">'+escapeHtml(t.display||"—")+'</td>'+
+        '<td class="umeta rit-mono">'+escapeHtml(t.keyword||"—")+'</td>'+
+        '<td class="umeta rit-mono">'+escapeHtml(t.marker_filename||"—")+'</td>'+
+        '<td class="umeta rit-mono">'+ritVec(t.click_center)+'</td>'+
+        '<td class="umeta rit-mono">'+ritVec(t.axis_asymmetric)+'</td>'+
+        '<td>'+(t.is_eng?'<span class="pill eng">ENG</span>':'<span class="pill neng">Non-ENG</span>')+'</td>'+
+      '</tr>';
+    });
+    html+='</tbody></table></div>'+
+      '<div class="row" style="margin-top:14px"><button class="btn revoke" id="rit-detail-close">Chiudi dettaglio</button></div>';
+    el.innerHTML=html;
+    el.querySelector("#rit-detail-close").addEventListener("click", function(){ el.classList.add("hidden"); el.innerHTML=""; });
+    if(d.has_preview){
+      // preview dietro auth: fetch come blob (un <img src> non porta il Bearer)
+      fetch(API+"/admin/rit/libraries/"+d.id+"/preview",{headers:adminHeaders()})
+        .then(function(r){ return r.ok ? r.blob() : Promise.reject(); })
+        .then(function(b){ var img=document.createElement("img"); img.className="rit-prev";
+          img.alt="anteprima"; img.src=URL.createObjectURL(b); el.insertBefore(img, el.firstChild); })
+        .catch(function(){});
+    }
+    el.classList.remove("hidden");
+    el.scrollIntoView({behavior:"smooth", block:"start"});
+  }
+
+  $("rit-upload-btn").addEventListener("click", function(){ ritUpload(); });
+  $("rit-overlay").addEventListener("click", function(e){ if(e.target===$("rit-overlay")) ritCloseConflict(); });
+
   // ---------- init ----------
   loadUsers();
+  ritLoad();
 
 })();
 </script>

@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.15.0 — **Data:** 2026-06-09
+> **Versione software mappata:** 8.16.0 — **Data:** 2026-06-09
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -20,7 +20,7 @@ Sorgenti primarie:
 | **Analizzare** | `/analizzare` | `syntesis-analyzer-v3b.html` | [169-174](../backend/main.py#L169) | App di analisi di precisione (~3.87 MB monolite). 4 workflow interni — analizza, accoppia, misurare, sostituire — gestiti da `selectWorkflow`. |
 | **Dashboard** | `/dashboard` | `syntesis-dashboard-v1.html` | [186-192](../backend/main.py#L186) | Area personale utente (mie analisi, profilo). |
 | **Accedi** | `/accedi` | `syntesis-accedi.html` | [194-201](../backend/main.py#L194) | Accesso a 3 stati: login, registrazione senza licenza (utente pending), pannello attesa con polling `/auth/me` + vista autorizzato. |
-| **Gestione** | `/gestione` | `syntesis-gestione.html` | [203-210](../backend/main.py#L203) | Pannello admin: lista registrati, autorizza (genera chiave) / revoca. API `/admin/*` protette da `require_admin`. |
+| **Gestione** | `/gestione` | `syntesis-gestione.html` | [203-210](../backend/main.py#L203) | Pannello admin: lista registrati, autorizza (genera chiave) / revoca. **8.16.0**: sezione "Librerie Replace-iT" (ingest/lista/verifica/attivazione librerie scanbody Exocad). API `/admin/*` e `/admin/rit/*` protette da `require_admin`. |
 
 Note di completezza:
 - I 6 file `.html` in `backend/static/` (accedi, analyzer-v3b, dashboard, gestione, icp-vedere, **synthesis-home**) sono **tutti** serviti dalle route sopra — nessun HTML orfano.
@@ -321,9 +321,25 @@ Pannello admin (~390 righe). **Wiring via `addEventListener`**; righe utente gen
 | Filtro In attesa / Autorizzati / Tutti | `[data-f]` | click | handler (→ `render`) | filtra lista | [133-135] | [372] |
 | Cerca | `#search` | input | `render` | filtra per nome/città | [140] | [381] |
 | Ordina | `#sort` | change | `render` | riordina | [142] | [382] |
-| **(per riga)** Autorizza | (injected) | click | `onAuthorize` [332] | genera chiave SICP, attiva utente | — | [325] |
-| **(per riga)** Revoca | (injected) | click | `onRevoke` [343] | revoca accesso | — | [320] |
-| Modal: Copia chiave / Chiudi | `#m-copy` / `#m-close` | click | handler | copia / chiudi | [173-175] | [357-359] |
+| **(per riga)** Autorizza | (injected) | click | `onAuthorize` | genera chiave SICP, attiva utente | — | (binding per riga) |
+| **(per riga)** Revoca | (injected) | click | `onRevoke` | revoca accesso | — | (binding per riga) |
+| Modal: Copia chiave / Chiudi | `#m-copy` / `#m-close` | click | handler | copia / chiudi | (markup modale) | (binding modale) |
+
+> I numeri di riga del pannello utenti sono shiftati dall'aggiunta della sezione Replace-iT (8.16.0); localizzare con `grep -n`. La logica utenti è invariata.
+
+### Sezione "Librerie Replace-iT" (8.16.0 — ingest librerie scanbody Exocad)
+
+Aggiunta sotto il pannello utenti, **stessa IIFE e stesso wiring `addEventListener`**, riusa `adminHeaders`/`escapeHtml`/`fmtDate`/`toast`. Backend: `admin.py` → `/admin/rit/*` (dietro `require_admin`); DB: `database.py` (tabelle `rit_marker_stl` / `rit_library` / `rit_scanbody_type`, schema in `init_db`). **NON** tocca il runtime Sostituisci né l'analisi. Nessun deploy in 8.16.0.
+
+| Elemento | id / selettore | Evento | Funzione | Effetto | Endpoint |
+|---|---|---|---|---|---|
+| Input ZIP + Carica | `#rit-file` / `#rit-upload-btn` | click | `ritUpload` | upload multipart libreria Exocad | `POST /admin/rit/libraries` |
+| Tabella librerie | `#rit-rows` (render) | — | `ritLoad` → `ritRender` | lista import_name/keyword/display/fornitore/n.type/stato | `GET /admin/rit/libraries` |
+| **(per riga)** Dettagli | (injected) | click | `ritDetail` → `ritRenderDetail` | pannello read-only root-params + type (click_center/axis/ENG) + preview PNG | `GET /admin/rit/libraries/{id}` (+ `/preview`) |
+| **(per riga)** toggle Attiva/Disattiva | (injected) | click | `ritToggle` | attiva/disattiva libreria | `PATCH /admin/rit/libraries/{id}/active` |
+| Dialog conflitto keyword | `#rit-overlay` / `#rit-conflict` | click | `ritShowConflict` / `ritCloseConflict` | da 409 `keyword_conflict`: elenca **esplicitamente** ogni libreria sovrascrivibile (import_name, caricata, n.type, uploaded_by) da `existing[]`; per-riga "Sovrascrivi" (`mode=overwrite`+`target_library_id`) o "Importa come nuova" (`mode=new`+`import_name`) | (ri-`POST` con `mode`) |
+
+**Comportamento ingest** (server): salta `__MACOSX/` e `._*`, ignora subtype/`.sdfa`/firme RSA; **validazione bloccante** = ogni `MarkerFilename` deve esistere come STL nello ZIP (altrimenti 400, rollback totale); dedup STL per `sha256` del contenuto (`rit_marker_stl` globale); `active=FALSE` di default; `uploaded_by` = email admin dal JWT. Conflitto keyword senza `mode` → **409** con `existing[]`, nessuna scrittura.
 
 ---
 

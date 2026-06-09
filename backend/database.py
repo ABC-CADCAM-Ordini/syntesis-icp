@@ -290,6 +290,65 @@ async def init_db():
                 WHERE contact_pro_role IS NOT NULL;
         """)
 
+        # === v8.16.0 - Replace-iT (Passo 1): librerie scanbody Exocad ===
+        # Ingest fidato di librerie Exocad (config.xml + STL marker) dietro
+        # require_admin. Gli STL sono deduplicati per sha256 del CONTENUTO ed
+        # e\' GLOBALE cross-libreria (rit_marker_stl): salva su Postgres come
+        # bytea (niente volume -> simmetria dei due servizi). L\'unita\' clinica
+        # e\' il TYPE (ImplantTypeConfig), NON il file: lo stesso marker e\'
+        # condiviso tra piu\' type (ENG/Non-ENG) con click-center/asse propri,
+        # quindi i parametri stanno sul type. Subtype (ImplantSubtypeConfig),
+        # .sdfa e firme RSA sono ignorati. Vedi admin.py -> /admin/rit/*.
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS rit_marker_stl (
+            sha256              CHAR(64) PRIMARY KEY,
+            content             BYTEA NOT NULL,
+            original_filename   TEXT,
+            size_bytes          INTEGER,
+            first_seen_at       TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS rit_library (
+            id                   SERIAL PRIMARY KEY,
+            import_name          TEXT UNIQUE NOT NULL,
+            keyword              TEXT,
+            display              TEXT,
+            connection_id        TEXT,
+            rotation_lock_count  INTEGER,
+            ref_rotation_offset  DOUBLE PRECISION,
+            axis_occlusal_x      DOUBLE PRECISION,
+            axis_occlusal_y      DOUBLE PRECISION,
+            axis_occlusal_z      DOUBLE PRECISION,
+            supplier             TEXT,
+            supplier_version     TEXT,
+            preview_png          BYTEA,
+            logo_png             BYTEA,
+            active               BOOLEAN DEFAULT FALSE,
+            uploaded_at          TIMESTAMPTZ DEFAULT NOW(),
+            uploaded_by          TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS rit_scanbody_type (
+            id                   SERIAL PRIMARY KEY,
+            library_id           INTEGER NOT NULL REFERENCES rit_library(id) ON DELETE CASCADE,
+            display              TEXT,
+            keyword              TEXT,
+            marker_filename      TEXT,
+            marker_sha256        CHAR(64) REFERENCES rit_marker_stl(sha256),
+            click_center_x       DOUBLE PRECISION,
+            click_center_y       DOUBLE PRECISION,
+            click_center_z       DOUBLE PRECISION,
+            axis_asymmetric_x    DOUBLE PRECISION,
+            axis_asymmetric_y    DOUBLE PRECISION,
+            axis_asymmetric_z    DOUBLE PRECISION,
+            is_eng               BOOLEAN,
+            ord                  INTEGER
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_rit_type_library ON rit_scanbody_type(library_id);
+        CREATE INDEX IF NOT EXISTS idx_rit_library_active ON rit_library(active);
+        """)
+
         # Migrazione retroattiva: i contatti esistenti hanno gia\' role (TEXT libero)
         # ma per il nuovo flusso vogliamo solo medico/laboratorio. Aggiungo un commento
         # senza vincoli (i vecchi role restano validi). La UI filtrera\' solo per
@@ -1369,4 +1428,201 @@ async def reconcile_pending_shared_invites(user_id: str, user_email: str) -> int
               AND status = 'pending'
         """, user_id, user_email)
     return int(result.split()[-1]) if result else 0
+
+
+# =====================================================================
+# Replace-iT (Passo 1) — librerie scanbody Exocad
+# Schema creato in init_db() (blocco v8.16.0). Il PARSING dello ZIP vive
+# in admin.py (non e\' DB); qui solo lettura/scrittura. La scrittura e\'
+# ATOMICA: rit_import_library() fa tutto in un\'unica transazione, quindi
+# un errore (es. import_name duplicato) lascia il DB invariato.
+# =====================================================================
+
+def _iso(dt):
+    """Serializza un datetime in ISO; passa-attraverso None/altri tipi."""
+    try:
+        return dt.isoformat()
+    except AttributeError:
+        return dt
+
+
+async def rit_find_libraries_by_keyword(keyword: str) -> list[dict]:
+    """Librerie che condividono lo stesso keyword Exocad (non-unique).
+    Usata per rilevare il conflitto in ingest e popolare existing[] nel 409."""
+    if not keyword:
+        return []
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT l.id, l.import_name, l.keyword, l.display, l.supplier,
+                   l.supplier_version, l.active, l.uploaded_by, l.uploaded_at,
+                   (SELECT COUNT(*) FROM rit_scanbody_type t WHERE t.library_id = l.id) AS n_types
+            FROM rit_library l
+            WHERE l.keyword = $1
+            ORDER BY l.uploaded_at DESC
+        """, keyword)
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["uploaded_at"] = _iso(d.get("uploaded_at"))
+        d["n_types"] = int(d.get("n_types") or 0)
+        out.append(d)
+    return out
+
+
+async def rit_list_libraries() -> list[dict]:
+    """Elenco di tutte le librerie con conteggio type (per la tabella in /gestione)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT l.id, l.import_name, l.keyword, l.display, l.supplier,
+                   l.supplier_version, l.active, l.uploaded_by, l.uploaded_at,
+                   (SELECT COUNT(*) FROM rit_scanbody_type t WHERE t.library_id = l.id) AS n_types
+            FROM rit_library l
+            ORDER BY l.uploaded_at DESC
+        """)
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["uploaded_at"] = _iso(d.get("uploaded_at"))
+        d["n_types"] = int(d.get("n_types") or 0)
+        out.append(d)
+    return out
+
+
+async def rit_get_library_detail(library_id: int) -> Optional[dict]:
+    """Dettaglio read-only: root-params + lista type con TUTTI i parametri.
+    Esclude i BYTEA (preview/logo serviti a parte). None se non esiste."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        lib = await conn.fetchrow("""
+            SELECT id, import_name, keyword, display, connection_id,
+                   rotation_lock_count, ref_rotation_offset,
+                   axis_occlusal_x, axis_occlusal_y, axis_occlusal_z,
+                   supplier, supplier_version, active, uploaded_by, uploaded_at,
+                   (preview_png IS NOT NULL) AS has_preview,
+                   (logo_png IS NOT NULL) AS has_logo
+            FROM rit_library WHERE id = $1
+        """, library_id)
+        if lib is None:
+            return None
+        types = await conn.fetch("""
+            SELECT id, display, keyword, marker_filename, marker_sha256,
+                   click_center_x, click_center_y, click_center_z,
+                   axis_asymmetric_x, axis_asymmetric_y, axis_asymmetric_z,
+                   is_eng, ord
+            FROM rit_scanbody_type
+            WHERE library_id = $1
+            ORDER BY ord NULLS LAST, id
+        """, library_id)
+    return {
+        "id": lib["id"],
+        "import_name": lib["import_name"],
+        "keyword": lib["keyword"],
+        "display": lib["display"],
+        "connection_id": lib["connection_id"],
+        "rotation_lock_count": lib["rotation_lock_count"],
+        "ref_rotation_offset": lib["ref_rotation_offset"],
+        "axis_occlusal": {"x": lib["axis_occlusal_x"], "y": lib["axis_occlusal_y"], "z": lib["axis_occlusal_z"]},
+        "supplier": lib["supplier"],
+        "supplier_version": lib["supplier_version"],
+        "active": lib["active"],
+        "uploaded_by": lib["uploaded_by"],
+        "uploaded_at": _iso(lib["uploaded_at"]),
+        "has_preview": lib["has_preview"],
+        "has_logo": lib["has_logo"],
+        "types": [{
+            "id": t["id"],
+            "display": t["display"],
+            "keyword": t["keyword"],
+            "marker_filename": t["marker_filename"],
+            "marker_sha256": t["marker_sha256"],
+            "click_center": {"x": t["click_center_x"], "y": t["click_center_y"], "z": t["click_center_z"]},
+            "axis_asymmetric": {"x": t["axis_asymmetric_x"], "y": t["axis_asymmetric_y"], "z": t["axis_asymmetric_z"]},
+            "is_eng": t["is_eng"],
+            "ord": t["ord"],
+        } for t in types],
+    }
+
+
+async def rit_get_library_image(library_id: int, which: str) -> Optional[bytes]:
+    """Ritorna i bytes di preview_png o logo_png; None se assenti."""
+    col = "preview_png" if which == "preview" else "logo_png"
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        val = await conn.fetchval(f"SELECT {col} FROM rit_library WHERE id = $1", library_id)
+    return bytes(val) if val is not None else None
+
+
+async def rit_set_library_active(library_id: int, active: bool) -> bool:
+    """Attiva/disattiva una libreria. False se l\'id non esiste."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        res = await conn.execute(
+            "UPDATE rit_library SET active = $2 WHERE id = $1", library_id, active
+        )
+    # asyncpg ritorna 'UPDATE n'
+    return res.split()[-1] != "0"
+
+
+async def rit_import_library(*, parsed: dict, import_name: Optional[str],
+                             uploaded_by: Optional[str],
+                             overwrite_target_id: Optional[int] = None) -> int:
+    """Scrive una libreria in UNICA transazione. Se overwrite_target_id e\'
+    dato, cancella prima quella libreria (CASCADE sui type; gli STL marker
+    deduplicati sopravvivono) e ne eredita l\'import_name se non fornito.
+    Gli STL sono inseriti con ON CONFLICT DO NOTHING (dedup per sha256).
+    Solleva asyncpg.UniqueViolationError se import_name e\' gia\' preso ->
+    l\'intera transazione viene annullata. Ritorna l\'id della nuova libreria."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            if overwrite_target_id is not None:
+                if not import_name:
+                    import_name = await conn.fetchval(
+                        "SELECT import_name FROM rit_library WHERE id = $1", overwrite_target_id
+                    )
+                await conn.execute("DELETE FROM rit_library WHERE id = $1", overwrite_target_id)
+            if not import_name:
+                import_name = parsed.get("default_import_name")
+
+            # STL marker deduplicati per sha256 del contenuto (globali)
+            for sha, m in parsed["markers"].items():
+                await conn.execute("""
+                    INSERT INTO rit_marker_stl (sha256, content, original_filename, size_bytes)
+                    VALUES ($1, $2, $3, $4)
+                    ON CONFLICT (sha256) DO NOTHING
+                """, sha, m["content"], m["filename"], m["size"])
+
+            ax = parsed.get("axis_occlusal") or (None, None, None)
+            lib_id = await conn.fetchval("""
+                INSERT INTO rit_library (
+                    import_name, keyword, display, connection_id,
+                    rotation_lock_count, ref_rotation_offset,
+                    axis_occlusal_x, axis_occlusal_y, axis_occlusal_z,
+                    supplier, supplier_version, preview_png, logo_png,
+                    active, uploaded_by
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, FALSE, $14)
+                RETURNING id
+            """, import_name, parsed.get("keyword"), parsed.get("display"),
+                 parsed.get("connection_id"), parsed.get("rotation_lock_count"),
+                 parsed.get("ref_rotation_offset"), ax[0], ax[1], ax[2],
+                 parsed.get("supplier"), parsed.get("supplier_version"),
+                 parsed.get("preview_png"), parsed.get("logo_png"), uploaded_by)
+
+            for t in parsed["types"]:
+                cc = t["click_center"]
+                aa = t["axis_asymmetric"]
+                await conn.execute("""
+                    INSERT INTO rit_scanbody_type (
+                        library_id, display, keyword, marker_filename, marker_sha256,
+                        click_center_x, click_center_y, click_center_z,
+                        axis_asymmetric_x, axis_asymmetric_y, axis_asymmetric_z,
+                        is_eng, ord
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+                """, lib_id, t["display"], t["keyword"], t["marker_filename"],
+                     t["marker_sha256"], cc[0], cc[1], cc[2], aa[0], aa[1], aa[2],
+                     t["is_eng"], t["ord"])
+
+            return lib_id
 
