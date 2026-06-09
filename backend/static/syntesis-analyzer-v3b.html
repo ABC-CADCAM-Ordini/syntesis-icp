@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.18.0</title>
+<title>Syntesis-ICP - Analizzare v8.19.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1990,6 +1990,10 @@ if (document.readyState === 'loading') {
         <button id="replaceBtnPlace" class="replace-only" onclick="replaceStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona</button>
       </div>
 
+      <div id="replaceGuide" style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:8px;line-height:1.5">
+        Clicca il <b>centro del disco</b> dello scanbody: il <span style="color:#FF3B30;font-weight:700">punto rosso</span> segna il riferimento del marker (lo stesso punto compare sul modello piazzato).
+      </div>
+
       <div id="replacePlacedList" style="display:none;margin-top:10px">
         <div id="replacePlacedItems"></div>
       </div>
@@ -2374,7 +2378,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.18.0';
+window.ANALIZZA_BUILD = '8.19.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-09';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2568,6 +2572,10 @@ function init(){
   document.addEventListener('dragleave',function(e){if(e.relatedTarget===null||!document.body.contains(e.relatedTarget)){document.getElementById('dropOverlay').classList.remove('active')}});
   document.addEventListener('drop',function(e){e.preventDefault();e.stopPropagation();document.getElementById('dropOverlay').classList.remove('active');if(e.dataTransfer&&e.dataTransfer.files.length>0){var file=e.dataTransfer.files[0];if(file.name.toLowerCase().endsWith('.stl')){loadScanFile(file)}}});
   renderer.domElement.addEventListener('click',onViewportClick);
+  // Replace-iT 2b-1.1: hover dot live durante il placement. Listener UNICO e PASSIVO,
+  // gated internamente a (currentWorkflow==='replace' && replacePlacementMode) ->
+  // nessuna interferenza con gli altri workflow ne' col controller camera (no preventDefault).
+  renderer.domElement.addEventListener('mousemove',replaceOnViewportHover,{passive:true});
   // Click puro (senza drag) cambia il pivot di rotazione al punto cliccato
   (function(){
     var downX=0, downY=0, downT=0, isDown=false;
@@ -15482,6 +15490,10 @@ var REPLACE_COLORS = [0x0065B3, 0x0D9E6E, 0xD97706, 0xA855F7, 0xEF4444, 0x14B8A6
 // Segno dell'asse di inserzione applicato (+1 = asse-mondo A, -1 = -A). ISOLATO
 // di proposito (check visivo 2b-1): se i marker risultano CAPOVOLTI -> -1.
 var REPLACE_AXIS_SIGN = +1;
+// 2b-1.1: marcatore punto-di-riferimento (click_center). Rosso, piccolo.
+var REPLACE_DOT_COLOR = 0xFF3B30;
+var REPLACE_DOT_R = 0.45;           // mm, piu' piccolo dei marker
+var replaceHoverDot = null;         // dot "preview" semi-trasparente che segue il cursore in placement
 
 function replaceShowStatus(msg, isError){
   var s = document.getElementById('replaceStatus');
@@ -15489,6 +15501,58 @@ function replaceShowStatus(msg, isError){
   s.style.display = '';
   s.textContent = msg;
   s.style.color = isError ? '#EF4444' : 'var(--gray)';
+}
+
+// --- DOT marcatore del punto di riferimento (clone idioma ensurePivotMarker) ---
+// Sfera rossa piccola, MeshBasicMaterial depthTest:false -> sempre visibile sopra
+// le mesh. Persistente (niente fade). Usata sia per i dot dei marker piazzati sia
+// (lazy) per il dot di hover.
+function replaceMakeDot(point, opts){
+  opts = opts || {};
+  var geo = new THREE.SphereGeometry(REPLACE_DOT_R, 16, 12);
+  var mat = new THREE.MeshBasicMaterial({
+    color: (opts.color != null ? opts.color : REPLACE_DOT_COLOR),
+    transparent: true,
+    opacity: (opts.opacity != null ? opts.opacity : 1.0),
+    depthTest: false,
+    depthWrite: false
+  });
+  var dot = new THREE.Mesh(geo, mat);
+  dot.renderOrder = 10001;
+  dot.userData.isReplace = true;
+  dot.userData.replaceRole = opts.role || 'dot';
+  if(point) dot.position.copy(point);
+  scene.add(dot);
+  return dot;
+}
+
+function replaceHideHoverDot(){
+  if(replaceHoverDot) replaceHoverDot.visible = false;
+}
+
+// Hover dot live: segue il raycast sulla scansione DURANTE il placement, cosi'
+// l'utente vede dove cadra' il punto di riferimento PRIMA di cliccare.
+// Listener UNICO e PASSIVO agganciato a init; gate ISOLATO qui dentro: agisce solo
+// in Replace-iT durante il placement, esce subito in ogni altro caso (nessuna
+// interferenza con Sostituisci/Analizza/altri workflow ne' col controller camera).
+function replaceOnViewportHover(event){
+  if(typeof currentWorkflow === 'undefined' || currentWorkflow !== 'replace'
+     || !replacePlacementMode || !replaceMesh){ replaceHideHoverDot(); return; }
+  var rect = renderer.domElement.getBoundingClientRect();
+  var mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  var raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, camera);
+  var hits = raycaster.intersectObject(replaceMesh);
+  if(hits.length > 0){
+    if(!replaceHoverDot) replaceHoverDot = replaceMakeDot(null, { opacity: 0.55, role: 'hover' });
+    replaceHoverDot.position.copy(hits[0].point);
+    replaceHoverDot.visible = true;
+  } else {
+    replaceHideHoverDot();
+  }
 }
 
 // --- FETCH /api/rit/* (Bearer da localStorage, pattern /api/place-mua) ---
@@ -15586,11 +15650,23 @@ function replaceClearScene(){
   }
   if(replaceOriginalGeo){ replaceOriginalGeo.dispose(); replaceOriginalGeo = null; }
   // NB: NON disposo le geometrie marker (replaceMarkerGeoCache, condivise/cache);
-  // rimuovo solo i gruppi dalla scena.
-  replacePlaced.forEach(function(p){ if(p.group) scene.remove(p.group); });
+  // rimuovo solo i gruppi dalla scena. I dot (sfere per-marker) sono propri di ogni
+  // marker -> dispose sicuro.
+  replacePlaced.forEach(function(p){
+    if(p.group) scene.remove(p.group);
+    if(p.dotMesh){
+      scene.remove(p.dotMesh);
+      if(p.dotMesh.geometry) p.dotMesh.geometry.dispose();
+      if(p.dotMesh.material) p.dotMesh.material.dispose();
+    }
+  });
   replacePlaced.length = 0;
   replaceCounter = 0;
   replacePaletteIdx = 0;
+  // 2b-1.1: nascondi anche l'hover dot (es. ricarico scansione durante il
+  // placement) -> niente dot rosso "stale" sulla nuova scena prima del prossimo
+  // mousemove. Simmetrico al cleanup dei dot per-marker sopra.
+  replaceHideHoverDot();
 }
 
 function replaceLoadScanToScene(geo, filename){
@@ -15628,7 +15704,7 @@ function replaceStartPlacement(){
   if(!replaceCurrentType){ replaceShowStatus('Scegli prima libreria e type.', true); return; }
   replacePlacementMode = true;
   renderer.domElement.style.cursor = 'crosshair';
-  replaceShowStatus('Clicca sullo scanbody nella scansione per posizionare il marker.');
+  replaceShowStatus('Clicca il centro del disco dello scanbody: il punto rosso segue il cursore e segna dove cadra\' il riferimento.');
 }
 
 function replaceOnViewportClick(event){
@@ -15644,6 +15720,7 @@ function replaceOnViewportClick(event){
   if(hits.length > 0){
     replacePlaceTemplate(hits[0].point, hits[0].face.normal);
     replacePlacementMode = false;
+    replaceHideHoverDot();
     renderer.domElement.style.cursor = 'default';
     return true;
   }
@@ -15690,9 +15767,13 @@ function replacePlaceTemplate(rawPoint, rawNormal){
     group.name = id;
     scene.add(group);
 
+    // 2b-1.1: punto rosso PERSISTENTE sul punto di riferimento (= P, dove cade
+    // il click_center del CAD = il punto cliccato dall'utente).
+    var dotMesh = replaceMakeDot(P);
+
     var aa = t.axis_asymmetric || { x: 0, y: 0, z: 0 };
     replacePlaced.push({
-      id: id, num: replaceCounter, group: group,
+      id: id, num: replaceCounter, group: group, dotMesh: dotMesh,
       clickPoint: rawPoint.clone(), clickNormal: rawNormal.clone(),
       position: P.clone(),               // ancora-mondo = click (= dove cade click_center)
       axisDir: A.clone(),
@@ -15774,6 +15855,12 @@ function _hardResetReplace(){
   try {
     replaceClearScene();
     replacePlacementMode = false;
+    if(replaceHoverDot){
+      scene.remove(replaceHoverDot);
+      if(replaceHoverDot.geometry) replaceHoverDot.geometry.dispose();
+      if(replaceHoverDot.material) replaceHoverDot.material.dispose();
+      replaceHoverDot = null;
+    }
     replaceCurrentLibId = null;
     replaceCurrentDetail = null;
     replaceCurrentType = null;

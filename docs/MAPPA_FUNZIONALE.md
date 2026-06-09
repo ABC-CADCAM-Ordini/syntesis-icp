@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.18.0 — **Data:** 2026-06-09
+> **Versione software mappata:** 8.19.0 — **Data:** 2026-06-09
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -70,6 +70,8 @@ Quinto workflow, **NUOVO e SEPARATO**: clona i mattoni di Sostituire — che res
 | Label 2D | `.replace-label` | loop `animate` | `replaceEnsureLabelElements` / `replaceUpdateLabels` | numeri `#N` proiettati | loop `animate` |
 
 **Piazzamento `replacePlaceTemplate`** [~15655]: riconciliazione CAD↔click **senza match** — `A` = asse-mondo da `findScanbodyCenter().axis` × `REPLACE_AXIS_SIGN` (segno **isolato/invertibile** se i marker risultano capovolti); `P` = `rawPoint` (click grezzo, **niente** center radius-dipendente → 2b-2); `q` = quaternion (+Z locale → `A`); `t` = `P − q·click_center` (il `click_center` del CAD cade su `P`). Roll attorno ad `A` **libero**; `axis_asymmetric` **memorizzato** in `replacePlaced` per 2b-2, **non applicato**. Fetch marker via `replaceFetchMarkerGeo` (`GET /api/rit/markers/{sha}` → ArrayBuffer → `sostParseSTLToGeometry`, cache). Reset `_hardResetReplace` [~15772]. Stato `replace*` separato da `sost*`.
+
+> **UX guida del piazzamento (8.19.0 — slice 2b-1.1):** punto rosso del riferimento (`click_center`) + guida. `replaceMakeDot(point,opts)` clona l'idioma `ensurePivotMarker` (sfera rossa `0xFF3B30` r~0.45mm, `MeshBasicMaterial` `depthTest:false`, persistente). **Dot per-marker**: in `replacePlaceTemplate` creato a `replacePlaced[i].position` (= `P`, dove cade il `click_center`), salvato come `dotMesh`, rimosso+disposto in `replaceClearScene`/`_hardResetReplace`. **Hover dot live**: `replaceOnViewportHover` agganciato a init come listener **unico e passivo** (`{passive:true}`, gemello dell'attach del `click` a [~2570]), **gated** internamente a `currentWorkflow==='replace' && replacePlacementMode && replaceMesh` → raycast su `replaceMesh`, sposta `replaceHoverDot` (semi-trasparente); `replaceHideHoverDot` su nessun-hit/click/uscita/reset. **Isolamento**: nessun `preventDefault`/`stopPropagation` → il controller camera custom ([2418-2445], `mousemove` solo durante drag) e `onViewportClick` restano identici; early-return in ogni altro workflow. **Guida**: div statico `#replaceGuide` nel `#panelReplace` + messaggio `#replaceStatus` in fase di placement.
 
 > **Albero scena (layersPanel) in `replace`:** **nascosto** in 8.18.0. `rebuildTree()` ha un ramo dedicato solo per `sostituire` (`sostRebuildTree`); per `replace` non esiste ancora un `replaceRebuildTree`, quindi il pannello albero verrebbe vuoto/incoerente → il ramo `replace` imposta `layPan='none'`. La lista dei marker piazzati vive in `#replacePlacedList` (`replaceRebuildPlacedList`, etichetta da `typeLabel` **catturata al piazzamento** così resta corretta col multi-marker cross-libreria). L'albero scena dedicato di Replace-iT è rimandato alla slice **2b-2**.
 
