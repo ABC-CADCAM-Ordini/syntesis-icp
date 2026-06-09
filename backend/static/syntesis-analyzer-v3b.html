@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.14.0</title>
+<title>Syntesis-ICP - Analizzare v8.15.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2331,7 +2331,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.14.0';
+window.ANALIZZA_BUILD = '8.15.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-09';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -3295,6 +3295,13 @@ function synAxisUseLateral(isSR, onThrow){
   return (e === 'lateralwall') || (e === 'auto' && isSR);
 }
 
+// Motore di centraggio Sostituire (Replace-iT): 'legacy' (default, comportamento
+// 8.14.0) | 'robust' (centraggio click-invariante full-surface, vedi sostRobustCenter).
+function synSostCenterRead(){
+  try { return localStorage.getItem('syntesis_sost_center') || 'legacy'; }
+  catch(e){ return 'legacy'; }
+}
+
 // Motore asse cilindro: cap-media (default) vs lateral-wall. Stesso pattern di onAlgoChange.
 function onAxisEngineChange(value){
   if(value !== 'cap' && value !== 'lateralwall' && value !== 'auto') return;
@@ -3311,6 +3318,20 @@ function onAxisEngineChange(value){
     optC.style.background = (value === 'cap') ? '#F0F9FF' : '#fff';
     optL.style.borderColor = (value === 'lateralwall') ? 'var(--blue)' : 'var(--border)';
     optL.style.background = (value === 'lateralwall') ? '#F0F9FF' : '#fff';
+  }
+}
+
+// Motore centraggio Sostituire (syntesis_sost_center): legacy (default) vs robust. Stesso pattern.
+function onSostCenterChange(value){
+  if(value !== 'legacy' && value !== 'robust') return;
+  try { localStorage.setItem('syntesis_sost_center', value); } catch(e){}
+  var optL = document.getElementById('sostCenterOptLegacy');
+  var optR = document.getElementById('sostCenterOptRobust');
+  if(optL && optR){
+    optL.style.borderColor = (value === 'legacy') ? 'var(--blue)' : 'var(--border)';
+    optL.style.background = (value === 'legacy') ? '#F0F9FF' : '#fff';
+    optR.style.borderColor = (value === 'robust') ? 'var(--blue)' : 'var(--border)';
+    optR.style.background = (value === 'robust') ? '#F0F9FF' : '#fff';
   }
 }
 
@@ -12572,6 +12593,10 @@ function switchSettingsTab(which){
       var savedAx = localStorage.getItem('syntesis_axis_engine') || 'auto';
       document.querySelectorAll('input[name="axisEngineOpt"]').forEach(function(r){ r.checked = (r.value === savedAx); });
       if(typeof onAxisEngineChange === 'function') onAxisEngineChange(savedAx);
+      // Motore centraggio Sostituire (syntesis_sost_center): riallinea radio + stile
+      var savedSc = localStorage.getItem('syntesis_sost_center') || 'legacy';
+      document.querySelectorAll('input[name="sostCenterOpt"]').forEach(function(r){ r.checked = (r.value === savedSc); });
+      if(typeof onSostCenterChange === 'function') onSostCenterChange(savedSc);
     } catch(e){}
     if(typeof refreshAlgoDiagnostics === 'function') refreshAlgoDiagnostics();
   }
@@ -15377,6 +15402,69 @@ function sostBuildTemplateGroup(key, geo, connectionWorld, axis, mirror){
   return group;
 }
 
+// ── Centraggio robusto click-invariante (Replace-iT, dietro flag 'syntesis_sost_center'='robust') ──
+// Ri-fitta il CENTRO dello scanbody ancorandosi all'ASSE lateral-wall (robusto) invece che al
+// crop del click: re-crop cilindrico ITERATO della parete attorno all'asse + fit cerchio
+// algebrico (kasa, raggio libero). Converge a un punto fisso indipendente dal click — validato
+// su geometria reale SR: spread 0µm fino a ~150° d'arco visibile (vs ~37µm del centraggio
+// click-seedato), accuratezza ~µm = livello Exocad. Mantiene il livello assiale del disco e
+// l'asse (lateral-wall): rifinisce solo la posizione radiale (XY nel piano ⊥ asse).
+// Gate di copertura: se l'arco di parete visibile < SOST_MIN_COVERAGE_DEG -> applied=false
+// (fail-soft: il chiamante tiene il centro di findScanbodyCenter).
+var SOST_MIN_COVERAGE_DEG = 140;
+function sostRobustCenter(scanGeo, roughCenter, axis, R){
+  if(!axis || !isFinite(axis.x) || !isFinite(axis.y) || !isFinite(axis.z)) return { applied:false, center:roughCenter, coverageDeg:0, nWall:0 };
+  if(!scanGeo || !scanGeo.attributes || !scanGeo.attributes.normal) return { applied:false, center:roughCenter, coverageDeg:0, nWall:0 };
+  var pos = scanGeo.attributes.position.array;
+  var nrm = scanGeo.attributes.normal.array;
+  var nTri = pos.length / 9;
+  var ax0 = axis.x, ax1 = axis.y, ax2 = axis.z;
+  var ref = (Math.abs(ax2) < 0.9) ? [0,0,1] : [1,0,0];
+  var ux = ax1*ref[2]-ax2*ref[1], uy = ax2*ref[0]-ax0*ref[2], uz = ax0*ref[1]-ax1*ref[0];
+  var ul = Math.sqrt(ux*ux+uy*uy+uz*uz); if(ul < 1e-9) return { applied:false, center:roughCenter, coverageDeg:0, nWall:0 };
+  ux/=ul; uy/=ul; uz/=ul;
+  var vx = ax1*uz-ax2*uy, vy = ax2*ux-ax0*uz, vz = ax0*uy-ax1*ux;
+  var vl = Math.sqrt(vx*vx+vy*vy+vz*vz); if(vl < 1e-9) return { applied:false, center:roughCenter, coverageDeg:0, nWall:0 };
+  vx/=vl; vy/=vl; vz/=vl;
+  var cx = roughCenter.x, cy = roughCenter.y, cz = roughCenter.z;
+  var Rlo = R-0.8, Rhi = R+0.6, coverageDeg = 0, nWall = 0;
+  for(var pass = 0; pass < 2; pass++){
+    var P2x=[], P2y=[];
+    for(var i=0;i<nTri;i++){
+      var ni=i*9;
+      var tx=(pos[ni]+pos[ni+3]+pos[ni+6])/3, ty=(pos[ni+1]+pos[ni+4]+pos[ni+7])/3, tz=(pos[ni+2]+pos[ni+5]+pos[ni+8])/3;
+      var nx=(nrm[ni]+nrm[ni+3]+nrm[ni+6])/3, ny=(nrm[ni+1]+nrm[ni+4]+nrm[ni+7])/3, nz=(nrm[ni+2]+nrm[ni+5]+nrm[ni+8])/3;
+      var nl=Math.sqrt(nx*nx+ny*ny+nz*nz); if(nl<0.01) continue; nx/=nl;ny/=nl;nz/=nl;
+      if(Math.abs(nx*ax0+ny*ax1+nz*ax2) >= 0.35) continue;       // solo parete laterale
+      var dx=tx-cx, dy=ty-cy, dz=tz-cz;
+      var axial=dx*ax0+dy*ax1+dz*ax2; if(Math.abs(axial) > 3.5) continue;   // banda assiale
+      var px=dx-axial*ax0, py=dy-axial*ax1, pz=dz-axial*ax2;
+      var rad=Math.sqrt(px*px+py*py+pz*pz); if(rad < Rlo || rad > Rhi) continue; // anello parete
+      P2x.push(dx*ux+dy*uy+dz*uz); P2y.push(dx*vx+dy*vy+dz*vz);   // 2D nel piano ⊥ asse
+    }
+    nWall = P2x.length;
+    if(nWall < 10) return { applied:false, center:roughCenter, coverageDeg:0, nWall:nWall };
+    // copertura = 360 - max gap angolare (osservabilita' del centro XY)
+    var ang=[]; for(var k=0;k<nWall;k++) ang.push(Math.atan2(P2y[k], P2x[k]));
+    ang.sort(function(a,b){return a-b;});
+    var maxgap = ang[0] + 2*Math.PI - ang[nWall-1];
+    for(var kk=1;kk<nWall;kk++){ var gp=ang[kk]-ang[kk-1]; if(gp>maxgap) maxgap=gp; }
+    coverageDeg = (2*Math.PI - maxgap) * 180/Math.PI;
+    // fit cerchio algebrico (kasa, raggio libero) -> centro 2D rel ancora corrente
+    var Sx=0,Sy=0,Sxx=0,Syy=0,Sxy=0,Sxz=0,Syz=0,Sz=0;
+    for(var j=0;j<nWall;j++){ var x=P2x[j], y=P2y[j], z=x*x+y*y;
+      Sx+=x;Sy+=y;Sxx+=x*x;Syy+=y*y;Sxy+=x*y;Sxz+=x*z;Syz+=y*z;Sz+=z; }
+    var det = Sxx*(Syy*nWall - Sy*Sy) - Sxy*(Sxy*nWall - Sy*Sx) + Sx*(Sxy*Sy - Syy*Sx);
+    if(Math.abs(det) < 1e-6) return { applied:false, center:roughCenter, coverageDeg:coverageDeg, nWall:nWall };
+    var dA = Sxz*(Syy*nWall - Sy*Sy) - Sxy*(Syz*nWall - Sy*Sz) + Sx*(Syz*Sy - Syy*Sz);
+    var dB = Sxx*(Syz*nWall - Sy*Sz) - Sxz*(Sxy*nWall - Sy*Sx) + Sx*(Sxy*Sz - Syz*Sx);
+    var c2x = (dA/det)/2, c2y = (dB/det)/2;
+    cx = cx + c2x*ux + c2y*vx; cy = cy + c2x*uy + c2y*vy; cz = cz + c2x*uz + c2y*vz;
+  }
+  if(coverageDeg < SOST_MIN_COVERAGE_DEG) return { applied:false, center:roughCenter, coverageDeg:coverageDeg, nWall:nWall };
+  return { applied:true, center:new THREE.Vector3(cx,cy,cz), coverageDeg:coverageDeg, nWall:nWall };
+}
+
 function sostPlaceTemplate(rawPoint, rawNormal){
   // Auto-centratura deterministica (stessa funzione di Analizza).
   // Passa il raggio del marker presente nella scansione di partenza
@@ -15386,6 +15474,16 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sourceRadius ? { radius: sourceRadius } : undefined);
   var discWorld = autoResult.center;       // faccia del disco scansionato nel mondo
   var axis = autoResult.axis.clone().normalize();
+  // Replace-iT: centraggio click-invariante (flag 'syntesis_sost_center'='robust', SR-only).
+  // Ri-fitta solo il centro (XY) ancorandolo all'asse; livello disco e asse invariati.
+  // Fail-soft: se la copertura della parete e' insufficiente, resta il centro legacy.
+  if(synSostCenterRead() === 'robust' && sostSourceTemplate === 'SR' && sourceRadius){
+    try {
+      var _rc = sostRobustCenter(sostMesh.geometry, autoResult.center, axis, sourceRadius);
+      if(_rc.applied) discWorld = _rc.center;
+      console.log('[sostRobustCenter] applied='+_rc.applied+' cov='+(_rc.coverageDeg||0).toFixed(0)+'° nWall='+_rc.nWall);
+    } catch(e){ console.warn('[sostRobustCenter] errore, fallback legacy:', e); }
+  }
 
   // Template da costruire per ogni marker: tutti e tre insieme cosi' l'utente
   // puo' scegliere dall'albero cosa visualizzare/esportare.
@@ -16955,7 +17053,7 @@ window.addEventListener('DOMContentLoaded',init);
 </div>
 
 <!-- Dialog impostazioni -->
-<div id="settingsDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
+<div id="settingsDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9500;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:12px;padding:22px;max-width:500px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
     <div style="font-family:var(--mono);font-size:15px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Impostazioni</div>
 
@@ -17186,6 +17284,31 @@ window.addEventListener('DOMContentLoaded',init);
               <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Lateral-wall (parete laterale)</div>
               <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
                 Asse raffinato dalle normali della parete laterale (|n&middot;asse| &lt; 0.35), minor eigenvector pesato &radic;area. Piu&apos; stabile per scanbody con un solo cap. Sperimentale (A/B vs Cap-media).
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Motore centraggio Sostituire (syntesis_sost_center): legacy vs robust (Replace-iT) -->
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-family:var(--mono);font-size:12px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Motore centraggio Sostituire</label>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="sostCenterOptLegacy">
+            <input type="radio" name="sostCenterOpt" value="legacy" checked onchange="onSostCenterChange(this.value)" style="margin-top:2px">
+            <div style="flex:1">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Legacy (storico)</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
+                Centro dal fit cilindro sul crop del click. Comportamento 8.14.0.
+              </div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="sostCenterOptRobust">
+            <input type="radio" name="sostCenterOpt" value="robust" onchange="onSostCenterChange(this.value)" style="margin-top:2px">
+            <div style="flex:1">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Robust click-invariante (beta, SR)</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
+                Centro da fit full-surface ancorato all&apos;asse (ri-crop iterato della parete), indipendente dal punto di click. Solo SR; fail-soft se la copertura della parete e&apos; insufficiente. Sperimentale (A/B vs Legacy).
               </div>
             </div>
           </label>
