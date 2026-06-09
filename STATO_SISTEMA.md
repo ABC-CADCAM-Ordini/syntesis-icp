@@ -25,6 +25,22 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
+## 8.13.0 — motore asse "lateral-wall" robusto (Sostituire + Misurare) (PRONTO, NON DEPLOYATO) (2026-06-09)
+
+Chiude il gap angolare con **Exocad** sul fit dell'asse cilindro. Root dimostrato sui dati reali (barra ID 2161): l'errore è nella **stima dell'asse**, NON nell'allineamento ICP (centroidi/RMSD ottimi, è l'asse a sballare).
+
+- **FIX #1 (report Misurare ICP)** — `misICP_cylAxis` (v3b ~6303): con `syntesis_axis_engine='lateralwall'` l'asse viene raffinato dalla **parete laterale** (minor eigenvector di M=Σ area·nnᵀ sui triangoli con |n·seed|<0.35, via `misICP_jacobi3`); fallback al seed cap-PCA se <8 laterali; default `'cap'` **bit-identico**. Il cap-PCA aveva **~1.2° di errore strutturale** sullo scanbody SR (tozzo, un cap + base aperta), misurato sul marker ideale.
+- **FIX #2 (coupling Sostituire, il root)** — `sostAlignAll`/Raffina (v3b ~15741 crop loop + ~15908 apply block): il point-ICP resta SOLO per il **centraggio** (R,t invariati); l'**asse** finale viene da un fit lateral-wall della parete scansionata e ri-orienta il marker attorno a `p.position` (delta-rotazione `T(+pos)·Rd·T(-pos)` propagata a `g.matrix`→export); fallback `R·seed` se <8 triangoli parete. Prima il Raffina **sovrascriveva** l'asse buono col rumore del point-ICP (~1° non-rigido).
+
+**Verifica su click utente reali** (mock, codice vero via preview, scansioni barra ID 2161):
+- degrado angoli relativi del Raffina **0.66°→0.13° (−81%)**, max 2.4°→0.27° (−89%);
+- incoerenza export **scan-to-scan** (prima vs seconda) **0.95°→0.14–0.31° = Exocad** (0.14°);
+- centraggio invariato (RMSD 0.11–0.14 mm).
+
+Design + verifica avversariale 4-lensi su entrambe le patch; `node --check` PASS; gate sintassi inline OK. Bump 8.12.1→8.13.0 (registry + v3b `<title>`/`ANALIZZA_BUILD`). `docs/MAPPA_FUNZIONALE.md` aggiornata (`sostAlignAll`/`onAxisEngineChange`/`misICP_cylAxis`). **Rischio residuo**: la guardia `wallN>=8` conta i triangoli, non lo spread angolare delle normali (stesso limite del motore di placement già in prod) — monitorare su pareti quasi-planari.
+
+**NON DEPLOYATO.** Solo working tree → commit locale; deploy su entrambi i servizi (LEGACY + BACKEND) quando autorizzato.
+
 ## 8.12.1 — fix Raffina idempotente a convergenza (Sostituire) (LIVE su entrambi i servizi + custom domain) (2026-06-08)
 
 Guard di **idempotenza** nel **Raffina** del workflow **Sostituire** (`sostAlignAll`): nel `forEach` per-marker, dopo il loop ICP e prima di applicare la matrice rigida `Rm`, se la trasformazione **TOTALE** accumulata (`R=Racc`, `t=tAcc`) è sotto soglia di rigidità (**rotazione < 0.01°** e **traslazione < 1 µm = 0.001 mm**) il marker è già a convergenza → `return` (no-op), posa invariata. Risolve il **micro-drift ~µm a ogni Raffina ripetuto** su scan rumorosi (prima `Racc`/`tAcc` non erano mai esattamente identità); i marker non ancora convergenti continuano a rifinirsi normalmente. Il `return` precede `nRefined++` → i convergenti non vengono contati in "Raffinamento completato (N/M)". ICP/pesi/crop/accumulo INVARIATI. **Gate visivo su scan reali OK** (Raffina ×2/×3 non muove i marker). Fix in v3b `sostAlignAll` ~15750 (commit `e6b402a`); bump PATCH 8.12.0→8.12.1 (registry + v3b `<title>`/`ANALIZZA_BUILD`, commit `e6e5fca`). `docs/MAPPA_FUNZIONALE.md` riallineata (drift righe regione Sostituire + shift guard).

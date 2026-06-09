@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.12.1</title>
+<title>Syntesis-ICP - Analizzare v8.13.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2331,8 +2331,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.12.1';
-window.ANALIZZA_BUILD_DATE = '2026-06-08';
+window.ANALIZZA_BUILD = '8.13.0';
+window.ANALIZZA_BUILD_DATE = '2026-06-09';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -6356,10 +6356,57 @@ function misICP_cylAxis(tris){
   // Allineo i due versori coerentemente con l'asse PCA
   if(nTop[0]*axPCA[0]+nTop[1]*axPCA[1]+nTop[2]*axPCA[2]<0){ nTop=[-nTop[0],-nTop[1],-nTop[2]]; }
   if(nBot[0]*axPCA[0]+nBot[1]*axPCA[1]+nBot[2]*axPCA[2]<0){ nBot=[-nBot[0],-nBot[1],-nBot[2]]; }
-  // Asse cilindro = media delle due normali
+  // ── Asse cilindro cap-media (SEED): media normalizzata delle due normali cap ──
   var ax=[nTop[0]+nBot[0], nTop[1]+nBot[1], nTop[2]+nBot[2]];
   var len=Math.sqrt(ax[0]*ax[0]+ax[1]*ax[1]+ax[2]*ax[2])||1;
-  return [ax[0]/len, ax[1]/len, ax[2]/len];
+  ax=[ax[0]/len, ax[1]/len, ax[2]/len];   // seed cap-based normalizzato
+  // ─── MOTORE ASSE ALTERNATIVO "lateral-wall" (setting syntesis_axis_engine) ───
+  // Default 'cap': ritorna il seed cap-media (sopra), invariato. Con 'lateralwall'
+  // il seed cap-media viene RAFFINATO dalla parete laterale del cilindro — piu'
+  // stabile per scanbody con un solo cap pieno + parete (base aperta):
+  //   1. per ogni triangolo: normale = cross(v1-v0,v2-v0), area = 0.5*|cross|
+  //   2. tieni i laterali con |n_unit . seed| < 0.35 (scarta cap/disco)
+  //   3. asse = minor eigenvector di M = Σ area_i (n_i n_iᵀ)  [= normali pesate
+  //      √area in senso SVD], via misICP_jacobi3 (eigensolver 3x3, nessuna dep)
+  //   4. riorienta concorde col seed. Fallback al seed se < 8 laterali validi.
+  var _axisEngine = 'cap';
+  try { _axisEngine = localStorage.getItem('syntesis_axis_engine') || 'cap'; } catch(e){}
+  if(_axisEngine === 'lateralwall'){
+    var _M=[[0,0,0],[0,0,0],[0,0,0]], _usedLat=0;
+    for(var _ti=0; _ti<tris.length; _ti++){
+      var _t=tris[_ti], _v0=_t[0], _v1=_t[1], _v2=_t[2];
+      // bordi e cross product -> normale (non normalizzata) + area
+      var _e1x=_v1[0]-_v0[0], _e1y=_v1[1]-_v0[1], _e1z=_v1[2]-_v0[2];
+      var _e2x=_v2[0]-_v0[0], _e2y=_v2[1]-_v0[1], _e2z=_v2[2]-_v0[2];
+      var _crx=_e1y*_e2z-_e1z*_e2y, _cry=_e1z*_e2x-_e1x*_e2z, _crz=_e1x*_e2y-_e1y*_e2x;
+      var _clen=Math.sqrt(_crx*_crx+_cry*_cry+_crz*_crz);
+      if(_clen < 1e-12) continue;              // triangolo degenere
+      var _area=0.5*_clen;
+      var _nx=_crx/_clen, _ny=_cry/_clen, _nz=_crz/_clen;  // normale unitaria
+      // banda assiale: scarta cap/disco (normale quasi parallela al seed)
+      if(Math.abs(_nx*ax[0] + _ny*ax[1] + _nz*ax[2]) >= 0.35) continue;
+      var _w=_area;   // peso area (covarianza Σ area·nnᵀ = √area-pesata in senso SVD; = POC findScanbodyCenter)
+      _M[0][0]+=_w*_nx*_nx; _M[0][1]+=_w*_nx*_ny; _M[0][2]+=_w*_nx*_nz;
+      _M[1][1]+=_w*_ny*_ny; _M[1][2]+=_w*_ny*_nz; _M[2][2]+=_w*_nz*_nz;
+      _usedLat++;
+    }
+    if(_usedLat >= 8){
+      _M[1][0]=_M[0][1]; _M[2][0]=_M[0][2]; _M[2][1]=_M[1][2];   // simmetria
+      var _eig=misICP_jacobi3(_M);
+      var _mi=0;
+      if(_eig.vals[1] < _eig.vals[_mi]) _mi=1;
+      if(_eig.vals[2] < _eig.vals[_mi]) _mi=2;
+      var _la=[_eig.vecs[0][_mi], _eig.vecs[1][_mi], _eig.vecs[2][_mi]];  // minor eigenvector
+      var _ll=Math.sqrt(_la[0]*_la[0]+_la[1]*_la[1]+_la[2]*_la[2]);
+      if(_ll > 1e-6){
+        _la[0]/=_ll; _la[1]/=_ll; _la[2]/=_ll;
+        if(_la[0]*ax[0]+_la[1]*ax[1]+_la[2]*ax[2] < 0){ _la=[-_la[0],-_la[1],-_la[2]]; }
+        ax=_la;   // asse raffinato dalla parete laterale
+      }
+    }
+    // _usedLat < 8 (o eigenvector degenere): ax resta = seed cap-media
+  }
+  return ax;
 }
 function misICP_axisAngleDeg(a,b){
   if(!a || !b) return 0;
@@ -15738,6 +15785,15 @@ function sostAlignAll(){
         var zLo = cullInfo.zMin - 0.5;
         var zHi = cullInfo.zMax + 0.5;
         var scanPts = [];
+        // FIX asse (Opzione 2): accumulatore lateral-wall sui triangoli di PARETE
+        // della scansione cadenti nel crop. M = somma area_i*(n_i outer n_i) sui
+        // triangoli con normale circa perpendicolare all'asse (|n.asse| < 0.35).
+        // Il minor eigenvector di M (via misICP_jacobi3) e' l'asse del cilindro.
+        // Stesso estimatore validato che eguaglia Exocad. Normali ricavate dal
+        // cross dei 3 vertici (niente attributo normal sulla scansione).
+        var wallM = [[0,0,0],[0,0,0],[0,0,0]];
+        var wallN = 0;
+        var WALL_BAND = 0.35;
         for(var i = 0; i < nScanTri; i++){
           var oi = i * 9;
           var px = (scanPos[oi]   + scanPos[oi+3] + scanPos[oi+6]) / 3;
@@ -15749,6 +15805,21 @@ function sostAlignAll(){
           var rx = dx - zp*ax, ry = dy - zp*ay, rz = dz - zp*az;
           if(rx*rx + ry*ry + rz*rz > radLim2) continue;
           scanPts.push([px, py, pz]);
+          // Normale (non normalizzata) = (v1-v0) x (v2-v0); |cross| = 2*area.
+          var e1x = scanPos[oi+3]-scanPos[oi], e1y = scanPos[oi+4]-scanPos[oi+1], e1z = scanPos[oi+5]-scanPos[oi+2];
+          var e2x = scanPos[oi+6]-scanPos[oi], e2y = scanPos[oi+7]-scanPos[oi+1], e2z = scanPos[oi+8]-scanPos[oi+2];
+          var nxw = e1y*e2z - e1z*e2y;
+          var nyw = e1z*e2x - e1x*e2z;
+          var nzw = e1x*e2y - e1y*e2x;
+          var nLen = Math.sqrt(nxw*nxw + nyw*nyw + nzw*nzw);
+          if(nLen < 1e-9) continue;
+          var area = 0.5 * nLen;
+          var unx = nxw/nLen, uny = nyw/nLen, unz = nzw/nLen;
+          if(Math.abs(unx*ax + uny*ay + unz*az) >= WALL_BAND) continue; // tieni solo parete
+          wallM[0][0] += area*unx*unx; wallM[0][1] += area*unx*uny; wallM[0][2] += area*unx*unz;
+          wallM[1][0] += area*uny*unx; wallM[1][1] += area*uny*uny; wallM[1][2] += area*uny*unz;
+          wallM[2][0] += area*unz*unx; wallM[2][1] += area*unz*uny; wallM[2][2] += area*unz*unz;
+          wallN++;
         }
 
         if(scanPts.length < 50 || tplWorld.length < 50) return;
@@ -15881,9 +15952,46 @@ function sostAlignAll(){
         var newPos = new THREE.Vector3(cx, cy, cz).applyMatrix4(Rm);
         p.position.copy(newPos);
         if(p.discWorld){ p.discWorld.applyMatrix4(Rm); }
+        // Asse post-centraggio dal point-ICP (rotazione di Rm applicata al seed).
+        // Resta il FALLBACK se la parete e' troppo povera (< 8 triangoli).
         var nAx = new THREE.Vector3(ax, ay, az);
         nAx.applyMatrix4(new THREE.Matrix4().extractRotation(Rm));
         nAx.normalize();
+
+        // FIX asse (Opzione 2): se la parete della scansione e' sufficiente,
+        // l'asse finale NON viene dalla rotazione del point-ICP (non-rigida, ~1 deg
+        // di degrado) ma dal fit lateral-wall (minor eigenvector di wallM, robusto,
+        // = Exocad). Poi ri-orientiamo il marker attorno a p.position con la delta
+        // rotazione che porta nAx sull'asse parete, propagandola ai gruppi (export).
+        if(wallN >= 8){
+          var ejW = misICP_jacobi3(wallM);
+          var miW = 0;
+          if(ejW.vals[1] < ejW.vals[miW]) miW = 1;
+          if(ejW.vals[2] < ejW.vals[miW]) miW = 2;
+          var wAx = new THREE.Vector3(ejW.vecs[0][miW], ejW.vecs[1][miW], ejW.vecs[2][miW]);
+          if(wAx.lengthSq() > 1e-12){
+            wAx.normalize();
+            // Riorienta il segno concorde col seed (asse e' bidirezionale).
+            if(wAx.dot(nAx) < 0) wAx.multiplyScalar(-1);
+            // Delta rotazione che porta nAx -> wAx, applicata attorno a p.position.
+            var qDelta = new THREE.Quaternion().setFromUnitVectors(nAx.clone().normalize(), wAx);
+            var Rd = new THREE.Matrix4().makeRotationFromQuaternion(qDelta);
+            var pPos = p.position;
+            var Rorient = new THREE.Matrix4()
+              .makeTranslation(pPos.x, pPos.y, pPos.z)
+              .multiply(Rd)
+              .multiply(new THREE.Matrix4().makeTranslation(-pPos.x, -pPos.y, -pPos.z));
+            Object.keys(p.groups || {}).forEach(function(k){
+              var g = p.groups[k];
+              if(!g) return;
+              var newMat = new THREE.Matrix4().multiplyMatrices(Rorient, g.matrix);
+              g.matrix.copy(newMat);
+              g.matrixAutoUpdate = false;
+            });
+            if(p.discWorld){ p.discWorld.applyMatrix4(Rorient); }
+            nAx.copy(wAx);
+          }
+        }
         p.axisDir.copy(nAx);
 
         var endPt = p.position.clone().add(p.axisDir.clone().multiplyScalar(20));

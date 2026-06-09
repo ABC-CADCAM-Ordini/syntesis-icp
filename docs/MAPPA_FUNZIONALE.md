@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.12.1 — **Data:** 2026-06-08
+> **Versione software mappata:** 8.13.0 — **Data:** 2026-06-09
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -223,7 +223,7 @@ Sostituzione scan body con ICP. Pannello `panelSostituire` [1915]:
 | **Radio "Scansione di partenza" 1T3/SR/OS (Box B)** | `#sostSourceRadio` | onchange | `sostOnSourceChange` | `sostSourceTemplate`, `sostActiveTemplate` | tipo marker presente (allineamento) | [1928-1931] |
 | Upload custom | `#sostInputCustom` | onchange | `sostOnCustomPicked` | — | template custom | [1934] |
 | + Posiziona | `#sostBtnPlace` | onclick | `sostStartPlacement` | — | placement marker | [1938] |
-| Raffina | `#sostBtnRefine` | onclick | `sostAlignAll` | — | ICP sostituzione | [1939] | disabled di default |
+| Raffina | `#sostBtnRefine` | onclick | `sostAlignAll` | — | ICP sostituzione — 8.13.0: il point-ICP **centra** soltanto; l'**asse** del marker viene da un fit lateral-wall della parete scansionata (gated `syntesis_axis_engine='lateralwall'`, fallback `R·seed` se <8 triangoli parete) — vedi `sostAlignAll` [15690] | [1939] | disabled di default |
 | Esporta STL | `#sostBtnExport` | onclick | `sostExportSTL` | `_sostExportPending` | apre **`#sostExportDialog`** (nome file precompilato) → Conferma scarica col nome scelto (sanificato, `.stl` auto); Annulla non scarica | [1946] | `display:none` default; dialog nome file (8.4.7) |
 
 > **Box B vs Box A**: Box B (`sostSourceTemplate`) = tipo di marker **già presente** nella scansione di partenza, per la registrazione (`SOSTITUIRE_TEMPLATE_INFO`, `BBOX_LOCAL`, `T_ROOT` — [14849]/[15354]/[15353]). NON è ridondante con Box A (`_ANALYZE_SBTYPE`, che guida `placeMUA` in Analizza). Vedi fix 8.4.5 e 8.4.6 sopra.
@@ -339,7 +339,9 @@ Pannello admin (~390 righe). **Wiring via `addEventListener`**; righe utente gen
 | `hardReset` | v3b [4218] | Ricarica l'app con cache-bust `?_r=` | btn Reset [1262] |
 | `newCase` | v3b [4165] | Reset del caso corrente (confirm se stato) | File→Nuovo [1222] |
 | `setAnalyzeSbType` / `getAnalyzeSbType` / `getAnalyzeSbCfg` | v3b [1967] / [1986] / [1987] | Scrive/legge `_ANALYZE_SBTYPE` e cfg CAD | radio Box A [1666-1669]; `placeMUA` |
-| `sostStartPlacement` / `sostAlignAll` | v3b [15086] / [15543] | Placement marker / ICP nel workflow Sostituire | btn `#sostBtnPlace` [1938] / `#sostBtnRefine` [1939] |
+| `sostStartPlacement` / `sostAlignAll` | v3b [15165] / [15690] | Placement marker / Raffina ICP nel workflow Sostituire; **8.13.0**: Raffina centra (point-ICP) + asse da fit lateral-wall della parete (gated `syntesis_axis_engine`) | btn `#sostBtnPlace` [1938] / `#sostBtnRefine` [1939] |
+| `onAxisEngineChange` | v3b [3280] | Scrive `syntesis_axis_engine` (`'cap'`\|`'lateralwall'`) dal radio **"Motore asse cilindro"** (tab Algoritmo, modal Impostazioni); gate del motore asse per `findScanbodyCenter` (placement), `sostAlignAll` (Raffina, 8.13.0) e `misICP_cylAxis` (asse report, 8.13.0) | radio tab Algoritmo (`openSettings` [90]) |
+| `misICP_cylAxis` | v3b [6303] | Asse cilindro per il report Misurare ICP; **8.13.0**: con `syntesis_axis_engine='lateralwall'` raffina dalla parete (minor eigenvector di Σ area·nnᵀ), default `'cap'` = cap-PCA storico | `misICP_run` → report clinico |
 | `sostExportSTL` / `openSostExportNameDialog` / `closeSostExportNameDialog` / `confirmSostExport` / `_sostDoExport` | v3b [15859] / [15898] / [15906] / [15912] / [15928] | Export STL Sostituire con dialog nome file (8.4.7): valida + nome default → apre `#sostExportDialog` → Annulla / Conferma (sanifica) → `_sostDoExport` scarica | btn `#sostBtnExport` [1946]; `#sostExportDialog` |
 | `sostOnSourceChange` | v3b [14938] | Scrive `sostSourceTemplate`/`sostActiveTemplate` (Box B) | radio Box B [1928-1931] |
 | `_hardResetSostituire` | v3b [4628] | Reset stato Sostituire all'uscita | `selectWorkflow` [4592] |
