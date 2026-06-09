@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-09, 8.13.0 — **motore asse lateral-wall robusto**: Raffina (`sostAlignAll`) deriva l'asse dalla parete scansionata invece che dalla rotazione del point-ICP + report Misurare (`misICP_cylAxis`) raffina dalla parete; chiude il gap angolare con Exocad (incoerenza export scan-to-scan **0.95°→0.14-0.31°**). Base 8.12.1 Raffina idempotente; 8.12.0 panel/UI infra `ds/syn-panel.js`; 8.11.0 clip engine `ds/syn-clip.js`; r169 via `ds/syn-render.js`)
+## Versione live (2026-06-09, 8.14.0 — **motore asse "auto" (default per-tipo)**: `syntesis_axis_engine` a 3 stati (auto|cap|lateralwall, default **auto**) che sceglie il motore per tipo di scanbody — lateral-wall per **SR**, cap-media per **1T3/OS**. Base 8.13.0 **lateral-wall robusto** (Raffina+report, incoerenza export scan-to-scan **0.95°→0.14-0.31° = Exocad**); 8.12.1 Raffina idempotente; 8.12.0 panel/UI infra `ds/syn-panel.js`; 8.11.0 clip engine; r169 via `ds/syn-render.js`)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.13.0 (live, commit `38cda88` del 2026-06-09, deploy `5ce821a7`) |
-| Legacy syntesis-icp (7ac922ce) | 8.13.0 (live, commit `38cda88` del 2026-06-09, deploy `ce9ace7a`) |
+| Backend principale (b7671e12) | 8.14.0 (live, commit `00a72df` del 2026-06-09, deploy `673bbce0`) |
+| Legacy syntesis-icp (7ac922ce) | 8.14.0 (live, commit `00a72df` del 2026-06-09, deploy `cc0cf86e`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.13.0 (**asse lateral-wall robusto** Sostituire/Misurare [8.13.0]; **motori r169 via fonte unica** `ds/syn-render.js`, retrofit a comportamento invariato Δ0; **resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 — **motore clip in `ds/syn-clip.js`** (8.11.0) + **panel/UI infra in `ds/syn-panel.js`** (8.12.0, relocazione in-place verbatim), comportamento INVARIATO via gate — + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. **Color picker per-oggetto** in tutti gli alberi scena (8.9.0, gestione unica `setSceneObjectColor`). _Follow-up aperti: ombre di contatto AO (#6) + persistenza colori "apri caso" (#7) — vedi Sospesi._ |
+| /analizzare | v8.14.0 (**motore asse "auto"** per-tipo [8.14.0]: SR→lateral-wall, 1T3/OS→cap, 3 stati nel tab Algoritmo; **asse lateral-wall robusto** Sostituire/Misurare [8.13.0]; **motori r169 via fonte unica** `ds/syn-render.js`, retrofit a comportamento invariato Δ0; **resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 — **motore clip in `ds/syn-clip.js`** (8.11.0) + **panel/UI infra in `ds/syn-panel.js`** (8.12.0, relocazione in-place verbatim), comportamento INVARIATO via gate — + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. **Color picker per-oggetto** in tutti gli alberi scena (8.9.0, gestione unica `setSceneObjectColor`). _Follow-up aperti: ombre di contatto AO (#6) + persistenza colori "apri caso" (#7) — vedi Sospesi._ |
 | /accedi | **logo brand bianco** (8.10.1: `<img src="/static/synthesis-logo.png">` reso bianco via `filter:invert`, al posto del wordmark testo "Syntesis ICP"; corregge anche "Syntesis"→"Synthesis"). Ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor (**r169 dal 8.10.0**: loader importmap+bridge, init differito a three-ready, addon jsm Trackball/Transform[getHelper]/OBJ/PLY, clip/stencil+PiP; **color picker nativo** `setSceneObjectColor`; **reticolo "Entrambi"** uniformato a /analizzare WireframeGeometry nero 0.35; colore Δ0 vs /analizzare) — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | /dashboard | preview STL **r169 dal 8.10.0** (`import('three')` dinamico lazy + `applyRendererPipeline`); fix bug `async` orfano pre-esistente (riga ~3585). Zero r128 residuo nel codebase |
@@ -25,7 +25,7 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
-## 8.14.0 — motore asse "auto" (nuovo default) (in rilascio) (2026-06-09)
+## 8.14.0 — motore asse "auto" (nuovo default) (LIVE su entrambi i servizi + custom domain) (2026-06-09)
 
 `syntesis_axis_engine` passa da binario a **3 stati**: `auto` (nuovo default) | `cap` | `lateralwall`. `auto` sceglie il motore **per tipo di scanbody**: lateral-wall per **SR** (validato), cap-media per **1T3/OS** (non ancora validati). Risolto nei 3 path: placement `findScanbodyCenter` (SR via `opts.radius`~2.03), report `misICP_cylAxis` (SR via altezza cilindro `H`>2.4mm), Raffina `sostAlignAll` (SR via `sostSourceTemplate`). UI: 3ª opzione radio "Auto (consigliato)" nel tab Algoritmo.
 
@@ -33,7 +33,7 @@ I valori espliciti `cap`/`lateralwall` restano **identici a 8.13.0** (la logica 
 
 Smoke test su **codice vero** (mock): `auto`+SR(r2.03) ≡ `lateralwall` (0.0°), `auto`+1T3(r2.515) ≡ `cap` (0.0°). Design+verifica 4-lensi (workflow sola-lettura, allSound), `node --check` PASS, gate sintassi OK. Bump 8.13.0→8.14.0. `docs/MAPPA_FUNZIONALE.md` aggiornata (radio auto + 3 gate; corretta la riga Raffina che descriveva male 8.13.0 come gated).
 
-(deploy in corso — esiti sotto a verifica)
+**DEPLOYATO LIVE** il 2026-06-09 (canary **LEGACY → BACKEND**, `serviceInstanceDeploy latestCommit:true`, commit `00a72df`): LEGACY `7ac922ce` deploy `cc0cf86e`, BACKEND `b7671e12` deploy `673bbce0`. **Verifica live (curl -sL):** `backend_version=8.14.0` + `<title>`/`ANALIZZA_BUILD` `8.14.0` + radio `value="auto"` presente + `/analizzare` 200 + gating (no auth) `/api/me/profile` → 403, su BACKEND + LEGACY + `app.syntesis-icp.com`.
 
 ## 8.13.0 — motore asse "lateral-wall" robusto (Sostituire + Misurare) (LIVE su entrambi i servizi + custom domain) (2026-06-09)
 
