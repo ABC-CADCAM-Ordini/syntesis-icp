@@ -2,14 +2,14 @@
 
 > Snapshot corrente. Aggiornare dopo ogni fase chiusa.
 
-## Versione live (2026-06-08, 8.12.1 — fix **Raffina idempotente a convergenza** in `sostAlignAll` (Sostituire): guard di rigidità sulla trasformazione TOTALE accumulata dall'ICP → marker già convergente = no-op. Base 8.12.0: estrazione panel/UI infra `ds/syn-panel.js`; 8.11.0 clip engine `ds/syn-clip.js`; r169 via `ds/syn-render.js`)
+## Versione live (2026-06-09, 8.13.0 — **motore asse lateral-wall robusto**: Raffina (`sostAlignAll`) deriva l'asse dalla parete scansionata invece che dalla rotazione del point-ICP + report Misurare (`misICP_cylAxis`) raffina dalla parete; chiude il gap angolare con Exocad (incoerenza export scan-to-scan **0.95°→0.14-0.31°**). Base 8.12.1 Raffina idempotente; 8.12.0 panel/UI infra `ds/syn-panel.js`; 8.11.0 clip engine `ds/syn-clip.js`; r169 via `ds/syn-render.js`)
 
 | Componente | Versione |
 |---|---|
-| Backend principale (b7671e12) | 8.12.1 (live, commit `e6e5fca` del 2026-06-08, deploy `cbb4550b`) |
-| Legacy syntesis-icp (7ac922ce) | 8.12.1 (live, commit `e6e5fca` del 2026-06-08, deploy `14f08c96`) |
+| Backend principale (b7671e12) | 8.13.0 (live, commit `38cda88` del 2026-06-09, deploy `5ce821a7`) |
+| Legacy syntesis-icp (7ac922ce) | 8.13.0 (live, commit `38cda88` del 2026-06-09, deploy `ce9ace7a`) |
 | / (home pubblica, 8.6.4) | `synthesis-home.html` — splash **dark** (`--dark #0F1923`): cornice perimetrale animata **cava** (`.synt-frame` via `mask`, fixed, `pointer-events:none`), logo bianco (invert), hero (headline + immagine crop in card chiara) + 4 tool-card. **Layout 16:9 "una schermata"** (8.6.2): `.viewport` inset:22px dentro la cornice + misure `vh`/`clamp` → tutto in `100vh` senza scroll; su desktop bassi compressione mirata (8.6.3, `@media max-height:900` + `overflow:hidden`); mobile verticale con scroll dentro la cornice. Sostituisce il redirect 302 a /vedere (fallback) |
-| /analizzare | v8.12.1 (**motori r169 via fonte unica** `ds/syn-render.js`, retrofit a comportamento invariato Δ0; **resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 — **motore clip in `ds/syn-clip.js`** (8.11.0) + **panel/UI infra in `ds/syn-panel.js`** (8.12.0, relocazione in-place verbatim), comportamento INVARIATO via gate — + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. **Color picker per-oggetto** in tutti gli alberi scena (8.9.0, gestione unica `setSceneObjectColor`). _Follow-up aperti: ombre di contatto AO (#6) + persistenza colori "apri caso" (#7) — vedi Sospesi._ |
+| /analizzare | v8.13.0 (**asse lateral-wall robusto** Sostituire/Misurare [8.13.0]; **motori r169 via fonte unica** `ds/syn-render.js`, retrofit a comportamento invariato Δ0; **resa colore corretta**: `ColorManagement ON` → colori fedeli al colore scelto, non più bruciati/virati al giallo; luci al rapporto r128 **1.2/1.8/0.75** + sfondo gradiente sRGB; include pannello **Taglio** 8.8.0 — **motore clip in `ds/syn-clip.js`** (8.11.0) + **panel/UI infra in `ds/syn-panel.js`** (8.12.0, relocazione in-place verbatim), comportamento INVARIATO via gate — + base r169 8.7.x) — il "vedere dentro" è pilotato dal pannello **Taglio** (`#btnOpenTaglio`, 4 controlli: taglio attivo / asse X-Y-Z / posizione / inverti); convivenza "opacità comanda"; reader `?wf=`; export STL Sostituire con dialog nome file; gate accesso attivo. **Color picker per-oggetto** in tutti gli alberi scena (8.9.0, gestione unica `setSceneObjectColor`). _Follow-up aperti: ombre di contatto AO (#6) + persistenza colori "apri caso" (#7) — vedi Sospesi._ |
 | /accedi | **logo brand bianco** (8.10.1: `<img src="/static/synthesis-logo.png">` reso bianco via `filter:invert`, al posto del wordmark testo "Syntesis ICP"; corregge anche "Syntesis"→"Synthesis"). Ritorno al deep-link dopo login (consuma `sessionStorage.syn_after_login`; fallback /vedere) — 8.5.0 |
 | /vedere | v8.0.0-refactor (**r169 dal 8.10.0**: loader importmap+bridge, init differito a three-ready, addon jsm Trackball/Transform[getHelper]/OBJ/PLY, clip/stencil+PiP; **color picker nativo** `setSceneObjectColor`; **reticolo "Entrambi"** uniformato a /analizzare WireframeGeometry nero 0.35; colore Δ0 vs /analizzare) — fix primo-click `#btnPick` (8.4.8). Non più target del redirect `/` (ora home), resta servito e fallback |
 | /dashboard | preview STL **r169 dal 8.10.0** (`import('three')` dinamico lazy + `applyRendererPipeline`); fix bug `async` orfano pre-esistente (riga ~3585). Zero r128 residuo nel codebase |
@@ -25,7 +25,7 @@
 
 > DS introdotto pilota /vedere (8.3.0/8.3.1, 2026-05-08): `backend/static/ds/tokens.css` e `backend/static/ds/components.css` come fonte unica per token visuali e classi `.syn-*`. Pilota su Vedere migra `.header` (proprieta' di pattern bar) e bottone btnPick "Aggiungi file" (da outline a primary CTA). Replica su Dashboard e v3b a tappe nelle prossime sessioni.
 
-## 8.13.0 — motore asse "lateral-wall" robusto (Sostituire + Misurare) (PRONTO, NON DEPLOYATO) (2026-06-09)
+## 8.13.0 — motore asse "lateral-wall" robusto (Sostituire + Misurare) (LIVE su entrambi i servizi + custom domain) (2026-06-09)
 
 Chiude il gap angolare con **Exocad** sul fit dell'asse cilindro. Root dimostrato sui dati reali (barra ID 2161): l'errore è nella **stima dell'asse**, NON nell'allineamento ICP (centroidi/RMSD ottimi, è l'asse a sballare).
 
@@ -39,7 +39,7 @@ Chiude il gap angolare con **Exocad** sul fit dell'asse cilindro. Root dimostrat
 
 Design + verifica avversariale 4-lensi su entrambe le patch; `node --check` PASS; gate sintassi inline OK. Bump 8.12.1→8.13.0 (registry + v3b `<title>`/`ANALIZZA_BUILD`). `docs/MAPPA_FUNZIONALE.md` aggiornata (`sostAlignAll`/`onAxisEngineChange`/`misICP_cylAxis`). **Rischio residuo**: la guardia `wallN>=8` conta i triangoli, non lo spread angolare delle normali (stesso limite del motore di placement già in prod) — monitorare su pareti quasi-planari.
 
-**NON DEPLOYATO.** Solo working tree → commit locale; deploy su entrambi i servizi (LEGACY + BACKEND) quando autorizzato.
+**DEPLOYATO LIVE** il 2026-06-09 (canary **LEGACY → BACKEND**, `serviceInstanceDeploy latestCommit:true`, commit `38cda88`): LEGACY `7ac922ce` deploy `ce9ace7a`, BACKEND `b7671e12` deploy `5ce821a7`. **Verifica live (curl -sL):** `backend_version=8.13.0` + `<title>`/`ANALIZZA_BUILD` `8.13.0` + `/analizzare` 200 + gating (no auth) `/api/me/profile` & `/api/leaderboard` → 403, su BACKEND + LEGACY + `app.syntesis-icp.com` (alias risponde senza errori SSL).
 
 ## 8.12.1 — fix Raffina idempotente a convergenza (Sostituire) (LIVE su entrambi i servizi + custom domain) (2026-06-08)
 
