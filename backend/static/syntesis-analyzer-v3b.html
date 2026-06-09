@@ -2725,14 +2725,12 @@ function findScanbodyCenter(scanGeo, clickPos, clickNormal, opts){
   //      vector delle normali pesate √area], via misICP_jacobi3 (eigensolver 3x3)
   //   3. riorienta concorde con l'asse grezzo
   // I due motori coesistono; tutto a valle (centro, [CylFit], return) usa 'axis'.
-  var _axisEngine = 'cap';
-  try { _axisEngine = localStorage.getItem('syntesis_axis_engine') || 'auto'; } catch(e){}
   // 'auto' (default): lateral-wall solo per SR (radius ~ 2.03). opts.radius arriva
   // dai call-site sia Sostituire (SOSTITUIRE_TEMPLATE_INFO[...].radius) sia Analizza
   // (SCANBODY_CFG[...].radius): SR=2.03 -> lateral; 1T3=2.515/OS=1.78 (e opts assente
   // -> default 2.515) -> cap-media. 'lateralwall'/'cap' espliciti = invariati (8.13.0).
   var _isSR = (opts && typeof opts.radius === 'number' && Math.abs(opts.radius - 2.03) < 0.1);
-  var _useLateral = (_axisEngine === 'lateralwall') || (_axisEngine === 'auto' && _isSR);
+  var _useLateral = synAxisUseLateral(_isSR, 'cap');   // onThrow 'cap' = default-eccezione preservato
   if(_useLateral && allNearNorms.length >= 8){
     // Crop r=2.5mm attorno al CLICK (= seed sullo scanbody, come il POC che
     // croppa attorno al centro-seed). Robusto: un centroide "cap-media"
@@ -3280,6 +3278,21 @@ function onAlgoChange(value){
     optS.style.borderColor = (value === 'server') ? 'var(--blue)' : 'var(--border)';
     optS.style.background = (value === 'server') ? '#F0F9FF' : '#fff';
   }
+}
+
+// Motore asse cilindro (syntesis_axis_engine): SORGENTE DI VERITA' unica per la
+// decisione cap-media vs lateral-wall, usata in modo identico da placement
+// (findScanbodyCenter), report (misICP_cylAxis) e Raffina (sostAlignAll).
+// isSR lo calcola il call-site (segnale diverso: radius / altezza H / sourceKey).
+// onThrow = default se localStorage LANCIA (preservato per-sito: 'cap' su
+// placement+report, 'auto' su Raffina); chiave assente -> 'auto' (= default 8.14.0).
+function synAxisEngineRead(onThrow){
+  try { return localStorage.getItem('syntesis_axis_engine') || 'auto'; }
+  catch(e){ return onThrow; }
+}
+function synAxisUseLateral(isSR, onThrow){
+  var e = synAxisEngineRead(onThrow);
+  return (e === 'lateralwall') || (e === 'auto' && isSR);
 }
 
 // Motore asse cilindro: cap-media (default) vs lateral-wall. Stesso pattern di onAlgoChange.
@@ -6380,12 +6393,10 @@ function misICP_cylAxis(tris){
   //   3. asse = minor eigenvector di M = Σ area_i (n_i n_iᵀ)  [= normali pesate
   //      √area in senso SVD], via misICP_jacobi3 (eigensolver 3x3, nessuna dep)
   //   4. riorienta concorde col seed. Fallback al seed se < 8 laterali validi.
-  var _axisEngine = 'cap';
-  try { _axisEngine = localStorage.getItem('syntesis_axis_engine') || 'auto'; } catch(e){}
   // 'auto' (default): lateral-wall solo per cilindro ALTO (H = altezza lungo l'asse
   // PCA, calcolata sopra come pmax-pmin). SR ~3.0mm -> H>2.4 -> lateral; 1T3 ~1.9 /
   // OS ~1.1 -> cap-media. 'lateralwall'/'cap' espliciti = invariati (8.13.0).
-  var _useLateral = (_axisEngine === 'lateralwall') || (_axisEngine === 'auto' && H > 2.4);
+  var _useLateral = synAxisUseLateral(H > 2.4, 'cap');   // onThrow 'cap' = default-eccezione preservato
   if(_useLateral){
     var _M=[[0,0,0],[0,0,0],[0,0,0]], _usedLat=0;
     for(var _ti=0; _ti<tris.length; _ti++){
@@ -15980,9 +15991,7 @@ function sostAlignAll(){
         // rotazione che porta nAx sull'asse parete, propagandola ai gruppi (export).
         // Motore asse: 'auto' (default) applica il fit lateral-wall solo a SR;
         // 'lateralwall' sempre (= 8.13.0); 'cap' mai. sourceKey e' il tipo template.
-        var _ae = 'auto';
-        try { _ae = localStorage.getItem('syntesis_axis_engine') || 'auto'; } catch(e){}
-        var _useLateral = (_ae === 'lateralwall') || (_ae === 'auto' && sourceKey === 'SR');
+        var _useLateral = synAxisUseLateral(sourceKey === 'SR', 'auto');   // onThrow 'auto' = default-eccezione preservato (divergente, by design)
         if(wallN >= 8 && _useLateral){
           var ejW = misICP_jacobi3(wallM);
           var miW = 0;
