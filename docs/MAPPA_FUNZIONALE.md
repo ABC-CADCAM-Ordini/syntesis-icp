@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.16.0 — **Data:** 2026-06-09
+> **Versione software mappata:** 8.16.1 — **Data:** 2026-06-09
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -340,6 +340,8 @@ Aggiunta sotto il pannello utenti, **stessa IIFE e stesso wiring `addEventListen
 | Dialog conflitto keyword | `#rit-overlay` / `#rit-conflict` | click | `ritShowConflict` / `ritCloseConflict` | da 409 `keyword_conflict`: elenca **esplicitamente** ogni libreria sovrascrivibile (import_name, caricata, n.type, uploaded_by) da `existing[]`; per-riga "Sovrascrivi" (`mode=overwrite`+`target_library_id`) o "Importa come nuova" (`mode=new`+`import_name`) | (ri-`POST` con `mode`) |
 
 **Comportamento ingest** (server): salta `__MACOSX/` e `._*`, ignora subtype/`.sdfa`/firme RSA; **validazione bloccante** = ogni `MarkerFilename` deve esistere come STL nello ZIP (altrimenti 400, rollback totale); dedup STL per `sha256` del contenuto (`rit_marker_stl` globale); `active=FALSE` di default; `uploaded_by` = email admin dal JWT. Conflitto keyword senza `mode` → **409** con `existing[]`, nessuna scrittura.
+
+> **Empty-state e visibilità (`.hidden`)** — gli empty-state `#rit-empty` ("Nessuna libreria importata") e `#empty` (tabella utenti), più il pannello dettaglio `#rit-detail`, si nascondono/mostrano via toggle JS della classe `.hidden` (`ritRender` `.classList.add/remove("hidden")`, `render` utenti, close/open `#rit-detail`). **Fix 8.16.1**: la classe `.hidden` non aveva regola CSS nel `<style>` → il toggle non aveva effetto visivo e `#rit-empty` restava visibile a lista popolata (e `#empty` latente, mascherato dalla tabella sempre popolata). Aggiunta `.hidden{display:none}` (dopo `.empty`): il toggle ora funziona per tutti e tre. Solo CSS, nessuna modifica JS.
 
 ---
 
