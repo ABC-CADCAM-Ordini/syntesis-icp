@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.25.0</title>
+<title>Syntesis-ICP - Analizzare v8.26.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2400,7 +2400,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.25.0';
+window.ANALIZZA_BUILD = '8.26.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -4014,6 +4014,8 @@ function rebuildTree(){
 //   'icp:'+group     -> layer ICP (bgA/scbA/bgB/scbB) via misICP_groupMeshes; storage misICP_layerColors
 //   'sostscan'       -> scansione Multi-A (sostMesh)
 //   'sosttype:'+key  -> tutti i marker del tipo key (1T3/SR/OS): gruppi sostPlaced + SOSTITUIRE_TEMPLATE_INFO
+//   'replacescan'    -> scansione workflow replace (replaceMesh)   [2b-3a]
+//   'replace:'+num   -> marker replace num-esimo: replacePlaced[].color + group   [2b-3a]
 // __synApplyColor applica il colore a una mesh / array / group THREE in modo uniforme (stessa logica ovunque).
 function __synApplyColor(x, col){
   if(!x) return;
@@ -4046,6 +4048,11 @@ function setSceneObjectColor(target, hex){
       var key = p[1];
       if(typeof SOSTITUIRE_TEMPLATE_INFO!=='undefined' && SOSTITUIRE_TEMPLATE_INFO[key]) SOSTITUIRE_TEMPLATE_INFO[key].color = parseInt(hex.replace('#',''),16);
       (typeof sostPlaced!=='undefined' ? sostPlaced : []).forEach(function(pp){ if(pp.groups && pp.groups[key]){ pp.color = parseInt(hex.replace('#',''),16); __synApplyColor(pp.groups[key], col); } });
+    } else if(kind === 'replacescan'){            // 2b-3a: scansione del workflow replace
+      if(typeof replaceMesh!=='undefined' && replaceMesh) __synApplyColor(replaceMesh, col);
+    } else if(kind === 'replace'){                 // 2b-3a: marker replace per num -> 'replace:'+num
+      var rnum = parseInt(p[1],10);
+      (typeof replacePlaced!=='undefined' ? replacePlaced : []).forEach(function(pp){ if(pp.num === rnum){ pp.color = parseInt(hex.replace('#',''),16); __synApplyColor(pp.group, col); } });
     }
   }catch(e){ console.warn('setSceneObjectColor', e); }
 }
@@ -5068,11 +5075,10 @@ function selectWorkflow(wf){
     if(panCli)  panCli.style.display  = 'none';
     if(panMua)  panMua.style.display  = 'none';
     if(panScan) panScan.style.display = 'none';
-    // 2b-1: rebuildTree() non ha ancora un ramo 'replace' -> nascondo il pannello
-    // albero per non mostrarlo vuoto/incoerente. L'albero dedicato (replaceRebuildTree,
-    // gemello di sostRebuildTree) arrivera' con la slice 2b-2. La lista marker vive
-    // gia' in #replacePlacedList.
-    if(layPan)  layPan.style.display  = 'none';
+    // 2b-3a: albero scena dedicato (replaceRebuildTree, gemello di sostRebuildTree)
+    // visibile a sinistra come negli altri workflow. La lista #replacePlacedList
+    // resta nel pannello per il flusso (posiziona->raffina->avanti).
+    if(layPan)  layPan.style.display  = 'flex';
     // Nascondo i pulsanti toolbar degli altri workflow
     analisiBtns.forEach(function(el){ el.style.display = 'none'; });
     misurareBtns.forEach(function(el){ el.style.display = 'none'; });
@@ -5084,6 +5090,7 @@ function selectWorkflow(wf){
     if(stage) stage.classList.add('hidden');
     // Carico le librerie attive (idempotente; popola il dropdown)
     try { replaceFetchLibraries(); } catch(e){}
+    try { replaceRebuildTree(); } catch(e){}   // 2b-3a: popola l'albero scena (scansione + marker gia' presenti)
     showStatus('Workflow Replace-iT: carica una scansione, scegli libreria e type.');
   }
 
@@ -15943,6 +15950,7 @@ function replaceLoadScanToScene(geo, filename){
   }
   var ph = document.getElementById('replaceScanPlaceholder');
   if(ph) ph.style.display = 'none';
+  try { replaceRebuildTree(); } catch(e){}   // 2b-3a: la scansione compare nell'albero
   replaceShowStatus('Scansione caricata. Scegli libreria e type, poi + Posiziona.');
 }
 
@@ -16176,6 +16184,7 @@ function replaceConfirmSeed(){
 }
 
 function replaceRebuildPlacedList(){
+  try { replaceRebuildTree(); } catch(e){}   // 2b-3a: albero scena allineato a ogni cambio marker
   var wrap = document.getElementById('replacePlacedList');
   var items = document.getElementById('replacePlacedItems');
   var flow = document.getElementById('replaceFlow');
@@ -16207,6 +16216,71 @@ function replaceRebuildPlacedList(){
     row.appendChild(sw); row.appendChild(lab); row.appendChild(del);
     items.appendChild(row);
   });
+}
+
+// 2b-3a: ALBERO componenti del workflow replace (gemello di sostRebuildTree),
+// popola il pannello scena condiviso #layerTree (#layersPanel a sinistra) come
+// negli altri workflow. Righe: Scansione (visibilita'/colore/opacita') + ogni
+// marker piazzato (visibilita'/colore/RMSD/elimina). Indipendente dalla lista
+// #replacePlacedList (che resta per il flusso). Guardia analysisMode: l'albero e'
+// condiviso fra workflow, scrive solo quando 'replace' e' attivo.
+var replaceScanUI = { opacity: 1.0 };
+function replaceToggleScanVisibility(on){ if(replaceMesh) replaceMesh.visible = !!on; }
+function replaceSetScanOpacity(pctStr){
+  var v = Math.max(0.1, Math.min(1.0, parseFloat(pctStr) / 100));
+  replaceScanUI.opacity = v;
+  if(replaceMesh && replaceMesh.material){
+    replaceMesh.material.transparent = v < 1.0;
+    replaceMesh.material.opacity = v;
+    replaceMesh.material.needsUpdate = true;
+  }
+  var lbl = document.getElementById('replaceOpLblScan'); if(lbl) lbl.textContent = Math.round(v * 100) + '%';
+}
+function replaceTogglePlacedVisibility(num, on){
+  for(var i = 0; i < replacePlaced.length; i++){
+    if(replacePlaced[i].num === num){ if(replacePlaced[i].group) replacePlaced[i].group.visible = !!on; break; }
+  }
+}
+function replaceRebuildTree(){
+  var layerTree = document.getElementById('layerTree');
+  if(!layerTree) return;
+  if(typeof analysisMode !== 'undefined' && analysisMode !== 'replace') return;   // albero condiviso: solo in replace
+  var h = '';
+  if(replaceMesh){
+    var scanHex = (replaceMesh.material && replaceMesh.material.color) ? ('#' + replaceMesh.material.color.getHexString()) : '#c4a48c';
+    h += '<div class="tree-node" style="display:flex;align-items:center;gap:2px">' +
+         '<span style="width:12px"></span>' +
+         '<input type="checkbox" ' + (replaceMesh.visible ? 'checked' : '') + ' onchange="replaceToggleScanVisibility(this.checked)">' +
+         '<input type="color" class="tree-color" value="' + scanHex + '" title="Colore scansione" onchange="setSceneObjectColor(\'replacescan\', this.value)" onclick="event.stopPropagation()">' +
+         '<span class="lbl" style="flex:1">Scansione</span>' +
+         '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:26px;text-align:right" id="replaceOpLblScan">' + Math.round(replaceScanUI.opacity * 100) + '%</span>' +
+         '</div>';
+    h += '<div class="tree-node" style="padding-left:18px;padding-right:4px;margin-top:-2px;margin-bottom:2px">' +
+         '<input type="range" min="10" max="100" step="1" value="' + Math.round(replaceScanUI.opacity * 100) + '"' +
+         ' oninput="replaceSetScanOpacity(this.value)" style="width:100%;accent-color:#c4a48c;height:4px" title="Trasparenza scansione">' +
+         '</div>';
+  }
+  if(replacePlaced.length){
+    h += '<div class="tree-node" style="margin-top:6px;display:flex;align-items:center;gap:2px">' +
+         '<span style="width:12px"></span>' +
+         '<span class="lbl" style="font-weight:700;flex:1">Marker (' + replacePlaced.length + ')</span>' +
+         '</div>';
+    replacePlaced.forEach(function(p){
+      var hex = '#' + ('000000' + p.color.toString(16)).slice(-6);
+      var vis = p.group ? p.group.visible : true;
+      h += '<div class="tree-node" style="padding-left:18px;display:flex;align-items:center;gap:2px">' +
+           '<input type="checkbox" ' + (vis ? 'checked' : '') + ' onchange="replaceTogglePlacedVisibility(' + p.num + ', this.checked)">' +
+           '<input type="color" class="tree-color" value="' + hex + '" title="Colore marker #' + p.num + '" onchange="setSceneObjectColor(\'replace:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
+           '<span class="lbl" style="flex:1">#' + p.num + ' ' + (p.typeLabel || ('type ' + p.typeOrd)) + '</span>' +
+           (p.rmsd != null ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:42px;text-align:right">' + (Math.round(p.rmsd * 1000) / 1000) + 'mm</span>' : '') +
+           '<button class="del-btn" onclick="replaceDeletePlaced(\'' + p.id + '\')" title="Elimina marker #' + p.num + '">✕</button>' +
+           '</div>';
+    });
+  }
+  if(!replaceMesh && !replacePlaced.length){
+    h = '<div class="tree-node"><span class="lbl" style="color:var(--gray);font-size:12px">Nessun oggetto. Carica una scansione.</span></div>';
+  }
+  layerTree.innerHTML = h;
 }
 
 // Elimina un marker piazzato (group + i suoi 3 dot) dalla scena e dal record.
