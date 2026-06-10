@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.29.0</title>
+<title>Syntesis-ICP - Analizzare v8.30.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1484,6 +1484,7 @@ if (document.readyState === 'loading') {
     <span id="replaceSeedCounter" style="font-size:10px;color:#8fb4d6;font-weight:700"></span>
     <button id="replaceSeedUndo" class="replace-only" onclick="replaceSeedUndo()" style="margin-left:auto;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
     <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
+    <button id="replaceBtn3pt" onclick="replaceStartThreePoint()" style="display:none;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer" title="Allinea con 3 punti di repere (roll preciso)">Allinea a 3 punti</button>
     <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
   </div>
 </div>
@@ -2011,7 +2012,7 @@ if (document.readyState === 'loading') {
 
 
       <div style="display:flex;gap:6px;margin-top:12px">
-        <button id="replaceBtnPlace" class="replace-only" onclick="replaceStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona (3 punti)</button>
+        <button id="replaceBtnPlace" class="replace-only" onclick="replaceStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Nuovo impianto</button>
       </div>
 
       <!-- 2b-3b: counter / Annulla / Ricomincia / Conferma vivono nella finestra
@@ -2412,7 +2413,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.29.0';
+window.ANALIZZA_BUILD = '8.30.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15539,7 +15540,12 @@ var REPLACE_SEED_N = 3;
 var REPLACE_SEED_COLORS = [0xFF3B30, 0x00C853, 0x2979FF]; // 1 rosso, 2 verde, 3 blu
 // Seme in corso: markerPts/scanPts coppie corrispondenti (per Kabsch); markerDots
 // sono figli della mesh anteprima, scanDots vivono nella scena principale.
-var replaceSeed = { phase: 'idle', markerPts: [], scanPts: [], scanNormals: [], markerDots: [], scanDots: [] };
+// 2b-3e.2 (wizard source-first): phase aggiunge 'pickSource' (indica lo scanbody da
+// sostituire) e 'chooseType'/'posed' (auto-posa). Il ramo 3-punti (pickMarker/pickScan/
+// pendingConfirm) resta INVARIATO come "Allinea a 3 punti" opzionale.
+// sourceCenter/sourceAxis = scanbody di partenza individuato (findScanbodyCenter);
+// sourceDot = sprite di evidenziazione.
+var replaceSeed = { phase: 'idle', markerPts: [], scanPts: [], scanNormals: [], markerDots: [], scanDots: [], sourceCenter: null, sourceAxis: null, sourceDot: null };
 // 2b-1.4: marker in posa di ANTEPRIMA non ancora confermato (live preview).
 var replacePending = null;
 // 2b-1.4: token di generazione del seme. Incrementato a ogni reset/cambio: il
@@ -15760,7 +15766,7 @@ function replacePreviewDispose(){
 
 // Azzera il seme in corso (dot anteprima + dot scansione non ancora trasferiti),
 // torna in idle e disarma il placement. Usato anche dal bottone "Ricomincia".
-function replaceSeedClear(){
+function replaceSeedClear(keepSource){
   // marker in anteprima posa non confermato (Ricomincia da pendingConfirm)
   replaceSeedGen++;   // invalida un eventuale fetch marker in volo
   if(replacePending){
@@ -15774,6 +15780,10 @@ function replaceSeedClear(){
   (replaceSeed.markerDots || []).forEach(_replaceDisposeDot);
   (replaceSeed.scanDots || []).forEach(_replaceDisposeDot);
   replaceSeed.markerPts = []; replaceSeed.scanPts = []; replaceSeed.scanNormals = []; replaceSeed.markerDots = []; replaceSeed.scanDots = [];
+  if(!keepSource){   // 2b-3e.2: il source-scanbody resta durante il flusso wizard (cambio type), si pulisce solo a reset/Ricomincia
+    if(replaceSeed.sourceDot){ _replaceDisposeDot(replaceSeed.sourceDot); replaceSeed.sourceDot = null; }
+    replaceSeed.sourceCenter = null; replaceSeed.sourceAxis = null;
+  }
   replaceSeed.phase = 'idle';
   replacePlacementMode = false;
   replaceHideHoverDot();
@@ -15810,16 +15820,25 @@ function replaceSeedUndo(){
 }
 
 function replaceSeedUpdateUI(){
+  var ph = replaceSeed.phase;
   var c = document.getElementById('replaceSeedCounter');
   if(c){
-    if(replaceSeed.phase === 'pickMarker') c.textContent = 'Marker: ' + replaceSeed.markerPts.length + '/3';
-    else if(replaceSeed.phase === 'pickScan') c.textContent = 'Scansione: ' + replaceSeed.scanPts.length + '/3';
-    else if(replaceSeed.phase === 'pendingConfirm') c.textContent = 'Anteprima posa';
+    if(ph === 'pickMarker') c.textContent = 'Marker: ' + replaceSeed.markerPts.length + '/3';
+    else if(ph === 'pickScan') c.textContent = 'Scansione: ' + replaceSeed.scanPts.length + '/3';
+    else if(ph === 'pendingConfirm' || ph === 'posed') c.textContent = 'Anteprima posa';
+    else if(ph === 'pickSource') c.textContent = '① Indica scanbody';
+    else if(ph === 'chooseType') c.textContent = '② Scegli marker';
     else c.textContent = '';
   }
-  // 2b-1.4: il bottone "Conferma" compare solo con una posa di anteprima pendente.
+  // Conferma: posa di anteprima pendente (auto 'posed' o 3-punti 'pendingConfirm').
   var cb = document.getElementById('replaceBtnConfirm');
-  if(cb) cb.style.display = (replaceSeed.phase === 'pendingConfirm') ? '' : 'none';
+  if(cb) cb.style.display = (ph === 'pendingConfirm' || ph === 'posed') ? '' : 'none';
+  // "Allinea a 3 punti": solo dopo l'auto-posa ('posed').
+  var b3 = document.getElementById('replaceBtn3pt');
+  if(b3) b3.style.display = (ph === 'posed') ? '' : 'none';
+  // "Annulla punto": solo durante la raccolta dei 3 punti.
+  var bu = document.getElementById('replaceSeedUndo');
+  if(bu) bu.style.display = (ph === 'pickMarker' || ph === 'pickScan') ? '' : 'none';
   replaceGuideRender();   // 2b-3b: aggiorna titolo impianto, badge passi, testo-passo nella finestra guida
 }
 
@@ -15830,10 +15849,12 @@ function replaceGuideRender(){
   var ph = replaceSeed.phase;
   var titleEl = document.getElementById('replaceGuideTitle');
   if(titleEl) titleEl.textContent = 'Impianto #' + (replacePlaced.length + 1);
-  var cur = (ph === 'pickScan') ? 2 : (ph === 'pendingConfirm') ? 3 : 1;
+  // 2b-3e.2: step ① Scanbody (pickSource) → ② Marker (chooseType) → ③ Posa (posed +
+  // ramo 3-punti pickMarker/pickScan/pendingConfirm).
+  var cur = (ph === 'pickSource' || ph === 'idle') ? 1 : (ph === 'chooseType') ? 2 : 3;
   var stepsEl = document.getElementById('replaceGuideSteps');
   if(stepsEl){
-    var defs = [['1', 'Marker'], ['2', 'Scansione'], ['✓', 'Conferma']];
+    var defs = [['1', 'Scanbody'], ['2', 'Marker'], ['3', 'Posa']];
     var html = '';
     for(var i = 0; i < defs.length; i++){
       var on = (i + 1) === cur;
@@ -15847,10 +15868,13 @@ function replaceGuideRender(){
   if(stepEl){
     var C = '<span style="color:#FF3B30;font-weight:700">1</span>·<span style="color:#00C853;font-weight:700">2</span>·<span style="color:#2979FF;font-weight:700">3</span>';
     var t;
-    if(ph === 'pickMarker') t = 'Clicca il punto <b>' + (replaceSeed.markerPts.length + 1) + '</b> sul <b>MARKER</b> qui sopra (ordine ' + C + '). Trascina per ruotare.';
-    else if(ph === 'pickScan') t = 'Ora clicca il punto <b>' + (replaceSeed.scanPts.length + 1) + '</b> <b>GEMELLO</b> sulla <b>scansione</b> (viewport grande), stesso ordine ' + C + '.';
-    else if(ph === 'pendingConfirm') t = 'Posa di <b>anteprima</b> pronta (grigia). Controlla, poi <b>✓ Conferma</b> — oppure <b>Ricomincia</b>. Dopo: <b>Raffina</b> e <b>Avanti</b> per il prossimo.';
-    else t = 'Premi <b>+ Posiziona</b> nel pannello, poi clicca <b>3 punti</b> di repere sul marker (' + C + ').';
+    if(ph === 'pickSource') t = '<b>①</b> Clicca lo <b>SCANBODY da sostituire</b> sulla scansione (viewport grande).';
+    else if(ph === 'chooseType') t = '<b>②</b> Scanbody individuato (pallino giallo). Scegli <b>libreria + type</b> del marker sostitutivo nel <b>pannello a destra</b>.';
+    else if(ph === 'posed') t = '<b>③</b> Posa <b>automatica</b> pronta (grigia). Se il roll è giusto premi <b>✓ Conferma</b> (poi <b>Raffina</b> per agganciare); altrimenti <b>Allinea a 3 punti</b> per il roll preciso prima di confermare.';
+    else if(ph === 'pickMarker') t = '<b>Allinea a 3 punti</b>: clicca il punto <b>' + (replaceSeed.markerPts.length + 1) + '</b> sul <b>MARKER</b> qui sopra (ordine ' + C + '). Trascina per ruotare.';
+    else if(ph === 'pickScan') t = '<b>Allinea a 3 punti</b>: clicca il punto <b>' + (replaceSeed.scanPts.length + 1) + '</b> <b>GEMELLO</b> sulla <b>scansione</b>, stesso ordine ' + C + '.';
+    else if(ph === 'pendingConfirm') t = 'Posa a <b>3 punti</b> pronta. Controlla, poi <b>✓ Conferma</b> — oppure <b>Ricomincia</b>.';
+    else t = 'Premi <b>+ Nuovo impianto</b> e indica lo scanbody da sostituire.';
     stepEl.innerHTML = t;
   }
 }
@@ -15910,10 +15934,13 @@ function replacePopulateTypeSelect(detail){
 
 function replaceOnTypeChange(sel){
   replaceCurrentType = null;
-  replaceSeedClear();
+  var hasSource = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);   // 2b-3e.2 wizard
+  replaceSeedClear(hasSource);          // preserva il source-scanbody durante il wizard
   if(!replaceCurrentDetail || sel.value === ''){
     replacePreviewDispose();
-    var b0 = document.getElementById('replacePreviewBox'); if(b0) b0.style.display = 'none';
+    var b0 = document.getElementById('replacePreviewBox');
+    if(b0 && !hasSource) b0.style.display = 'none';   // nel wizard la finestra resta aperta
+    if(hasSource){ replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }
     return;
   }
   var ord = parseInt(sel.value, 10);
@@ -15925,7 +15952,11 @@ function replaceOnTypeChange(sel){
     if(replaceCurrentType !== t) return;  // guardia stale: switch rapido di type -> solo l'ultimo costruisce l'anteprima
     if(!geo){ replaceShowStatus('Impossibile caricare il marker.', true); return; }
     replacePreviewInit(geo);
-    replaceShowStatus('Type "' + (t.display || t.keyword) + '" pronto. Premi "+ Posiziona (3 punti)" e scegli 3 punti sul marker nell\'anteprima.');
+    if(hasSource){
+      replaceAutoPlaceFromSource();      // wizard: posa automatica sullo scanbody individuato
+    } else {
+      replaceShowStatus('Type "' + (t.display || t.keyword) + '" pronto. Premi "+ Nuovo impianto" e indica lo scanbody da sostituire.');
+    }
   }).catch(function(st){ replaceShowStatus('Errore anteprima (' + st + ').', true); });
 }
 
@@ -16003,24 +16034,55 @@ function replaceLoadScanToScene(geo, filename){
   var ph = document.getElementById('replaceScanPlaceholder');
   if(ph) ph.style.display = 'none';
   try { replaceRebuildTree(); } catch(e){}   // 2b-3a: la scansione compare nell'albero
-  replaceShowStatus('Scansione caricata. Scegli libreria e type, poi + Posiziona.');
+  replaceShowStatus('Scansione caricata. Premi "+ Nuovo impianto" e indica lo scanbody da sostituire.');
 }
 
 // --- PLACEMENT (clone semplificato di sostStartPlacement/sostOnViewportClick) ---
+// 2b-3e.2: avvia il wizard di un NUOVO impianto -> step ① "indica lo scanbody da
+// sostituire" (fase pickSource). Non serve type/anteprima qui: si scelgono allo step ②.
 function replaceStartPlacement(){
   if(!replaceMesh){ replaceShowStatus('Carica prima una scansione.', true); return; }
-  if(!replaceCurrentType){ replaceShowStatus('Scegli prima libreria e type.', true); return; }
-  if(!replacePreviewRenderer){ replaceShowStatus('Anteprima del marker non pronta.', true); return; }
-  replaceSeedClear();                 // azzera eventuale seme precedente (mette phase=idle, placementMode=false)
-  replaceSeed.phase = 'pickMarker';
-  replacePlacementMode = true;        // tiene attivo il dispatch del click sul viewport (fase pickScan)
+  replaceSeedClear();                 // reset completo (anche source) per il nuovo impianto
+  // azzera il type/anteprima del giro precedente: lo si riscieglie allo step ②
+  replaceCurrentType = null;
+  var tsel0 = document.getElementById('replaceTypeSelect'); if(tsel0) tsel0.value = '';
+  replacePreviewDispose();
+  replaceSeed.phase = 'pickSource';
+  replacePlacementMode = true;        // tiene attivo il dispatch del click sul viewport
   renderer.domElement.style.cursor = 'crosshair';
-  replaceShowStatus('Scegli 3 punti di repere SUL MARKER nell\'anteprima (1 rosso, 2 verde, 3 blu).');
+  var box = document.getElementById('replacePreviewBox'); if(box) box.style.display = '';   // apre la finestra wizard
+  replaceShowStatus('Clicca lo SCANBODY da sostituire sulla scansione.');
   replaceSeedUpdateUI();
 }
 
 function replaceOnViewportClick(event){
-  // Collector dei punti GEMELLI sulla scansione (fase pickScan del seme 3-punti).
+  // 2b-3e.2: fase pickSource = individua lo SCANBODY da sostituire con 1 click.
+  if(replaceSeed.phase === 'pickSource' && replaceMesh){
+    var rectS = renderer.domElement.getBoundingClientRect();
+    var mouseS = new THREE.Vector2(((event.clientX - rectS.left) / rectS.width) * 2 - 1, -((event.clientY - rectS.top) / rectS.height) * 2 + 1);
+    var rcS = new THREE.Raycaster(); rcS.setFromCamera(mouseS, camera);
+    var hitsS = rcS.intersectObject(replaceMesh);
+    if(!hitsS.length) return false;
+    var ptS = hitsS[0].point.clone();
+    var nrmS = (hitsS[0].face && hitsS[0].face.normal) ? hitsS[0].face.normal.clone() : new THREE.Vector3(0, 0, 1);
+    // centro + asse dello scanbody (geometria ORIGINALE, mai tagliata)
+    var fitS = findScanbodyCenter(replaceOriginalGeo || replaceMesh.geometry, ptS, nrmS);
+    replaceSeed.sourceCenter = (fitS && fitS.center) ? fitS.center.clone() : ptS;
+    var axS = (fitS && fitS.axis) ? fitS.axis.clone().normalize() : nrmS.clone().normalize();
+    if(axS.dot(nrmS) < 0) axS.multiplyScalar(-1);   // verso outward
+    replaceSeed.sourceAxis = axS;
+    // evidenzia lo scanbody individuato (sfera gialla)
+    if(replaceSeed.sourceDot) _replaceDisposeDot(replaceSeed.sourceDot);
+    var sd = replaceMakeDot(replaceSeed.sourceCenter, { color: 0xFFD400, opacity: 0.95, role: 'source' });
+    sd.scale.setScalar(3); scene.add(sd);
+    replaceSeed.sourceDot = sd;
+    replaceSeed.phase = 'chooseType';
+    replaceHideHoverDot();
+    replaceSeedUpdateUI();
+    replaceShowStatus('Scanbody individuato. Ora scegli libreria e type del marker sostitutivo (nella finestra).');
+    return true;
+  }
+  // Collector dei punti GEMELLI sulla scansione (fase pickScan del seme 3-punti, ramo "Allinea a 3 punti").
   if(replaceSeed.phase !== 'pickScan' || !replaceMesh) return false;
   if(replaceSeed.scanPts.length >= REPLACE_SEED_N) return false;
   var rect = renderer.domElement.getBoundingClientRect();
@@ -16216,6 +16278,66 @@ function replacePlaceFromSeed(){
     replaceSeedUpdateUI();
     replaceShowStatus('Posa di ANTEPRIMA (asse dalla scansione). Controlla, poi Conferma — o Ricomincia.');
   }).catch(function(st){ replaceShowStatus('Errore fetch marker (' + st + ').', true); });
+}
+
+// 2b-3e.2: POSA AUTOMATICA del marker sullo scanbody individuato (sourceCenter/sourceAxis).
+// Asse del marker (axis_occlusal) allineato all'asse sorgente, posizione = centro sorgente,
+// roll arbitrario -> la Raffina ICP lo aggancia (o "Allinea a 3 punti" per il roll preciso).
+// Crea un marker PENDING grigio (come replacePlaceFromSeed); Conferma lo finalizza.
+function replaceAutoPlaceFromSource(){
+  var t = replaceCurrentType;
+  if(!t || !t.marker_sha256 || !replaceSeed.sourceCenter || !replaceSeed.sourceAxis){
+    replaceShowStatus('Manca lo scanbody di partenza o il type.', true); return;
+  }
+  if(replacePending){   // scarta un'eventuale posa pending precedente (re-scelta del type)
+    if(replacePending.group){ var _pm0 = replacePending.group.children[0]; if(_pm0 && _pm0.material) _pm0.material.dispose(); scene.remove(replacePending.group); }
+    replacePending = null;
+  }
+  var N = replaceSeed.sourceAxis.clone().normalize();
+  var ao = (replaceCurrentDetail && replaceCurrentDetail.axis_occlusal) || { x: 0, y: 0, z: 1 };
+  var u = new THREE.Vector3(ao.x || 0, ao.y || 0, ao.z || 0); if(u.lengthSq() < 1e-9) u.set(0, 0, 1); u.normalize();
+  var q0 = new THREE.Quaternion().setFromUnitVectors(u, N);
+  var posV = replaceSeed.sourceCenter.clone();
+  var _gen = replaceSeedGen;
+  replaceFetchMarkerGeo(t.marker_sha256).then(function(geoSrc){
+    if(_gen !== replaceSeedGen) return;
+    if(!geoSrc){ replaceShowStatus('Impossibile caricare il marker STL.', true); return; }
+    var mat = new THREE.MeshPhongMaterial({ color: 0x9aa7b3, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.85, depthWrite: true });
+    var mesh = new THREE.Mesh(geoSrc, mat); mesh.name = 'replace-marker';
+    var group = new THREE.Group(); group.add(mesh);
+    group.position.copy(posV); group.quaternion.copy(q0);
+    group.userData.isReplace = true; group.userData.replaceRole = 'marker-pending';
+    scene.add(group);
+    replacePending = {
+      group: group, seedMarkerPts: [], seedScanPts: [],
+      position: posV.clone(), axisDir: N.clone(),
+      libId: replaceCurrentLibId, typeOrd: t.ord, markerSha: t.marker_sha256,
+      typeLabel: (t.display || t.keyword || ('type ' + t.ord))
+    };
+    replaceSeed.phase = 'posed';
+    replaceSeedUpdateUI();
+    replaceShowStatus('Posa automatica pronta (grigia). Conferma (poi Raffina per agganciare), oppure "Allinea a 3 punti" per il roll preciso.');
+  }).catch(function(st){ replaceShowStatus('Errore fetch marker (' + st + ').', true); });
+}
+
+// 2b-3e.2: ramo OPZIONALE "Allinea a 3 punti" (roll preciso). Riusa il seeding a 3 punti
+// collaudato: scarta la posa auto e passa a pickMarker. Il source-scanbody resta.
+function replaceStartThreePoint(){
+  if(!replacePreviewRenderer){ replaceShowStatus('Scegli prima un type (anteprima).', true); return; }
+  replaceSeedGen++;   // invalida eventuali fetch in volo
+  if(replacePending){
+    if(replacePending.group){ var _pm1 = replacePending.group.children[0]; if(_pm1 && _pm1.material) _pm1.material.dispose(); scene.remove(replacePending.group); }
+    replacePending = null;
+  }
+  (replaceSeed.markerDots || []).forEach(_replaceDisposeDot);
+  (replaceSeed.scanDots || []).forEach(_replaceDisposeDot);
+  replaceSeed.markerPts = []; replaceSeed.scanPts = []; replaceSeed.scanNormals = []; replaceSeed.markerDots = []; replaceSeed.scanDots = [];
+  replaceSeed.phase = 'pickMarker';
+  replacePlacementMode = true;
+  renderer.domElement.style.cursor = 'crosshair';
+  if(replacePreviewRenderer) replacePreviewRender();
+  replaceSeedUpdateUI();
+  replaceShowStatus('Allinea a 3 punti: clicca 3 punti di repere SUL MARKER nell\'anteprima (1·2·3).');
 }
 
 // Conferma la posa di anteprima: finalizza il marker (entra in replacePlaced).
@@ -16429,12 +16551,8 @@ function replaceDeletePlaced(id){
 // "Avanti / nuovo": prepara il piazzamento del prossimo scanbody (azzera type,
 // seme e anteprima); i marker gia' piazzati restano in scena.
 function replaceNextScanbody(){
-  replaceSeedClear();
-  var tsel = document.getElementById('replaceTypeSelect'); if(tsel) tsel.value = '';
-  replaceCurrentType = null;
-  replacePreviewDispose();
-  var pbox = document.getElementById('replacePreviewBox'); if(pbox) pbox.style.display = 'none';
-  replaceShowStatus('Pronto per il prossimo scanbody: scegli un type.');
+  // 2b-3e.2: "Avanti" = nuovo impianto -> riparte dal wizard source-first (step ①).
+  replaceStartPlacement();
 }
 
 // ===== 2b-2: RAFFINA / ICP per-marker (precisione) =====
