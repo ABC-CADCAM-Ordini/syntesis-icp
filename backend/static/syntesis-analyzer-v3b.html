@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.31.1</title>
+<title>Syntesis-ICP - Analizzare v8.31.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1484,6 +1484,7 @@ if (document.readyState === 'loading') {
     <span id="replaceSeedCounter" style="font-size:10px;color:#8fb4d6;font-weight:700"></span>
     <button id="replaceSeedUndo" onclick="replaceSeedUndo()" style="display:none;margin-left:auto;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
     <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
+    <button id="replaceBtnAlign" onclick="replaceAutoPlaceFromSource()" style="display:none;padding:5px 12px;background:#0065B3;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer" title="Allinea il CAD sorgente alla scansione (ICP); il sostituto eredita la posa">▶ Allinea (ICP)</button>
     <button id="replaceBtn3pt" onclick="replaceStartThreePoint()" style="display:none;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer" title="Allinea con 3 punti di repere (roll preciso)">Allinea a 3 punti</button>
     <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
   </div>
@@ -1985,10 +1986,10 @@ if (document.readyState === 'loading') {
     <div class="panel-section" id="panelReplace" style="display:none">
       <div class="panel-label">Replace-iT — sostituzione da libreria</div>
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:8px;line-height:1.5">
-        Carica la scansione, scegli libreria attiva e type, poi piazza il marker con 3 punti di repere (anteprima → scansione).
+        Carica la scansione, scegli libreria attiva e i type SORGENTE + SOSTITUTO, "+ Nuovo impianto" e clicca lo scanbody, poi "▶ Allinea (ICP)": il sorgente si allinea alla scansione e il sostituto eredita la posa.
       </div>
       <div style="font-family:var(--mono);font-size:11px;color:#5B7A1F;background:#F2F7E6;border:1px solid #D6E4A8;border-radius:4px;padding:6px 8px;margin-bottom:10px;line-height:1.45">
-        Flusso: <b>+ Posiziona</b> (3 punti → posa grezza) → <b>Raffina</b> (ICP automatico fino a convergenza) → <b>Avanti</b> per il prossimo impianto. La scelta dei 3 punti avviene nella <b>finestra guida</b> in basso a sinistra.
+        Flusso: <b>+ Nuovo impianto</b> → clicca lo <b>scanbody</b> → <b>▶ Allinea (ICP)</b> (allinea il sorgente a 6 gradi) → <b>✓ Conferma</b> → <b>Avanti</b> per il prossimo. Se il roll è ambiguo (corpo simmetrico) usa <b>Allinea a 3 punti</b>. La finestra guida è in basso a sinistra.
       </div>
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:4px;line-height:1.5">Scansione (STL):</div>
@@ -2023,7 +2024,7 @@ if (document.readyState === 'loading') {
            guida #replacePreviewBox (sotto), accanto al canvas marker. -->
 
       <div id="replaceGuide" style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:8px;line-height:1.5">
-        Scegli <b>3 punti di repere</b> sul marker (anteprima), poi i <b>3 gemelli</b> sulla scansione nello stesso ordine: <span style="color:#FF3B30;font-weight:700">1</span> · <span style="color:#00C853;font-weight:700">2</span> · <span style="color:#2979FF;font-weight:700">3</span>. La posa iniziale nasce dai 3 punti (grezza; la Raffina fine arriva dopo).
+        Modello <b>sorgente→sostituto</b>: clicchi <b>1 punto</b> sullo scanbody e con <b>▶ Allinea (ICP)</b> il CAD sorgente si allinea alla scansione; il sostituto IPD eredita la posa via origine condivisa. Il ramo <b>Allinea a 3 punti</b> resta come ripiego per il roll su corpi simmetrici.
       </div>
 
       <div id="replacePlacedList" style="display:none;margin-top:10px">
@@ -2417,7 +2418,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.31.1';
+window.ANALIZZA_BUILD = '8.31.2';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15839,6 +15840,11 @@ function replaceSeedUpdateUI(){
     else if(ph === 'chooseType') c.textContent = '② Scegli marker';
     else c.textContent = '';
   }
+  // 8.31.2: "▶ Allinea (ICP)" — UNICO trigger esplicito dell'auto-posa. Visibile a
+  // fase chooseType quando ci sono scanbody individuato + entrambi i type (niente piu'
+  // auto-partenza al cambio menu: l'ICP parte solo quando l'utente preme il pulsante).
+  var ba = document.getElementById('replaceBtnAlign');
+  if(ba) ba.style.display = (ph === 'chooseType' && replaceSourceType && replaceSubstType && replaceSeed.sourceCenter && replaceSeed.sourceAxis) ? '' : 'none';
   // Conferma: posa di anteprima pendente (auto 'posed' o 3-punti 'pendingConfirm').
   var cb = document.getElementById('replaceBtnConfirm');
   if(cb) cb.style.display = (ph === 'pendingConfirm' || ph === 'posed') ? '' : 'none';
@@ -15878,7 +15884,9 @@ function replaceGuideRender(){
     var C = '<span style="color:#FF3B30;font-weight:700">1</span>·<span style="color:#00C853;font-weight:700">2</span>·<span style="color:#2979FF;font-weight:700">3</span>';
     var t;
     if(ph === 'pickSource') t = '<b>①</b> Clicca lo <b>SCANBODY da sostituire</b> sulla scansione (viewport grande).';
-    else if(ph === 'chooseType') t = '<b>②</b> Scanbody individuato (pallino giallo). Nel pannello a destra scegli il type <b>SORGENTE</b> (lo scanbody scansionato) e il type <b>SOSTITUTO</b> (IPD).';
+    else if(ph === 'chooseType') t = (replaceSourceType && replaceSubstType)
+        ? '<b>②</b> Type scelti. Premi <b>▶ Allinea (ICP)</b> qui sotto: il CAD <b>sorgente</b> si allinea alla scansione (6 gradi) e il <b>sostituto</b> eredita la posa.'
+        : '<b>②</b> Scanbody individuato (pallino giallo). Nel pannello a destra scegli il type <b>SORGENTE</b> (lo scanbody scansionato) e il type <b>SOSTITUTO</b> (IPD).';
     else if(ph === 'posed') t = '<b>③</b> Il CAD <b>sorgente</b> è stato <b>allineato</b> alla scansione (ICP, 6 gradi). Il <b>sostituto</b> (grigio) eredita la posa via origine condivisa. Controlla, poi <b>✓ Conferma</b>. <b>Raffina</b> per affinare.';
     else if(ph === 'pickMarker') t = '<b>Allinea a 3 punti</b>: clicca il punto <b>' + (replaceSeed.markerPts.length + 1) + '</b> sul <b>MARKER</b> qui sopra (ordine ' + C + '). Trascina per ruotare.';
     else if(ph === 'pickScan') t = '<b>Allinea a 3 punti</b>: clicca il punto <b>' + (replaceSeed.scanPts.length + 1) + '</b> <b>GEMELLO</b> sulla <b>scansione</b>, stesso ordine ' + C + '.';
@@ -15947,8 +15955,10 @@ function replacePopulateTypeOptions(selId, placeholder){
 function replaceTypeByOrd(ord){ return (replaceCurrentDetail && replaceCurrentDetail.types || []).filter(function(x){ return x.ord === ord; })[0] || null; }
 // avvia la posa automatica sorgente->sostituto quando ci sono: scanbody individuato + entrambi i type.
 function replaceMaybeAutoPlace(){
-  var hasSource = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);
-  if(hasSource && replaceSourceType && replaceSubstType) replaceAutoPlaceFromSource();
+  // 8.31.2: NON lancia piu' l'ICP automaticamente (richiesta UX: trigger esplicito via
+  // pulsante "▶ Allinea (ICP)" -> prevedibile, niente freeze a sorpresa al cambio menu).
+  // Si limita a rinfrescare la UI: il pulsante compare quando scanbody + entrambi i type sono pronti.
+  replaceSeedUpdateUI();
 }
 
 function replaceOnTypeChange(sel){   // 2b-3f: SOSTITUTO (IPD da piazzare)
@@ -16120,7 +16130,11 @@ function replaceOnViewportClick(event){
     if(renderer && renderer.domElement) renderer.domElement.style.cursor = 'default';
     replaceHideHoverDot();
     replaceSeedUpdateUI();
-    replaceShowStatus('Scanbody individuato. Ora scegli libreria e type del marker sostitutivo (nel pannello a destra).');
+    // 8.31.2: la posa NON parte da sola. Se i type sono gia' scelti il pulsante "▶ Allinea (ICP)"
+    // e' gia' visibile (replaceSeedUpdateUI) -> indirizza li'; altrimenti chiedi i due type.
+    replaceShowStatus((replaceSourceType && replaceSubstType)
+      ? 'Scanbody individuato. Premi "▶ Allinea (ICP)" nella finestra guida per allineare il sorgente alla scansione.'
+      : 'Scanbody individuato. Scegli i type SORGENTE e SOSTITUTO nel pannello a destra, poi premi "▶ Allinea (ICP)".');
     return true;
   }
   // Collector dei punti GEMELLI sulla scansione (fase pickScan del seme 3-punti, ramo "Allinea a 3 punti").
