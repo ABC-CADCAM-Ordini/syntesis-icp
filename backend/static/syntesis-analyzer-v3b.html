@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.23.1</title>
+<title>Syntesis-ICP - Analizzare v8.24.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2400,7 +2400,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.23.1';
+window.ANALIZZA_BUILD = '8.24.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15989,6 +15989,67 @@ function replaceOnViewportClick(event){
   return true;
 }
 
+// 2b-1.5: stima ROBUSTA dell'asse del cilindro scanbody attorno a `center`,
+// INDIPENDENTE da dove cadono i 3 click. Fix del "marker coricato" del seed
+// 8.23.0: quando i punti cadono sulla PARETE, la media delle normali-click e'
+// radiale (perp. all'asse) e findScanbodyCenter restituiva un asse radiale.
+// Per un cilindro le normali di superficie sono tutte perpendicolari all'asse ->
+// l'asse e' l'autovettore con autovalore MINORE di M = Sigma area*nn^T (la
+// direzione meno rappresentata fra le normali). Pass 1 su tutti i triangoli
+// vicini (asse grezzo), pass 2 tenendo solo la PARETE (|n.asse|<0.35) per
+// togliere il cap. Ritorna {axis, capSum} (capSum = somma pesata delle normali
+// "cap-like" |n.asse|>0.6, per orientare il verso occlusale). Riusa
+// misICP_jacobi3 (eigensolver 3x3 gia' presente ~6275). null se <8 triangoli.
+function replaceEstimateCylinderAxis(geo, center, searchR){
+  var pos = geo.attributes.position.array;
+  var nrm = geo.attributes.normal && geo.attributes.normal.array;
+  if(!nrm) return null;
+  var nTri = pos.length / 9, r2 = searchR * searchR;
+  var tN = [], tW = [];   // normali (unit) + peso area dei triangoli vicini
+  for(var i = 0; i < nTri; i++){
+    var k = i * 9;
+    var cx = (pos[k]+pos[k+3]+pos[k+6])/3, cy = (pos[k+1]+pos[k+4]+pos[k+7])/3, cz = (pos[k+2]+pos[k+5]+pos[k+8])/3;
+    var dx = cx-center.x, dy = cy-center.y, dz = cz-center.z;
+    if(dx*dx + dy*dy + dz*dz > r2) continue;
+    var nx = (nrm[k]+nrm[k+3]+nrm[k+6])/3, ny = (nrm[k+1]+nrm[k+4]+nrm[k+7])/3, nz = (nrm[k+2]+nrm[k+5]+nrm[k+8])/3;
+    var nl = Math.sqrt(nx*nx + ny*ny + nz*nz); if(nl < 1e-6) continue;
+    nx /= nl; ny /= nl; nz /= nl;
+    var e1x = pos[k+3]-pos[k], e1y = pos[k+4]-pos[k+1], e1z = pos[k+5]-pos[k+2];
+    var e2x = pos[k+6]-pos[k], e2y = pos[k+7]-pos[k+1], e2z = pos[k+8]-pos[k+2];
+    var crx = e1y*e2z-e1z*e2y, cry = e1z*e2x-e1x*e2z, crz = e1x*e2y-e1y*e2x;
+    tN.push([nx, ny, nz]); tW.push(0.5 * Math.sqrt(crx*crx + cry*cry + crz*crz));
+  }
+  if(tN.length < 8) return null;
+  function minorAxis(keep){   // autovettore minore di Sigma w*nn^T (keep = solo parete ⊥ keep)
+    var S = [[0,0,0],[0,0,0],[0,0,0]], used = 0;
+    for(var j = 0; j < tN.length; j++){
+      var n = tN[j];
+      if(keep && Math.abs(n[0]*keep.x + n[1]*keep.y + n[2]*keep.z) >= 0.35) continue;
+      var w = tW[j];
+      S[0][0]+=w*n[0]*n[0]; S[0][1]+=w*n[0]*n[1]; S[0][2]+=w*n[0]*n[2];
+      S[1][1]+=w*n[1]*n[1]; S[1][2]+=w*n[1]*n[2]; S[2][2]+=w*n[2]*n[2];
+      used++;
+    }
+    if(used < 8) return null;
+    S[1][0]=S[0][1]; S[2][0]=S[0][2]; S[2][1]=S[1][2];
+    var e = misICP_jacobi3(S), mi = 0;
+    if(e.vals[1] < e.vals[mi]) mi = 1;
+    if(e.vals[2] < e.vals[mi]) mi = 2;
+    var a = new THREE.Vector3(e.vecs[0][mi], e.vecs[1][mi], e.vecs[2][mi]);
+    return (a.lengthSq() > 1e-12) ? a.normalize() : null;
+  }
+  var ax = minorAxis(null); if(!ax) return null;   // pass 1: asse grezzo (tutti i tri)
+  var ax2 = minorAxis(ax); if(ax2) ax = ax2;        // pass 2: solo parete -> asse pulito
+  var capSum = new THREE.Vector3();                 // verso occlusale dalle normali cap-like
+  for(var m = 0; m < tN.length; m++){
+    var nn = tN[m];
+    if(Math.abs(nn[0]*ax.x + nn[1]*ax.y + nn[2]*ax.z) > 0.6){
+      capSum.add(new THREE.Vector3(nn[0], nn[1], nn[2]).multiplyScalar(tW[m]));
+    }
+  }
+  return { axis: ax, capSum: capSum };
+}
+
 // 2b-1.4: posa di ANTEPRIMA dai 3 punti, con ASSE preso dalla superficie della
 // scansione (robusto, niente ribaltamento) e i 3 punti che fissano posizione +
 // roll. Niente piu' Kabsch puro (che sbagliava il verso su cilindri lisci).
@@ -16009,7 +16070,10 @@ function replacePlaceFromSeed(){
     replaceSeedUpdateUI();
     return;
   }
-  // (1) ASSE outward dalla superficie scan: media normali-click + raffino robusto
+  // (1) ASSE del cilindro scanbody: stima ROBUSTA e INDIPENDENTE dai 3 click
+  // (2b-1.5). avgN (media normali-click) NON e' piu' l'asse (con punti sulla
+  // parete e' radiale -> era il bug "marker coricato" del seed 8.23.0): resta
+  // solo come ultimo fallback di verso.
   var avgN = new THREE.Vector3();
   (replaceSeed.scanNormals || []).forEach(function(n){ avgN.add(n); });
   if(avgN.lengthSq() < 1e-9) avgN.set(0, 0, 1);
@@ -16017,9 +16081,26 @@ function replacePlaceFromSeed(){
   var cB = new THREE.Vector3();
   replaceSeed.scanPts.forEach(function(p){ cB.add(p); });
   cB.multiplyScalar(1 / replaceSeed.scanPts.length);
-  var fit = findScanbodyCenter(replaceMesh.geometry, cB.clone(), avgN.clone());
-  var N = fit.axis.clone().normalize();
-  if(N.dot(avgN) < 0) N.multiplyScalar(-1);   // verso outward
+  var N;
+  var cyl = replaceEstimateCylinderAxis(replaceMesh.geometry, cB.clone(), 5.0);
+  if(cyl){
+    N = cyl.axis.clone().normalize();
+    // verso OCCLUSALE/outward: 1) normali del cap (occlusali); 2) "lo scanbody
+    // sporge dalla scansione" (cB - centro scansione); 3) media normali-click.
+    var sgnRef = (cyl.capSum && cyl.capSum.lengthSq() > 1e-9) ? cyl.capSum : null;
+    if(!sgnRef){
+      var bs = replaceMesh.geometry.boundingSphere;
+      if(!bs){ replaceMesh.geometry.computeBoundingSphere(); bs = replaceMesh.geometry.boundingSphere; }
+      if(bs) sgnRef = cB.clone().sub(bs.center);
+    }
+    if(!sgnRef || sgnRef.lengthSq() < 1e-9) sgnRef = avgN;
+    if(N.dot(sgnRef) < 0) N.multiplyScalar(-1);
+  } else {
+    // fallback legacy (poche facce vicine): findScanbodyCenter col seme normali-click
+    var fit = findScanbodyCenter(replaceMesh.geometry, cB.clone(), avgN.clone());
+    N = fit.axis.clone().normalize();
+    if(N.dot(avgN) < 0) N.multiplyScalar(-1);   // verso outward
+  }
   // asse di inserzione LOCALE del marker (da axis_occlusal della libreria; fallback +Z)
   var ao = (replaceCurrentDetail && replaceCurrentDetail.axis_occlusal) || { x: 0, y: 0, z: 1 };
   var u = new THREE.Vector3(ao.x || 0, ao.y || 0, ao.z || 0);
