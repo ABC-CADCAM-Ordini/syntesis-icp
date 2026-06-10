@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.27.0</title>
+<title>Syntesis-ICP - Analizzare v8.28.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2412,7 +2412,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.27.0';
+window.ANALIZZA_BUILD = '8.28.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16139,22 +16139,25 @@ function replacePlaceFromSeed(){
   replaceSeed.scanPts.forEach(function(p){ cB.add(p); });
   cB.multiplyScalar(1 / replaceSeed.scanPts.length);
   var N;
-  var cyl = replaceEstimateCylinderAxis(replaceMesh.geometry, cB.clone(), 5.0);
+  // 2b-3d: il fit usa la geometria ORIGINALE (mai tagliata) -> il "Taglia scansione"
+  // (buco attorno ai marker) non rompe il seed (ne' la Raffina, vedi _replaceDoRefine).
+  var _alignGeo = replaceOriginalGeo || replaceMesh.geometry;
+  var cyl = replaceEstimateCylinderAxis(_alignGeo, cB.clone(), 5.0);
   if(cyl){
     N = cyl.axis.clone().normalize();
     // verso OCCLUSALE/outward: 1) normali del cap (occlusali); 2) "lo scanbody
     // sporge dalla scansione" (cB - centro scansione); 3) media normali-click.
     var sgnRef = (cyl.capSum && cyl.capSum.lengthSq() > 1e-9) ? cyl.capSum : null;
     if(!sgnRef){
-      var bs = replaceMesh.geometry.boundingSphere;
-      if(!bs){ replaceMesh.geometry.computeBoundingSphere(); bs = replaceMesh.geometry.boundingSphere; }
+      var bs = _alignGeo.boundingSphere;
+      if(!bs){ _alignGeo.computeBoundingSphere(); bs = _alignGeo.boundingSphere; }
       if(bs) sgnRef = cB.clone().sub(bs.center);
     }
     if(!sgnRef || sgnRef.lengthSq() < 1e-9) sgnRef = avgN;
     if(N.dot(sgnRef) < 0) N.multiplyScalar(-1);
   } else {
     // fallback legacy (poche facce vicine): findScanbodyCenter col seme normali-click
-    var fit = findScanbodyCenter(replaceMesh.geometry, cB.clone(), avgN.clone());
+    var fit = findScanbodyCenter(_alignGeo, cB.clone(), avgN.clone());
     N = fit.axis.clone().normalize();
     if(N.dot(avgN) < 0) N.multiplyScalar(-1);   // verso outward
   }
@@ -16290,6 +16293,58 @@ function replaceTogglePlacedVisibility(num, on){
     if(replacePlaced[i].num === num){ if(replacePlaced[i].group) replacePlaced[i].group.visible = !!on; break; }
   }
 }
+
+// 2b-3d: stato UI albero (gruppo Marker collassabile, come Analizza).
+var replaceTreeUI = { markersCollapsed: false };
+function replaceToggleMarkersCollapse(){ replaceTreeUI.markersCollapsed = !replaceTreeUI.markersCollapsed; replaceRebuildTree(); }
+
+// 2b-3d: TAGLIA SCANSIONE (clone di rebuildScanMeshGeometry di Analizza). Ricostruisce
+// replaceMesh.geometry dalla ORIGINALE escludendo i triangoli dentro i cilindri dei
+// marker con p.cutScan===true -> buco attorno allo scanbody per vederlo "seduto".
+// La geometria ORIGINALE (replaceOriginalGeo) NON viene mai toccata (seed/Raffina la usano).
+var REPLACE_CUT_RADIUS = 3.0;    // mm: buco attorno al marker (scanbody ~2mm raggio + margine)
+var REPLACE_CUT_HALFH  = 30.0;   // mm: taglio passante ±30mm lungo l'asse
+function replaceRebuildScanGeometry(){
+  if(!replaceOriginalGeo || !replaceMesh) return;
+  var cyls = replacePlaced.filter(function(p){ return p.cutScan === true && p.position && p.axisDir; })
+    .map(function(p){ return { cp: p.position, ax: p.axisDir.clone().normalize(),
+                               R2: REPLACE_CUT_RADIUS * REPLACE_CUT_RADIUS, halfH: REPLACE_CUT_HALFH }; });
+  if(!cyls.length){
+    replaceMesh.geometry.dispose();
+    replaceMesh.geometry = replaceOriginalGeo.clone();
+    replaceMesh.geometry.computeVertexNormals();
+    return;
+  }
+  var pos = replaceOriginalGeo.attributes.position.array, nTri = pos.length / 9, kept = [];
+  for(var i = 0; i < nTri; i++){
+    var ni = i * 9;
+    var cx = (pos[ni] + pos[ni+3] + pos[ni+6]) / 3, cy = (pos[ni+1] + pos[ni+4] + pos[ni+7]) / 3, cz = (pos[ni+2] + pos[ni+5] + pos[ni+8]) / 3;
+    var inside = false;
+    for(var c = 0; c < cyls.length; c++){
+      var k = cyls[c];
+      var dx = cx - k.cp.x, dy = cy - k.cp.y, dz = cz - k.cp.z;
+      var axial = dx*k.ax.x + dy*k.ax.y + dz*k.ax.z;
+      if(Math.abs(axial) > k.halfH) continue;
+      var rx = dx - axial*k.ax.x, ry = dy - axial*k.ax.y, rz = dz - axial*k.ax.z;
+      if(rx*rx + ry*ry + rz*rz <= k.R2){ inside = true; break; }
+    }
+    if(!inside){ for(var v = 0; v < 9; v++) kept.push(pos[ni + v]); }
+  }
+  replaceMesh.geometry.dispose();
+  var ng = new THREE.BufferGeometry();
+  ng.setAttribute('position', new THREE.Float32BufferAttribute(kept, 3));
+  ng.computeVertexNormals();
+  replaceMesh.geometry = ng;
+}
+function replaceToggleMarkerCut(num, on){
+  for(var i = 0; i < replacePlaced.length; i++){ if(replacePlaced[i].num === num){ replacePlaced[i].cutScan = !!on; break; } }
+  replaceRebuildScanGeometry(); replaceRebuildTree();
+}
+function replaceToggleAllCuts(on){
+  replacePlaced.forEach(function(p){ p.cutScan = !!on; });
+  replaceRebuildScanGeometry(); replaceRebuildTree();
+}
+
 function replaceRebuildTree(){
   var layerTree = document.getElementById('layerTree');
   if(!layerTree) return;
@@ -16310,26 +16365,46 @@ function replaceRebuildTree(){
          '</div>';
   }
   if(replacePlaced.length){
+    var anyCut = replacePlaced.some(function(p){ return p.cutScan === true; });
+    var allCut = replacePlaced.every(function(p){ return p.cutScan === true; });
+    var collapsed = replaceTreeUI.markersCollapsed;
+    // header gruppo Marker (collassabile, come i gruppi di Analizza)
     h += '<div class="tree-node" style="margin-top:6px;display:flex;align-items:center;gap:2px">' +
-         '<span style="width:12px"></span>' +
+         '<span onclick="replaceToggleMarkersCollapse()" style="cursor:pointer;user-select:none;width:12px;font-size:11px;color:var(--gray);text-align:center">' + (collapsed ? '▸' : '▾') + '</span>' +
          '<span class="lbl" style="font-weight:700;flex:1">Marker (' + replacePlaced.length + ')</span>' +
          '</div>';
-    replacePlaced.forEach(function(p){
-      var hex = '#' + ('000000' + p.color.toString(16)).slice(-6);
-      var vis = p.group ? p.group.visible : true;
-      h += '<div class="tree-node" style="padding-left:18px;display:flex;align-items:center;gap:2px">' +
-           '<input type="checkbox" ' + (vis ? 'checked' : '') + ' onchange="replaceTogglePlacedVisibility(' + p.num + ', this.checked)">' +
-           '<input type="color" class="tree-color" value="' + hex + '" title="Colore marker #' + p.num + '" onchange="setSceneObjectColor(\'replace:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
-           '<span class="lbl" style="flex:1">#' + p.num + ' ' + (p.typeLabel || ('type ' + p.typeOrd)) + '</span>' +
-           (p.rmsd != null ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:42px;text-align:right">' + (Math.round(p.rmsd * 1000) / 1000) + 'mm</span>' : '') +
-           '<button class="del-btn" onclick="replaceDeletePlaced(\'' + p.id + '\')" title="Elimina marker #' + p.num + '">✕</button>' +
-           '</div>';
-    });
+    if(!collapsed){
+      replacePlaced.forEach(function(p){
+        var hex = '#' + ('000000' + p.color.toString(16)).slice(-6);
+        var vis = p.group ? p.group.visible : true;
+        h += '<div class="tree-node" style="padding-left:18px;display:flex;align-items:center;gap:2px">' +
+             '<input type="checkbox" ' + (vis ? 'checked' : '') + ' onchange="replaceTogglePlacedVisibility(' + p.num + ', this.checked)">' +
+             '<input type="color" class="tree-color" value="' + hex + '" title="Colore marker #' + p.num + '" onchange="setSceneObjectColor(\'replace:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
+             '<span class="lbl" style="flex:1">#' + p.num + ' ' + (p.typeLabel || ('type ' + p.typeOrd)) + '</span>' +
+             (p.rmsd != null ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:42px;text-align:right">' + (Math.round(p.rmsd * 1000) / 1000) + 'mm</span>' : '') +
+             '<button class="del-btn" onclick="replaceDeletePlaced(\'' + p.id + '\')" title="Elimina marker #' + p.num + '">✕</button>' +
+             '</div>';
+        // sub-riga: Taglia scansione attorno a QUESTO marker (buco per vederlo seduto)
+        h += '<div class="tree-node sub" style="padding-left:36px;display:flex;align-items:center;gap:2px">' +
+             '<input type="checkbox" ' + (p.cutScan ? 'checked' : '') + ' onchange="replaceToggleMarkerCut(' + p.num + ', this.checked)">' +
+             '<span class="dot" style="background:#889aad;border:1px dashed #333"></span>' +
+             '<span class="lbl">Taglia scansione</span>' +
+             '</div>';
+      });
+    }
+    // massivo: Taglia scansione (tutti) — gemello di toggleAllScanbodyCuts di Analizza
+    h += '<div class="tree-node" style="margin-top:4px;display:flex;align-items:center;gap:2px">' +
+         '<span style="width:12px"></span>' +
+         '<input type="checkbox" ' + ((anyCut && allCut) ? 'checked' : '') + ((anyCut && !allCut) ? ' data-indet="1"' : '') + ' onchange="replaceToggleAllCuts(this.checked)">' +
+         '<span class="dot" style="background:#889aad;border:1px dashed #333"></span>' +
+         '<span class="lbl">Taglia scansione (tutti)</span>' +
+         '</div>';
   }
   if(!replaceMesh && !replacePlaced.length){
     h = '<div class="tree-node"><span class="lbl" style="color:var(--gray);font-size:12px">Nessun oggetto. Carica una scansione.</span></div>';
   }
   layerTree.innerHTML = h;
+  layerTree.querySelectorAll('input[data-indet="1"]').forEach(function(cb){ cb.indeterminate = true; });
 }
 
 // Elimina un marker piazzato (group + i suoi 3 dot) dalla scena e dal record.
@@ -16343,6 +16418,7 @@ function replaceDeletePlaced(id){
   (p.dotMeshes || []).forEach(_replaceDisposeDot);
   if(p.labelEl && p.labelEl.parentNode) p.labelEl.parentNode.removeChild(p.labelEl);
   replacePlaced.splice(i, 1);
+  try { replaceRebuildScanGeometry(); } catch(e){}   // 2b-3d: richiude il buco "Taglia scansione" del marker rimosso
   replaceRebuildPlacedList();
   replaceShowStatus('Scanbody rimosso.');
 }
@@ -16417,8 +16493,9 @@ function _replaceDoRefine(p){
   var MARG = 1.5;
   var zLo = zMin - MARG, zHi = zMax + MARG, radLim2 = (rMax + MARG) * (rMax + MARG);
 
-  // 2. crop cilindrico della scansione attorno al marker
-  var scanPos = replaceMesh.geometry.attributes.position.array;
+  // 2. crop cilindrico della scansione attorno al marker (geometria ORIGINALE,
+  //    mai tagliata -> il "Taglia scansione" non svuota il crop della Raffina, 2b-3d)
+  var scanPos = (replaceOriginalGeo || replaceMesh.geometry).attributes.position.array;
   var nScanTri = scanPos.length / 9;
   var scanPts = [];
   for(var i = 0; i < nScanTri; i++){
@@ -16515,6 +16592,7 @@ function replaceRefineAll(){
   if(btn) btn.disabled = true;
   function finish(round, converged){
     if(btn) btn.disabled = false;
+    try { replaceRebuildScanGeometry(); } catch(e){}   // 2b-3d: i buchi "Taglia scansione" seguono le pose raffinate
     replaceRebuildPlacedList();
     var sum = 0, cnt = 0;
     replacePlaced.forEach(function(p){ if(typeof p.rmsd === 'number'){ sum += p.rmsd; cnt++; } });
