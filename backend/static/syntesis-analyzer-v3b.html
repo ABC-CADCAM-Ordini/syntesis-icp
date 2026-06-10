@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.32.0</title>
+<title>Syntesis-ICP - Analizzare v8.33.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1488,10 +1488,10 @@ if (document.readyState === 'loading') {
     <button id="replaceBtn3pt" onclick="replaceStartThreePoint()" style="display:none;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer" title="Allinea con 3 punti di repere (roll preciso)">Allinea a 3 punti</button>
     <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
   </div>
-  <div id="replaceViewRow" style="display:none;align-items:center;gap:8px;margin-top:6px;font-size:10px;color:#8fb4d6">
+  <div id="replaceViewRow" style="display:none;align-items:center;gap:10px;margin-top:6px;font-size:10px;color:#8fb4d6;flex-wrap:wrap">
     <span style="font-weight:700">Vista:</span>
-    <button id="replaceViewSrc" onclick="replaceSetPendingView('src')" style="padding:3px 9px;border-radius:4px;border:1px solid #2a3a4a;background:#0D9E6E;color:#fff;font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer" title="Mostra il CAD sorgente allineato dall'ICP">Sorgente</button>
-    <button id="replaceViewSub" onclick="replaceSetPendingView('sub')" style="padding:3px 9px;border-radius:4px;border:1px solid #2a3a4a;background:#1a2632;color:#c6d4e2;font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer" title="Mostra il sostituto IPD che eredita la posa">Sostituto</button>
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="CAD MADRE (sorgente) accoppiato alla scansione dall'ICP"><input type="checkbox" id="replaceViewSrc" checked onchange="replaceSetPendingMeshVis('src',this.checked)"><span style="color:#2DBE8B;font-weight:700">Madre</span> (sorgente)</label>
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="CAD FIGLIO (sostituto IPD) che eredita la posa via origine condivisa"><input type="checkbox" id="replaceViewSub" checked onchange="replaceSetPendingMeshVis('sub',this.checked)"><span style="color:#9aa7b3;font-weight:700">Figlio</span> (sostituto)</label>
     <label style="display:flex;align-items:center;gap:4px;cursor:pointer;margin-left:auto"><input type="checkbox" id="replaceViewOrigin" checked onchange="replaceTogglePendingOrigin(this.checked)">origine x0/y0/z0</label>
   </div>
 </div>
@@ -2424,7 +2424,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.32.0';
+window.ANALIZZA_BUILD = '8.33.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -4077,6 +4077,9 @@ function setSceneObjectColor(target, hex){
     } else if(kind === 'replace'){                 // 2b-3a: marker replace per num -> 'replace:'+num
       var rnum = parseInt(p[1],10);
       (typeof replacePlaced!=='undefined' ? replacePlaced : []).forEach(function(pp){ if(pp.num === rnum){ pp.color = parseInt(hex.replace('#',''),16); __synApplyColor(pp.meshSub || pp.group, col); } });   // 8.32.0: solo SOSTITUTO (non sorgente/terna)
+    } else if(kind === 'replacesrc'){              // 8.33.0: MADRE (sorgente) del marker per num -> 'replacesrc:'+num
+      var rsnum = parseInt(p[1],10);
+      (typeof replacePlaced!=='undefined' ? replacePlaced : []).forEach(function(pp){ if(pp.num === rsnum && pp.meshSrc){ __synApplyColor(pp.meshSrc, col); } });
     }
   }catch(e){ console.warn('setSceneObjectColor', e); }
 }
@@ -15643,8 +15646,10 @@ function _replaceMakeOriginAxes(len){
 // 8.32.0: applica lo stato vista (sorgente|sostituto + origine on/off) al group di un record.
 function _replaceApplyView(p){
   if(!p) return;
-  if(p.meshSub) p.meshSub.visible = (p.viewMode !== 'src');
-  if(p.meshSrc) p.meshSrc.visible = (p.viewMode === 'src');
+  // 8.33.0: MADRE (sorgente) e FIGLIO (sostituto) hanno visibilita' INDIPENDENTE -> entrambi
+  // visibili insieme di default (madre accoppiata alla scansione, figlio che eredita la posa).
+  if(p.meshSrc) p.meshSrc.visible = (p.showSrc !== false);
+  if(p.meshSub) p.meshSub.visible = (p.showSub !== false);
   if(p.originAxes) p.originAxes.visible = !!p.showOrigin;
 }
 // 8.32.0: dispone i material/texture/geometrie NON-cache di un group marker. Le mesh
@@ -15664,20 +15669,24 @@ function _replaceDisposeGroup(group){
     }
   });
 }
-// 8.32.0: toggle vista per il marker PENDING (finestra guida).
-function replaceSetPendingView(mode){
+// 8.33.0: visibilita' INDIPENDENTE di MADRE (sorgente) e FIGLIO (sostituto) sul marker
+// PENDING (finestra guida) — which='src'|'sub'.
+function replaceSetPendingMeshVis(which, on){
   if(!replacePending) return;
-  replacePending.viewMode = (mode === 'sub') ? 'sub' : 'src';
-  _replaceApplyView(replacePending); replaceSeedUpdateUI();
+  if(which === 'src') replacePending.showSrc = !!on; else replacePending.showSub = !!on;
+  _replaceApplyView(replacePending);
 }
 function replaceTogglePendingOrigin(on){
   if(!replacePending) return;
   replacePending.showOrigin = !!on; _replaceApplyView(replacePending);
 }
-// 8.32.0: toggle vista per i marker CONFERMATI (albero scena).
-function replaceSetMarkerView(num, mode){
+// 8.33.0: visibilita' madre/figlio per i marker CONFERMATI (albero scena).
+function replaceSetMarkerMeshVis(num, which, on){
   for(var i = 0; i < replacePlaced.length; i++){
-    if(replacePlaced[i].num === num){ replacePlaced[i].viewMode = (mode === 'sub') ? 'sub' : 'src'; _replaceApplyView(replacePlaced[i]); replaceRebuildTree(); break; }
+    if(replacePlaced[i].num === num){
+      if(which === 'src') replacePlaced[i].showSrc = !!on; else replacePlaced[i].showSub = !!on;
+      _replaceApplyView(replacePlaced[i]); break;
+    }
   }
 }
 function replaceToggleMarkerOrigin(num, on){
@@ -15929,14 +15938,12 @@ function replaceSeedUpdateUI(){
   // Conferma: posa di anteprima pendente (auto 'posed' o 3-punti 'pendingConfirm').
   var cb = document.getElementById('replaceBtnConfirm');
   if(cb) cb.style.display = (ph === 'pendingConfirm' || ph === 'posed') ? '' : 'none';
-  // 8.32.0: riga "Vista" (Sorgente/Sostituto + origine) durante l'ispezione auto-posa.
+  // 8.33.0: riga "Vista" (checkbox Madre + Figlio + origine) durante l'ispezione auto-posa.
   var vr = document.getElementById('replaceViewRow');
   if(vr) vr.style.display = (ph === 'posed' && replacePending) ? 'flex' : 'none';
   if(ph === 'posed' && replacePending){
-    var vmode = replacePending.viewMode || 'src';
-    var bvs = document.getElementById('replaceViewSrc'), bvb = document.getElementById('replaceViewSub');
-    if(bvs) bvs.style.background = (vmode === 'src') ? '#0D9E6E' : '#1a2632';
-    if(bvb) bvb.style.background = (vmode === 'sub') ? '#0065B3' : '#1a2632';
+    var cvs = document.getElementById('replaceViewSrc'); if(cvs) cvs.checked = (replacePending.showSrc !== false);
+    var cvb = document.getElementById('replaceViewSub'); if(cvb) cvb.checked = (replacePending.showSub !== false);
     var voc = document.getElementById('replaceViewOrigin'); if(voc) voc.checked = !!replacePending.showOrigin;
   }
   // "Allinea a 3 punti": solo dopo l'auto-posa ('posed').
@@ -16458,13 +16465,15 @@ function replaceAutoPlaceFromSource(){
     if(_gen !== replaceSeedGen) return;
     var geoSrc = geos[0], geoSub = geos[1];
     if(!geoSrc || !geoSub){ replaceShowStatus('Impossibile caricare gli STL sorgente/sostituto.', true); return; }
-    // 8.32.0: il group contiene ENTRAMBE le mesh (stesso frame): SOSTITUTO (children[0],
-    // = marker finale; la logica confirm/refine/dispose lavora su children[0]) + SORGENTE
-    // (children[1], = ispezione del fit ICP) + terna ORIGINE x0/y0/z0 (children[2]).
+    // 8.32.0/8.33.0: il group contiene ENTRAMBE le mesh nello STESSO FRAME (origine CAD
+    // condivisa 0,0,0): FIGLIO=SOSTITUTO (children[0], = marker finale; confirm/refine/dispose
+    // lavorano su children[0]) + MADRE=SORGENTE (children[1], accoppiata alla scansione) +
+    // terna ORIGINE x0/y0/z0 (children[2]). 8.33.0: ENTRAMBE visibili insieme; madre verde
+    // translucida (overlay del fit) sotto il figlio.
     var matSub = new THREE.MeshPhongMaterial({ color: 0x9aa7b3, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: true });
     var meshSub = new THREE.Mesh(geoSub, matSub); meshSub.name = 'replace-marker';
-    var matSrc = new THREE.MeshPhongMaterial({ color: 0x2DBE8B, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.92, depthWrite: true });
-    var meshSrc = new THREE.Mesh(geoSrc, matSrc); meshSrc.name = 'replace-source';
+    var matSrc = new THREE.MeshPhongMaterial({ color: 0x2DBE8B, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false });
+    var meshSrc = new THREE.Mesh(geoSrc, matSrc); meshSrc.name = 'replace-source'; meshSrc.renderOrder = 1;
     var group = new THREE.Group(); group.add(meshSub); group.add(meshSrc);
     var originAxes = _replaceMakeOriginAxes(3.2); group.add(originAxes);
     group.position.copy(posV); group.quaternion.copy(q0);
@@ -16472,12 +16481,13 @@ function replaceAutoPlaceFromSource(){
     scene.add(group);
     var p = {
       group: group, meshSub: meshSub, meshSrc: meshSrc, originAxes: originAxes,
-      viewMode: 'src', showOrigin: true,            // pending: default SORGENTE allineato + origine ON
+      showSrc: true, showSub: true, showOrigin: true,   // 8.33.0: pending = MADRE + FIGLIO insieme + origine ON
       srcGeo: geoSrc, seedMarkerPts: [], seedScanPts: [],
       position: posV.clone(), axisDir: N.clone(),
       libId: replaceCurrentLibId, typeOrd: tSub.ord, markerSha: tSub.marker_sha256,
       srcMarkerSha: tSrc.marker_sha256,
-      typeLabel: (tSub.display || tSub.keyword || ('type ' + tSub.ord))
+      typeLabel: (tSub.display || tSub.keyword || ('type ' + tSub.ord)),
+      srcTypeLabel: (tSrc.display || tSrc.keyword || ('type ' + tSrc.ord))
     };
     _replaceApplyView(p);
     // ICP full-surface del SORGENTE -> 6-DOF. MULTI-START del ROLL (fix review 8.31.1):
@@ -16514,7 +16524,7 @@ function replaceAutoPlaceFromSource(){
     // ambiguo (corpo simmetrico o feature deboli) -> avvisa di usare "Allinea a 3 punti".
     var ambiguous = !(isFinite(second) && best.rmsd > 0 && (second - best.rmsd) > 0.15 * best.rmsd);
     replaceShowStatus('Sorgente allineato (ICP, RMSD ' + (Math.round((best.rmsd||0) * 1000) / 1000) + 'mm). '
-      + 'Vedi il CAD SORGENTE sulla scansione (verde) + origine x0/y0/z0; con "Vista" passi al Sostituto. '
+      + 'Vedi MADRE (sorgente, verde) accoppiata alla scansione + FIGLIO (sostituto) che eredita la posa + origine x0/y0/z0; toggle Madre/Figlio/origine in "Vista". '
       + (ambiguous ? 'Roll poco determinato: se l\'orientamento anti-rotazione non è giusto usa "Allinea a 3 punti". ' : '')
       + 'Controlla, poi ✓ Conferma.');
   }).catch(function(st){ replaceShowStatus('Errore (' + st + ').', true); });
@@ -16549,11 +16559,11 @@ function replaceConfirmSeed(){
   P.id = 'REPL_' + replaceCounter; P.num = replaceCounter;
   P.color = REPLACE_COLORS[replacePaletteIdx % REPLACE_COLORS.length]; replacePaletteIdx++;
   P.group.name = P.id; P.group.userData.replaceRole = 'marker';
-  var mm = P.group.children[0];   // = meshSub (SOSTITUTO) = marker finale colorato
+  var mm = P.group.children[0];   // = meshSub (FIGLIO/SOSTITUTO) = marker finale colorato
   if(mm && mm.material){ mm.material.color.setHex(P.color); mm.material.opacity = 1.0; }
-  // 8.32.0: confermato -> default vista SOSTITUTO + origine OFF (sorgente/origine restano
-  // togglabili dall'albero scena, scelta utente "restano anche dopo").
-  P.viewMode = 'sub'; P.showOrigin = false; _replaceApplyView(P);
+  // 8.33.0: confermato -> MADRE + FIGLIO entrambi visibili (madre verde translucida sopra),
+  // origine OFF (sorgente/figlio/origine restano togglabili dall'albero scena).
+  P.showSrc = true; P.showSub = true; P.showOrigin = false; _replaceApplyView(P);
   P.dotMeshes = replaceSeed.scanDots.slice();   // i 3 dot del seme restano come riferimento
   P.labelEl = null;
   replacePlaced.push(P);
@@ -16706,31 +16716,48 @@ function replaceRebuildTree(){
       replacePlaced.forEach(function(p){
         var hex = '#' + ('000000' + p.color.toString(16)).slice(-6);
         var vis = p.group ? p.group.visible : true;
-        h += '<div class="tree-node" style="padding-left:18px;display:flex;align-items:center;gap:2px">' +
-             '<input type="checkbox" ' + (vis ? 'checked' : '') + ' onchange="replaceTogglePlacedVisibility(' + p.num + ', this.checked)">' +
-             '<input type="color" class="tree-color" value="' + hex + '" title="Colore marker #' + p.num + '" onchange="setSceneObjectColor(\'replace:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
-             '<span class="lbl" style="flex:1">#' + p.num + ' ' + (p.typeLabel || ('type ' + p.typeOrd)) + '</span>' +
-             (p.rmsd != null ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:42px;text-align:right">' + (Math.round(p.rmsd * 1000) / 1000) + 'mm</span>' : '') +
-             '<button class="del-btn" onclick="replaceDeletePlaced(\'' + p.id + '\')" title="Elimina marker #' + p.num + '">✕</button>' +
-             '</div>';
-        // sub-riga: Taglia scansione attorno a QUESTO marker (buco per vederlo seduto)
+        if(p.meshSrc){
+          // 8.33.0: marker AUTO-POSA = coppia MADRE (sorgente) + FIGLIO (sostituto), legati
+          // dall'origine condivisa. Header = on/off dell'impianto; due sotto-voci INDIPENDENTI
+          // (visibilita'+colore) + origine x0/y0/z0. Entrambi compaiono nell'albero.
+          var srcHex = (p.meshSrc.material && p.meshSrc.material.color) ? ('#' + p.meshSrc.material.color.getHexString()) : '#2dbe8b';
+          h += '<div class="tree-node" style="padding-left:18px;display:flex;align-items:center;gap:2px">' +
+               '<input type="checkbox" ' + (vis ? 'checked' : '') + ' onchange="replaceTogglePlacedVisibility(' + p.num + ', this.checked)">' +
+               '<span class="lbl" style="flex:1;font-weight:700">#' + p.num + ' impianto</span>' +
+               (p.rmsd != null ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:42px;text-align:right">' + (Math.round(p.rmsd * 1000) / 1000) + 'mm</span>' : '') +
+               '<button class="del-btn" onclick="replaceDeletePlaced(\'' + p.id + '\')" title="Elimina impianto #' + p.num + '">✕</button>' +
+               '</div>';
+          h += '<div class="tree-node sub" style="padding-left:36px;display:flex;align-items:center;gap:2px" title="CAD MADRE (sorgente) accoppiato alla scansione dall\'ICP">' +
+               '<input type="checkbox" ' + ((p.showSrc !== false) ? 'checked' : '') + ' onchange="replaceSetMarkerMeshVis(' + p.num + ',\'src\',this.checked)">' +
+               '<input type="color" class="tree-color" value="' + srcHex + '" title="Colore MADRE" onchange="setSceneObjectColor(\'replacesrc:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
+               '<span class="lbl">Madre · ' + (p.srcTypeLabel || 'sorgente') + '</span>' +
+               '</div>';
+          h += '<div class="tree-node sub" style="padding-left:36px;display:flex;align-items:center;gap:2px" title="CAD FIGLIO (sostituto IPD) che eredita la posa via origine condivisa">' +
+               '<input type="checkbox" ' + ((p.showSub !== false) ? 'checked' : '') + ' onchange="replaceSetMarkerMeshVis(' + p.num + ',\'sub\',this.checked)">' +
+               '<input type="color" class="tree-color" value="' + hex + '" title="Colore FIGLIO" onchange="setSceneObjectColor(\'replace:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
+               '<span class="lbl">Figlio · ' + (p.typeLabel || ('type ' + p.typeOrd)) + '</span>' +
+               '</div>';
+          h += '<div class="tree-node sub" style="padding-left:36px;display:flex;align-items:center;gap:2px">' +
+               '<input type="checkbox" ' + (p.showOrigin ? 'checked' : '') + ' onchange="replaceToggleMarkerOrigin(' + p.num + ',this.checked)">' +
+               '<span class="dot" style="background:#0A84FF"></span>' +
+               '<span class="lbl">origine x0/y0/z0</span>' +
+               '</div>';
+        } else {
+          // marker singola-mesh (ramo "Allinea a 3 punti") -> riga classica
+          h += '<div class="tree-node" style="padding-left:18px;display:flex;align-items:center;gap:2px">' +
+               '<input type="checkbox" ' + (vis ? 'checked' : '') + ' onchange="replaceTogglePlacedVisibility(' + p.num + ', this.checked)">' +
+               '<input type="color" class="tree-color" value="' + hex + '" title="Colore marker #' + p.num + '" onchange="setSceneObjectColor(\'replace:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
+               '<span class="lbl" style="flex:1">#' + p.num + ' ' + (p.typeLabel || ('type ' + p.typeOrd)) + '</span>' +
+               (p.rmsd != null ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:42px;text-align:right">' + (Math.round(p.rmsd * 1000) / 1000) + 'mm</span>' : '') +
+               '<button class="del-btn" onclick="replaceDeletePlaced(\'' + p.id + '\')" title="Elimina marker #' + p.num + '">✕</button>' +
+               '</div>';
+        }
+        // sub-riga: Taglia scansione attorno a QUESTO marker (buco per vederlo seduto) — comune
         h += '<div class="tree-node sub" style="padding-left:36px;display:flex;align-items:center;gap:2px">' +
              '<input type="checkbox" ' + (p.cutScan ? 'checked' : '') + ' onchange="replaceToggleMarkerCut(' + p.num + ', this.checked)">' +
              '<span class="dot" style="background:#889aad;border:1px dashed #333"></span>' +
              '<span class="lbl">Taglia scansione</span>' +
              '</div>';
-        // 8.32.0 sub-riga: Vista Sorgente/Sostituto + origine x0/y0/z0 (ispezione persistente).
-        // Solo marker AUTO-POSA (hanno meshSrc+terna); i marker "Allinea a 3 punti" hanno una
-        // sola mesh -> niente toggle morti (review avversariale 8.32.0).
-        if(p.meshSrc){
-          var _vm = p.viewMode || 'sub';
-          h += '<div class="tree-node sub" style="padding-left:36px;display:flex;align-items:center;gap:5px;font-size:10px">' +
-               '<span class="lbl" style="color:var(--gray);flex:0 0 auto">Vista:</span>' +
-               '<button onclick="replaceSetMarkerView(' + p.num + ',\'src\')" style="padding:1px 6px;border-radius:3px;border:1px solid var(--border);cursor:pointer;font-family:var(--mono);font-size:10px;background:' + (_vm==='src'?'#0D9E6E':'#fff') + ';color:' + (_vm==='src'?'#fff':'var(--dark)') + '">Sorgente</button>' +
-               '<button onclick="replaceSetMarkerView(' + p.num + ',\'sub\')" style="padding:1px 6px;border-radius:3px;border:1px solid var(--border);cursor:pointer;font-family:var(--mono);font-size:10px;background:' + (_vm==='sub'?'#0065B3':'#fff') + ';color:' + (_vm==='sub'?'#fff':'var(--dark)') + '">Sostituto</button>' +
-               '<label style="display:flex;align-items:center;gap:3px;cursor:pointer;margin-left:auto"><input type="checkbox" ' + (p.showOrigin?'checked':'') + ' onchange="replaceToggleMarkerOrigin(' + p.num + ',this.checked)">origine</label>' +
-               '</div>';
-        }
       });
     }
     // massivo: Taglia scansione (tutti) — gemello di toggleAllScanbodyCuts di Analizza
