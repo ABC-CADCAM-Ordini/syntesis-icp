@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.31.0</title>
+<title>Syntesis-ICP - Analizzare v8.31.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2417,7 +2417,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.31.0';
+window.ANALIZZA_BUILD = '8.31.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16071,16 +16071,13 @@ function replaceLoadScanToScene(geo, filename){
 // sostituire" (fase pickSource). Non serve type/anteprima qui: si scelgono allo step ②.
 function replaceStartPlacement(){
   if(!replaceMesh){ replaceShowStatus('Carica prima una scansione.', true); return; }
-  replaceSeedClear();                 // reset completo (anche source) per il nuovo impianto
-  // azzera il type/anteprima del giro precedente: lo si riscieglie allo step ②
-  replaceCurrentType = null;
-  var tsel0 = document.getElementById('replaceTypeSelect'); if(tsel0) tsel0.value = '';
-  replacePreviewDispose();
+  replaceSeedClear();                 // reset del SOLO source (i type SORGENTE/SOSTITUTO restano scelti per il prossimo impianto)
   replaceSeed.phase = 'pickSource';
   replacePlacementMode = true;        // tiene attivo il dispatch del click sul viewport
   renderer.domElement.style.cursor = 'crosshair';
-  var box = document.getElementById('replacePreviewBox'); if(box) box.style.display = '';   // apre la finestra wizard
-  replaceShowStatus('Clicca lo SCANBODY da sostituire sulla scansione.');
+  var box = document.getElementById('replacePreviewBox'); if(box) box.style.display = '';
+  var bothTypes = !!(replaceSourceType && replaceSubstType);
+  replaceShowStatus('Clicca lo SCANBODY da sostituire sulla scansione' + (bothTypes ? ' (type sorgente/sostituto già scelti).' : '; poi scegli i type SORGENTE e SOSTITUTO.'));
   replaceSeedUpdateUI();
 }
 
@@ -16315,6 +16312,10 @@ function replacePlaceFromSeed(){
     replacePending = {
       group: group, seedMarkerPts: seedMarker, seedScanPts: seedScan,
       position: posV.clone(), axisDir: N.clone(),
+      // 8.31.1: la Raffina deve restare sul SORGENTE -> srcGeo = geometria del preview
+      // (replacePreviewMesh mostra il sorgente, init in replaceOnSourceTypeChange).
+      srcGeo: (replacePreviewMesh && replacePreviewMesh.geometry) || geoSrc,
+      srcMarkerSha: (replaceSourceType && replaceSourceType.marker_sha256) || t.marker_sha256,
       libId: replaceCurrentLibId, typeOrd: t.ord, markerSha: t.marker_sha256,
       typeLabel: (t.display || t.keyword || ('type ' + t.ord))
     };
@@ -16367,19 +16368,41 @@ function replaceAutoPlaceFromSource(){
       srcMarkerSha: tSrc.marker_sha256,
       typeLabel: (tSub.display || tSub.keyword || ('type ' + tSub.ord))
     };
-    // ICP full-surface del SORGENTE -> 6-DOF (roll dalla forma); il group (sostituto) segue.
-    try {
-      for(var it = 0; it < 8; it++){
-        var pB = p.position.clone();
-        if(typeof _replaceDoRefine(p) !== 'number' && it === 0) break;
-        if(p.position.distanceTo(pB) < 1e-3) break;
+    // ICP full-surface del SORGENTE -> 6-DOF. MULTI-START del ROLL (fix review 8.31.1):
+    // un singolo ICP da roll arbitrario q0 puo' bloccarsi su un roll SBAGLIATO con RMSD
+    // basso (corpo quasi-simmetrico). Provo ROLLS roll iniziali, tengo quello a RMSD minore,
+    // poi rifinisco. Su sorgente con feature anti-rotazione il roll giusto vince; su cilindro
+    // liscio i roll sono equivalenti (roll irrilevante).
+    var ROLLS = 8;
+    var best = { rmsd: Infinity, pos: null, quat: null }, second = Infinity;
+    for(var k = 0; k < ROLLS; k++){
+      var qk = new THREE.Quaternion().setFromAxisAngle(N, (k * 2 * Math.PI) / ROLLS).multiply(q0);
+      group.position.copy(posV); group.quaternion.copy(qk);
+      p.position.copy(posV); p.axisDir.copy(N);
+      var r = null;
+      try { _replaceDoRefine(p); r = _replaceDoRefine(p); } catch(e){ continue; }   // 2 iter di valutazione
+      if(typeof r === 'number'){
+        if(r < best.rmsd){ second = best.rmsd; best = { rmsd: r, pos: p.position.clone(), quat: group.quaternion.clone() }; }
+        else if(r < second){ second = r; }
+      }
+    }
+    if(best.quat){ group.position.copy(best.pos); group.quaternion.copy(best.quat); p.position.copy(best.pos); p.axisDir.copy(N); }
+    try {   // rifinitura del migliore fino a convergenza (traslazione + asse)
+      for(var it = 0; it < 6; it++){
+        var pB = p.position.clone(), aB = p.axisDir.clone();
+        _replaceDoRefine(p);
+        if(p.position.distanceTo(pB) < 1e-3 && aB.angleTo(p.axisDir) < 2e-4) break;
       }
     } catch(e){ console.warn('[replace fit source]', e); }
     replacePending = p;
     replaceSeed.phase = 'posed';
     replaceSeedUpdateUI();
-    var same = (tSrc.marker_sha256 === tSub.marker_sha256);
-    replaceShowStatus('Sorgente allineato (ICP)' + (same ? '' : ' e sostituto piazzato via origine condivisa') + '. Controlla, poi ✓ Conferma. "Raffina" per affinare.');
+    // confidenza del roll: se il migliore non e' chiaramente separato dal 2°, il roll e'
+    // ambiguo (corpo simmetrico o feature deboli) -> avvisa di usare "Allinea a 3 punti".
+    var ambiguous = !(isFinite(second) && best.rmsd > 0 && (second - best.rmsd) > 0.15 * best.rmsd);
+    replaceShowStatus('Sorgente allineato (ICP, RMSD ' + (Math.round((best.rmsd||0) * 1000) / 1000) + 'mm). '
+      + (ambiguous ? 'Roll poco determinato: se l\'orientamento anti-rotazione non è giusto usa "Allinea a 3 punti". ' : '')
+      + 'Controlla, poi ✓ Conferma. "Raffina" per affinare.');
   }).catch(function(st){ replaceShowStatus('Errore (' + st + ').', true); });
 }
 
@@ -16871,14 +16894,15 @@ function _hardResetReplace(){
     var pc = document.getElementById('replaceSeedCounter'); if(pc) pc.textContent = '';
     replaceCurrentLibId = null;
     replaceCurrentDetail = null;
-    replaceCurrentType = null;
+    replaceCurrentType = null; replaceSourceType = null; replaceSubstType = null;   // 8.31.1: reset anche i nuovi stati
     var slot = document.getElementById('replaceSlotScan');
     var ph = document.getElementById('replaceScanPlaceholder');
     if(slot) slot.classList.remove('loaded');
     if(ph){ ph.style.display = ''; ph.textContent = 'Clicca o trascina .stl'; }
     var inp = document.getElementById('replaceInputScan'); if(inp) inp.value = '';
     var lsel = document.getElementById('replaceLibSelect'); if(lsel) lsel.value = '';
-    var tsel = document.getElementById('replaceTypeSelect'); if(tsel) tsel.innerHTML = '<option value="">— scegli type —</option>';
+    var tsel = document.getElementById('replaceTypeSelect'); if(tsel) tsel.innerHTML = '<option value="">— scegli sostituto —</option>';
+    var ssel = document.getElementById('replaceSourceTypeSelect'); if(ssel) ssel.innerHTML = '<option value="">— scegli sorgente —</option>';
     var wrap = document.getElementById('replacePlacedList'); if(wrap) wrap.style.display = 'none';
     var items = document.getElementById('replacePlacedItems'); if(items) items.innerHTML = '';
     var flow = document.getElementById('replaceFlow'); if(flow) flow.style.display = 'none';
