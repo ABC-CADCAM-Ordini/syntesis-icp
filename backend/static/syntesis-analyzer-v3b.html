@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.30.1</title>
+<title>Syntesis-ICP - Analizzare v8.31.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2002,9 +2002,13 @@ if (document.readyState === 'loading') {
         <option value="">— scegli libreria —</option>
       </select>
 
-      <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin:10px 0 4px 0;line-height:1.5">Type scanbody:</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin:10px 0 4px 0;line-height:1.5">Type SORGENTE <span style="color:var(--gray)">(scanbody nella scansione):</span></div>
+      <select id="replaceSourceTypeSelect" onchange="replaceOnSourceTypeChange(this)" style="width:100%;padding:7px 8px;font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--dark)">
+        <option value="">— scegli sorgente —</option>
+      </select>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin:10px 0 4px 0;line-height:1.5">Type SOSTITUTO <span style="color:var(--gray)">(IPD da piazzare):</span></div>
       <select id="replaceTypeSelect" onchange="replaceOnTypeChange(this)" style="width:100%;padding:7px 8px;font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--dark)">
-        <option value="">— scegli type —</option>
+        <option value="">— scegli sostituto —</option>
       </select>
 
       <!-- 2b-3b: l'anteprima marker + scelta 3 punti vivono nella finestra guida
@@ -2413,7 +2417,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.30.1';
+window.ANALIZZA_BUILD = '8.31.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15526,7 +15530,12 @@ var replaceCounter = 0;
 var replaceLibs = [];               // cache lista librerie attive
 var replaceCurrentLibId = null;
 var replaceCurrentDetail = null;    // detail libreria selezionata {..., types:[...]}
-var replaceCurrentType = null;      // type selezionato
+var replaceCurrentType = null;      // type selezionato (= SOSTITUTO; alias di replaceSubstType per i consumer a valle)
+// 2b-3f (modello sorgente->sostituto, come Sostituisci): due type della stessa libreria.
+// SORGENTE = geometria del brand fisicamente scansionato (su cui gira l'ICP).
+// SOSTITUTO = IPD da piazzare (mostrato; eredita la posa via origine condivisa).
+var replaceSourceType = null;       // type SORGENTE
+var replaceSubstType  = null;       // type SOSTITUTO (= replaceCurrentType)
 var replaceMarkerGeoCache = {};     // cache sha256 -> THREE.BufferGeometry (read-only, condivisa)
 var replacePaletteIdx = 0;
 var REPLACE_COLORS = [0x0065B3, 0x0D9E6E, 0xD97706, 0xA855F7, 0xEF4444, 0x14B8A6];
@@ -15869,8 +15878,8 @@ function replaceGuideRender(){
     var C = '<span style="color:#FF3B30;font-weight:700">1</span>·<span style="color:#00C853;font-weight:700">2</span>·<span style="color:#2979FF;font-weight:700">3</span>';
     var t;
     if(ph === 'pickSource') t = '<b>①</b> Clicca lo <b>SCANBODY da sostituire</b> sulla scansione (viewport grande).';
-    else if(ph === 'chooseType') t = '<b>②</b> Scanbody individuato (pallino giallo). Scegli <b>libreria + type</b> del marker sostitutivo nel <b>pannello a destra</b>.';
-    else if(ph === 'posed') t = '<b>③</b> Posa <b>automatica</b> (asse allineato, <b>roll NON garantito</b>). Per l\'orientamento anti-rotazione corretto usa <b>Allinea a 3 punti</b> (consigliato), poi <b>✓ Conferma</b>. La <b>Raffina</b> rifinisce asse e posizione, <b>non</b> il roll su scanbody simmetrico.';
+    else if(ph === 'chooseType') t = '<b>②</b> Scanbody individuato (pallino giallo). Nel pannello a destra scegli il type <b>SORGENTE</b> (lo scanbody scansionato) e il type <b>SOSTITUTO</b> (IPD).';
+    else if(ph === 'posed') t = '<b>③</b> Il CAD <b>sorgente</b> è stato <b>allineato</b> alla scansione (ICP, 6 gradi). Il <b>sostituto</b> (grigio) eredita la posa via origine condivisa. Controlla, poi <b>✓ Conferma</b>. <b>Raffina</b> per affinare.';
     else if(ph === 'pickMarker') t = '<b>Allinea a 3 punti</b>: clicca il punto <b>' + (replaceSeed.markerPts.length + 1) + '</b> sul <b>MARKER</b> qui sopra (ordine ' + C + '). Trascina per ruotare.';
     else if(ph === 'pickScan') t = '<b>Allinea a 3 punti</b>: clicca il punto <b>' + (replaceSeed.scanPts.length + 1) + '</b> <b>GEMELLO</b> sulla <b>scansione</b>, stesso ordine ' + C + '.';
     else if(ph === 'pendingConfirm') t = 'Posa a <b>3 punti</b> pronta. Controlla, poi <b>✓ Conferma</b> — oppure <b>Ricomincia</b>.';
@@ -15909,25 +15918,25 @@ function replaceOnLibChange(sel){
   var id = sel.value ? parseInt(sel.value, 10) : null;
   replaceCurrentLibId = id;
   replaceCurrentDetail = null;
-  replaceCurrentType = null;
-  var tsel = document.getElementById('replaceTypeSelect');
-  if(tsel) tsel.innerHTML = '<option value="">— scegli type —</option>';
-  // 2b-3e.2 fix: cambiare libreria a wizard avviato scarta la posa pending del type
-  // vecchio e riporta a 'chooseType' (no conferma di un marker di libreria abbandonata).
+  replaceCurrentType = null; replaceSourceType = null; replaceSubstType = null;
+  var tsel = document.getElementById('replaceTypeSelect'); if(tsel) tsel.innerHTML = '<option value="">— scegli sostituto —</option>';
+  var ssel = document.getElementById('replaceSourceTypeSelect'); if(ssel) ssel.innerHTML = '<option value="">— scegli sorgente —</option>';
+  // cambiare libreria a impianto avviato scarta la posa pending e torna a 'chooseType'.
   var hasSourceLib = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);
   if(hasSourceLib){ replaceSeedClear(true); replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }
   if(id == null) return;
   fetch('/api/rit/libraries/' + id, { headers: _replaceAuthHeaders() })
     .then(function(r){ if(!r.ok) throw r.status; return r.json(); })
-    .then(function(d){ replaceCurrentDetail = d; replacePopulateTypeSelect(d); })
+    .then(function(d){ replaceCurrentDetail = d; replacePopulateTypeOptions('replaceSourceTypeSelect', '— scegli sorgente —'); replacePopulateTypeOptions('replaceTypeSelect', '— scegli sostituto —'); })
     .catch(function(st){ replaceShowStatus('Errore caricamento type (' + st + ').', true); });
 }
 
-function replacePopulateTypeSelect(detail){
-  var sel = document.getElementById('replaceTypeSelect');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">— scegli type —</option>';
-  (detail.types || []).forEach(function(t){
+// popola un dropdown di type (sorgente o sostituto) dalla detail libreria corrente.
+function replacePopulateTypeOptions(selId, placeholder){
+  var sel = document.getElementById(selId);
+  if(!sel || !replaceCurrentDetail) return;
+  sel.innerHTML = '<option value="">' + placeholder + '</option>';
+  (replaceCurrentDetail.types || []).forEach(function(t){
     var o = document.createElement('option');
     o.value = (t.ord != null ? t.ord : '');
     var tag = t.is_eng ? '[ENG] ' : '[Non-ENG] ';
@@ -15935,34 +15944,47 @@ function replacePopulateTypeSelect(detail){
     sel.appendChild(o);
   });
 }
+function replaceTypeByOrd(ord){ return (replaceCurrentDetail && replaceCurrentDetail.types || []).filter(function(x){ return x.ord === ord; })[0] || null; }
+// avvia la posa automatica sorgente->sostituto quando ci sono: scanbody individuato + entrambi i type.
+function replaceMaybeAutoPlace(){
+  var hasSource = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);
+  if(hasSource && replaceSourceType && replaceSubstType) replaceAutoPlaceFromSource();
+}
 
-function replaceOnTypeChange(sel){
-  replaceCurrentType = null;
-  var hasSource = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);   // 2b-3e.2 wizard
-  replaceSeedClear(hasSource);          // preserva il source-scanbody durante il wizard
-  if(hasSource){ replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }   // no flicker 'idle' durante il fetch async
+function replaceOnTypeChange(sel){   // 2b-3f: SOSTITUTO (IPD da piazzare)
+  var hasSource = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);
+  replaceSeedClear(hasSource);          // scarta la posa pending; preserva lo scanbody individuato
+  if(hasSource){ replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }
   if(!replaceCurrentDetail || sel.value === ''){
-    replacePreviewDispose();
-    var b0 = document.getElementById('replacePreviewBox');
-    if(b0 && !hasSource) b0.style.display = 'none';   // nel wizard la finestra resta aperta
-    if(hasSource){ replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }
+    replaceCurrentType = null; replaceSubstType = null;
+    var b0 = document.getElementById('replacePreviewBox'); if(b0 && !hasSource) b0.style.display = 'none';
     return;
   }
-  var ord = parseInt(sel.value, 10);
-  var t = (replaceCurrentDetail.types || []).filter(function(x){ return x.ord === ord; })[0];
-  replaceCurrentType = t || null;
+  var t = replaceTypeByOrd(parseInt(sel.value, 10));
+  replaceCurrentType = t; replaceSubstType = t;   // alias per i consumer a valle (replaceConfirmSeed ecc.)
   if(!t) return;
-  replaceShowStatus('Carico l\'anteprima del marker…');
-  replaceFetchMarkerGeo(t.marker_sha256).then(function(geo){
-    if(replaceCurrentType !== t) return;  // guardia stale: switch rapido di type -> solo l'ultimo costruisce l'anteprima
-    if(!geo){ replaceShowStatus('Impossibile caricare il marker.', true); return; }
-    replacePreviewInit(geo);
-    if(hasSource){
-      replaceAutoPlaceFromSource();      // wizard: posa automatica sullo scanbody individuato
-    } else {
-      replaceShowStatus('Type "' + (t.display || t.keyword) + '" pronto. Premi "+ Nuovo impianto" e indica lo scanbody da sostituire.');
-    }
-  }).catch(function(st){ replaceShowStatus('Errore anteprima (' + st + ').', true); });
+  replaceMaybeAutoPlace();
+  if(!replaceSourceType) replaceShowStatus('Scegli anche il type SORGENTE (lo scanbody scansionato), poi "+ Nuovo impianto" e clicca lo scanbody.');
+}
+
+// 2b-3f: SORGENTE (scanbody nella scansione) = il CAD su cui gira l'ICP.
+function replaceOnSourceTypeChange(sel){
+  var hasSource = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);
+  replaceSeedClear(hasSource);
+  if(hasSource){ replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }
+  if(!replaceCurrentDetail || sel.value === ''){ replaceSourceType = null; return; }
+  replaceSourceType = replaceTypeByOrd(parseInt(sel.value, 10));
+  if(!replaceSourceType) return;
+  // comodita': se il sostituto non e' ancora scelto, pre-selezionalo = sorgente
+  if(!replaceSubstType){
+    var tsel = document.getElementById('replaceTypeSelect');
+    if(tsel){ tsel.value = sel.value; replaceCurrentType = replaceSourceType; replaceSubstType = replaceSourceType; }
+  }
+  // anteprima del CAD SORGENTE nella finestra (visivo + fallback "Allinea a 3 punti")
+  replaceFetchMarkerGeo(replaceSourceType.marker_sha256).then(function(geo){
+    if(geo) replacePreviewInit(geo);
+    replaceMaybeAutoPlace();
+  }).catch(function(){ replaceMaybeAutoPlace(); });
 }
 
 // Fetch del marker STL per sha256 -> geometry (riuso sostParseSTLToGeometry).
@@ -16306,12 +16328,18 @@ function replacePlaceFromSeed(){
 // Asse del marker (axis_occlusal) allineato all'asse sorgente, posizione = centro sorgente,
 // roll arbitrario -> la Raffina ICP lo aggancia (o "Allinea a 3 punti" per il roll preciso).
 // Crea un marker PENDING grigio (come replacePlaceFromSeed); Conferma lo finalizza.
+// 2b-3f: POSA sorgente->sostituto (come Sostituisci). Allinea il CAD SORGENTE alla
+// scansione con ICP full-surface (6-DOF, ROLL incluso perche' la geometria del sorgente
+// combacia con lo scansionato); il group MOSTRA il SOSTITUTO, che condividendo l'origine
+// xyz eredita la stessa posa. _replaceDoRefine campiona p.srcGeo (sorgente) ma muove il
+// group (sostituto). srcGeo salvato nel record -> la Raffina ri-allinea sempre sul sorgente.
 function replaceAutoPlaceFromSource(){
-  var t = replaceCurrentType;
-  if(!t || !t.marker_sha256 || !replaceSeed.sourceCenter || !replaceSeed.sourceAxis){
-    replaceShowStatus('Manca lo scanbody di partenza o il type.', true); return;
+  var tSub = replaceSubstType || replaceCurrentType;
+  var tSrc = replaceSourceType || tSub;
+  if(!tSrc || !tSrc.marker_sha256 || !tSub || !tSub.marker_sha256 || !replaceSeed.sourceCenter || !replaceSeed.sourceAxis){
+    replaceShowStatus('Manca lo scanbody individuato o i type sorgente/sostituto.', true); return;
   }
-  if(replacePending){   // scarta un'eventuale posa pending precedente (re-scelta del type)
+  if(replacePending){
     if(replacePending.group){ var _pm0 = replacePending.group.children[0]; if(_pm0 && _pm0.material) _pm0.material.dispose(); scene.remove(replacePending.group); }
     replacePending = null;
   }
@@ -16321,25 +16349,38 @@ function replaceAutoPlaceFromSource(){
   var q0 = new THREE.Quaternion().setFromUnitVectors(u, N);
   var posV = replaceSeed.sourceCenter.clone();
   var _gen = replaceSeedGen;
-  replaceFetchMarkerGeo(t.marker_sha256).then(function(geoSrc){
+  replaceShowStatus('Allineo il CAD sorgente alla scansione (ICP)…');
+  Promise.all([replaceFetchMarkerGeo(tSrc.marker_sha256), replaceFetchMarkerGeo(tSub.marker_sha256)]).then(function(geos){
     if(_gen !== replaceSeedGen) return;
-    if(!geoSrc){ replaceShowStatus('Impossibile caricare il marker STL.', true); return; }
+    var geoSrc = geos[0], geoSub = geos[1];
+    if(!geoSrc || !geoSub){ replaceShowStatus('Impossibile caricare gli STL sorgente/sostituto.', true); return; }
     var mat = new THREE.MeshPhongMaterial({ color: 0x9aa7b3, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.85, depthWrite: true });
-    var mesh = new THREE.Mesh(geoSrc, mat); mesh.name = 'replace-marker';
+    var mesh = new THREE.Mesh(geoSub, mat); mesh.name = 'replace-marker';   // il group MOSTRA il sostituto
     var group = new THREE.Group(); group.add(mesh);
     group.position.copy(posV); group.quaternion.copy(q0);
     group.userData.isReplace = true; group.userData.replaceRole = 'marker-pending';
     scene.add(group);
-    replacePending = {
-      group: group, seedMarkerPts: [], seedScanPts: [],
+    var p = {
+      group: group, srcGeo: geoSrc, seedMarkerPts: [], seedScanPts: [],
       position: posV.clone(), axisDir: N.clone(),
-      libId: replaceCurrentLibId, typeOrd: t.ord, markerSha: t.marker_sha256,
-      typeLabel: (t.display || t.keyword || ('type ' + t.ord))
+      libId: replaceCurrentLibId, typeOrd: tSub.ord, markerSha: tSub.marker_sha256,
+      srcMarkerSha: tSrc.marker_sha256,
+      typeLabel: (tSub.display || tSub.keyword || ('type ' + tSub.ord))
     };
+    // ICP full-surface del SORGENTE -> 6-DOF (roll dalla forma); il group (sostituto) segue.
+    try {
+      for(var it = 0; it < 8; it++){
+        var pB = p.position.clone();
+        if(typeof _replaceDoRefine(p) !== 'number' && it === 0) break;
+        if(p.position.distanceTo(pB) < 1e-3) break;
+      }
+    } catch(e){ console.warn('[replace fit source]', e); }
+    replacePending = p;
     replaceSeed.phase = 'posed';
     replaceSeedUpdateUI();
-    replaceShowStatus('Posa automatica (solo asse, roll non garantito). Per il roll corretto usa "Allinea a 3 punti" (consigliato); la Raffina rifinisce asse+posizione, non il roll. Poi Conferma.');
-  }).catch(function(st){ replaceShowStatus('Errore fetch marker (' + st + ').', true); });
+    var same = (tSrc.marker_sha256 === tSub.marker_sha256);
+    replaceShowStatus('Sorgente allineato (ICP)' + (same ? '' : ' e sostituto piazzato via origine condivisa') + '. Controlla, poi ✓ Conferma. "Raffina" per affinare.');
+  }).catch(function(st){ replaceShowStatus('Errore (' + st + ').', true); });
 }
 
 // 2b-3e.2: ramo OPZIONALE "Allinea a 3 punti" (roll preciso). Riusa il seeding a 3 punti
@@ -16599,7 +16640,10 @@ function _replaceDoRefine(p){
   p.group.updateMatrixWorld(true);
   var m = p.group.matrixWorld.elements;
   var nmat = new THREE.Matrix3().getNormalMatrix(p.group.matrixWorld);
-  var geo = mesh.geometry;
+  // 2b-3f: l'ICP campiona la geometria SORGENTE (p.srcGeo, = brand scansionato) anche
+  // quando il group MOSTRA il sostituto -> allineando il sorgente alla scansione, il
+  // sostituto (stesso group/frame condiviso) si posiziona, rotazione inclusa.
+  var geo = p.srcGeo || mesh.geometry;
   var cadPos = geo.attributes.position.array;
   var cadNorm = geo.attributes.normal ? geo.attributes.normal.array : null;
   var nCadTri = cadPos.length / 9;
