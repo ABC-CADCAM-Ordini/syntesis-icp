@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.30.0</title>
+<title>Syntesis-ICP - Analizzare v8.30.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1482,7 +1482,7 @@ if (document.readyState === 'loading') {
   <div id="replaceGuideStep" style="font-size:11px;color:#c6d4e2;margin-top:8px;line-height:1.45;min-height:32px"></div>
   <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
     <span id="replaceSeedCounter" style="font-size:10px;color:#8fb4d6;font-weight:700"></span>
-    <button id="replaceSeedUndo" class="replace-only" onclick="replaceSeedUndo()" style="margin-left:auto;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
+    <button id="replaceSeedUndo" onclick="replaceSeedUndo()" style="display:none;margin-left:auto;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
     <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
     <button id="replaceBtn3pt" onclick="replaceStartThreePoint()" style="display:none;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer" title="Allinea con 3 punti di repere (roll preciso)">Allinea a 3 punti</button>
     <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
@@ -2413,7 +2413,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.30.0';
+window.ANALIZZA_BUILD = '8.30.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15836,9 +15836,9 @@ function replaceSeedUpdateUI(){
   // "Allinea a 3 punti": solo dopo l'auto-posa ('posed').
   var b3 = document.getElementById('replaceBtn3pt');
   if(b3) b3.style.display = (ph === 'posed') ? '' : 'none';
-  // "Annulla punto": solo durante la raccolta dei 3 punti.
+  // "Annulla punto": durante la raccolta dei 3 punti e in pendingConfirm (scarta la posa 3-punti).
   var bu = document.getElementById('replaceSeedUndo');
-  if(bu) bu.style.display = (ph === 'pickMarker' || ph === 'pickScan') ? '' : 'none';
+  if(bu) bu.style.display = (ph === 'pickMarker' || ph === 'pickScan' || ph === 'pendingConfirm') ? '' : 'none';
   replaceGuideRender();   // 2b-3b: aggiorna titolo impianto, badge passi, testo-passo nella finestra guida
 }
 
@@ -15870,7 +15870,7 @@ function replaceGuideRender(){
     var t;
     if(ph === 'pickSource') t = '<b>①</b> Clicca lo <b>SCANBODY da sostituire</b> sulla scansione (viewport grande).';
     else if(ph === 'chooseType') t = '<b>②</b> Scanbody individuato (pallino giallo). Scegli <b>libreria + type</b> del marker sostitutivo nel <b>pannello a destra</b>.';
-    else if(ph === 'posed') t = '<b>③</b> Posa <b>automatica</b> pronta (grigia). Se il roll è giusto premi <b>✓ Conferma</b> (poi <b>Raffina</b> per agganciare); altrimenti <b>Allinea a 3 punti</b> per il roll preciso prima di confermare.';
+    else if(ph === 'posed') t = '<b>③</b> Posa <b>automatica</b> (asse allineato, <b>roll NON garantito</b>). Per l\'orientamento anti-rotazione corretto usa <b>Allinea a 3 punti</b> (consigliato), poi <b>✓ Conferma</b>. La <b>Raffina</b> rifinisce asse e posizione, <b>non</b> il roll su scanbody simmetrico.';
     else if(ph === 'pickMarker') t = '<b>Allinea a 3 punti</b>: clicca il punto <b>' + (replaceSeed.markerPts.length + 1) + '</b> sul <b>MARKER</b> qui sopra (ordine ' + C + '). Trascina per ruotare.';
     else if(ph === 'pickScan') t = '<b>Allinea a 3 punti</b>: clicca il punto <b>' + (replaceSeed.scanPts.length + 1) + '</b> <b>GEMELLO</b> sulla <b>scansione</b>, stesso ordine ' + C + '.';
     else if(ph === 'pendingConfirm') t = 'Posa a <b>3 punti</b> pronta. Controlla, poi <b>✓ Conferma</b> — oppure <b>Ricomincia</b>.';
@@ -15912,6 +15912,10 @@ function replaceOnLibChange(sel){
   replaceCurrentType = null;
   var tsel = document.getElementById('replaceTypeSelect');
   if(tsel) tsel.innerHTML = '<option value="">— scegli type —</option>';
+  // 2b-3e.2 fix: cambiare libreria a wizard avviato scarta la posa pending del type
+  // vecchio e riporta a 'chooseType' (no conferma di un marker di libreria abbandonata).
+  var hasSourceLib = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);
+  if(hasSourceLib){ replaceSeedClear(true); replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }
   if(id == null) return;
   fetch('/api/rit/libraries/' + id, { headers: _replaceAuthHeaders() })
     .then(function(r){ if(!r.ok) throw r.status; return r.json(); })
@@ -15936,6 +15940,7 @@ function replaceOnTypeChange(sel){
   replaceCurrentType = null;
   var hasSource = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);   // 2b-3e.2 wizard
   replaceSeedClear(hasSource);          // preserva il source-scanbody durante il wizard
+  if(hasSource){ replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }   // no flicker 'idle' durante il fetch async
   if(!replaceCurrentDetail || sel.value === ''){
     replacePreviewDispose();
     var b0 = document.getElementById('replacePreviewBox');
@@ -15997,6 +16002,8 @@ function replaceClearScene(){
   // marker -> dispose sicuro.
   replacePlaced.forEach(function(p){
     if(p.group) scene.remove(p.group);
+    var _mm = p.group && p.group.children[0];   // dispose material per-marker (geometria in cache: NON)
+    if(_mm && _mm.material){ if(_mm.material.map) _mm.material.map.dispose(); _mm.material.dispose(); }
     (p.dotMeshes || []).forEach(_replaceDisposeDot);
   });
   replacePlaced.length = 0;
@@ -16065,21 +16072,36 @@ function replaceOnViewportClick(event){
     if(!hitsS.length) return false;
     var ptS = hitsS[0].point.clone();
     var nrmS = (hitsS[0].face && hitsS[0].face.normal) ? hitsS[0].face.normal.clone() : new THREE.Vector3(0, 0, 1);
-    // centro + asse dello scanbody (geometria ORIGINALE, mai tagliata)
-    var fitS = findScanbodyCenter(replaceOriginalGeo || replaceMesh.geometry, ptS, nrmS);
+    var _sgeo = replaceOriginalGeo || replaceMesh.geometry;   // geometria ORIGINALE (mai tagliata)
+    var fitS = findScanbodyCenter(_sgeo, ptS, nrmS);
     replaceSeed.sourceCenter = (fitS && fitS.center) ? fitS.center.clone() : ptS;
-    var axS = (fitS && fitS.axis) ? fitS.axis.clone().normalize() : nrmS.clone().normalize();
-    if(axS.dot(nrmS) < 0) axS.multiplyScalar(-1);   // verso outward
+    // ASSE col motore ROBUSTO lateral-wall (replaceEstimateCylinderAxis, 8.24.0): evita
+    // l'asse radiale / "marker coricato" quando il click cade sulla parete. Verso outward
+    // da capSum (cap occlusale); fallback all'asse cap-media di findScanbodyCenter / normale.
+    var cylS = replaceEstimateCylinderAxis(_sgeo, replaceSeed.sourceCenter.clone(), 5.0);
+    var axS;
+    if(cylS && cylS.axis){
+      axS = cylS.axis.clone().normalize();
+      var sgnS = (cylS.capSum && cylS.capSum.lengthSq() > 1e-9) ? cylS.capSum : nrmS;
+      if(axS.dot(sgnS) < 0) axS.multiplyScalar(-1);
+    } else if(fitS && fitS.axis){
+      axS = fitS.axis.clone().normalize();
+      if(axS.dot(nrmS) < 0) axS.multiplyScalar(-1);
+    } else {
+      axS = nrmS.clone().normalize();
+    }
     replaceSeed.sourceAxis = axS;
-    // evidenzia lo scanbody individuato (sfera gialla)
+    // evidenzia lo scanbody individuato (sfera gialla; replaceMakeDot fa GIA' scene.add)
     if(replaceSeed.sourceDot) _replaceDisposeDot(replaceSeed.sourceDot);
     var sd = replaceMakeDot(replaceSeed.sourceCenter, { color: 0xFFD400, opacity: 0.95, role: 'source' });
-    sd.scale.setScalar(3); scene.add(sd);
+    sd.scale.setScalar(3);
     replaceSeed.sourceDot = sd;
     replaceSeed.phase = 'chooseType';
+    replacePlacementMode = false;   // step ② non-interattivo sul viewport
+    if(renderer && renderer.domElement) renderer.domElement.style.cursor = 'default';
     replaceHideHoverDot();
     replaceSeedUpdateUI();
-    replaceShowStatus('Scanbody individuato. Ora scegli libreria e type del marker sostitutivo (nella finestra).');
+    replaceShowStatus('Scanbody individuato. Ora scegli libreria e type del marker sostitutivo (nel pannello a destra).');
     return true;
   }
   // Collector dei punti GEMELLI sulla scansione (fase pickScan del seme 3-punti, ramo "Allinea a 3 punti").
@@ -16316,7 +16338,7 @@ function replaceAutoPlaceFromSource(){
     };
     replaceSeed.phase = 'posed';
     replaceSeedUpdateUI();
-    replaceShowStatus('Posa automatica pronta (grigia). Conferma (poi Raffina per agganciare), oppure "Allinea a 3 punti" per il roll preciso.');
+    replaceShowStatus('Posa automatica (solo asse, roll non garantito). Per il roll corretto usa "Allinea a 3 punti" (consigliato); la Raffina rifinisce asse+posizione, non il roll. Poi Conferma.');
   }).catch(function(st){ replaceShowStatus('Errore fetch marker (' + st + ').', true); });
 }
 
@@ -16325,6 +16347,7 @@ function replaceAutoPlaceFromSource(){
 function replaceStartThreePoint(){
   if(!replacePreviewRenderer){ replaceShowStatus('Scegli prima un type (anteprima).', true); return; }
   replaceSeedGen++;   // invalida eventuali fetch in volo
+  if(replaceSeed.sourceDot){ _replaceDisposeDot(replaceSeed.sourceDot); replaceSeed.sourceDot = null; }   // via la sfera gialla source (il 3-punti ricalcola dai propri click)
   if(replacePending){
     if(replacePending.group){ var _pm1 = replacePending.group.children[0]; if(_pm1 && _pm1.material) _pm1.material.dispose(); scene.remove(replacePending.group); }
     replacePending = null;
@@ -16540,6 +16563,8 @@ function replaceDeletePlaced(id){
   if(i < 0) return;
   var p = replacePlaced[i];
   if(p.group) scene.remove(p.group);
+  var _mmD = p.group && p.group.children[0];   // dispose material per-marker (geometria in cache: NON)
+  if(_mmD && _mmD.material){ if(_mmD.material.map) _mmD.material.map.dispose(); _mmD.material.dispose(); }
   (p.dotMeshes || []).forEach(_replaceDisposeDot);
   if(p.labelEl && p.labelEl.parentNode) p.labelEl.parentNode.removeChild(p.labelEl);
   replacePlaced.splice(i, 1);
