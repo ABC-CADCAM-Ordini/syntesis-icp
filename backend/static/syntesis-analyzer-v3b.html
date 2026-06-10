@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.33.0</title>
+<title>Syntesis-ICP - Analizzare v8.34.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2424,7 +2424,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.33.0';
+window.ANALIZZA_BUILD = '8.34.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15652,6 +15652,30 @@ function _replaceApplyView(p){
   if(p.meshSub) p.meshSub.visible = (p.showSub !== false);
   if(p.originAxes) p.originAxes.visible = !!p.showOrigin;
 }
+// 8.34.0: raggio del cilindro scanbody stimato dalla geometria del CAD SORGENTE (frame locale,
+// asse = axis_occlusal u): mediana della distanza radiale dei triangoli di PARETE (|n.u|<0.35)
+// dall'asse passante per l'origine. Serve solo come raggio APPROSSIMATO per l'anello di crop di
+// sostRobustCenter (kasa a raggio libero -> tollerante). null se < 8 triangoli parete.
+function _replaceEstimateCadRadius(geo, u){
+  if(!geo || !geo.attributes || !geo.attributes.position) return null;
+  var pos = geo.attributes.position.array, nrm = geo.attributes.normal && geo.attributes.normal.array;
+  var nTri = pos.length / 9, rs = [];
+  for(var i = 0; i < nTri; i++){
+    var k = i * 9;
+    if(nrm){
+      var nx = (nrm[k]+nrm[k+3]+nrm[k+6])/3, ny = (nrm[k+1]+nrm[k+4]+nrm[k+7])/3, nz = (nrm[k+2]+nrm[k+5]+nrm[k+8])/3;
+      var nl = Math.sqrt(nx*nx + ny*ny + nz*nz);
+      if(nl > 1e-6){ if(Math.abs((nx/nl)*u.x + (ny/nl)*u.y + (nz/nl)*u.z) >= 0.35) continue; }   // scarta cap/flat
+    }
+    var cx = (pos[k]+pos[k+3]+pos[k+6])/3, cy = (pos[k+1]+pos[k+4]+pos[k+7])/3, cz = (pos[k+2]+pos[k+5]+pos[k+8])/3;
+    var axl = cx*u.x + cy*u.y + cz*u.z;
+    var rx = cx - axl*u.x, ry = cy - axl*u.y, rz = cz - axl*u.z;
+    rs.push(Math.sqrt(rx*rx + ry*ry + rz*rz));
+  }
+  if(rs.length < 8) return null;
+  rs.sort(function(a, b){ return a - b; });
+  return rs[Math.floor(rs.length / 2)];
+}
 // 8.32.0: dispone i material/texture/geometrie NON-cache di un group marker. Le mesh
 // marker (geoSub/geoSrc) hanno geometria in CACHE -> solo material; la terna origine
 // (geometrie+sprite proprie) -> dispose completo.
@@ -16490,6 +16514,19 @@ function replaceAutoPlaceFromSource(){
       srcTypeLabel: (tSrc.display || tSrc.keyword || ('type ' + tSrc.ord))
     };
     _replaceApplyView(p);
+    // 8.34.0: RICENTRA il seed con sostRobustCenter (centro full-surface click-invariante ~um),
+    // raggio derivato dal CAD SORGENTE -> tutti gli 8 roll partono da un centro corretto. ROOT
+    // CAUSE del "flottante" (RMSD ~0.6mm): findScanbodyCenter al click usava il raggio DEFAULT
+    // (1T3 2.515) a prescindere dal type -> centro decentrato 0.2-0.5mm -> crop sbagliato ->
+    // ICP point-to-point aggancia la gengiva. Il kasa di sostRobustCenter e' a raggio LIBERO
+    // (tollera R approssimato) e fail-soft (copertura <140deg -> tiene il centro legacy).
+    try {
+      var _Rcad = _replaceEstimateCadRadius(geoSrc, u);
+      if(_Rcad){
+        var _rc = sostRobustCenter(replaceOriginalGeo || replaceMesh.geometry, posV, N, _Rcad);
+        if(_rc && _rc.applied && _rc.center){ posV = _rc.center.clone(); group.position.copy(posV); p.position.copy(posV); }
+      }
+    } catch(e){ console.warn('[replace robust center]', e); }
     // ICP full-surface del SORGENTE -> 6-DOF. MULTI-START del ROLL (fix review 8.31.1):
     // un singolo ICP da roll arbitrario q0 puo' bloccarsi su un roll SBAGLIATO con RMSD
     // basso (corpo quasi-simmetrico). Provo ROLLS roll iniziali, tengo quello a RMSD minore,
@@ -16520,10 +16557,27 @@ function replaceAutoPlaceFromSource(){
     replaceSeed.phase = 'posed';
     _replaceApplyView(p);   // 8.32.0: mostra il SORGENTE allineato (default) + terna origine
     replaceSeedUpdateUI();
+    // 8.34.0: GATE RMSD — se l'allineamento auto resta scarso (oltre soglia fisica), passa
+    // AUTOMATICAMENTE ad "Allinea a 3 punti" (scelta utente) invece di presentare una posa
+    // flottante come "allineata". p.rmsd e' impostato da _replaceDoRefine (rifinitura sopra).
+    var REPLACE_AUTO_RMSD_GATE = 0.15;   // mm; atteso ~decine di um, 0.15 = soglia di sicurezza
+    // 8.34.0: FAIL-CLOSED (review avversariale): rmsd assente/non-finito = fit degenerato (crop
+    // vuoto) -> instrada anch'esso al fallback, non spacciarlo per "allineato".
+    var _rmsdOk = (typeof p.rmsd === 'number' && isFinite(p.rmsd));
+    var _rmsdTxt = _rmsdOk ? ((Math.round(p.rmsd * 1000) / 1000) + 'mm') : 'non valido';
+    if(!_rmsdOk || p.rmsd > REPLACE_AUTO_RMSD_GATE){
+      if(replacePreviewRenderer){
+        replaceShowStatus('Allineamento auto impreciso (RMSD ' + _rmsdTxt + '): passo ad "Allinea a 3 punti".', true);
+        replaceStartThreePoint();   // scarta la posa auto (p) e avvia il seeding 3-punti
+      } else {
+        replaceShowStatus('Allineamento auto impreciso (RMSD ' + _rmsdTxt + '). Usa "Allinea a 3 punti".', true);
+      }
+      return;
+    }
     // confidenza del roll: se il migliore non e' chiaramente separato dal 2°, il roll e'
     // ambiguo (corpo simmetrico o feature deboli) -> avvisa di usare "Allinea a 3 punti".
     var ambiguous = !(isFinite(second) && best.rmsd > 0 && (second - best.rmsd) > 0.15 * best.rmsd);
-    replaceShowStatus('Sorgente allineato (ICP, RMSD ' + (Math.round((best.rmsd||0) * 1000) / 1000) + 'mm). '
+    replaceShowStatus('Sorgente allineato (ICP, RMSD ' + (Math.round((p.rmsd || 0) * 1000) / 1000) + 'mm). '
       + 'Vedi MADRE (sorgente, verde) accoppiata alla scansione + FIGLIO (sostituto) che eredita la posa + origine x0/y0/z0; toggle Madre/Figlio/origine in "Vista". '
       + (ambiguous ? 'Roll poco determinato: se l\'orientamento anti-rotazione non è giusto usa "Allinea a 3 punti". ' : '')
       + 'Controlla, poi ✓ Conferma.');
