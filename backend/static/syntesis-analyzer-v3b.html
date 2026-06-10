@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.34.0</title>
+<title>Syntesis-ICP - Analizzare v8.35.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1484,7 +1484,7 @@ if (document.readyState === 'loading') {
     <span id="replaceSeedCounter" style="font-size:10px;color:#8fb4d6;font-weight:700"></span>
     <button id="replaceSeedUndo" onclick="replaceSeedUndo()" style="display:none;margin-left:auto;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
     <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
-    <button id="replaceBtnAlign" onclick="replaceAutoPlaceFromSource()" style="display:none;padding:5px 12px;background:#0065B3;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer" title="Allinea il CAD sorgente alla scansione (ICP); il sostituto eredita la posa">▶ Allinea (ICP)</button>
+    <button id="replaceBtnAlign" onclick="replaceStartThreePoint()" style="display:none;padding:5px 12px;background:#0065B3;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer" title="Allinea con 3 punti di repere: 3 sul marker (anteprima) + 3 gemelli sulla scansione">▶ Allinea (3 punti)</button>
     <button id="replaceBtn3pt" onclick="replaceStartThreePoint()" style="display:none;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer" title="Allinea con 3 punti di repere (roll preciso)">Allinea a 3 punti</button>
     <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
   </div>
@@ -1992,10 +1992,10 @@ if (document.readyState === 'loading') {
     <div class="panel-section" id="panelReplace" style="display:none">
       <div class="panel-label">Replace-iT — sostituzione da libreria</div>
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:8px;line-height:1.5">
-        Carica la scansione, scegli libreria attiva e i type SORGENTE + SOSTITUTO, "+ Nuovo impianto" e clicca lo scanbody, poi "▶ Allinea (ICP)": il sorgente si allinea alla scansione e il sostituto eredita la posa.
+        Carica la scansione, scegli libreria attiva e i type SORGENTE + SOSTITUTO, "+ Nuovo impianto" e clicca lo scanbody, poi "▶ Allinea (3 punti)": allinei il sorgente con 3 punti di repere e il sostituto eredita la posa.
       </div>
       <div style="font-family:var(--mono);font-size:11px;color:#5B7A1F;background:#F2F7E6;border:1px solid #D6E4A8;border-radius:4px;padding:6px 8px;margin-bottom:10px;line-height:1.45">
-        Flusso: <b>+ Nuovo impianto</b> → clicca lo <b>scanbody</b> → <b>▶ Allinea (ICP)</b> (allinea il sorgente a 6 gradi) → <b>✓ Conferma</b> → <b>Avanti</b> per il prossimo. Se il roll è ambiguo (corpo simmetrico) usa <b>Allinea a 3 punti</b>. La finestra guida è in basso a sinistra.
+        Flusso: <b>+ Nuovo impianto</b> → clicca lo <b>scanbody</b> → <b>▶ Allinea (3 punti)</b> → <b>3 punti</b> sul marker (anteprima) + <b>3 gemelli</b> sulla scansione → <b>✓ Conferma</b> → <b>Avanti</b> per il prossimo. Vedi MADRE (verde) + FIGLIO + origine. La finestra guida è in basso a sinistra.
       </div>
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:4px;line-height:1.5">Scansione (STL):</div>
@@ -2030,7 +2030,7 @@ if (document.readyState === 'loading') {
            guida #replacePreviewBox (sotto), accanto al canvas marker. -->
 
       <div id="replaceGuide" style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:8px;line-height:1.5">
-        Modello <b>sorgente→sostituto</b>: clicchi <b>1 punto</b> sullo scanbody e con <b>▶ Allinea (ICP)</b> il CAD sorgente si allinea alla scansione; il sostituto IPD eredita la posa via origine condivisa. Il ramo <b>Allinea a 3 punti</b> resta come ripiego per il roll su corpi simmetrici.
+        Modello <b>sorgente→sostituto</b>: clicchi lo scanbody, poi <b>▶ Allinea (3 punti)</b> → 3 punti di repere sul marker (anteprima) + 3 gemelli sulla scansione → il CAD <b>sorgente</b> (madre) si allinea alla scansione; il <b>sostituto</b> IPD (figlio) eredita la posa via origine condivisa.
       </div>
 
       <div id="replacePlacedList" style="display:none;margin-top:10px">
@@ -2424,7 +2424,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.34.0';
+window.ANALIZZA_BUILD = '8.35.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15962,10 +15962,12 @@ function replaceSeedUpdateUI(){
   // Conferma: posa di anteprima pendente (auto 'posed' o 3-punti 'pendingConfirm').
   var cb = document.getElementById('replaceBtnConfirm');
   if(cb) cb.style.display = (ph === 'pendingConfirm' || ph === 'posed') ? '' : 'none';
-  // 8.33.0: riga "Vista" (checkbox Madre + Figlio + origine) durante l'ispezione auto-posa.
+  // 8.33.0/8.34.1: riga "Vista" (checkbox Madre + Figlio + origine) durante l'ispezione —
+  // sia auto-posa ('posed') sia 3-punti ('pendingConfirm'): entrambi i rami hanno madre+figlio.
+  var _viewPh = (ph === 'posed' || ph === 'pendingConfirm');
   var vr = document.getElementById('replaceViewRow');
-  if(vr) vr.style.display = (ph === 'posed' && replacePending) ? 'flex' : 'none';
-  if(ph === 'posed' && replacePending){
+  if(vr) vr.style.display = (_viewPh && replacePending && replacePending.meshSrc) ? 'flex' : 'none';
+  if(_viewPh && replacePending && replacePending.meshSrc){
     var cvs = document.getElementById('replaceViewSrc'); if(cvs) cvs.checked = (replacePending.showSrc !== false);
     var cvb = document.getElementById('replaceViewSub'); if(cvb) cvb.checked = (replacePending.showSub !== false);
     var voc = document.getElementById('replaceViewOrigin'); if(voc) voc.checked = !!replacePending.showOrigin;
@@ -16007,7 +16009,7 @@ function replaceGuideRender(){
     var t;
     if(ph === 'pickSource') t = '<b>①</b> Clicca lo <b>SCANBODY da sostituire</b> sulla scansione (viewport grande).';
     else if(ph === 'chooseType') t = (replaceSourceType && replaceSubstType)
-        ? '<b>②</b> Type scelti. Premi <b>▶ Allinea (ICP)</b> qui sotto: il CAD <b>sorgente</b> si allinea alla scansione (6 gradi) e il <b>sostituto</b> eredita la posa.'
+        ? '<b>②</b> Type scelti. Premi <b>▶ Allinea (3 punti)</b> qui sotto: clicchi 3 punti sul marker e 3 sulla scansione → il <b>sorgente</b> si allinea e il <b>sostituto</b> eredita la posa.'
         : '<b>②</b> Scanbody individuato (pallino giallo). Nel pannello a destra scegli il type <b>SORGENTE</b> (lo scanbody scansionato) e il type <b>SOSTITUTO</b> (IPD).';
     else if(ph === 'posed') t = '<b>③</b> Il CAD <b>sorgente</b> è stato <b>allineato</b> alla scansione (ICP, 6 gradi). Il <b>sostituto</b> (grigio) eredita la posa via origine condivisa. Controlla, poi <b>✓ Conferma</b>. <b>Raffina</b> per affinare.';
     else if(ph === 'pickMarker') t = '<b>Allinea a 3 punti</b>: clicca il punto <b>' + (replaceSeed.markerPts.length + 1) + '</b> sul <b>MARKER</b> qui sopra (ordine ' + C + '). Trascina per ruotare.';
@@ -16250,11 +16252,11 @@ function replaceOnViewportClick(event){
     if(renderer && renderer.domElement) renderer.domElement.style.cursor = 'default';
     replaceHideHoverDot();
     replaceSeedUpdateUI();
-    // 8.31.2: la posa NON parte da sola. Se i type sono gia' scelti il pulsante "▶ Allinea (ICP)"
+    // 8.35.0: flusso unico a 3 punti. Se i type sono gia' scelti il pulsante "▶ Allinea (3 punti)"
     // e' gia' visibile (replaceSeedUpdateUI) -> indirizza li'; altrimenti chiedi i due type.
     replaceShowStatus((replaceSourceType && replaceSubstType)
-      ? 'Scanbody individuato. Premi "▶ Allinea (ICP)" nella finestra guida per allineare il sorgente alla scansione.'
-      : 'Scanbody individuato. Scegli i type SORGENTE e SOSTITUTO nel pannello a destra, poi premi "▶ Allinea (ICP)".');
+      ? 'Scanbody individuato. Premi "▶ Allinea (3 punti)" nella finestra guida per allineare con 3 punti di repere.'
+      : 'Scanbody individuato. Scegli i type SORGENTE e SOSTITUTO nel pannello a destra, poi premi "▶ Allinea (3 punti)".');
     return true;
   }
   // Collector dei punti GEMELLI sulla scansione (fase pickScan del seme 3-punti, ramo "Allinea a 3 punti").
@@ -16429,45 +16431,55 @@ function replacePlaceFromSeed(){
   var seedMarker = replaceSeed.markerPts.map(function(p){ return p.clone(); });
   var seedScan = replaceSeed.scanPts.map(function(p){ return p.clone(); });
   var _gen = replaceSeedGen;   // guardia anti-fantasma: se il seme cambia durante il fetch, bail
-
-  replaceFetchMarkerGeo(t.marker_sha256).then(function(geoSrc){
-    if(_gen !== replaceSeedGen) return;   // reset/cambio workflow durante il fetch -> scarta (no group fantasma)
-    if(!geoSrc){ replaceShowStatus('Impossibile caricare il marker STL.', true); return; }
-    // posa di ANTEPRIMA: materiale grigio semi-trasparente per dire "non confermato".
-    var mat = new THREE.MeshPhongMaterial({
-      color: 0x9aa7b3, specular: 0x222222, shininess: 40,
-      side: THREE.DoubleSide, transparent: true, opacity: 0.85, depthWrite: true
-    });
-    var mesh = new THREE.Mesh(geoSrc, mat); mesh.name = 'replace-marker';
-    var group = new THREE.Group(); group.add(mesh);
+  // 8.34.1: il 3-punti costruisce la STESSA struttura MADRE+FIGLIO dell'auto (geoSrc SORGENTE +
+  // geoSub SOSTITUTO nello stesso frame + terna origine) -> anche col fallback ai 3 punti vedi
+  // MADRE (verde) + FIGLIO + origine nella scena e nell'albero. La posa (posV/qFinal) viene dai
+  // 3 click (allineano il SORGENTE alla scansione); il sostituto eredita via origine condivisa.
+  var _tSub = t;                                  // = replaceCurrentType (SOSTITUTO/figlio)
+  var _tSrc = replaceSourceType || t;             // SORGENTE/madre
+  Promise.all([replaceFetchMarkerGeo(_tSrc.marker_sha256), replaceFetchMarkerGeo(_tSub.marker_sha256)]).then(function(geos){
+    if(_gen !== replaceSeedGen) return;   // reset/cambio workflow durante il fetch -> scarta
+    var geoSrc = geos[0], geoSub = geos[1];
+    if(!geoSrc || !geoSub){ replaceShowStatus('Impossibile caricare gli STL sorgente/sostituto.', true); return; }
+    var matSub = new THREE.MeshPhongMaterial({ color: 0x9aa7b3, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: true });
+    var meshSub = new THREE.Mesh(geoSub, matSub); meshSub.name = 'replace-marker';            // FIGLIO children[0]
+    var matSrc = new THREE.MeshPhongMaterial({ color: 0x2DBE8B, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false });
+    var meshSrc = new THREE.Mesh(geoSrc, matSrc); meshSrc.name = 'replace-source'; meshSrc.renderOrder = 1;   // MADRE children[1]
+    var group = new THREE.Group(); group.add(meshSub); group.add(meshSrc);
+    var originAxes = _replaceMakeOriginAxes(3.2); group.add(originAxes);
     group.position.copy(posV); group.quaternion.copy(qFinal);
     group.userData.isReplace = true; group.userData.replaceRole = 'marker-pending';
     scene.add(group);
-    replacePending = {
-      group: group, seedMarkerPts: seedMarker, seedScanPts: seedScan,
+    var p = {
+      group: group, meshSub: meshSub, meshSrc: meshSrc, originAxes: originAxes,
+      showSrc: true, showSub: true, showOrigin: true,
+      seedMarkerPts: seedMarker, seedScanPts: seedScan,
       position: posV.clone(), axisDir: N.clone(),
-      // 8.31.1: la Raffina deve restare sul SORGENTE -> srcGeo = geometria del preview
-      // (replacePreviewMesh mostra il sorgente, init in replaceOnSourceTypeChange).
-      srcGeo: (replacePreviewMesh && replacePreviewMesh.geometry) || geoSrc,
-      srcMarkerSha: (replaceSourceType && replaceSourceType.marker_sha256) || t.marker_sha256,
-      libId: replaceCurrentLibId, typeOrd: t.ord, markerSha: t.marker_sha256,
-      typeLabel: (t.display || t.keyword || ('type ' + t.ord))
+      srcGeo: geoSrc,                               // 8.31.1: la Raffina resta sul SORGENTE
+      srcMarkerSha: _tSrc.marker_sha256,
+      libId: replaceCurrentLibId, typeOrd: _tSub.ord, markerSha: _tSub.marker_sha256,
+      typeLabel: (_tSub.display || _tSub.keyword || ('type ' + _tSub.ord)),
+      srcTypeLabel: (_tSrc.display || _tSrc.keyword || ('type ' + _tSrc.ord))
     };
+    _replaceApplyView(p);
+    replacePending = p;
     replaceSeed.phase = 'pendingConfirm';
     replaceSeedUpdateUI();
-    replaceShowStatus('Posa di ANTEPRIMA (asse dalla scansione). Controlla, poi Conferma — o Ricomincia.');
+    replaceShowStatus('Posa a 3 punti pronta — MADRE (verde) + FIGLIO + origine. Controlla, poi ✓ Conferma — o Ricomincia.');
   }).catch(function(st){ replaceShowStatus('Errore fetch marker (' + st + ').', true); });
 }
 
-// 2b-3e.2: POSA AUTOMATICA del marker sullo scanbody individuato (sourceCenter/sourceAxis).
-// Asse del marker (axis_occlusal) allineato all'asse sorgente, posizione = centro sorgente,
-// roll arbitrario -> la Raffina ICP lo aggancia (o "Allinea a 3 punti" per il roll preciso).
-// Crea un marker PENDING grigio (come replacePlaceFromSeed); Conferma lo finalizza.
+// 8.35.0: DISATTIVATA (dead code, NON cancellata — rimozione in passo dedicato §3.4). Scelta
+// utente in collaudo: "togliamo l'auto e lasciamo solo i 3 punti, gestiamo solo una cosa".
+// L'auto-ICP era imprecisa su scanbody reali (CAD flottante, RMSD >0.15mm -> fallback continuo
+// ai 3-punti). Il pulsante "▶ Allinea" ora chiama replaceStartThreePoint; replaceAutoPlaceFromSource
+// + _replaceEstimateCadRadius + il gate RMSD (8.34.0) non sono piu' cablati a nessun handler.
+// RI-ABILITARLA = ricablare #replaceBtnAlign onclick a questa funzione. Conservata per un futuro
+// tentativo sulla precisione auto (vedi memoria sostituire-placement-precision-gap).
+//
 // 2b-3f: POSA sorgente->sostituto (come Sostituisci). Allinea il CAD SORGENTE alla
-// scansione con ICP full-surface (6-DOF, ROLL incluso perche' la geometria del sorgente
-// combacia con lo scansionato); il group MOSTRA il SOSTITUTO, che condividendo l'origine
-// xyz eredita la stessa posa. _replaceDoRefine campiona p.srcGeo (sorgente) ma muove il
-// group (sostituto). srcGeo salvato nel record -> la Raffina ri-allinea sempre sul sorgente.
+// scansione con ICP full-surface (6-DOF); il group MOSTRA il SOSTITUTO, che condividendo
+// l'origine xyz eredita la posa. _replaceDoRefine campiona p.srcGeo (sorgente) ma muove il group.
 function replaceAutoPlaceFromSource(){
   var tSub = replaceSubstType || replaceCurrentType;
   var tSrc = replaceSourceType || tSub;
