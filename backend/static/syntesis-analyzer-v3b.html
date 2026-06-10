@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.28.0</title>
+<title>Syntesis-ICP - Analizzare v8.29.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2412,7 +2412,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.28.0';
+window.ANALIZZA_BUILD = '8.29.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15650,14 +15650,14 @@ function replacePreviewRender(){
     replacePreviewRenderer.render(replacePreviewScene, replacePreviewCamera);
 }
 function replacePreviewUpdateCam(){
-  if(!replacePreviewCamera || !replacePreviewCam) return;
-  var s = replacePreviewCam;
-  replacePreviewCamera.position.set(
-    s.rad * Math.sin(s.phi) * Math.sin(s.theta),
-    s.rad * Math.cos(s.phi),
-    s.rad * Math.sin(s.phi) * Math.cos(s.theta)
-  );
-  replacePreviewCamera.lookAt(0, 0, 0);
+  if(!replacePreviewCamera || !replacePreviewCam || !replacePreviewCam.q) return;
+  // 2b-3e: orbita LIBERA (trackball a quaternioni). Camera a distanza rad orientata
+  // dal quaternione q (guarda l'origine), NESSUN clamp polare -> ruoti il marker in
+  // qualsiasi direzione, anche oltre i poli. Il mesh resta fermo all'origine.
+  var q = replacePreviewCam.q;
+  replacePreviewCamera.position.set(0, 0, replacePreviewCam.rad).applyQuaternion(q);
+  replacePreviewCamera.quaternion.copy(q);
+  replacePreviewCamera.updateMatrixWorld();
 }
 function replacePreviewInit(geo){
   var canvas = document.getElementById('replacePreviewCanvas');
@@ -15680,7 +15680,7 @@ function replacePreviewInit(geo){
   if(bs) replacePreviewMesh.position.copy(bs.center).multiplyScalar(-1); // baricentro -> origine
   replacePreviewScene.add(replacePreviewMesh);
   replacePreviewCamera = new THREE.PerspectiveCamera(40, w / h, Math.max(rad * 0.02, 0.05), rad * 100);
-  replacePreviewCam = { theta: 0.6, phi: 1.15, rad: rad * 3.4 };
+  replacePreviewCam = { q: new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.35, 0.6, 0, 'XYZ')), rad: rad * 3.4 };
   replacePreviewUpdateCam();
   replacePreviewAttachInput(canvas);
   replacePreviewRender();
@@ -15692,9 +15692,12 @@ function replacePreviewAttachInput(canvas){
     if(!down) return;
     var dx = e.clientX - sx, dy = e.clientY - sy;
     if(Math.abs(dx) + Math.abs(dy) > 3) moved = true;
-    if(replacePreviewCam){
-      replacePreviewCam.theta -= dx * 0.01;
-      replacePreviewCam.phi = Math.max(0.15, Math.min(Math.PI - 0.15, replacePreviewCam.phi - dy * 0.01));
+    if(replacePreviewCam && replacePreviewCam.q){
+      // trackball libero: rotazioni attorno agli assi LOCALI della camera (post-moltiplica
+      // -> niente blocco ai poli, ruoti come vuoi). yaw=dx attorno all'up, pitch=dy al right.
+      var qx = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -dx * 0.01);
+      var qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -dy * 0.01);
+      replacePreviewCam.q.multiply(qx).multiply(qy).normalize();
     }
     sx = e.clientX; sy = e.clientY;
     replacePreviewUpdateCam(); replacePreviewRender();
