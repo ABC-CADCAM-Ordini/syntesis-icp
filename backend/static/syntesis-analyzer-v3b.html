@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.26.0</title>
+<title>Syntesis-ICP - Analizzare v8.27.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1468,6 +1468,26 @@ if (document.readyState === 'loading') {
   <div style="font-family:var(--mono);font-size:10px;color:#555;text-align:center">Trascina per ruotare, slider per zoom</div>
 </div>
 
+<!-- 2b-3b: FINESTRA GUIDA accoppiamento Replace-iT (anteprima marker grande + scelta 3 punti
+     + step + navigazione impianti). position:fixed TOP-LEVEL (come #cutViewOverlay) per evitare
+     il containing-block dei pannelli. id #replacePreviewBox per compat con replacePreviewInit/
+     Dispose (mostrata al type-select). I 3 punti SCANSIONE restano sul viewport grande. -->
+<div id="replacePreviewBox" style="display:none;position:fixed;left:16px;bottom:16px;width:390px;max-width:44vw;background:rgba(13,27,42,0.97);border:1px solid #2a3a4a;border-radius:10px;padding:10px 12px 12px 12px;z-index:25;box-shadow:0 10px 30px rgba(0,0,0,0.5);font-family:var(--mono);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="font-size:12px;font-weight:800;color:#fff;letter-spacing:.06em;text-transform:uppercase">Accoppiamento guidato</span>
+    <span id="replaceGuideTitle" style="margin-left:auto;font-size:11px;color:#8fb4d6;font-weight:700"></span>
+  </div>
+  <div id="replaceGuideSteps" style="display:flex;gap:6px;margin-bottom:8px;font-size:10px"></div>
+  <canvas id="replacePreviewCanvas" style="width:100%;height:min(380px,42vh);display:block;background:#0a0a0f;border:1px solid #2a3a4a;border-radius:6px;cursor:crosshair"></canvas>
+  <div id="replaceGuideStep" style="font-size:11px;color:#c6d4e2;margin-top:8px;line-height:1.45;min-height:32px"></div>
+  <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+    <span id="replaceSeedCounter" style="font-size:10px;color:#8fb4d6;font-weight:700"></span>
+    <button id="replaceSeedUndo" class="replace-only" onclick="replaceSeedUndo()" style="margin-left:auto;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
+    <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
+    <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
+  </div>
+</div>
+
 <div class="viewport" id="viewport">
     <!-- ============================================================
          SYN LAYER PANEL (Fase 2 - sola lettura)
@@ -1966,8 +1986,8 @@ if (document.readyState === 'loading') {
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:8px;line-height:1.5">
         Carica la scansione, scegli libreria attiva e type, poi piazza il marker con 3 punti di repere (anteprima → scansione).
       </div>
-      <div style="font-family:var(--mono);font-size:11px;color:#B7791F;background:#FBF3E2;border:1px solid #F0DFA8;border-radius:4px;padding:6px 8px;margin-bottom:10px;line-height:1.45">
-        ⚠ Fase preliminare: la posa nasce dai <b>3 punti</b> (allineamento <b>approssimativo</b>). L'<b>allineamento fine (Raffina/ICP)</b> arriverà in un secondo momento e non è ancora disponibile.
+      <div style="font-family:var(--mono);font-size:11px;color:#5B7A1F;background:#F2F7E6;border:1px solid #D6E4A8;border-radius:4px;padding:6px 8px;margin-bottom:10px;line-height:1.45">
+        Flusso: <b>+ Posiziona</b> (3 punti → posa grezza) → <b>Raffina</b> (ICP automatico fino a convergenza) → <b>Avanti</b> per il prossimo impianto. La scelta dei 3 punti avviene nella <b>finestra guida</b> in basso a sinistra.
       </div>
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:4px;line-height:1.5">Scansione (STL):</div>
@@ -1986,24 +2006,16 @@ if (document.readyState === 'loading') {
         <option value="">— scegli type —</option>
       </select>
 
-      <!-- 2b-1.2: anteprima interattiva del marker per scegliere i 3 punti di repere -->
-      <div id="replacePreviewBox" style="display:none;margin-top:10px">
-        <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:4px;line-height:1.5">Anteprima marker — trascina per ruotare, clicca i 3 punti <span style="color:#FF3B30;font-weight:700">1</span>·<span style="color:#00C853;font-weight:700">2</span>·<span style="color:#2979FF;font-weight:700">3</span>:</div>
-        <canvas id="replacePreviewCanvas" style="width:100%;height:300px;display:block;background:#0D1B2A;border:1px solid var(--border);border-radius:6px;cursor:crosshair"></canvas>
-      </div>
+      <!-- 2b-3b: l'anteprima marker + scelta 3 punti vivono nella finestra guida
+           fluttuante #replacePreviewBox (in basso a sinistra), mostrata al type-select. -->
+
 
       <div style="display:flex;gap:6px;margin-top:12px">
         <button id="replaceBtnPlace" class="replace-only" onclick="replaceStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona (3 punti)</button>
       </div>
 
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-        <span id="replaceSeedCounter" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:700"></span>
-        <button id="replaceSeedUndo" class="replace-only" onclick="replaceSeedUndo()" style="margin-left:auto;padding:4px 9px;background:#fff;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
-        <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:4px 9px;background:#fff;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
-      </div>
-
-      <!-- 2b-1.4: Conferma della posa di anteprima (visibile solo in pendingConfirm, gestita da replaceSeedUpdateUI; NON .replace-only per non essere forzata visibile dal gate workflow) -->
-      <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;width:100%;margin-top:8px;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">✓ Conferma posa</button>
+      <!-- 2b-3b: counter / Annulla / Ricomincia / Conferma vivono nella finestra
+           guida #replacePreviewBox (sotto), accanto al canvas marker. -->
 
       <div id="replaceGuide" style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:8px;line-height:1.5">
         Scegli <b>3 punti di repere</b> sul marker (anteprima), poi i <b>3 gemelli</b> sulla scansione nello stesso ordine: <span style="color:#FF3B30;font-weight:700">1</span> · <span style="color:#00C853;font-weight:700">2</span> · <span style="color:#2979FF;font-weight:700">3</span>. La posa iniziale nasce dai 3 punti (grezza; la Raffina fine arriva dopo).
@@ -2400,7 +2412,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.26.0';
+window.ANALIZZA_BUILD = '8.27.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -5101,6 +5113,9 @@ function selectWorkflow(wf){
   // 2b-1: bottoni .replace-only consumati solo nel ramo replace (gemello del blocco sost).
   var replBtns = document.querySelectorAll('.replace-only');
   replBtns.forEach(function(el){ el.style.display = (wf === 'replace') ? '' : 'none'; });
+  // 2b-3b: la finestra guida (#replacePreviewBox, top-level fixed) non e' in un pannello
+  // -> nascondila esplicitamente fuori dal workflow replace (in replace si apre al type-select).
+  if(wf !== 'replace'){ var _gw = document.getElementById('replacePreviewBox'); if(_gw) _gw.style.display = 'none'; }
 }
 
 // Retrocompatibilita': setMode('misura'|'accoppia') continua a funzionare per
@@ -15688,6 +15703,7 @@ function replacePreviewAttachInput(canvas){
   canvas.addEventListener('mousedown', canvas._replDown);
   window.addEventListener('mousemove', replacePreviewMoveH);
   window.addEventListener('mouseup', replacePreviewUpH);
+  replaceSeedUpdateUI();   // 2b-3b: testo-passo iniziale nella finestra guida appena aperta
 }
 function replacePreviewPickAt(clientX, clientY){
   if(!replacePreviewRenderer || !replacePreviewMesh) return;
@@ -15793,14 +15809,47 @@ function replaceSeedUndo(){
 function replaceSeedUpdateUI(){
   var c = document.getElementById('replaceSeedCounter');
   if(c){
-    if(replaceSeed.phase === 'pickMarker') c.textContent = 'Punti sul marker: ' + replaceSeed.markerPts.length + '/3';
-    else if(replaceSeed.phase === 'pickScan') c.textContent = 'Punti sulla scansione: ' + replaceSeed.scanPts.length + '/3';
-    else if(replaceSeed.phase === 'pendingConfirm') c.textContent = 'Anteprima posa — Conferma o Ricomincia';
+    if(replaceSeed.phase === 'pickMarker') c.textContent = 'Marker: ' + replaceSeed.markerPts.length + '/3';
+    else if(replaceSeed.phase === 'pickScan') c.textContent = 'Scansione: ' + replaceSeed.scanPts.length + '/3';
+    else if(replaceSeed.phase === 'pendingConfirm') c.textContent = 'Anteprima posa';
     else c.textContent = '';
   }
   // 2b-1.4: il bottone "Conferma" compare solo con una posa di anteprima pendente.
   var cb = document.getElementById('replaceBtnConfirm');
   if(cb) cb.style.display = (replaceSeed.phase === 'pendingConfirm') ? '' : 'none';
+  replaceGuideRender();   // 2b-3b: aggiorna titolo impianto, badge passi, testo-passo nella finestra guida
+}
+
+// 2b-3b: render della finestra guida (titolo impianto + badge dei 3 passi + testo-passo
+// dinamico). Riflette replaceSeed.phase. Tutti gli elementi null-checked (no-op se la
+// finestra non e' nel DOM).
+function replaceGuideRender(){
+  var ph = replaceSeed.phase;
+  var titleEl = document.getElementById('replaceGuideTitle');
+  if(titleEl) titleEl.textContent = 'Impianto #' + (replacePlaced.length + 1);
+  var cur = (ph === 'pickScan') ? 2 : (ph === 'pendingConfirm') ? 3 : 1;
+  var stepsEl = document.getElementById('replaceGuideSteps');
+  if(stepsEl){
+    var defs = [['1', 'Marker'], ['2', 'Scansione'], ['✓', 'Conferma']];
+    var html = '';
+    for(var i = 0; i < defs.length; i++){
+      var on = (i + 1) === cur;
+      html += '<span style="flex:1;text-align:center;padding:3px 2px;border-radius:4px;font-weight:700;' +
+              (on ? 'background:#0D9E6E;color:#fff;' : 'background:#1a2632;color:#7a8a9a;') + '">' +
+              defs[i][0] + ' ' + defs[i][1] + '</span>';
+    }
+    stepsEl.innerHTML = html;
+  }
+  var stepEl = document.getElementById('replaceGuideStep');
+  if(stepEl){
+    var C = '<span style="color:#FF3B30;font-weight:700">1</span>·<span style="color:#00C853;font-weight:700">2</span>·<span style="color:#2979FF;font-weight:700">3</span>';
+    var t;
+    if(ph === 'pickMarker') t = 'Clicca il punto <b>' + (replaceSeed.markerPts.length + 1) + '</b> sul <b>MARKER</b> qui sopra (ordine ' + C + '). Trascina per ruotare.';
+    else if(ph === 'pickScan') t = 'Ora clicca il punto <b>' + (replaceSeed.scanPts.length + 1) + '</b> <b>GEMELLO</b> sulla <b>scansione</b> (viewport grande), stesso ordine ' + C + '.';
+    else if(ph === 'pendingConfirm') t = 'Posa di <b>anteprima</b> pronta (grigia). Controlla, poi <b>✓ Conferma</b> — oppure <b>Ricomincia</b>. Dopo: <b>Raffina</b> e <b>Avanti</b> per il prossimo.';
+    else t = 'Premi <b>+ Posiziona</b> nel pannello, poi clicca <b>3 punti</b> di repere sul marker (' + C + ').';
+    stepEl.innerHTML = t;
+  }
 }
 
 // --- FETCH /api/rit/* (Bearer da localStorage, pattern /api/place-mua) ---
