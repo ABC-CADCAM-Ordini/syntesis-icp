@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.19.0</title>
+<title>Syntesis-ICP - Analizzare v8.20.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1964,10 +1964,10 @@ if (document.readyState === 'loading') {
     <div class="panel-section" id="panelReplace" style="display:none">
       <div class="panel-label">Replace-iT — sostituzione da libreria</div>
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:8px;line-height:1.5">
-        Carica la scansione, scegli libreria attiva e type, poi clicca sullo scanbody per posizionare il marker.
+        Carica la scansione, scegli libreria attiva e type, poi piazza il marker con 3 punti di repere (anteprima → scansione).
       </div>
       <div style="font-family:var(--mono);font-size:11px;color:#B7791F;background:#FBF3E2;border:1px solid #F0DFA8;border-radius:4px;padding:6px 8px;margin-bottom:10px;line-height:1.45">
-        ⚠ Fase preliminare: il posizionamento è <b>approssimativo</b> (il marker si appoggia dove clicchi, orientato alla superficie). L'<b>allineamento fine (Raffina)</b> arriverà in un secondo momento e non è ancora disponibile.
+        ⚠ Fase preliminare: la posa nasce dai <b>3 punti</b> (allineamento <b>approssimativo</b>). L'<b>allineamento fine (Raffina/ICP)</b> arriverà in un secondo momento e non è ancora disponibile.
       </div>
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:4px;line-height:1.5">Scansione (STL):</div>
@@ -1986,12 +1986,24 @@ if (document.readyState === 'loading') {
         <option value="">— scegli type —</option>
       </select>
 
+      <!-- 2b-1.2: anteprima interattiva del marker per scegliere i 3 punti di repere -->
+      <div id="replacePreviewBox" style="display:none;margin-top:10px">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:4px;line-height:1.5">Anteprima marker — trascina per ruotare, clicca per i 3 punti:</div>
+        <canvas id="replacePreviewCanvas" style="width:100%;height:190px;display:block;background:#0D1B2A;border:1px solid var(--border);border-radius:6px;cursor:crosshair"></canvas>
+      </div>
+
       <div style="display:flex;gap:6px;margin-top:12px">
-        <button id="replaceBtnPlace" class="replace-only" onclick="replaceStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona</button>
+        <button id="replaceBtnPlace" class="replace-only" onclick="replaceStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona (3 punti)</button>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <span id="replaceSeedCounter" style="font-family:var(--mono);font-size:11px;color:var(--dark);font-weight:700"></span>
+        <button id="replaceSeedUndo" class="replace-only" onclick="replaceSeedUndo()" style="margin-left:auto;padding:4px 9px;background:#fff;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
+        <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:4px 9px;background:#fff;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
       </div>
 
       <div id="replaceGuide" style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:8px;line-height:1.5">
-        Clicca il <b>centro del disco</b> dello scanbody: il <span style="color:#FF3B30;font-weight:700">punto rosso</span> segna il riferimento del marker (lo stesso punto compare sul modello piazzato).
+        Scegli <b>3 punti di repere</b> sul marker (anteprima), poi i <b>3 gemelli</b> sulla scansione nello stesso ordine: <span style="color:#FF3B30;font-weight:700">1</span> · <span style="color:#00C853;font-weight:700">2</span> · <span style="color:#2979FF;font-weight:700">3</span>. La posa iniziale nasce dai 3 punti (grezza; la Raffina fine arriva dopo).
       </div>
 
       <div id="replacePlacedList" style="display:none;margin-top:10px">
@@ -2378,7 +2390,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.19.0';
+window.ANALIZZA_BUILD = '8.20.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-09';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15456,29 +15468,27 @@ function sostUpdateLabels(){
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// REPLACE-iT (workflow 'replace', slice 2b-1) — UI + fetch marker + PIAZZAMENTO
+// REPLACE-iT (workflow 'replace') — UI + fetch marker + SEEDING a 3 punti
 // ════════════════════════════════════════════════════════════════════════
 // Workflow NUOVO SEPARATO. CLONA i mattoni di Sostituire (che resta
 // bit-identico); riusa SOLO i mattoni puri: parseSTL, sostParseSTLToGeometry,
-// findScanbodyCenter (di cui prendo SOLO l'asse). NIENTE match/Raffina/robust
-// (quello e' la slice 2b-2). Consuma la superficie 2a /api/rit/*
-// (require_authorized, solo librerie active=TRUE) col Bearer in localStorage.
+// kabsch (fit rigido a punti). NIENTE match/Raffina/ICP (= slice 2b-2).
+// Consuma la superficie 2a /api/rit/* (require_authorized, solo librerie
+// active=TRUE) col Bearer in localStorage.
 //
-// RICONCILIAZIONE CAD<->click (il nodo, senza match):
-//   A = asse-mondo (media normali faccia piatta, RADIUS-INDEPENDENT; fallback
-//       rawNormal) * REPLACE_AXIS_SIGN
-//   P = rawPoint (click grezzo; NIENTE center radius-dipendente -> e' 2b-2)
-//   q = quaternion che porta l'asse di inserzione LOCALE del marker (+Z, da
-//       AxisOcclusal=(0,0,1)) sull'asse-mondo A
-//   t = P - q*click_center  -> il click_center del CAD cade ESATTAMENTE su P
-//   roll attorno ad A = LIBERO (default). axis_asymmetric viene MEMORIZZATO in
-//   replacePlaced per la slice 2b-2 (risoluzione del roll), NON applicato qui.
+// SEEDING a 3 punti (2b-1.2, SOSTITUISCE il vecchio click_center):
+//   - 3 punti scelti SUL MARKER nell'anteprima interattiva (frame locale, via
+//     worldToLocal) <-> 3 punti GEMELLI sulla scansione (mondo), stesso ordine.
+//   - posa = kabsch(markerPts_locali, scanPts_mondo) -> R,t (world = R*local + t)
+//     -> Matrix4 -> decompose -> group.position/quaternion.
+//   - Allineamento GREZZO (3 punti, nessuna iterazione). Le coppie + R,t sono
+//     memorizzate per-marker (seme) per la Raffina/ICP della slice 2b-2.
 
 // --- STATO (gemello del blocco sost*, separato da Sostituire) ---
 var replaceMesh = null;             // THREE.Mesh della scansione (separata da sostMesh)
 var replaceOriginalGeo = null;
 var replacePlacementMode = false;   // true in attesa di click
-var replacePlaced = [];             // [{id,num,group,clickPoint,clickNormal,position,axisDir,libId,typeOrd,markerSha,clickCenterLocal,axisAsymLocal,color,labelEl}]
+var replacePlaced = [];             // [{id,num,group,dotMeshes,seedMarkerPts,seedScanPts,seedR,seedT,position,axisDir,libId,typeOrd,markerSha,typeLabel,color,labelEl}]
 var replaceCounter = 0;
 var replaceLibs = [];               // cache lista librerie attive
 var replaceCurrentLibId = null;
@@ -15490,10 +15500,21 @@ var REPLACE_COLORS = [0x0065B3, 0x0D9E6E, 0xD97706, 0xA855F7, 0xEF4444, 0x14B8A6
 // Segno dell'asse di inserzione applicato (+1 = asse-mondo A, -1 = -A). ISOLATO
 // di proposito (check visivo 2b-1): se i marker risultano CAPOVOLTI -> -1.
 var REPLACE_AXIS_SIGN = +1;
-// 2b-1.1: marcatore punto-di-riferimento (click_center). Rosso, piccolo.
+// 2b-1.1: marcatore punto-di-riferimento. Rosso, piccolo.
 var REPLACE_DOT_COLOR = 0xFF3B30;
 var REPLACE_DOT_R = 0.45;           // mm, piu' piccolo dei marker
 var replaceHoverDot = null;         // dot "preview" semi-trasparente che segue il cursore in placement
+// 2b-1.2: seeding a 3 punti (sostituisce il click_center). I 3 punti hanno
+// colori distinti, uguali tra anteprima-marker e scansione, per accoppiarli a vista.
+var REPLACE_SEED_N = 3;
+var REPLACE_SEED_COLORS = [0xFF3B30, 0x00C853, 0x2979FF]; // 1 rosso, 2 verde, 3 blu
+// Seme in corso: markerPts/scanPts coppie corrispondenti (per Kabsch); markerDots
+// sono figli della mesh anteprima, scanDots vivono nella scena principale.
+var replaceSeed = { phase: 'idle', markerPts: [], scanPts: [], markerDots: [], scanDots: [] };
+// Secondo renderer Three per l'anteprima interattiva del marker nel pannello.
+var replacePreviewRenderer = null, replacePreviewScene = null, replacePreviewCamera = null;
+var replacePreviewMesh = null, replacePreviewCam = null;   // replacePreviewCam = {theta,phi,rad}
+var replacePreviewMoveH = null, replacePreviewUpH = null;  // handler window (rimossi in dispose)
 
 function replaceShowStatus(msg, isError){
   var s = document.getElementById('replaceStatus');
@@ -15537,7 +15558,7 @@ function replaceHideHoverDot(){
 // interferenza con Sostituisci/Analizza/altri workflow ne' col controller camera).
 function replaceOnViewportHover(event){
   if(typeof currentWorkflow === 'undefined' || currentWorkflow !== 'replace'
-     || !replacePlacementMode || !replaceMesh){ replaceHideHoverDot(); return; }
+     || replaceSeed.phase !== 'pickScan' || !replaceMesh){ replaceHideHoverDot(); return; }
   var rect = renderer.domElement.getBoundingClientRect();
   var mouse = new THREE.Vector2(
     ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -15553,6 +15574,147 @@ function replaceOnViewportHover(event){
   } else {
     replaceHideHoverDot();
   }
+}
+
+// ===== 2b-1.2: ANTEPRIMA INTERATTIVA (secondo renderer) + SEEDING A 3 PUNTI =====
+// L'anteprima e' un piccolo viewport Three PROPRIO (canvas #replacePreviewCanvas),
+// indipendente dal viewer principale. La camera orbita attorno all'origine; la mesh
+// del marker (dalla cache) e' offsettata cosi' che il baricentro sia all'origine ->
+// orbit pulito, e worldToLocal sui click restituisce coord nel frame LOCALE canonico
+// del marker. I dot dei 3 punti marker sono FIGLI della mesh (seguono l'orbita).
+function replacePreviewRender(){
+  if(replacePreviewRenderer && replacePreviewScene && replacePreviewCamera)
+    replacePreviewRenderer.render(replacePreviewScene, replacePreviewCamera);
+}
+function replacePreviewUpdateCam(){
+  if(!replacePreviewCamera || !replacePreviewCam) return;
+  var s = replacePreviewCam;
+  replacePreviewCamera.position.set(
+    s.rad * Math.sin(s.phi) * Math.sin(s.theta),
+    s.rad * Math.cos(s.phi),
+    s.rad * Math.sin(s.phi) * Math.cos(s.theta)
+  );
+  replacePreviewCamera.lookAt(0, 0, 0);
+}
+function replacePreviewInit(geo){
+  var canvas = document.getElementById('replacePreviewCanvas');
+  var box = document.getElementById('replacePreviewBox');
+  if(!canvas || !geo) return;
+  if(box) box.style.display = '';
+  replacePreviewDispose();
+  var w = canvas.clientWidth || 230, h = canvas.clientHeight || 190;
+  replacePreviewRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  replacePreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  replacePreviewRenderer.setSize(w, h, false);
+  replacePreviewScene = new THREE.Scene();
+  replacePreviewScene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  var key = new THREE.DirectionalLight(0xffffff, 0.85); key.position.set(1, 1.2, 2);
+  replacePreviewScene.add(key);
+  var mat = new THREE.MeshPhongMaterial({ color: 0xBFD4E6, specular: 0x223344, shininess: 30, side: THREE.DoubleSide });
+  replacePreviewMesh = new THREE.Mesh(geo, mat);
+  geo.computeBoundingSphere();
+  var bs = geo.boundingSphere, rad = (bs && bs.radius) || 10;
+  if(bs) replacePreviewMesh.position.copy(bs.center).multiplyScalar(-1); // baricentro -> origine
+  replacePreviewScene.add(replacePreviewMesh);
+  replacePreviewCamera = new THREE.PerspectiveCamera(40, w / h, Math.max(rad * 0.02, 0.05), rad * 100);
+  replacePreviewCam = { theta: 0.6, phi: 1.15, rad: rad * 3.4 };
+  replacePreviewUpdateCam();
+  replacePreviewAttachInput(canvas);
+  replacePreviewRender();
+}
+function replacePreviewAttachInput(canvas){
+  var down = false, moved = false, sx = 0, sy = 0;
+  canvas._replDown = function(e){ down = true; moved = false; sx = e.clientX; sy = e.clientY; };
+  replacePreviewMoveH = function(e){
+    if(!down) return;
+    var dx = e.clientX - sx, dy = e.clientY - sy;
+    if(Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    if(replacePreviewCam){
+      replacePreviewCam.theta -= dx * 0.01;
+      replacePreviewCam.phi = Math.max(0.15, Math.min(Math.PI - 0.15, replacePreviewCam.phi - dy * 0.01));
+    }
+    sx = e.clientX; sy = e.clientY;
+    replacePreviewUpdateCam(); replacePreviewRender();
+  };
+  replacePreviewUpH = function(e){ if(down && !moved) replacePreviewPickAt(e.clientX, e.clientY); down = false; };
+  canvas.addEventListener('mousedown', canvas._replDown);
+  window.addEventListener('mousemove', replacePreviewMoveH);
+  window.addEventListener('mouseup', replacePreviewUpH);
+}
+function replacePreviewPickAt(clientX, clientY){
+  if(!replacePreviewRenderer || !replacePreviewMesh) return;
+  if(replaceSeed.phase !== 'pickMarker' || replaceSeed.markerPts.length >= REPLACE_SEED_N) return;
+  var canvas = replacePreviewRenderer.domElement;
+  var rect = canvas.getBoundingClientRect();
+  var mouse = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+  var rc = new THREE.Raycaster(); rc.setFromCamera(mouse, replacePreviewCamera);
+  var hits = rc.intersectObject(replacePreviewMesh);
+  if(!hits.length){ replaceShowStatus('Clicca sulla superficie del marker.', true); return; }
+  var local = replacePreviewMesh.worldToLocal(hits[0].point.clone()); // frame locale canonico
+  var idx = replaceSeed.markerPts.length;
+  replaceSeed.markerPts.push(local.clone());
+  var dgeo = new THREE.SphereGeometry(REPLACE_DOT_R, 14, 10);
+  var dmat = new THREE.MeshBasicMaterial({ color: REPLACE_SEED_COLORS[idx], depthTest: false, depthWrite: false });
+  var dot = new THREE.Mesh(dgeo, dmat); dot.renderOrder = 10002; dot.position.copy(local);
+  replacePreviewMesh.add(dot);   // figlio della mesh -> segue l'orbita
+  replaceSeed.markerDots.push(dot);
+  replacePreviewRender();
+  if(replaceSeed.markerPts.length >= REPLACE_SEED_N){
+    replaceSeed.phase = 'pickScan';
+    replaceShowStatus('Ora indica i 3 punti GEMELLI sulla scansione, nello stesso ordine: 1 rosso, 2 verde, 3 blu.');
+  }
+  replaceSeedUpdateUI();
+}
+function replacePreviewDispose(){
+  var canvas = document.getElementById('replacePreviewCanvas');
+  if(canvas && canvas._replDown){ canvas.removeEventListener('mousedown', canvas._replDown); canvas._replDown = null; }
+  if(replacePreviewMoveH){ window.removeEventListener('mousemove', replacePreviewMoveH); replacePreviewMoveH = null; }
+  if(replacePreviewUpH){ window.removeEventListener('mouseup', replacePreviewUpH); replacePreviewUpH = null; }
+  // i markerDots sono figli della mesh -> rimossi/disposti qui (la GEOMETRIA marker
+  // resta nella cache, NON la disposo).
+  (replaceSeed.markerDots || []).forEach(function(d){ if(d.geometry) d.geometry.dispose(); if(d.material) d.material.dispose(); });
+  replaceSeed.markerDots = [];
+  if(replacePreviewMesh){ if(replacePreviewMesh.material) replacePreviewMesh.material.dispose(); replacePreviewMesh = null; }
+  if(replacePreviewRenderer){ try { replacePreviewRenderer.dispose(); } catch(e){} replacePreviewRenderer = null; }
+  replacePreviewScene = null; replacePreviewCamera = null; replacePreviewCam = null;
+}
+
+// Azzera il seme in corso (dot anteprima + dot scansione non ancora trasferiti),
+// torna in idle e disarma il placement. Usato anche dal bottone "Ricomincia".
+function replaceSeedClear(){
+  (replaceSeed.markerDots || []).forEach(function(d){ if(d.parent) d.parent.remove(d); if(d.geometry) d.geometry.dispose(); if(d.material) d.material.dispose(); });
+  (replaceSeed.scanDots || []).forEach(function(d){ scene.remove(d); if(d.geometry) d.geometry.dispose(); if(d.material) d.material.dispose(); });
+  replaceSeed.markerPts = []; replaceSeed.scanPts = []; replaceSeed.markerDots = []; replaceSeed.scanDots = [];
+  replaceSeed.phase = 'idle';
+  replacePlacementMode = false;
+  replaceHideHoverDot();
+  if(typeof renderer !== 'undefined' && renderer && renderer.domElement) renderer.domElement.style.cursor = 'default';
+  if(replacePreviewRenderer) replacePreviewRender();
+  replaceSeedUpdateUI();
+}
+
+// Annulla l'ultimo punto della fase corrente.
+function replaceSeedUndo(){
+  if(replaceSeed.phase === 'pickScan' && replaceSeed.scanPts.length > 0){
+    replaceSeed.scanPts.pop();
+    var d = replaceSeed.scanDots.pop();
+    if(d){ scene.remove(d); if(d.geometry) d.geometry.dispose(); if(d.material) d.material.dispose(); }
+  } else if(replaceSeed.markerPts.length > 0){
+    replaceSeed.phase = 'pickMarker';
+    replaceSeed.markerPts.pop();
+    var dm = replaceSeed.markerDots.pop();
+    if(dm){ if(dm.parent) dm.parent.remove(dm); if(dm.geometry) dm.geometry.dispose(); if(dm.material) dm.material.dispose(); }
+    replacePreviewRender();
+  }
+  replaceSeedUpdateUI();
+}
+
+function replaceSeedUpdateUI(){
+  var c = document.getElementById('replaceSeedCounter');
+  if(!c) return;
+  if(replaceSeed.phase === 'pickMarker') c.textContent = 'Punti sul marker: ' + replaceSeed.markerPts.length + '/3';
+  else if(replaceSeed.phase === 'pickScan') c.textContent = 'Punti sulla scansione: ' + replaceSeed.scanPts.length + '/3';
+  else c.textContent = '';
 }
 
 // --- FETCH /api/rit/* (Bearer da localStorage, pattern /api/place-mua) ---
@@ -15610,11 +15772,23 @@ function replacePopulateTypeSelect(detail){
 
 function replaceOnTypeChange(sel){
   replaceCurrentType = null;
-  if(!replaceCurrentDetail || sel.value === '') return;
+  replaceSeedClear();
+  if(!replaceCurrentDetail || sel.value === ''){
+    replacePreviewDispose();
+    var b0 = document.getElementById('replacePreviewBox'); if(b0) b0.style.display = 'none';
+    return;
+  }
   var ord = parseInt(sel.value, 10);
   var t = (replaceCurrentDetail.types || []).filter(function(x){ return x.ord === ord; })[0];
   replaceCurrentType = t || null;
-  if(t) replaceShowStatus('Type "' + (t.display || t.keyword) + '" pronto. Premi + Posiziona e clicca sullo scanbody.');
+  if(!t) return;
+  replaceShowStatus('Carico l\'anteprima del marker…');
+  replaceFetchMarkerGeo(t.marker_sha256).then(function(geo){
+    if(replaceCurrentType !== t) return;  // guardia stale: switch rapido di type -> solo l'ultimo costruisce l'anteprima
+    if(!geo){ replaceShowStatus('Impossibile caricare il marker.', true); return; }
+    replacePreviewInit(geo);
+    replaceShowStatus('Type "' + (t.display || t.keyword) + '" pronto. Premi "+ Posiziona (3 punti)" e scegli 3 punti sul marker nell\'anteprima.');
+  }).catch(function(st){ replaceShowStatus('Errore anteprima (' + st + ').', true); });
 }
 
 // Fetch del marker STL per sha256 -> geometry (riuso sostParseSTLToGeometry).
@@ -15654,19 +15828,18 @@ function replaceClearScene(){
   // marker -> dispose sicuro.
   replacePlaced.forEach(function(p){
     if(p.group) scene.remove(p.group);
-    if(p.dotMesh){
-      scene.remove(p.dotMesh);
-      if(p.dotMesh.geometry) p.dotMesh.geometry.dispose();
-      if(p.dotMesh.material) p.dotMesh.material.dispose();
-    }
+    (p.dotMeshes || []).forEach(function(d){
+      scene.remove(d);
+      if(d.geometry) d.geometry.dispose();
+      if(d.material) d.material.dispose();
+    });
   });
   replacePlaced.length = 0;
   replaceCounter = 0;
   replacePaletteIdx = 0;
-  // 2b-1.1: nascondi anche l'hover dot (es. ricarico scansione durante il
-  // placement) -> niente dot rosso "stale" sulla nuova scena prima del prossimo
-  // mousemove. Simmetrico al cleanup dei dot per-marker sopra.
-  replaceHideHoverDot();
+  // 2b-1.2: azzera anche il seme in corso (dot scansione non ancora piazzati) +
+  // disarma il placement; nasconde l'hover dot e ripristina il cursore.
+  replaceSeedClear();
 }
 
 function replaceLoadScanToScene(geo, filename){
@@ -15702,13 +15875,19 @@ function replaceLoadScanToScene(geo, filename){
 function replaceStartPlacement(){
   if(!replaceMesh){ replaceShowStatus('Carica prima una scansione.', true); return; }
   if(!replaceCurrentType){ replaceShowStatus('Scegli prima libreria e type.', true); return; }
-  replacePlacementMode = true;
+  if(!replacePreviewRenderer){ replaceShowStatus('Anteprima del marker non pronta.', true); return; }
+  replaceSeedClear();                 // azzera eventuale seme precedente (mette phase=idle, placementMode=false)
+  replaceSeed.phase = 'pickMarker';
+  replacePlacementMode = true;        // tiene attivo il dispatch del click sul viewport (fase pickScan)
   renderer.domElement.style.cursor = 'crosshair';
-  replaceShowStatus('Clicca il centro del disco dello scanbody: il punto rosso segue il cursore e segna dove cadra\' il riferimento.');
+  replaceShowStatus('Scegli 3 punti di repere SUL MARKER nell\'anteprima (1 rosso, 2 verde, 3 blu).');
+  replaceSeedUpdateUI();
 }
 
 function replaceOnViewportClick(event){
-  if(!replacePlacementMode || !replaceMesh) return false;
+  // Collector dei punti GEMELLI sulla scansione (fase pickScan del seme 3-punti).
+  if(replaceSeed.phase !== 'pickScan' || !replaceMesh) return false;
+  if(replaceSeed.scanPts.length >= REPLACE_SEED_N) return false;
   var rect = renderer.domElement.getBoundingClientRect();
   var mouse = new THREE.Vector2(
     ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -15717,32 +15896,43 @@ function replaceOnViewportClick(event){
   var raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(mouse, camera);
   var hits = raycaster.intersectObject(replaceMesh);
-  if(hits.length > 0){
-    replacePlaceTemplate(hits[0].point, hits[0].face.normal);
-    replacePlacementMode = false;
+  if(hits.length === 0) return false;
+  var idx = replaceSeed.scanPts.length;
+  replaceSeed.scanPts.push(hits[0].point.clone());
+  replaceSeed.scanDots.push(replaceMakeDot(hits[0].point, { color: REPLACE_SEED_COLORS[idx], role: 'seed' }));
+  replaceSeedUpdateUI();
+  if(replaceSeed.scanPts.length >= REPLACE_SEED_N){
     replaceHideHoverDot();
-    renderer.domElement.style.cursor = 'default';
-    return true;
+    replacePlaceFromSeed();
   }
-  return false;
+  return true;
 }
 
-// Piazzamento di UN marker (clone semplificato di sostPlaceTemplate, senza
-// triade ne' match). Vedi RICONCILIAZIONE in testa al modulo.
-function replacePlaceTemplate(rawPoint, rawNormal){
+// Posa del marker dai 3 punti del seme (Kabsch closed-form, riuso kabsch() di
+// Misurare/ICP). SOSTITUISCE il vecchio piazzamento a click_center. Niente match
+// (= slice 2b-2). I 3 punti del marker (frame locale) sono in corrispondenza coi
+// 3 punti della scansione (mondo): kabsch -> R,t con world = R*local + t.
+function replacePlaceFromSeed(){
   var t = replaceCurrentType;
   if(!t || !t.marker_sha256){ replaceShowStatus('Type non valido.', true); return; }
-  // Asse: SOLO l'asse di findScanbodyCenter (media normali faccia piatta,
-  // radius-independent; fallback interno a rawNormal se geometria povera).
-  var fit = findScanbodyCenter(replaceMesh.geometry, rawPoint, rawNormal);
-  var A = fit.axis.clone().normalize().multiplyScalar(REPLACE_AXIS_SIGN);
-  var P = rawPoint.clone();
-  var cc = t.click_center || { x: 0, y: 0, z: 0 };
-  var clickCenterLocal = new THREE.Vector3(cc.x || 0, cc.y || 0, cc.z || 0);
-  // q: porta l'asse di inserzione locale (+Z) su A. Roll attorno ad A libero.
-  var q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), A.clone().normalize());
-  // t_pos: cosi' che (group.pos + q*click_center_local) == P.
-  var tpos = P.clone().sub(clickCenterLocal.clone().applyQuaternion(q));
+  if(replaceSeed.markerPts.length < REPLACE_SEED_N || replaceSeed.scanPts.length < REPLACE_SEED_N){
+    replaceShowStatus('Servono 3 punti sul marker e 3 sulla scansione.', true); return;
+  }
+  var A = replaceSeed.markerPts.map(function(p){ return [p.x, p.y, p.z]; }); // marker-locale
+  var B = replaceSeed.scanPts.map(function(p){ return [p.x, p.y, p.z]; });   // scansione-mondo
+  var kb = kabsch(A, B);   // world = R*local + t
+  var R = kb.R, tt = kb.t;
+  var M = new THREE.Matrix4();
+  M.set(R[0][0], R[0][1], R[0][2], tt[0],
+        R[1][0], R[1][1], R[1][2], tt[1],
+        R[2][0], R[2][1], R[2][2], tt[2],
+        0, 0, 0, 1);
+  var pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
+  M.decompose(pos, quat, scl);
+  // Snapshot del seme + trasferimento dei dot scansione al marker piazzato.
+  var seedMarker = replaceSeed.markerPts.map(function(p){ return p.clone(); });
+  var seedScan = replaceSeed.scanPts.map(function(p){ return p.clone(); });
+  var keptDots = replaceSeed.scanDots.slice();
 
   replaceFetchMarkerGeo(t.marker_sha256).then(function(geoSrc){
     if(!geoSrc){ replaceShowStatus('Impossibile caricare il marker STL.', true); return; }
@@ -15760,34 +15950,28 @@ function replacePlaceTemplate(rawPoint, rawNormal){
     mesh.name = 'replace-marker';
     var group = new THREE.Group();
     group.add(mesh);
-    group.position.copy(tpos);
-    group.quaternion.copy(q);
+    group.position.copy(pos);
+    group.quaternion.copy(quat);
     group.userData.isReplace = true;
     group.userData.replaceRole = 'marker';
     group.name = id;
     scene.add(group);
 
-    // 2b-1.1: punto rosso PERSISTENTE sul punto di riferimento (= P, dove cade
-    // il click_center del CAD = il punto cliccato dall'utente).
-    var dotMesh = replaceMakeDot(P);
-
-    var aa = t.axis_asymmetric || { x: 0, y: 0, z: 0 };
     replacePlaced.push({
-      id: id, num: replaceCounter, group: group, dotMesh: dotMesh,
-      clickPoint: rawPoint.clone(), clickNormal: rawNormal.clone(),
-      position: P.clone(),               // ancora-mondo = click (= dove cade click_center)
-      axisDir: A.clone(),
+      id: id, num: replaceCounter, group: group,
+      dotMeshes: keptDots,                 // i 3 dot del seme restano come riferimento
+      seedMarkerPts: seedMarker, seedScanPts: seedScan,  // coppie corrispondenti
+      seedR: R, seedT: tt,                 // trasformata closed-form (seme per 2b-2/ICP)
+      position: pos.clone(),
+      axisDir: new THREE.Vector3(0, 0, 1).applyQuaternion(quat),
       libId: replaceCurrentLibId, typeOrd: t.ord, markerSha: t.marker_sha256,
-      // label catturata AL PIAZZAMENTO (t === replaceCurrentType, libreria giusta):
-      // la lista non deve ri-derivarla da replaceCurrentDetail (cambia col dropdown).
       typeLabel: (t.display || t.keyword || ('type ' + t.ord)),
-      clickCenterLocal: clickCenterLocal.clone(),
-      // MEMORIZZATO per la slice 2b-2 (risoluzione del roll), NON applicato ora:
-      axisAsymLocal: new THREE.Vector3(aa.x || 0, aa.y || 0, aa.z || 0),
       color: color, labelEl: null
     });
+    replaceSeed.scanDots = [];   // ceduti al marker -> replaceSeedClear non li disporra'
+    replaceSeedClear();          // azzera dot anteprima + stato seme, disarma il placement
     replaceRebuildPlacedList();
-    replaceShowStatus('Marker #' + replaceCounter + ' posizionato — allineamento GREZZO (il fine arriva con Raffina, 2b-2).');
+    replaceShowStatus('Marker #' + replaceCounter + ' posizionato dai 3 punti — allineamento GREZZO (la Raffina fine arriva con 2b-2).');
   }).catch(function(st){ replaceShowStatus('Errore fetch marker (' + st + ').', true); });
 }
 
@@ -15861,6 +16045,10 @@ function _hardResetReplace(){
       if(replaceHoverDot.material) replaceHoverDot.material.dispose();
       replaceHoverDot = null;
     }
+    // 2b-1.2: smonta l'anteprima (secondo renderer) e nascondi il box.
+    replacePreviewDispose();
+    var pbox = document.getElementById('replacePreviewBox'); if(pbox) pbox.style.display = 'none';
+    var pc = document.getElementById('replaceSeedCounter'); if(pc) pc.textContent = '';
     replaceCurrentLibId = null;
     replaceCurrentDetail = null;
     replaceCurrentType = null;
