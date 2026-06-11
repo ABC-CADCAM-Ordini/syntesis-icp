@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.36.1</title>
+<title>Syntesis-ICP - Analizzare v8.37.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2424,7 +2424,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.36.1';
+window.ANALIZZA_BUILD = '8.37.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -5109,6 +5109,9 @@ function selectWorkflow(wf){
     // visibile a sinistra come negli altri workflow. La lista #replacePlacedList
     // resta nel pannello per il flusso (posiziona->raffina->avanti).
     if(layPan)  layPan.style.display  = 'flex';
+    // 8.37.0 (review): assicura i dropdown libreria/type ABILITATI all'ingresso (potrebbero essere
+    // rimasti .disabled da un piazzamento interrotto da un cambio workflow). Il piazzamento li ri-disabilita.
+    ['replaceLibSelect','replaceSourceTypeSelect','replaceTypeSelect'].forEach(function(_id){ var _s = document.getElementById(_id); if(_s){ _s.disabled = false; _s.style.opacity = ''; _s.style.cursor = ''; } });
     // Nascondo i pulsanti toolbar degli altri workflow
     analisiBtns.forEach(function(el){ el.style.display = 'none'; });
     misurareBtns.forEach(function(el){ el.style.display = 'none'; });
@@ -11122,6 +11125,14 @@ function openComparatorV7(){
 document.addEventListener('keydown', function(e){
   if((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey){
     e.preventDefault();
+    // 8.37.0 (fix audit): Ctrl+Z workflow-aware. In replace instrada all'undo di replace
+    // (seeding -> ultimo punto; altrimenti -> ultimo impianto piazzato), non a undoLastMUA (altro workflow).
+    if(typeof analysisMode !== 'undefined' && analysisMode === 'replace'){
+      var _rph = (typeof replaceSeed !== 'undefined' && replaceSeed) ? replaceSeed.phase : 'idle';
+      if(_rph === 'pickMarker' || _rph === 'pickScan' || _rph === 'pendingConfirm'){ try { replaceSeedUndo(); } catch(_e){} }
+      else if(typeof replacePlaced !== 'undefined' && replacePlaced.length){ try { replaceDeletePlaced(replacePlaced[replacePlaced.length - 1].id); } catch(_e){} }
+      return;
+    }
     undoLastMUA();
   }
   // Tasto L per toggle pannello Livelli (solo se non si sta scrivendo in input/textarea)
@@ -15961,6 +15972,11 @@ function replaceSeedUpdateUI(){
     if(_gbox) _gbox.style.display = _placing ? '' : 'none';
     var _lp = document.getElementById('layersPanel');
     if(_lp) _lp.style.maxHeight = _placing ? 'max(120px, calc(100% - 28px - 42vh - 190px))' : 'calc(100% - 28px)';
+    // 8.37.0 (protezione seme, fix audit): durante il piazzamento DISABILITA i dropdown libreria/type
+    // -> cambiarli a meta' azzererebbe in silenzio i punti gia' cliccati (replaceSeedClear). Riabilitati a idle.
+    ['replaceLibSelect','replaceSourceTypeSelect','replaceTypeSelect'].forEach(function(_id){
+      var _s = document.getElementById(_id); if(_s){ _s.disabled = _placing; _s.style.opacity = _placing ? '0.55' : ''; _s.style.cursor = _placing ? 'not-allowed' : ''; }
+    });
   }
   var c = document.getElementById('replaceSeedCounter');
   if(c){
@@ -16042,12 +16058,19 @@ function _replaceAuthHeaders(){
   try { token = localStorage.getItem('syntesis_token') || ''; } catch(e){}
   return { 'Authorization': 'Bearer ' + token };
 }
+// 8.37.0 (fix audit): messaggio leggibile per i fetch /api/rit/* (st = HTTP status numerico o Error di rete).
+function _replaceFetchErrMsg(st){
+  if(st === 401 || st === 403) return 'sessione scaduta o non autorizzato — rifai il login.';
+  if(st === 404) return 'risorsa non trovata (libreria/marker).';
+  if(typeof st === 'number') return 'errore server (' + st + ').';
+  return 'errore di rete — controlla la connessione e riprova.';
+}
 
 function replaceFetchLibraries(){
   return fetch('/api/rit/libraries', { headers: _replaceAuthHeaders() })
     .then(function(r){ if(!r.ok) throw r.status; return r.json(); })
     .then(function(d){ replaceLibs = (d && d.libraries) || []; replacePopulateLibSelect(); })
-    .catch(function(st){ replaceShowStatus('Errore caricamento librerie (' + st + ').', true); });
+    .catch(function(st){ replaceShowStatus('Librerie: ' + _replaceFetchErrMsg(st), true); });
 }
 
 function replacePopulateLibSelect(){
@@ -16076,7 +16099,7 @@ function replaceOnLibChange(sel){
   fetch('/api/rit/libraries/' + id, { headers: _replaceAuthHeaders() })
     .then(function(r){ if(!r.ok) throw r.status; return r.json(); })
     .then(function(d){ replaceCurrentDetail = d; replacePopulateTypeOptions('replaceSourceTypeSelect', '— scegli sorgente —'); replacePopulateTypeOptions('replaceTypeSelect', '— scegli sostituto —'); })
-    .catch(function(st){ replaceShowStatus('Errore caricamento type (' + st + ').', true); });
+    .catch(function(st){ replaceShowStatus('Type: ' + _replaceFetchErrMsg(st), true); });
 }
 
 // popola un dropdown di type (sorgente o sostituto) dalla detail libreria corrente.
@@ -16130,11 +16153,14 @@ function replaceOnSourceTypeChange(sel){
     var tsel = document.getElementById('replaceTypeSelect');
     if(tsel){ tsel.value = sel.value; replaceCurrentType = replaceSourceType; replaceSubstType = replaceSourceType; }
   }
-  // anteprima del CAD SORGENTE nella finestra (visivo + fallback "Allinea a 3 punti")
+  // anteprima del CAD SORGENTE nella finestra guida (necessaria per i 3 punti sul marker)
   replaceFetchMarkerGeo(replaceSourceType.marker_sha256).then(function(geo){
     if(geo) replacePreviewInit(geo);
     replaceMaybeAutoPlace();
-  }).catch(function(){ replaceMaybeAutoPlace(); });
+  }).catch(function(st){   // 8.37.0 (fix audit): non ingoiare l'errore in silenzio (era un soft dead-end)
+    replaceShowStatus('Anteprima marker sorgente: ' + _replaceFetchErrMsg(st), true);
+    replaceMaybeAutoPlace();
+  });
 }
 
 // Fetch del marker STL per sha256 -> geometry (riuso sostParseSTLToGeometry).
@@ -16502,37 +16528,50 @@ function replacePlaceFromSeed(){
       srcTypeLabel: (_tSrc.display || _tSrc.keyword || ('type ' + _tSrc.ord))
     };
     _replaceApplyView(p);
-    // 8.36.0: RAFFINA ICP AUTO *bounded* (scelta utente) — la posa 3-punti e' gia' precisa, l'ICP
-    // la STRINGE soltanto. Riusa _replaceDoRefine (campiona p.srcGeo = SORGENTE). SICUREZZA: se la
-    // raffina deriva oltre i bound dal seed 3-punti (ICP che scappa sulla gengiva) o non produce un
-    // RMSD valido -> TORNA alla posa 3-punti (niente flottante, a differenza dell'auto rimossa).
-    var _seedPos = group.position.clone(), _seedQuat = group.quaternion.clone();
-    var _seedPosP = p.position.clone(), _seedAxisP = p.axisDir.clone();
-    var _refined = false;
-    try {
-      for(var _it = 0; _it < 3; _it++){   // 8.36.0: cap 3 (review: l'ICP interno converge gia'; il seed 3-punti e' preciso, basta ri-croppare 1-2 volte) -> meno freeze su scan densi
-        var _pB = p.position.clone(), _aB = p.axisDir.clone();
-        _replaceDoRefine(p);
-        if(p.position.distanceTo(_pB) < 1e-3 && _aB.angleTo(p.axisDir) < 2e-4) break;
-      }
-      var _drift = group.position.distanceTo(_seedPos);
-      var _rotDrift = _seedQuat.angleTo(group.quaternion) * 180 / Math.PI;
-      _refined = (typeof p.rmsd === 'number' && isFinite(p.rmsd) && _drift <= 0.8 && _rotDrift <= 8);
-      if(!_refined){   // raffina scartata -> ripristina la posa 3-punti
-        group.position.copy(_seedPos); group.quaternion.copy(_seedQuat);
-        p.position.copy(_seedPosP); p.axisDir.copy(_seedAxisP); p.rmsd = null;
-      }
-    } catch(e){
-      console.warn('[replace 3pt refine]', e);
-      group.position.copy(_seedPos); group.quaternion.copy(_seedQuat);
-      p.position.copy(_seedPosP); p.axisDir.copy(_seedAxisP); p.rmsd = null;
-    }
-    _replaceApplyView(p);
+    // 8.37.0: mostra SUBITO la posa 3-punti (madre+figlio+origine), poi lancia la Raffina ICP in un
+    // TICK SEPARATO con FEEDBACK (status "Raffino…" + cursor wait, che vengono dipinti grazie al
+    // setTimeout(0) prima del calcolo sincrono). Fix audit: prima il freeze era senza alcun feedback.
     replacePending = p;
     replaceSeed.phase = 'pendingConfirm';
     replaceSeedUpdateUI();
-    replaceShowStatus('③ Posa a 3 punti pronta' + (_refined ? (' + Raffina (RMSD ' + (Math.round(p.rmsd * 1000) / 1000) + 'mm)') : '') + ' — MADRE (verde) + FIGLIO + origine. Controlla, poi ✓ Conferma — o Ricomincia.');
-  }).catch(function(st){ replaceShowStatus('Errore fetch marker (' + st + ').', true); });
+    replaceShowStatus('Raffino la posa (ICP)…');
+    try { if(typeof renderer !== 'undefined' && renderer && renderer.domElement) renderer.domElement.style.cursor = 'wait'; } catch(e){}
+    setTimeout(function(){
+      if(replacePending !== p){   // l'utente ha gia' Confermato/Ricominciato nel frattempo -> non toccare (8.37.0 review: ripristina anche il cursore, sennò resta 'wait')
+        try { if(typeof renderer !== 'undefined' && renderer && renderer.domElement) renderer.domElement.style.cursor = 'default'; } catch(_e){}
+        return;
+      }
+      // RAFFINA ICP AUTO *bounded* — la posa 3-punti e' gia' precisa, l'ICP la STRINGE soltanto. Riusa
+      // _replaceDoRefine (campiona p.srcGeo = SORGENTE). SICUREZZA (fix audit): accetta SOLO se RMSD
+      // valido E sotto soglia clinica (0.15mm) E drift contenuto (bound stretti 0.3mm/3°). Altrimenti
+      // (ICP che scappa sulla gengiva o RMSD alto) -> TORNA alla posa 3-punti: niente flottante, mai
+      // peggiorare una posa 3-punti gia' buona.
+      var _seedPos = group.position.clone(), _seedQuat = group.quaternion.clone();
+      var _seedPosP = p.position.clone(), _seedAxisP = p.axisDir.clone();
+      var _refined = false;
+      try {
+        for(var _it = 0; _it < 3; _it++){
+          var _pB = p.position.clone(), _aB = p.axisDir.clone();
+          _replaceDoRefine(p);
+          if(p.position.distanceTo(_pB) < 1e-3 && _aB.angleTo(p.axisDir) < 2e-4) break;
+        }
+        var _drift = group.position.distanceTo(_seedPos);
+        var _rotDrift = _seedQuat.angleTo(group.quaternion) * 180 / Math.PI;
+        _refined = (typeof p.rmsd === 'number' && isFinite(p.rmsd) && p.rmsd <= 0.15 && _drift <= 0.3 && _rotDrift <= 3);
+        if(!_refined){   // raffina scartata -> ripristina la posa 3-punti
+          group.position.copy(_seedPos); group.quaternion.copy(_seedQuat);
+          p.position.copy(_seedPosP); p.axisDir.copy(_seedAxisP); p.rmsd = null;
+        }
+      } catch(e){
+        console.warn('[replace 3pt refine]', e);
+        group.position.copy(_seedPos); group.quaternion.copy(_seedQuat);
+        p.position.copy(_seedPosP); p.axisDir.copy(_seedAxisP); p.rmsd = null;
+      }
+      try { if(typeof renderer !== 'undefined' && renderer && renderer.domElement) renderer.domElement.style.cursor = 'default'; } catch(e){}
+      _replaceApplyView(p);
+      replaceShowStatus('③ Posa a 3 punti pronta' + (_refined ? (' + Raffina (RMSD ' + (Math.round(p.rmsd * 1000) / 1000) + 'mm)') : ' (raffina non applicata: tenuta la posa 3-punti)') + ' — MADRE (verde) + FIGLIO + origine. Controlla, poi ✓ Conferma — o Ricomincia.');
+    }, 0);
+  }).catch(function(st){ replaceShowStatus('Marker: ' + _replaceFetchErrMsg(st), true); });
 }
 
 // 8.35.0: DISATTIVATA (dead code, NON cancellata — rimozione in passo dedicato §3.4). Scelta
