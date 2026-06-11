@@ -4,6 +4,16 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.39.0: Replace-iT — visualizzazione (render mode + trasparenza per-oggetto)
+
+4° intervento dall'audit (autonomo). Richiesta utente: solido/reticolo/entrambi + trasparenza, "stesso metodo di Analizza". Solo blocco `replace*`; altri workflow invariati.
+
+- **Modalità render globale estesa al workflow replace**: `applyRenderModeToScene` (invocata dalla barra `#vmBar` via `onSyntesisViewModeChange`→`onEnvRenderModeChange`, e dal tab Impostazioni) ora chiama il nuovo `replaceApplyRenderMode()` → `solid|wireframe|both` raggiunge `replaceMesh` + `meshSub`/`meshSrc` di ogni impianto + anteprima `replacePending` (prima enumerava solo `scanMesh`/MUA/Misurare). `replaceApplyRenderMode` richiamato anche in coda a `replaceRebuildTree` → mesh nuove o ri-geometrizzate (load, conferma, swap figlio, taglio scansione) prendono subito la modalità.
+- **Trasparenza per-oggetto Madre/Figlio** nell'albero: due slider sub-riga (`replaceSetMarkerOpacity(num,'src'|'sub',pct)` → `mesh.material.opacity`/`transparent`; label % live `#replaceOpLbl_{src|sub}_{num}`), gemelli dello slider Scansione.
+- **Fix leak**: `_replaceDisposeGroup` dispone anche l'overlay wireframe (`userData.wireframeOverlay`) figlio della mesh in modalità "both" (geometria marker = cache condivisa, non disposta).
+
+`node --check` TUTTI OK; smoke test browser (mock): build 8.39.0, slider renderizzati, opacità+label aggiornate, wireframe su madre/figlio, overlay "both" creato e disposto senza leak. Review avversariale (2 lenti isolamento+lifecycle) → 0 finding. Bump 8.39.0, MAPPA aggiornata. Deploy canary LEGACY→BACKEND commit `89a6198` (LEGACY `3faf8ed1`, BACKEND `39f2c611`); verifica live 8.39.0 + gating anon→403 su entrambi + alias.
+
 ## 2026-06-10 — 8.38.0: Replace-iT — cambia FIGLIO dall'albero
 
 3° intervento dall'audit (autonomo). Richiesta utente: dall'albero richiamare figli differenti della stessa madre senza ri-accoppiare (condividono l'origine). Solo blocco `replace*`; altri workflow invariati.
