@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.45.0</title>
+<title>Syntesis-ICP - Analizzare v8.46.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2037,7 +2037,7 @@ if (document.readyState === 'loading') {
       <div id="replaceFlow" style="display:none;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button id="replaceBtnRefine" class="replace-only" disabled onclick="replaceRefineAll()" title="Allineamento fine ICP dei marker piazzati (parte dalla posa a 3 punti)" style="flex:1;min-width:78px;padding:7px 8px;background:#0065B3;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina</button>
         <button id="replaceBtnNext" class="replace-only" onclick="replaceNextScanbody()" style="flex:1;min-width:78px;padding:7px 8px;background:#fff;color:var(--dark);border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Avanti / nuovo</button>
-        <button id="replaceBtnFinish" class="replace-only" disabled title="Vedi il replace finale, salva/esporta i file — arriva con la slice 2b-3" style="flex:1;min-width:78px;padding:7px 8px;background:#0D1B2A;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Concludi</button>
+        <button id="replaceBtnFinish" class="replace-only" onclick="replaceExportSTL()" title="Esporta i sostituti (figli) piazzati come file STL nelle loro posizioni in scena" style="flex:1;min-width:78px;padding:7px 8px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Concludi · Esporta</button>
       </div>
 
       <div id="replaceStatus" style="display:none;font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:6px;padding:4px 6px;background:var(--light);border-radius:4px;line-height:1.45"></div>
@@ -2420,7 +2420,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.45.0';
+window.ANALIZZA_BUILD = '8.46.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-11';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16757,6 +16757,62 @@ function replaceToggleAllCuts(on){
   replaceRebuildScanGeometry(); replaceRebuildTree();
 }
 
+// ===== 8.46.0 (feedback utente "arriva il pulsante concludi e esporta file"): CONCLUDI / EXPORT STL =====
+// Esporta i SOSTITUTI (figli, p.meshSub) di tutti gli impianti piazzati, trasformati in MONDO
+// (group.matrixWorld), come unico STL binario (writeBinarySTL, gemello dell'export Sostituire).
+// La MADRE (sorgente, riferimento di match) NON viene esportata: il deliverable e' il sostituto IPD.
+function replaceExportSTL(){
+  if(!replacePlaced.length){ replaceShowStatus('Niente da esportare: piazza e conferma almeno un impianto.', true); return; }
+  var defaultBase = 'replace_sostituti';
+  var slot = document.getElementById('replaceSlotScan');
+  if(slot){ var fn = slot.querySelector('.fname'); if(fn) defaultBase = fn.textContent.replace(/\.stl$/i, '') + '_sostituti'; }
+  var inp = document.getElementById('replaceExportName'); if(inp) inp.value = defaultBase;
+  var dlg = document.getElementById('replaceExportDialog'); if(dlg) dlg.style.display = 'flex';
+  if(inp){ inp.focus(); inp.select(); }
+}
+function closeReplaceExportDialog(){ var d = document.getElementById('replaceExportDialog'); if(d) d.style.display = 'none'; }
+function confirmReplaceExport(){
+  var inp = document.getElementById('replaceExportName');
+  var base = (inp ? inp.value : '').replace(/\.stl$/i, '').replace(/[^a-zA-Z0-9._ -]+/g, '_').replace(/^[ .]+|[ .]+$/g, '').trim();
+  if(!base) base = 'replace_sostituti';
+  closeReplaceExportDialog();
+  _replaceDoExportSTL(base);
+}
+function _replaceDoExportSTL(base){
+  var tris = [], V = new THREE.Vector3(), nmat = new THREE.Matrix3();
+  replacePlaced.forEach(function(p){
+    var mesh = p.meshSub; if(!mesh || !mesh.geometry || !mesh.geometry.attributes.position) return;
+    p.group.updateMatrixWorld(true);
+    var mw = p.group.matrixWorld; nmat.getNormalMatrix(mw);
+    var pos = mesh.geometry.attributes.position.array;
+    var nrm = mesh.geometry.attributes.normal ? mesh.geometry.attributes.normal.array : null;
+    var nTri = pos.length / 9;
+    for(var i = 0; i < nTri; i++){
+      var o = i*9, vs = [];
+      for(var v = 0; v < 3; v++){ V.set(pos[o+v*3], pos[o+v*3+1], pos[o+v*3+2]).applyMatrix4(mw); vs.push([V.x, V.y, V.z]); }
+      var nx, ny, nz;
+      if(nrm){
+        var N = new THREE.Vector3((nrm[o]+nrm[o+3]+nrm[o+6])/3, (nrm[o+1]+nrm[o+4]+nrm[o+7])/3, (nrm[o+2]+nrm[o+5]+nrm[o+8])/3).applyMatrix3(nmat).normalize();
+        nx = N.x; ny = N.y; nz = N.z;
+      } else {
+        var ax = vs[1][0]-vs[0][0], ay = vs[1][1]-vs[0][1], az = vs[1][2]-vs[0][2];
+        var bx = vs[2][0]-vs[0][0], by = vs[2][1]-vs[0][1], bz = vs[2][2]-vs[0][2];
+        var cx = ay*bz-az*by, cy = az*bx-ax*bz, cz = ax*by-ay*bx, L = Math.sqrt(cx*cx+cy*cy+cz*cz) || 1;
+        nx = cx/L; ny = cy/L; nz = cz/L;
+      }
+      tris.push({ n: [nx, ny, nz], v: vs });
+    }
+  });
+  if(!tris.length){ replaceShowStatus('Niente geometria da esportare.', true); return; }
+  try {
+    var blob = writeBinarySTL(tris, 'Syntesis-ICP Replace-iT export');
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = base + '.stl';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    replaceShowStatus('Esportati ' + replacePlaced.length + ' sostituto/i in ' + base + '.stl (' + Math.round(tris.length) + ' triangoli).');
+  } catch(e){ replaceShowStatus('Errore export STL: ' + (e && e.message ? e.message : e), true); }
+}
 function replaceRebuildTree(){
   var layerTree = document.getElementById('layerTree');
   if(!layerTree) return;
@@ -18856,6 +18912,22 @@ window.addEventListener('DOMContentLoaded',init);
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="closeSostExportNameDialog()" style="padding:6px 14px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:13px;cursor:pointer">Annulla</button>
       <button onclick="confirmSostExport()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Scarica</button>
+    </div>
+  </div>
+</div>
+
+<!-- 8.46.0: Dialog nome export STL Replace-iT (gemello #sostExportDialog) -->
+<div id="replaceExportDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+    <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Concludi · Esporta STL</div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-bottom:16px">Esporta i <b>sostituti</b> (figli) piazzati nelle loro posizioni. Nome del file; l'estensione <b>.stl</b> e' aggiunta automaticamente.</div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:18px">
+      <input type="text" id="replaceExportName" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmReplaceExport();}else if(event.key==='Escape'){event.preventDefault();closeReplaceExportDialog();}" style="flex:1;padding:8px 10px;font-family:var(--mono);font-size:13px;border:1px solid var(--border);border-radius:6px;color:var(--dark)">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--gray)">.stl</span>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="closeReplaceExportDialog()" style="padding:6px 14px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:13px;cursor:pointer">Annulla</button>
+      <button onclick="confirmReplaceExport()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Scarica</button>
     </div>
   </div>
 </div>
