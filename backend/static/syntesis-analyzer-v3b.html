@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.44.0</title>
+<title>Syntesis-ICP - Analizzare v8.45.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2420,7 +2420,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.44.0';
+window.ANALIZZA_BUILD = '8.45.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-11';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16686,13 +16686,41 @@ function replaceToggleMarkersCollapse(){ replaceTreeUI.markersCollapsed = !repla
 // replaceMesh.geometry dalla ORIGINALE escludendo i triangoli dentro i cilindri dei
 // marker con p.cutScan===true -> buco attorno allo scanbody per vederlo "seduto".
 // La geometria ORIGINALE (replaceOriginalGeo) NON viene mai toccata (seed/Raffina la usano).
-var REPLACE_CUT_RADIUS = 3.0;    // mm: buco attorno al marker (scanbody ~2mm raggio + margine)
+var REPLACE_CUT_RADIUS = 3.0;    // mm: CAP/fallback del buco. 8.45.0: il raggio reale e' ADATTIVO per marker (replaceEstimateMarkerRadius) -> taglia ~il footprint dello scanbody, non un'ampia fascia.
 var REPLACE_CUT_HALFH  = 30.0;   // mm: taglio passante ±30mm lungo l'asse
+// 8.45.0 (feedback utente: il taglio scansione tagliava troppo in orizzontale x/y): raggio del
+// buco ADATTIVO = estensione radiale (90° percentile) del FIGLIO piazzato attorno all'asse, in
+// MONDO, + piccolo margine -> taglia ~il footprint dello scanbody e poco altro, non un'ampia fascia
+// di gengiva. Cap al vecchio fisso (mai PIU' largo di prima). Fallback fisso se geometria assente.
+function replaceEstimateMarkerRadius(p){
+  var mesh = (p.meshSub) || (p.group && p.group.children && p.group.children[0]);
+  if(!mesh || !mesh.geometry || !mesh.geometry.attributes || !mesh.geometry.attributes.position) return REPLACE_CUT_RADIUS;
+  try {
+    p.group.updateMatrixWorld(true);
+    var m = p.group.matrixWorld.elements;
+    var ax = p.axisDir.clone().normalize();
+    var pos = mesh.geometry.attributes.position.array, n = pos.length / 3, rs = [];
+    for(var i = 0; i < n; i++){
+      var lx = pos[i*3], ly = pos[i*3+1], lz = pos[i*3+2];
+      var wx = m[0]*lx + m[4]*ly + m[8]*lz  + m[12];
+      var wy = m[1]*lx + m[5]*ly + m[9]*lz  + m[13];
+      var wz = m[2]*lx + m[6]*ly + m[10]*lz + m[14];
+      var dx = wx - p.position.x, dy = wy - p.position.y, dz = wz - p.position.z;
+      var axial = dx*ax.x + dy*ax.y + dz*ax.z;
+      var rx = dx - axial*ax.x, ry = dy - axial*ax.y, rz = dz - axial*ax.z;
+      rs.push(Math.sqrt(rx*rx + ry*ry + rz*rz));
+    }
+    if(rs.length < 8) return REPLACE_CUT_RADIUS;
+    rs.sort(function(a, b){ return a - b; });
+    var p90 = rs[Math.floor(rs.length * 0.90)];   // ~raggio scanbody (ignora outlier del cap)
+    return Math.min(REPLACE_CUT_RADIUS, p90 + 0.3);   // + margine; mai piu' largo del vecchio fisso
+  } catch(e){ return REPLACE_CUT_RADIUS; }
+}
 function replaceRebuildScanGeometry(){
   if(!replaceOriginalGeo || !replaceMesh) return;
   var cyls = replacePlaced.filter(function(p){ return p.cutScan === true && p.position && p.axisDir; })
-    .map(function(p){ return { cp: p.position, ax: p.axisDir.clone().normalize(),
-                               R2: REPLACE_CUT_RADIUS * REPLACE_CUT_RADIUS, halfH: REPLACE_CUT_HALFH }; });
+    .map(function(p){ var _R = replaceEstimateMarkerRadius(p); return { cp: p.position, ax: p.axisDir.clone().normalize(),
+                               R2: _R * _R, halfH: REPLACE_CUT_HALFH }; });
   if(!cyls.length){
     replaceMesh.geometry.dispose();
     replaceMesh.geometry = replaceOriginalGeo.clone();
