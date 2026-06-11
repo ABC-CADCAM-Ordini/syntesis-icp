@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.40.0</title>
+<title>Syntesis-ICP - Analizzare v8.41.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -38,7 +38,7 @@ body{
 @keyframes syntSpin{to{--synt-sa:360deg}}
 
 
-:root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Source Sans 3','Source Sans Pro',sans-serif;--mono:'Source Sans 3','Source Sans Pro',sans-serif}
+:root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--ghost:#8090A8;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Source Sans 3','Source Sans Pro',sans-serif;--mono:'Source Sans 3','Source Sans Pro',sans-serif}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100vh;display:flex;flex-direction:column;font-feature-settings:"tnum";font-variant-numeric:tabular-nums}
 .header{display:flex;align-items:center;gap:6px;padding:10px 16px;background:var(--white);border-bottom:1px solid var(--border);z-index:10;flex-shrink:0;flex-wrap:wrap;border-top-left-radius:10px;border-top-right-radius:10px}
@@ -1484,11 +1484,11 @@ if (document.readyState === 'loading') {
     <span id="replaceSeedCounter" style="font-size:10px;color:#8fb4d6;font-weight:700"></span>
     <button id="replaceSeedUndo" onclick="replaceSeedUndo()" style="display:none;margin-left:auto;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
     <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
-    <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
+    <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:var(--green);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
   </div>
   <div id="replaceViewRow" style="display:none;align-items:center;gap:10px;margin-top:6px;font-size:10px;color:#8fb4d6;flex-wrap:wrap">
     <span style="font-weight:700">Vista:</span>
-    <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="CAD MADRE (sorgente) accoppiato alla scansione dall'ICP"><input type="checkbox" id="replaceViewSrc" checked onchange="replaceSetPendingMeshVis('src',this.checked)"><span style="color:#2DBE8B;font-weight:700">Madre</span> (sorgente)</label>
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="CAD MADRE (sorgente) accoppiato alla scansione dall'ICP"><input type="checkbox" id="replaceViewSrc" checked onchange="replaceSetPendingMeshVis('src',this.checked)"><span style="color:var(--ghost);font-weight:700">Madre</span> (sorgente)</label>
     <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="CAD FIGLIO (sostituto IPD) che eredita la posa via origine condivisa"><input type="checkbox" id="replaceViewSub" checked onchange="replaceSetPendingMeshVis('sub',this.checked)"><span style="color:#9aa7b3;font-weight:700">Figlio</span> (sostituto)</label>
     <label style="display:flex;align-items:center;gap:4px;cursor:pointer;margin-left:auto"><input type="checkbox" id="replaceViewOrigin" checked onchange="replaceTogglePendingOrigin(this.checked)">origine x0/y0/z0</label>
   </div>
@@ -1992,8 +1992,8 @@ if (document.readyState === 'loading') {
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:8px;line-height:1.5">
         Carica la scansione, scegli libreria attiva e i type SORGENTE + SOSTITUTO, "+ Nuovo impianto" e clicca lo scanbody, poi "▶ Allinea (3 punti)": allinei il sorgente con 3 punti di repere e il sostituto eredita la posa.
       </div>
-      <div style="font-family:var(--mono);font-size:11px;color:#5B7A1F;background:#F2F7E6;border:1px solid #D6E4A8;border-radius:4px;padding:6px 8px;margin-bottom:10px;line-height:1.45">
-        Flusso: <b>+ Nuovo impianto</b> → clicca lo <b>scanbody</b> → <b>▶ Allinea (3 punti)</b> → <b>3 punti</b> sul marker (anteprima) + <b>3 gemelli</b> sulla scansione → <b>✓ Conferma</b> → <b>Avanti</b> per il prossimo. Vedi MADRE (verde) + FIGLIO + origine. La finestra guida è in basso a sinistra.
+      <div style="font-family:var(--mono);font-size:11px;color:var(--dark);background:var(--pearl);border:1px solid var(--border);border-radius:4px;padding:6px 8px;margin-bottom:10px;line-height:1.45">
+        Flusso: <b>+ Nuovo impianto</b> → clicca lo <b>scanbody</b> → <b>▶ Allinea (3 punti)</b> → <b>3 punti</b> sul marker (anteprima) + <b>3 gemelli</b> sulla scansione → <b>✓ Conferma</b> → <b>Avanti</b> per il prossimo. Vedi MADRE (grigio-blu) + FIGLIO + origine. La finestra guida è in basso a sinistra.
       </div>
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:4px;line-height:1.5">Scansione (STL):</div>
@@ -2021,7 +2021,7 @@ if (document.readyState === 'loading') {
 
 
       <div style="display:flex;gap:6px;margin-top:12px">
-        <button id="replaceBtnPlace" class="replace-only" onclick="replaceStartNewImplant()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Nuovo impianto</button>
+        <button id="replaceBtnPlace" class="replace-only" onclick="replaceStartNewImplant()" style="flex:1;padding:8px 10px;background:var(--green);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Nuovo impianto</button>
       </div>
 
       <!-- 2b-3b: counter / Annulla / Ricomincia / Conferma vivono nella finestra
@@ -2422,7 +2422,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.40.0';
+window.ANALIZZA_BUILD = '8.41.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-11';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16025,7 +16025,7 @@ function replaceGuideRender(){
     for(var i = 0; i < defs.length; i++){
       var on = (i + 1) === cur;
       html += '<span style="flex:1;text-align:center;padding:3px 2px;border-radius:4px;font-weight:700;' +
-              (on ? 'background:#0D9E6E;color:#fff;' : 'background:#1a2632;color:#7a8a9a;') + '">' +
+              (on ? 'background:var(--green);color:#fff;' : 'background:#1a2632;color:#7a8a9a;') + '">' +
               defs[i][0] + ' ' + defs[i][1] + '</span>';
     }
     stepsEl.innerHTML = html;
@@ -16036,7 +16036,7 @@ function replaceGuideRender(){
     var t;
     if(ph === 'pickMarker') t = '<b>① Marker</b> — clicca il punto <b>' + (replaceSeed.markerPts.length + 1) + ' di 3</b> sul <b>MARKER</b> nell\'anteprima qui sopra (ordine ' + C + '). Trascina per ruotare il marker. Scegli 3 punti ben distanti tra loro (no in linea).';
     else if(ph === 'pickScan') t = '<b>② Scansione</b> — clicca il punto <b>' + (replaceSeed.scanPts.length + 1) + ' di 3</b> <b>GEMELLO</b> sulla <b>scansione</b> (viewport grande), <b>stesso ordine</b> ' + C + ' del marker. <b>Annulla punto</b> se sbagli.';
-    else if(ph === 'pendingConfirm') t = '<b>③ Conferma</b> — posa pronta: <b>madre</b> (verde) + <b>figlio</b> + <b>origine</b>. Controlla l\'incastro, poi <b>✓ Conferma</b>. <b>Annulla punto</b> per correggere o <b>Ricomincia</b> da capo.';
+    else if(ph === 'pendingConfirm') t = '<b>③ Conferma</b> — posa pronta: <b>madre</b> (grigio-blu) + <b>figlio</b> + <b>origine</b>. Controlla l\'incastro, poi <b>✓ Conferma</b>. <b>Annulla punto</b> per correggere o <b>Ricomincia</b> da capo.';
     else t = 'Scegli i type <b>SORGENTE</b> + <b>SOSTITUTO</b>, poi <b>+ Nuovo impianto</b> per allineare con 3 punti.';
     stepEl.innerHTML = t;
   }
@@ -16422,7 +16422,7 @@ function replacePlaceFromSeed(){
   var _gen = replaceSeedGen;   // guardia anti-fantasma: se il seme cambia durante il fetch, bail
   // 8.34.1: il 3-punti costruisce la STESSA struttura MADRE+FIGLIO dell'auto (geoSrc SORGENTE +
   // geoSub SOSTITUTO nello stesso frame + terna origine) -> anche col fallback ai 3 punti vedi
-  // MADRE (verde) + FIGLIO + origine nella scena e nell'albero. La posa (posV/qFinal) viene dai
+  // MADRE (grigio-blu) + FIGLIO + origine nella scena e nell'albero. La posa (posV/qFinal) viene dai
   // 3 click (allineano il SORGENTE alla scansione); il sostituto eredita via origine condivisa.
   var _tSub = t;                                  // = replaceCurrentType (SOSTITUTO/figlio)
   var _tSrc = replaceSourceType || t;             // SORGENTE/madre
@@ -16432,7 +16432,7 @@ function replacePlaceFromSeed(){
     if(!geoSrc || !geoSub){ replaceShowStatus('Impossibile caricare gli STL sorgente/sostituto.', true); return; }
     var matSub = new THREE.MeshPhongMaterial({ color: 0x9aa7b3, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: true });
     var meshSub = new THREE.Mesh(geoSub, matSub); meshSub.name = 'replace-marker';            // FIGLIO children[0]
-    var matSrc = new THREE.MeshPhongMaterial({ color: 0x2DBE8B, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false });
+    var matSrc = new THREE.MeshPhongMaterial({ color: 0x8090A8, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false });
     var meshSrc = new THREE.Mesh(geoSrc, matSrc); meshSrc.name = 'replace-source'; meshSrc.renderOrder = 1;   // MADRE children[1]
     var group = new THREE.Group(); group.add(meshSub); group.add(meshSrc);
     var originAxes = _replaceMakeOriginAxes(3.2); group.add(originAxes);
@@ -16497,7 +16497,7 @@ function replacePlaceFromSeed(){
       }
       try { if(typeof renderer !== 'undefined' && renderer && renderer.domElement) renderer.domElement.style.cursor = 'default'; } catch(e){}
       _replaceApplyView(p);
-      replaceShowStatus('③ Posa a 3 punti pronta' + (_refined ? (' + Raffina (RMSD ' + (Math.round(p.rmsd * 1000) / 1000) + 'mm)') : ' (raffina non applicata: tenuta la posa 3-punti)') + ' — MADRE (verde) + FIGLIO + origine. Controlla, poi ✓ Conferma — o Ricomincia.');
+      replaceShowStatus('③ Posa a 3 punti pronta' + (_refined ? (' + Raffina (RMSD ' + (Math.round(p.rmsd * 1000) / 1000) + 'mm)') : ' (raffina non applicata: tenuta la posa 3-punti)') + ' — MADRE (grigio-blu) + FIGLIO + origine. Controlla, poi ✓ Conferma — o Ricomincia.');
     }, 0);
   }).catch(function(st){ replaceShowStatus('Marker: ' + _replaceFetchErrMsg(st), true); });
 }
@@ -16532,7 +16532,7 @@ function replaceConfirmSeed(){
   P.group.name = P.id; P.group.userData.replaceRole = 'marker';
   var mm = P.group.children[0];   // = meshSub (FIGLIO/SOSTITUTO) = marker finale colorato
   if(mm && mm.material){ mm.material.color.setHex(P.color); mm.material.opacity = 1.0; }
-  // 8.33.0: confermato -> MADRE + FIGLIO entrambi visibili (madre verde translucida sopra),
+  // 8.33.0: confermato -> MADRE + FIGLIO entrambi visibili (madre grigio-blu translucida sopra),
   // origine OFF (sorgente/figlio/origine restano togglabili dall'albero scena).
   P.showSrc = true; P.showSub = true; P.showOrigin = false; _replaceApplyView(P);
   // 8.36.0: i 3 PUNTI di accoppiamento hanno esaurito il compito -> via dal 3D dopo la Conferma
@@ -16728,7 +16728,7 @@ function replaceRebuildTree(){
           // 8.33.0: marker AUTO-POSA = coppia MADRE (sorgente) + FIGLIO (sostituto), legati
           // dall'origine condivisa. Header = on/off dell'impianto; due sotto-voci INDIPENDENTI
           // (visibilita'+colore) + origine x0/y0/z0. Entrambi compaiono nell'albero.
-          var srcHex = (p.meshSrc.material && p.meshSrc.material.color) ? ('#' + p.meshSrc.material.color.getHexString()) : '#2dbe8b';
+          var srcHex = (p.meshSrc.material && p.meshSrc.material.color) ? ('#' + p.meshSrc.material.color.getHexString()) : '#8090a8';
           h += '<div class="tree-node" style="padding-left:18px;display:flex;align-items:center;gap:2px">' +
                '<input type="checkbox" ' + (vis ? 'checked' : '') + ' onchange="replaceTogglePlacedVisibility(' + p.num + ', this.checked)">' +
                '<span class="lbl" style="flex:1;font-weight:700">#' + p.num + ' impianto</span>' +
@@ -16744,7 +16744,7 @@ function replaceRebuildTree(){
           var _srcOp = (p.meshSrc.material && p.meshSrc.material.opacity != null) ? p.meshSrc.material.opacity : 0.5;
           h += '<div class="tree-node sub" style="padding-left:54px;padding-right:4px;margin-top:-2px;margin-bottom:2px;display:flex;align-items:center;gap:4px">' +
                '<input type="range" min="10" max="100" step="1" value="' + Math.round(_srcOp * 100) + '"' +
-               ' oninput="replaceSetMarkerOpacity(' + p.num + ',\'src\',this.value)" onclick="event.stopPropagation()" style="flex:1;accent-color:#2dbe8b;height:4px" title="Trasparenza Madre">' +
+               ' oninput="replaceSetMarkerOpacity(' + p.num + ',\'src\',this.value)" onclick="event.stopPropagation()" style="flex:1;accent-color:#8090a8;height:4px" title="Trasparenza Madre">' +
                '<span id="replaceOpLbl_src_' + p.num + '" style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:26px;text-align:right">' + Math.round(_srcOp * 100) + '%</span>' +
                '</div>';
           // 8.38.0: il FIGLIO e' un DROPDOWN -> richiami un altro IPD della stessa madre (swap geometria, stessa posa)
