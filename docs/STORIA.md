@@ -4,6 +4,15 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-10 — 8.38.0: Replace-iT — cambia FIGLIO dall'albero
+
+3° intervento dall'audit (autonomo). Richiesta utente: dall'albero richiamare figli differenti della stessa madre senza ri-accoppiare (condividono l'origine). Solo blocco `replace*`; altri workflow invariati.
+
+- La sotto-voce **Figlio** nell'albero (`replaceRebuildTree`) è un `<select>` dei type della stessa libreria/connessione (snapshot `p.libTypes` sul record in `replacePlaceFromSeed`).
+- `replaceSwapFiglio(num, ord)`: fetch nuovo STL + swap della sola `p.meshSub.geometry` alla stessa posa (madre+terna+posa invariati; origine condivisa); aggiorna typeOrd/markerSha/typeLabel; vecchia geo in cache non disposta. Niente ri-accoppiamento.
+
+Review avversariale pre-deploy (2 dim, 0 blocker, 0 major, 2 minor) → 2 fix: token anti-stale `p._swapGen` + re-check `indexOf` (race swap rapidi/durante-delete), rebuild su rami d'errore (re-sync del select). Bump 8.38.0, MAPPA aggiornata, `node --check` TUTTI OK. Deploy commit `5872931` (LEGACY `570d61f0`, BACKEND `fcc3d6fa`).
+
 ## 2026-06-10 — 8.37.0: Replace-iT — robustezza (Raffina feedback + gate + protezioni)
 
 2° intervento dall'audit (autonomo). Solo blocco `replace*`; altri workflow invariati.
