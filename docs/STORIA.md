@@ -4,6 +4,14 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.45.0: Replace-iT — "taglia scansione" a raggio adattivo
+
+Feedback utente: la "taglia scansione" tagliava troppo in orizzontale (x e y); dovrebbe tagliare le interferenze e poco altro. Solo blocco `replace*`; altri workflow invariati.
+
+Prima `replaceRebuildScanGeometry` bucava con cilindro a raggio fisso 3.0mm attorno a ogni marker (buco 6mm, oltre lo scanbody ~4mm). Ora `replaceEstimateMarkerRadius(p)`: raggio = 90° percentile dell'estensione radiale del figlio piazzato attorno all'asse (vertici in mondo) + 0.3mm, cap al vecchio 3.0 (mai più largo), fallback fisso. Scanbody ~2mm → raggio ~2.3mm (era 3.0). Profondità ±30mm invariata.
+
+Verifica browser (mock): R2.0→2.3, R2.9→cap 3.0, fallback 3.0. `node --check` 8/8 OK. Deploy canary LEGACY→BACKEND commit `4ce6234` (LEGACY `6cbdd5bf`, BACKEND `120092bc`); verifica live 8.45.0 + gating 403 su entrambi + alias.
+
 ## 2026-06-11 — 8.44.0: Replace-iT — pulizia testi pannello + finestra guida tema Albero Scena
 
 Feedback utente: ripulire i testi spiegazione nella colonna destra + finestra anteprima coi colori della finestra Albero Scena. Solo markup/CSS `replace*`; logica e altri workflow invariati.
