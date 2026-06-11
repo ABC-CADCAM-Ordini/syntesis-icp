@@ -4,6 +4,14 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.47.0: Replace-iT — Conferma = conferma + raffina + auto-taglio scansione
+
+Feedback utente: il pulsante Conferma deve attivare conferma e raffina; una volta raffinato deve attivarsi il taglia scansione sull'albero. Solo blocco `replace*`; altri workflow invariati.
+
+`replaceConfirmSeed`, dopo aver finalizzato l'impianto, lancia `replaceRefineAll` (ICP auto-loop) e — a raffina conclusa, via callback `onDone` — imposta `p.cutScan=true` + `replaceRebuildScanGeometry` + `replaceRebuildTree` (auto-taglio scansione, raggio adattivo 8.45.0). Il bottone "Raffina" separato resta. Verifica browser (mock, `_replaceDoRefine` stubbato): conferma → push immediato, cutScan true dopo onDone. `node --check` 8/8 OK. Deploy canary LEGACY→BACKEND commit `c2b7b70` (LEGACY `a2979ffd`, BACKEND `79e89ebe`).
+
+Item 3 del feedback (migliorare l'ICP) investigato ma NON rilasciato: l'ICP è point-to-point; il rifiuto-normali prototipato è no-op sul sintetico; la leva reale è point-to-plane. Non si spedisce una modifica di precisione clinica validata solo su sintetico — serve validazione su scan reale (prototipo revertato).
+
 ## 2026-06-11 — 8.46.0: Replace-iT — Concludi / export STL dei sostituti
 
 Feedback utente: "arriva il pulsante concludi e esporta file". Chiude il gap più grosso: il risultato non usciva dall'app. Solo blocco `replace*`; altri workflow invariati.
