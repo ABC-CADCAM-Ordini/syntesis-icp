@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.39.0</title>
+<title>Syntesis-ICP - Analizzare v8.40.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1484,8 +1484,6 @@ if (document.readyState === 'loading') {
     <span id="replaceSeedCounter" style="font-size:10px;color:#8fb4d6;font-weight:700"></span>
     <button id="replaceSeedUndo" onclick="replaceSeedUndo()" style="display:none;margin-left:auto;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
     <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
-    <button id="replaceBtnAlign" onclick="replaceStartThreePoint()" style="display:none;padding:5px 12px;background:#0065B3;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer" title="Allinea con 3 punti di repere: 3 sul marker (anteprima) + 3 gemelli sulla scansione">▶ Allinea (3 punti)</button>
-    <button id="replaceBtn3pt" onclick="replaceStartThreePoint()" style="display:none;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer" title="Allinea con 3 punti di repere (roll preciso)">Allinea a 3 punti</button>
     <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
   </div>
   <div id="replaceViewRow" style="display:none;align-items:center;gap:10px;margin-top:6px;font-size:10px;color:#8fb4d6;flex-wrap:wrap">
@@ -2424,7 +2422,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.39.0';
+window.ANALIZZA_BUILD = '8.40.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-11';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15576,12 +15574,11 @@ var REPLACE_SEED_N = 3;
 var REPLACE_SEED_COLORS = [0xFF3B30, 0x00C853, 0x2979FF]; // 1 rosso, 2 verde, 3 blu
 // Seme in corso: markerPts/scanPts coppie corrispondenti (per Kabsch); markerDots
 // sono figli della mesh anteprima, scanDots vivono nella scena principale.
-// 2b-3e.2 (wizard source-first): phase aggiunge 'pickSource' (indica lo scanbody da
-// sostituire) e 'chooseType'/'posed' (auto-posa). Il ramo 3-punti (pickMarker/pickScan/
-// pendingConfirm) resta INVARIATO come "Allinea a 3 punti" opzionale.
-// sourceCenter/sourceAxis = scanbody di partenza individuato (findScanbodyCenter);
-// sourceDot = sprite di evidenziazione.
-var replaceSeed = { phase: 'idle', markerPts: [], scanPts: [], scanNormals: [], markerDots: [], scanDots: [], sourceCenter: null, sourceAxis: null, sourceDot: null };
+// 8.40.0: flusso UNICO a 3 punti. Fasi: idle -> pickMarker (3 punti sul marker, anteprima)
+// -> pickScan (3 punti gemelli sulla scansione) -> pendingConfirm (anteprima posa) -> conferma.
+// (Il binario auto-ICP — pickSource/chooseType/posed + sourceCenter/sourceAxis/sourceDot — e'
+// stato rimosso in 8.40.0.)
+var replaceSeed = { phase: 'idle', markerPts: [], scanPts: [], scanNormals: [], markerDots: [], scanDots: [] };
 // 2b-1.4: marker in posa di ANTEPRIMA non ancora confermato (live preview).
 var replacePending = null;
 // 2b-1.4: token di generazione del seme. Incrementato a ogni reset/cambio: il
@@ -15668,30 +15665,6 @@ function _replaceApplyView(p){
   if(p.meshSrc) p.meshSrc.visible = (p.showSrc !== false);
   if(p.meshSub) p.meshSub.visible = (p.showSub !== false);
   if(p.originAxes) p.originAxes.visible = !!p.showOrigin;
-}
-// 8.34.0: raggio del cilindro scanbody stimato dalla geometria del CAD SORGENTE (frame locale,
-// asse = axis_occlusal u): mediana della distanza radiale dei triangoli di PARETE (|n.u|<0.35)
-// dall'asse passante per l'origine. Serve solo come raggio APPROSSIMATO per l'anello di crop di
-// sostRobustCenter (kasa a raggio libero -> tollerante). null se < 8 triangoli parete.
-function _replaceEstimateCadRadius(geo, u){
-  if(!geo || !geo.attributes || !geo.attributes.position) return null;
-  var pos = geo.attributes.position.array, nrm = geo.attributes.normal && geo.attributes.normal.array;
-  var nTri = pos.length / 9, rs = [];
-  for(var i = 0; i < nTri; i++){
-    var k = i * 9;
-    if(nrm){
-      var nx = (nrm[k]+nrm[k+3]+nrm[k+6])/3, ny = (nrm[k+1]+nrm[k+4]+nrm[k+7])/3, nz = (nrm[k+2]+nrm[k+5]+nrm[k+8])/3;
-      var nl = Math.sqrt(nx*nx + ny*ny + nz*nz);
-      if(nl > 1e-6){ if(Math.abs((nx/nl)*u.x + (ny/nl)*u.y + (nz/nl)*u.z) >= 0.35) continue; }   // scarta cap/flat
-    }
-    var cx = (pos[k]+pos[k+3]+pos[k+6])/3, cy = (pos[k+1]+pos[k+4]+pos[k+7])/3, cz = (pos[k+2]+pos[k+5]+pos[k+8])/3;
-    var axl = cx*u.x + cy*u.y + cz*u.z;
-    var rx = cx - axl*u.x, ry = cy - axl*u.y, rz = cz - axl*u.z;
-    rs.push(Math.sqrt(rx*rx + ry*ry + rz*rz));
-  }
-  if(rs.length < 8) return null;
-  rs.sort(function(a, b){ return a - b; });
-  return rs[Math.floor(rs.length / 2)];
 }
 // 8.32.0: dispone i material/texture/geometrie NON-cache di un group marker. Le mesh
 // marker (geoSub/geoSrc) hanno geometria in CACHE -> solo material; la terna origine
@@ -15955,10 +15928,6 @@ function replaceSeedClear(keepSource){
   (replaceSeed.markerDots || []).forEach(_replaceDisposeDot);
   (replaceSeed.scanDots || []).forEach(_replaceDisposeDot);
   replaceSeed.markerPts = []; replaceSeed.scanPts = []; replaceSeed.scanNormals = []; replaceSeed.markerDots = []; replaceSeed.scanDots = [];
-  if(!keepSource){   // 2b-3e.2: il source-scanbody resta durante il flusso wizard (cambio type), si pulisce solo a reset/Ricomincia
-    if(replaceSeed.sourceDot){ _replaceDisposeDot(replaceSeed.sourceDot); replaceSeed.sourceDot = null; }
-    replaceSeed.sourceCenter = null; replaceSeed.sourceAxis = null;
-  }
   replaceSeed.phase = 'idle';
   replacePlacementMode = false;
   replaceHideHoverDot();
@@ -16018,22 +15987,14 @@ function replaceSeedUpdateUI(){
   if(c){
     if(ph === 'pickMarker') c.textContent = '① Marker: ' + replaceSeed.markerPts.length + '/3';
     else if(ph === 'pickScan') c.textContent = '② Scansione: ' + replaceSeed.scanPts.length + '/3';
-    else if(ph === 'pendingConfirm' || ph === 'posed') c.textContent = '③ Anteprima posa';
-    else if(ph === 'pickSource') c.textContent = '① Indica scanbody';
-    else if(ph === 'chooseType') c.textContent = '② Scegli marker';
+    else if(ph === 'pendingConfirm') c.textContent = '③ Anteprima posa';
     else c.textContent = '';
   }
-  // 8.31.2: "▶ Allinea (ICP)" — UNICO trigger esplicito dell'auto-posa. Visibile a
-  // fase chooseType quando ci sono scanbody individuato + entrambi i type (niente piu'
-  // auto-partenza al cambio menu: l'ICP parte solo quando l'utente preme il pulsante).
-  var ba = document.getElementById('replaceBtnAlign');
-  if(ba) ba.style.display = (ph === 'chooseType' && replaceSourceType && replaceSubstType && replaceSeed.sourceCenter && replaceSeed.sourceAxis) ? '' : 'none';
-  // Conferma: posa di anteprima pendente (auto 'posed' o 3-punti 'pendingConfirm').
+  // Conferma: posa di anteprima pendente (3-punti 'pendingConfirm').
   var cb = document.getElementById('replaceBtnConfirm');
-  if(cb) cb.style.display = (ph === 'pendingConfirm' || ph === 'posed') ? '' : 'none';
-  // 8.33.0/8.34.1: riga "Vista" (checkbox Madre + Figlio + origine) durante l'ispezione —
-  // sia auto-posa ('posed') sia 3-punti ('pendingConfirm'): entrambi i rami hanno madre+figlio.
-  var _viewPh = (ph === 'posed' || ph === 'pendingConfirm');
+  if(cb) cb.style.display = (ph === 'pendingConfirm') ? '' : 'none';
+  // 8.33.0/8.34.1: riga "Vista" (checkbox Madre + Figlio + origine) durante l'ispezione (pendingConfirm).
+  var _viewPh = (ph === 'pendingConfirm');
   var vr = document.getElementById('replaceViewRow');
   if(vr) vr.style.display = (_viewPh && replacePending && replacePending.meshSrc) ? 'flex' : 'none';
   if(_viewPh && replacePending && replacePending.meshSrc){
@@ -16041,9 +16002,6 @@ function replaceSeedUpdateUI(){
     var cvb = document.getElementById('replaceViewSub'); if(cvb) cvb.checked = (replacePending.showSub !== false);
     var voc = document.getElementById('replaceViewOrigin'); if(voc) voc.checked = !!replacePending.showOrigin;
   }
-  // "Allinea a 3 punti": solo dopo l'auto-posa ('posed').
-  var b3 = document.getElementById('replaceBtn3pt');
-  if(b3) b3.style.display = (ph === 'posed') ? '' : 'none';
   // "Annulla punto": durante la raccolta dei 3 punti e in pendingConfirm (scarta la posa 3-punti).
   var bu = document.getElementById('replaceSeedUndo');
   if(bu) bu.style.display = (ph === 'pickMarker' || ph === 'pickScan' || ph === 'pendingConfirm') ? '' : 'none';
@@ -16058,8 +16016,8 @@ function replaceGuideRender(){
   var titleEl = document.getElementById('replaceGuideTitle');
   if(titleEl) titleEl.textContent = 'Impianto #' + (replacePlaced.length + 1);
   // 8.36.0: flusso a 3 punti diretto — step ① Marker (pickMarker) → ② Scansione (pickScan) →
-  // ③ Conferma (pendingConfirm). idle/pickSource→1 (fallback). chooseType/posed = rami auto (dead).
-  var cur = (ph === 'pickMarker' || ph === 'idle' || ph === 'pickSource') ? 1 : (ph === 'pickScan') ? 2 : 3;
+  // ③ Conferma (pendingConfirm). idle→1 (fallback).
+  var cur = (ph === 'pickMarker' || ph === 'idle') ? 1 : (ph === 'pickScan') ? 2 : 3;
   var stepsEl = document.getElementById('replaceGuideSteps');
   if(stepsEl){
     var defs = [['1', 'Marker'], ['2', 'Scansione'], ['3', 'Conferma']];
@@ -16079,10 +16037,6 @@ function replaceGuideRender(){
     if(ph === 'pickMarker') t = '<b>① Marker</b> — clicca il punto <b>' + (replaceSeed.markerPts.length + 1) + ' di 3</b> sul <b>MARKER</b> nell\'anteprima qui sopra (ordine ' + C + '). Trascina per ruotare il marker. Scegli 3 punti ben distanti tra loro (no in linea).';
     else if(ph === 'pickScan') t = '<b>② Scansione</b> — clicca il punto <b>' + (replaceSeed.scanPts.length + 1) + ' di 3</b> <b>GEMELLO</b> sulla <b>scansione</b> (viewport grande), <b>stesso ordine</b> ' + C + ' del marker. <b>Annulla punto</b> se sbagli.';
     else if(ph === 'pendingConfirm') t = '<b>③ Conferma</b> — posa pronta: <b>madre</b> (verde) + <b>figlio</b> + <b>origine</b>. Controlla l\'incastro, poi <b>✓ Conferma</b>. <b>Annulla punto</b> per correggere o <b>Ricomincia</b> da capo.';
-    // rami auto (dead 8.35.0/8.36.0): pickSource/chooseType/posed non raggiunti dal flusso 3-punti diretto
-    else if(ph === 'pickSource') t = '<b>①</b> Clicca lo <b>SCANBODY</b> sulla scansione.';
-    else if(ph === 'chooseType') t = '<b>②</b> Scegli i type SORGENTE e SOSTITUTO.';
-    else if(ph === 'posed') t = '<b>③</b> Posa pronta. Controlla, poi <b>✓ Conferma</b>.';
     else t = 'Scegli i type <b>SORGENTE</b> + <b>SOSTITUTO</b>, poi <b>+ Nuovo impianto</b> per allineare con 3 punti.';
     stepEl.innerHTML = t;
   }
@@ -16128,9 +16082,6 @@ function replaceOnLibChange(sel){
   replaceCurrentType = null; replaceSourceType = null; replaceSubstType = null;
   var tsel = document.getElementById('replaceTypeSelect'); if(tsel) tsel.innerHTML = '<option value="">— scegli sostituto —</option>';
   var ssel = document.getElementById('replaceSourceTypeSelect'); if(ssel) ssel.innerHTML = '<option value="">— scegli sorgente —</option>';
-  // cambiare libreria a impianto avviato scarta la posa pending e torna a 'chooseType'.
-  var hasSourceLib = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);
-  if(hasSourceLib){ replaceSeedClear(true); replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }
   if(id == null) return;
   fetch('/api/rit/libraries/' + id, { headers: _replaceAuthHeaders() })
     .then(function(r){ if(!r.ok) throw r.status; return r.json(); })
@@ -16154,19 +16105,16 @@ function replacePopulateTypeOptions(selId, placeholder){
 function replaceTypeByOrd(ord){ return (replaceCurrentDetail && replaceCurrentDetail.types || []).filter(function(x){ return x.ord === ord; })[0] || null; }
 // avvia la posa automatica sorgente->sostituto quando ci sono: scanbody individuato + entrambi i type.
 function replaceMaybeAutoPlace(){
-  // 8.31.2: NON lancia piu' l'ICP automaticamente (richiesta UX: trigger esplicito via
-  // pulsante "▶ Allinea (ICP)" -> prevedibile, niente freeze a sorpresa al cambio menu).
-  // Si limita a rinfrescare la UI: il pulsante compare quando scanbody + entrambi i type sono pronti.
+  // 8.40.0: vestigiale (era il gate dell'auto-ICP, ora rimossa). Si limita a rinfrescare la UI;
+  // mantenuta come no-op perche' chiamata dagli handler dei dropdown type (zero side-effect).
   replaceSeedUpdateUI();
 }
 
 function replaceOnTypeChange(sel){   // 2b-3f: SOSTITUTO (IPD da piazzare)
-  var hasSource = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);
-  replaceSeedClear(hasSource);          // scarta la posa pending; preserva lo scanbody individuato
-  if(hasSource){ replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }
+  replaceSeedClear();          // scarta la posa pending
   if(!replaceCurrentDetail || sel.value === ''){
     replaceCurrentType = null; replaceSubstType = null;
-    var b0 = document.getElementById('replacePreviewBox'); if(b0 && !hasSource) b0.style.display = 'none';
+    var b0 = document.getElementById('replacePreviewBox'); if(b0) b0.style.display = 'none';
     return;
   }
   var t = replaceTypeByOrd(parseInt(sel.value, 10));
@@ -16178,9 +16126,7 @@ function replaceOnTypeChange(sel){   // 2b-3f: SOSTITUTO (IPD da piazzare)
 
 // 2b-3f: SORGENTE (scanbody nella scansione) = il CAD su cui gira l'ICP.
 function replaceOnSourceTypeChange(sel){
-  var hasSource = !!(replaceSeed.sourceCenter && replaceSeed.sourceAxis);
-  replaceSeedClear(hasSource);
-  if(hasSource){ replaceSeed.phase = 'chooseType'; replaceSeedUpdateUI(); }
+  replaceSeedClear();
   if(!replaceCurrentDetail || sel.value === ''){ replaceSourceType = null; return; }
   replaceSourceType = replaceTypeByOrd(parseInt(sel.value, 10));
   if(!replaceSourceType) return;
@@ -16291,67 +16237,8 @@ function replaceStartNewImplant(){
   replaceStartThreePoint();     // -> fase pickMarker (3 punti sul marker)
 }
 
-// 8.36.0: DISATTIVATA (dead, non cancellata §3.4). Vecchio ingresso "source-first" del flusso
-// auto-ICP: pickSource (click scanbody) -> chooseType -> ▶ Allinea. Rimpiazzata da
-// replaceStartNewImplant (diretto ai 3 punti). #replaceBtnPlace e replaceNextScanbody ora la bypassano.
-function replaceStartPlacement(){
-  if(!replaceMesh){ replaceShowStatus('Carica prima una scansione.', true); return; }
-  replaceSeedClear();                 // reset del SOLO source (i type SORGENTE/SOSTITUTO restano scelti per il prossimo impianto)
-  replaceSeed.phase = 'pickSource';
-  replacePlacementMode = true;        // tiene attivo il dispatch del click sul viewport
-  renderer.domElement.style.cursor = 'crosshair';
-  var box = document.getElementById('replacePreviewBox'); if(box) box.style.display = '';
-  var bothTypes = !!(replaceSourceType && replaceSubstType);
-  replaceShowStatus('Clicca lo SCANBODY da sostituire sulla scansione' + (bothTypes ? ' (type sorgente/sostituto già scelti).' : '; poi scegli i type SORGENTE e SOSTITUTO.'));
-  replaceSeedUpdateUI();
-}
 
 function replaceOnViewportClick(event){
-  // 2b-3e.2: fase pickSource = individua lo SCANBODY da sostituire con 1 click.
-  if(replaceSeed.phase === 'pickSource' && replaceMesh){
-    var rectS = renderer.domElement.getBoundingClientRect();
-    var mouseS = new THREE.Vector2(((event.clientX - rectS.left) / rectS.width) * 2 - 1, -((event.clientY - rectS.top) / rectS.height) * 2 + 1);
-    var rcS = new THREE.Raycaster(); rcS.setFromCamera(mouseS, camera);
-    var hitsS = rcS.intersectObject(replaceMesh);
-    if(!hitsS.length) return false;
-    var ptS = hitsS[0].point.clone();
-    var nrmS = (hitsS[0].face && hitsS[0].face.normal) ? hitsS[0].face.normal.clone() : new THREE.Vector3(0, 0, 1);
-    var _sgeo = replaceOriginalGeo || replaceMesh.geometry;   // geometria ORIGINALE (mai tagliata)
-    var fitS = findScanbodyCenter(_sgeo, ptS, nrmS);
-    replaceSeed.sourceCenter = (fitS && fitS.center) ? fitS.center.clone() : ptS;
-    // ASSE col motore ROBUSTO lateral-wall (replaceEstimateCylinderAxis, 8.24.0): evita
-    // l'asse radiale / "marker coricato" quando il click cade sulla parete. Verso outward
-    // da capSum (cap occlusale); fallback all'asse cap-media di findScanbodyCenter / normale.
-    var cylS = replaceEstimateCylinderAxis(_sgeo, replaceSeed.sourceCenter.clone(), 5.0);
-    var axS;
-    if(cylS && cylS.axis){
-      axS = cylS.axis.clone().normalize();
-      var sgnS = (cylS.capSum && cylS.capSum.lengthSq() > 1e-9) ? cylS.capSum : nrmS;
-      if(axS.dot(sgnS) < 0) axS.multiplyScalar(-1);
-    } else if(fitS && fitS.axis){
-      axS = fitS.axis.clone().normalize();
-      if(axS.dot(nrmS) < 0) axS.multiplyScalar(-1);
-    } else {
-      axS = nrmS.clone().normalize();
-    }
-    replaceSeed.sourceAxis = axS;
-    // evidenzia lo scanbody individuato (sfera gialla; replaceMakeDot fa GIA' scene.add)
-    if(replaceSeed.sourceDot) _replaceDisposeDot(replaceSeed.sourceDot);
-    var sd = replaceMakeDot(replaceSeed.sourceCenter, { color: 0xFFD400, opacity: 0.95, role: 'source' });
-    sd.scale.setScalar(3);
-    replaceSeed.sourceDot = sd;
-    replaceSeed.phase = 'chooseType';
-    replacePlacementMode = false;   // step ② non-interattivo sul viewport
-    if(renderer && renderer.domElement) renderer.domElement.style.cursor = 'default';
-    replaceHideHoverDot();
-    replaceSeedUpdateUI();
-    // 8.35.0: flusso unico a 3 punti. Se i type sono gia' scelti il pulsante "▶ Allinea (3 punti)"
-    // e' gia' visibile (replaceSeedUpdateUI) -> indirizza li'; altrimenti chiedi i due type.
-    replaceShowStatus((replaceSourceType && replaceSubstType)
-      ? 'Scanbody individuato. Premi "▶ Allinea (3 punti)" nella finestra guida per allineare con 3 punti di repere.'
-      : 'Scanbody individuato. Scegli i type SORGENTE e SOSTITUTO nel pannello a destra, poi premi "▶ Allinea (3 punti)".');
-    return true;
-  }
   // Collector dei punti GEMELLI sulla scansione (fase pickScan del seme 3-punti, ramo "Allinea a 3 punti").
   if(replaceSeed.phase !== 'pickScan' || !replaceMesh) return false;
   if(replaceSeed.scanPts.length >= REPLACE_SEED_N) return false;
@@ -16615,139 +16502,11 @@ function replacePlaceFromSeed(){
   }).catch(function(st){ replaceShowStatus('Marker: ' + _replaceFetchErrMsg(st), true); });
 }
 
-// 8.35.0: DISATTIVATA (dead code, NON cancellata — rimozione in passo dedicato §3.4). Scelta
-// utente in collaudo: "togliamo l'auto e lasciamo solo i 3 punti, gestiamo solo una cosa".
-// L'auto-ICP era imprecisa su scanbody reali (CAD flottante, RMSD >0.15mm -> fallback continuo
-// ai 3-punti). Il pulsante "▶ Allinea" ora chiama replaceStartThreePoint; replaceAutoPlaceFromSource
-// + _replaceEstimateCadRadius + il gate RMSD (8.34.0) non sono piu' cablati a nessun handler.
-// RI-ABILITARLA = ricablare #replaceBtnAlign onclick a questa funzione. Conservata per un futuro
-// tentativo sulla precisione auto (vedi memoria sostituire-placement-precision-gap).
-//
-// 2b-3f: POSA sorgente->sostituto (come Sostituisci). Allinea il CAD SORGENTE alla
-// scansione con ICP full-surface (6-DOF); il group MOSTRA il SOSTITUTO, che condividendo
-// l'origine xyz eredita la posa. _replaceDoRefine campiona p.srcGeo (sorgente) ma muove il group.
-function replaceAutoPlaceFromSource(){
-  var tSub = replaceSubstType || replaceCurrentType;
-  var tSrc = replaceSourceType || tSub;
-  if(!tSrc || !tSrc.marker_sha256 || !tSub || !tSub.marker_sha256 || !replaceSeed.sourceCenter || !replaceSeed.sourceAxis){
-    replaceShowStatus('Manca lo scanbody individuato o i type sorgente/sostituto.', true); return;
-  }
-  if(replacePending){
-    if(replacePending.group){ _replaceDisposeGroup(replacePending.group); scene.remove(replacePending.group); }   // 8.32.0
-    replacePending = null;
-  }
-  var N = replaceSeed.sourceAxis.clone().normalize();
-  var ao = (replaceCurrentDetail && replaceCurrentDetail.axis_occlusal) || { x: 0, y: 0, z: 1 };
-  var u = new THREE.Vector3(ao.x || 0, ao.y || 0, ao.z || 0); if(u.lengthSq() < 1e-9) u.set(0, 0, 1); u.normalize();
-  var q0 = new THREE.Quaternion().setFromUnitVectors(u, N);
-  var posV = replaceSeed.sourceCenter.clone();
-  var _gen = replaceSeedGen;
-  replaceShowStatus('Allineo il CAD sorgente alla scansione (ICP)…');
-  Promise.all([replaceFetchMarkerGeo(tSrc.marker_sha256), replaceFetchMarkerGeo(tSub.marker_sha256)]).then(function(geos){
-    if(_gen !== replaceSeedGen) return;
-    var geoSrc = geos[0], geoSub = geos[1];
-    if(!geoSrc || !geoSub){ replaceShowStatus('Impossibile caricare gli STL sorgente/sostituto.', true); return; }
-    // 8.32.0/8.33.0: il group contiene ENTRAMBE le mesh nello STESSO FRAME (origine CAD
-    // condivisa 0,0,0): FIGLIO=SOSTITUTO (children[0], = marker finale; confirm/refine/dispose
-    // lavorano su children[0]) + MADRE=SORGENTE (children[1], accoppiata alla scansione) +
-    // terna ORIGINE x0/y0/z0 (children[2]). 8.33.0: ENTRAMBE visibili insieme; madre verde
-    // translucida (overlay del fit) sotto il figlio.
-    var matSub = new THREE.MeshPhongMaterial({ color: 0x9aa7b3, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: true });
-    var meshSub = new THREE.Mesh(geoSub, matSub); meshSub.name = 'replace-marker';
-    var matSrc = new THREE.MeshPhongMaterial({ color: 0x2DBE8B, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false });
-    var meshSrc = new THREE.Mesh(geoSrc, matSrc); meshSrc.name = 'replace-source'; meshSrc.renderOrder = 1;
-    var group = new THREE.Group(); group.add(meshSub); group.add(meshSrc);
-    var originAxes = _replaceMakeOriginAxes(3.2); group.add(originAxes);
-    group.position.copy(posV); group.quaternion.copy(q0);
-    group.userData.isReplace = true; group.userData.replaceRole = 'marker-pending';
-    scene.add(group);
-    var p = {
-      group: group, meshSub: meshSub, meshSrc: meshSrc, originAxes: originAxes,
-      showSrc: true, showSub: true, showOrigin: true,   // 8.33.0: pending = MADRE + FIGLIO insieme + origine ON
-      srcGeo: geoSrc, seedMarkerPts: [], seedScanPts: [],
-      position: posV.clone(), axisDir: N.clone(),
-      libId: replaceCurrentLibId, typeOrd: tSub.ord, markerSha: tSub.marker_sha256,
-      srcMarkerSha: tSrc.marker_sha256,
-      typeLabel: (tSub.display || tSub.keyword || ('type ' + tSub.ord)),
-      srcTypeLabel: (tSrc.display || tSrc.keyword || ('type ' + tSrc.ord))
-    };
-    _replaceApplyView(p);
-    // 8.34.0: RICENTRA il seed con sostRobustCenter (centro full-surface click-invariante ~um),
-    // raggio derivato dal CAD SORGENTE -> tutti gli 8 roll partono da un centro corretto. ROOT
-    // CAUSE del "flottante" (RMSD ~0.6mm): findScanbodyCenter al click usava il raggio DEFAULT
-    // (1T3 2.515) a prescindere dal type -> centro decentrato 0.2-0.5mm -> crop sbagliato ->
-    // ICP point-to-point aggancia la gengiva. Il kasa di sostRobustCenter e' a raggio LIBERO
-    // (tollera R approssimato) e fail-soft (copertura <140deg -> tiene il centro legacy).
-    try {
-      var _Rcad = _replaceEstimateCadRadius(geoSrc, u);
-      if(_Rcad){
-        var _rc = sostRobustCenter(replaceOriginalGeo || replaceMesh.geometry, posV, N, _Rcad);
-        if(_rc && _rc.applied && _rc.center){ posV = _rc.center.clone(); group.position.copy(posV); p.position.copy(posV); }
-      }
-    } catch(e){ console.warn('[replace robust center]', e); }
-    // ICP full-surface del SORGENTE -> 6-DOF. MULTI-START del ROLL (fix review 8.31.1):
-    // un singolo ICP da roll arbitrario q0 puo' bloccarsi su un roll SBAGLIATO con RMSD
-    // basso (corpo quasi-simmetrico). Provo ROLLS roll iniziali, tengo quello a RMSD minore,
-    // poi rifinisco. Su sorgente con feature anti-rotazione il roll giusto vince; su cilindro
-    // liscio i roll sono equivalenti (roll irrilevante).
-    var ROLLS = 8;
-    var best = { rmsd: Infinity, pos: null, quat: null }, second = Infinity;
-    for(var k = 0; k < ROLLS; k++){
-      var qk = new THREE.Quaternion().setFromAxisAngle(N, (k * 2 * Math.PI) / ROLLS).multiply(q0);
-      group.position.copy(posV); group.quaternion.copy(qk);
-      p.position.copy(posV); p.axisDir.copy(N);
-      var r = null;
-      try { _replaceDoRefine(p); r = _replaceDoRefine(p); } catch(e){ continue; }   // 2 iter di valutazione
-      if(typeof r === 'number'){
-        if(r < best.rmsd){ second = best.rmsd; best = { rmsd: r, pos: p.position.clone(), quat: group.quaternion.clone() }; }
-        else if(r < second){ second = r; }
-      }
-    }
-    if(best.quat){ group.position.copy(best.pos); group.quaternion.copy(best.quat); p.position.copy(best.pos); p.axisDir.copy(N); }
-    try {   // rifinitura del migliore fino a convergenza (traslazione + asse)
-      for(var it = 0; it < 6; it++){
-        var pB = p.position.clone(), aB = p.axisDir.clone();
-        _replaceDoRefine(p);
-        if(p.position.distanceTo(pB) < 1e-3 && aB.angleTo(p.axisDir) < 2e-4) break;
-      }
-    } catch(e){ console.warn('[replace fit source]', e); }
-    replacePending = p;
-    replaceSeed.phase = 'posed';
-    _replaceApplyView(p);   // 8.32.0: mostra il SORGENTE allineato (default) + terna origine
-    replaceSeedUpdateUI();
-    // 8.34.0: GATE RMSD — se l'allineamento auto resta scarso (oltre soglia fisica), passa
-    // AUTOMATICAMENTE ad "Allinea a 3 punti" (scelta utente) invece di presentare una posa
-    // flottante come "allineata". p.rmsd e' impostato da _replaceDoRefine (rifinitura sopra).
-    var REPLACE_AUTO_RMSD_GATE = 0.15;   // mm; atteso ~decine di um, 0.15 = soglia di sicurezza
-    // 8.34.0: FAIL-CLOSED (review avversariale): rmsd assente/non-finito = fit degenerato (crop
-    // vuoto) -> instrada anch'esso al fallback, non spacciarlo per "allineato".
-    var _rmsdOk = (typeof p.rmsd === 'number' && isFinite(p.rmsd));
-    var _rmsdTxt = _rmsdOk ? ((Math.round(p.rmsd * 1000) / 1000) + 'mm') : 'non valido';
-    if(!_rmsdOk || p.rmsd > REPLACE_AUTO_RMSD_GATE){
-      if(replacePreviewRenderer){
-        replaceShowStatus('Allineamento auto impreciso (RMSD ' + _rmsdTxt + '): passo ad "Allinea a 3 punti".', true);
-        replaceStartThreePoint();   // scarta la posa auto (p) e avvia il seeding 3-punti
-      } else {
-        replaceShowStatus('Allineamento auto impreciso (RMSD ' + _rmsdTxt + '). Usa "Allinea a 3 punti".', true);
-      }
-      return;
-    }
-    // confidenza del roll: se il migliore non e' chiaramente separato dal 2°, il roll e'
-    // ambiguo (corpo simmetrico o feature deboli) -> avvisa di usare "Allinea a 3 punti".
-    var ambiguous = !(isFinite(second) && best.rmsd > 0 && (second - best.rmsd) > 0.15 * best.rmsd);
-    replaceShowStatus('Sorgente allineato (ICP, RMSD ' + (Math.round((p.rmsd || 0) * 1000) / 1000) + 'mm). '
-      + 'Vedi MADRE (sorgente, verde) accoppiata alla scansione + FIGLIO (sostituto) che eredita la posa + origine x0/y0/z0; toggle Madre/Figlio/origine in "Vista". '
-      + (ambiguous ? 'Roll poco determinato: se l\'orientamento anti-rotazione non è giusto usa "Allinea a 3 punti". ' : '')
-      + 'Controlla, poi ✓ Conferma.');
-  }).catch(function(st){ replaceShowStatus('Errore (' + st + ').', true); });
-}
 
-// 2b-3e.2: ramo OPZIONALE "Allinea a 3 punti" (roll preciso). Riusa il seeding a 3 punti
-// collaudato: scarta la posa auto e passa a pickMarker. Il source-scanbody resta.
+// 8.40.0: avvio del seeding a 3 punti (unico flusso di posa). Azzera seme/anteprima e passa a pickMarker.
 function replaceStartThreePoint(){
   if(!replacePreviewRenderer){ replaceShowStatus('Scegli prima un type (anteprima).', true); return; }
   replaceSeedGen++;   // invalida eventuali fetch in volo
-  if(replaceSeed.sourceDot){ _replaceDisposeDot(replaceSeed.sourceDot); replaceSeed.sourceDot = null; }   // via la sfera gialla source (il 3-punti ricalcola dai propri click)
   if(replacePending){
     if(replacePending.group){ _replaceDisposeGroup(replacePending.group); scene.remove(replacePending.group); }   // 8.32.0
     replacePending = null;
