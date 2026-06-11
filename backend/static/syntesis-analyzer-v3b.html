@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.48.0</title>
+<title>Syntesis-ICP - Analizzare v8.49.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2420,7 +2420,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.48.0';
+window.ANALIZZA_BUILD = '8.49.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-11';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15562,7 +15562,7 @@ function sostUpdateLabels(){
 var replaceMesh = null;             // THREE.Mesh della scansione (separata da sostMesh)
 var replaceOriginalGeo = null;
 var replacePlacementMode = false;   // true in attesa di click
-var replacePlaced = [];             // [{id,num,group,dotMeshes,seedMarkerPts,seedScanPts,position,axisDir,libId,typeOrd,markerSha,typeLabel,color,labelEl,rmsd}]
+var replacePlaced = [];             // [{id,num,group,dotMeshes,seedMarkerPts,seedScanPts,position,axisDir,libId,typeOrd,markerSha,typeLabel,color,labelEl,rmsd,toothLabel}]
 var replaceCounter = 0;
 var replaceLibs = [];               // cache lista librerie attive
 var replaceCurrentLibId = null;
@@ -16596,6 +16596,7 @@ function replaceConfirmSeed(){
   replaceSeed.scanDots = [];
   P.dotMeshes = [];
   P.labelEl = null;
+  if(P.toothLabel == null) P.toothLabel = '';   // 8.49.0: modello allineato al commento (nome dente, default vuoto)
   replacePlaced.push(P);
   replacePending = null;
   replaceSeedClear();          // azzera dot anteprima marker + stato seme
@@ -16839,6 +16840,52 @@ function _replaceDoExportSTL(base){
     replaceShowStatus('Esportati ' + replacePlaced.length + ' sostituto/i in ' + base + '.stl (' + Math.round(tris.length) + ' triangoli).');
   } catch(e){ replaceShowStatus('Errore export STL: ' + (e && e.message ? e.message : e), true); }
 }
+// 8.49.0 — focus camera su un impianto (doppio-clic sul nome nell'albero). Inquadra il
+// FIGLIO piazzato (p.meshSub, fallback group) calcolandone la bbox IN MONDO; porta
+// controls.target sul centro e avvicina la camera mantenendo la direzione di vista
+// corrente (no salto di angolazione). Animazione ease-out ~280ms (pattern di installAltClickPivot).
+function replaceFocusImplant(num){
+  if(typeof controls === 'undefined' || !controls || typeof camera === 'undefined' || !camera) return;
+  var p = null; for(var i = 0; i < replacePlaced.length; i++){ if(replacePlaced[i].num === num){ p = replacePlaced[i]; break; } }
+  if(!p) return;
+  // Inquadra direttamente il figlio (o la madre) — non il group, che include la terna
+  // AxesHelper e gonfierebbe la bbox; la visibilità non conta (la posa è la stessa).
+  var obj = p.meshSub || p.meshSrc || p.group;
+  if(!obj) return;
+  var box; try { box = new THREE.Box3().setFromObject(obj); } catch(e){ return; }
+  if(!box || box.isEmpty()) return;
+  var center = box.getCenter(new THREE.Vector3());
+  var size = box.getSize(new THREE.Vector3());
+  var rad = Math.max(size.length() * 0.5, 0.5);
+  var dir = camera.position.clone().sub(controls.target);
+  if(dir.lengthSq() < 1e-9) dir.set(1, 0.7, 1);
+  dir.normalize();
+  var fov = (camera.fov || 28) * Math.PI / 180;
+  var dist = (rad / Math.tan(fov / 2)) * 1.7;
+  var endPos = center.clone().add(dir.multiplyScalar(dist));
+  var startTgt = controls.target.clone(), startPos = camera.position.clone();
+  var t0 = performance.now(), DUR = 280;
+  (function step(){
+    var t = (performance.now() - t0) / DUR; if(t > 1) t = 1;
+    var e = 1 - Math.pow(1 - t, 3);
+    controls.target.copy(startTgt).lerp(center, e);
+    camera.position.copy(startPos).lerp(endPos, e);
+    controls.update();
+    if(t < 1) requestAnimationFrame(step);
+  })();
+  replaceShowStatus('Inquadrato ' + (p.toothLabel ? ('dente ' + p.toothLabel) : ('impianto #' + num)) + '.');
+}
+// 8.49.0 — rinomina dentale dell'impianto (numero dente FDI, es. "26"). Vuoto = ripristina
+// "#N impianto". Input libero (≤6 char) escapato in render via _escHtml. NB: non persistito
+// (saveCase non salva ancora il workflow replace — item audit separato).
+function replaceRenameImplant(num){
+  var p = null; for(var i = 0; i < replacePlaced.length; i++){ if(replacePlaced[i].num === num){ p = replacePlaced[i]; break; } }
+  if(!p) return;
+  var v = window.prompt('Numero dente (notazione FDI, es. 26). Vuoto = "#' + num + ' impianto":', p.toothLabel || '');
+  if(v === null) return;
+  p.toothLabel = String(v).trim().slice(0, 6);
+  replaceRebuildTree();
+}
 function replaceRebuildTree(){
   var layerTree = document.getElementById('layerTree');
   if(!layerTree) return;
@@ -16871,6 +16918,8 @@ function replaceRebuildTree(){
       replacePlaced.forEach(function(p){
         var hex = '#' + ('000000' + p.color.toString(16)).slice(-6);
         var vis = p.group ? p.group.visible : true;
+        // 8.49.0: nome impianto = "#N · <dente>" se rinominato (FDI), altrimenti "#N impianto".
+        var implName = p.toothLabel ? ('#' + p.num + ' · ' + _escHtml(p.toothLabel)) : ('#' + p.num + ' impianto');
         if(p.meshSrc){
           // 8.33.0: marker AUTO-POSA = coppia MADRE (sorgente) + FIGLIO (sostituto), legati
           // dall'origine condivisa. Header = on/off dell'impianto; due sotto-voci INDIPENDENTI
@@ -16878,7 +16927,8 @@ function replaceRebuildTree(){
           var srcHex = (p.meshSrc.material && p.meshSrc.material.color) ? ('#' + p.meshSrc.material.color.getHexString()) : '#8090a8';
           h += '<div class="tree-node" style="padding-left:18px;display:flex;align-items:center;gap:2px">' +
                '<input type="checkbox" ' + (vis ? 'checked' : '') + ' onchange="replaceTogglePlacedVisibility(' + p.num + ', this.checked)">' +
-               '<span class="lbl" style="flex:1;font-weight:700">#' + p.num + ' impianto</span>' +
+               '<span class="lbl" style="flex:1;font-weight:700;cursor:pointer" ondblclick="replaceFocusImplant(' + p.num + ')" title="Doppio clic: inquadra l\'impianto">' + implName + '</span>' +
+               '<button class="del-btn" onclick="replaceRenameImplant(' + p.num + ')" title="Rinomina (numero dente)">✎</button>' +
                (p.rmsd != null ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:42px;text-align:right">' + (Math.round(p.rmsd * 1000) / 1000) + 'mm</span>' : '') +
                '<button class="del-btn" onclick="replaceDeletePlaced(\'' + p.id + '\')" title="Elimina impianto #' + p.num + '">✕</button>' +
                '</div>';
@@ -16929,7 +16979,8 @@ function replaceRebuildTree(){
           h += '<div class="tree-node" style="padding-left:18px;display:flex;align-items:center;gap:2px">' +
                '<input type="checkbox" ' + (vis ? 'checked' : '') + ' onchange="replaceTogglePlacedVisibility(' + p.num + ', this.checked)">' +
                '<input type="color" class="tree-color" value="' + hex + '" title="Colore marker #' + p.num + '" onchange="setSceneObjectColor(\'replace:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
-               '<span class="lbl" style="flex:1">#' + p.num + ' ' + (p.typeLabel || ('type ' + p.typeOrd)) + '</span>' +
+               '<span class="lbl" style="flex:1;cursor:pointer" ondblclick="replaceFocusImplant(' + p.num + ')" title="Doppio clic: inquadra l\'impianto">' + (p.toothLabel ? ('#' + p.num + ' · ' + _escHtml(p.toothLabel)) : ('#' + p.num + ' ' + (p.typeLabel || ('type ' + p.typeOrd)))) + '</span>' +
+               '<button class="del-btn" onclick="replaceRenameImplant(' + p.num + ')" title="Rinomina (numero dente)">✎</button>' +
                (p.rmsd != null ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:42px;text-align:right">' + (Math.round(p.rmsd * 1000) / 1000) + 'mm</span>' : '') +
                '<button class="del-btn" onclick="replaceDeletePlaced(\'' + p.id + '\')" title="Elimina marker #' + p.num + '">✕</button>' +
                '</div>';
