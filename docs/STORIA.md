@@ -4,6 +4,14 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-10 — 8.36.1: Replace-iT — fix sovrapposizione finestra guida ↔ Albero scena
+
+1° intervento dall'audit Replace-iT. Fix UI segnalato dall'utente: la finestra "Accoppiamento guidato" (`#replacePreviewBox`, fixed bottom-left z25) e l'"Albero scena" (`#layersPanel`, absolute top-left z8), entrambe sulla colonna sinistra del viewport, si sovrapponevano e si bloccavano a vicenda. Causa: l'albero è cresciuto dal 8.33.0 (ogni impianto = 5 righe: #N impianto + Madre + Figlio + origine + Taglia) → finisce sotto la guida che lo copre (z25>z8).
+
+Fix (`replaceSeedUpdateUI`, gated `analysisMode==='replace'`): la finestra guida vive solo durante il piazzamento attivo (`pickMarker`/`pickScan`/`pendingConfirm`) → quando `idle` si nasconde e l'albero torna pienamente cliccabile; durante il piazzamento l'albero è limitato al top (`max-height` riserva in basso lo spazio della guida) → reset altezza piena a idle e all'uscita da replace (`selectWorkflow`). Solo blocco `replace*`; altri workflow invariati.
+
+Bump v3b `<title>`+`ANALIZZA_BUILD` 8.36.1, `registry.BACKEND_VERSION` + History, `docs/MAPPA_FUNZIONALE.md`. `node --check` TUTTI OK. Deploy commit `ee629d3` (LEGACY `6b2c8b09`, BACKEND `3c4deea5`), verifica live 8.36.1 su entrambi + alias.
+
 ## 2026-06-10 — 8.36.0: Replace-iT — miglioramento flusso a 3 punti (diretto + guida + correzione + Raffina)
 
 Scelta utente: "andiamo diretti sui 3 punti, lavoriamo sul migliorare il flusso" (priorità: guida + correzione + Raffina). Solo blocco `replace*`; altri workflow invariati.
