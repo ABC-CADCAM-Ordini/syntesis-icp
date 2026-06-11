@@ -4,6 +4,17 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.43.0: Replace-iT — taglio del CAD sorgente dall'origine (slider, tieni il cap)
+
+Feedback utente live (stile Exocad): la scansione spesso non presenta tutta la superficie dello scanbody → accorciare il CAD sorgente alla sola parte esposta concentra l'accoppiamento sulla zona realmente scansionata. Solo blocco `replace*`; altri workflow invariati.
+
+- UI: slider verticale `#replaceTrimSlider` (in `#replaceTrimCol`, `writing-mode:vertical-lr`) accanto all'anteprima marker, label `#replaceTrimLbl`.
+- Motore (frame CAD): `replaceTrimGeoAlongAxis(geo, axis_occlusal, soglia)` tiene i triangoli col centroide-assiale ≥ soglia (cap), rimuove l'apicale vicino all'origine; soglia 0..95% sul range assiale (`replaceGeoAxialRange`); asse dalla libreria con flip robusto verso il baricentro.
+- Anteprima live (`replaceOnSrcTrim`): swap di `replacePreviewMesh.geometry`, marker fermo; stato `replaceSrcTrim`.
+- Integrazione fit: in `replacePlaceFromSeed` il taglio si applica a `geoSrc` → MADRE visibile + `p.srcGeo` (Raffina ICP campiona il cap); FIGLIO intero.
+
+Review avversariale (3 lenti) → 5 finding confermati, tutti fixati: flip asse verso il baricentro (axis_occlusal invertito non tiene più l'apicale), guardia non-indexed/normal, dispose geometria tagliata OWNED (flag `userData.replaceOwned`) in `_replaceDisposeGroup` (no leak su delete/abbandono pending), reset markerPts su ri-taglio. Verifiche browser (mock): range/trim corretti, asse −Z→+Z tiene il cap, owned flag, markerPts 2→0. `node --check` 8/8 OK. Deploy canary LEGACY→BACKEND commit `9798838` (LEGACY `a11f5d8b`, BACKEND `7eea2ab8`); verifica live 8.43.0 + trim function nel servito + gating 403 su entrambi + alias.
+
 ## 2026-06-11 — 8.42.0: Replace-iT — rimossa la "calamita" sui 3 clic scansione
 
 Feedback utente live: durante `pickScan` un dot rosso semi-trasparente (0.45mm r, opacity 0.55) seguiva il cursore su `replaceMesh` per mostrare dove sarebbe caduto il clic (nessuno snap) → "scomoda e grossolana, o migliora o la togliamo" → scelta: TOGLI. Solo blocco `replace*`; flusso 3-punti e altri workflow invariati.
