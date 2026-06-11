@@ -4,6 +4,14 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.46.0: Replace-iT — Concludi / export STL dei sostituti
+
+Feedback utente: "arriva il pulsante concludi e esporta file". Chiude il gap più grosso: il risultato non usciva dall'app. Solo blocco `replace*`; altri workflow invariati.
+
+`#replaceBtnFinish` "Concludi · Esporta" (era scaffolding disabilitato) → `replaceExportSTL` apre dialog nome `#replaceExportDialog`; `confirmReplaceExport` sanifica; `_replaceDoExportSTL` costruisce un unico STL binario dei sostituti (figli `p.meshSub`) di tutti gli impianti, vertici in mondo via `group.matrixWorld` (normali `getNormalMatrix` + fallback cross-product), scaricato con `writeBinarySTL`. Madre non esportata; niente flip extra (mesh già posata).
+
+Verifica browser (mock): dialog ok; 2 impianti → 260 triangoli, span x[−2,22]; normali trasformate (90°X: +Z→(0,−1,0)). Review agente: 1 "blocker" = falso positivo (getNormalMatrix muta in-place, verificato). `node --check` 8/8 OK. Deploy canary LEGACY→BACKEND commit `f44bd94` (LEGACY `bcd462a2`, BACKEND `fdf2892a`); verifica live 8.46.0 + gating 403 su entrambi + alias.
+
 ## 2026-06-11 — 8.45.0: Replace-iT — "taglia scansione" a raggio adattivo
 
 Feedback utente: la "taglia scansione" tagliava troppo in orizzontale (x e y); dovrebbe tagliare le interferenze e poco altro. Solo blocco `replace*`; altri workflow invariati.
