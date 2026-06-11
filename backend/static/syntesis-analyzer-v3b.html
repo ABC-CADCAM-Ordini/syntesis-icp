@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.43.0</title>
+<title>Syntesis-ICP - Analizzare v8.44.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1472,28 +1472,28 @@ if (document.readyState === 'loading') {
      + step + navigazione impianti). position:fixed TOP-LEVEL (come #cutViewOverlay) per evitare
      il containing-block dei pannelli. id #replacePreviewBox per compat con replacePreviewInit/
      Dispose (mostrata al type-select). I 3 punti SCANSIONE restano sul viewport grande. -->
-<div id="replacePreviewBox" style="display:none;position:fixed;left:16px;bottom:16px;width:390px;max-width:44vw;background:rgba(13,27,42,0.97);border:1px solid #2a3a4a;border-radius:10px;padding:10px 12px 12px 12px;z-index:25;box-shadow:0 10px 30px rgba(0,0,0,0.5);font-family:var(--mono);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">
+<div id="replacePreviewBox" style="display:none;position:fixed;left:16px;bottom:16px;width:390px;max-width:44vw;background:rgba(255,255,255,0.82);border:1px solid var(--border);border-radius:8px;padding:10px 12px 12px 12px;z-index:25;box-shadow:0 4px 14px rgba(0,0,0,0.10);font-family:var(--mono);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-    <span style="font-size:12px;font-weight:800;color:#fff;letter-spacing:.06em;text-transform:uppercase">Accoppiamento guidato</span>
-    <span id="replaceGuideTitle" style="margin-left:auto;font-size:11px;color:#8fb4d6;font-weight:700"></span>
+    <span style="font-size:12px;font-weight:800;color:var(--dark);letter-spacing:.06em;text-transform:uppercase">Accoppiamento guidato</span>
+    <span id="replaceGuideTitle" style="margin-left:auto;font-size:11px;color:var(--blue);font-weight:700"></span>
   </div>
   <div id="replaceGuideSteps" style="display:flex;gap:6px;margin-bottom:8px;font-size:10px"></div>
   <div style="display:flex;gap:8px;align-items:stretch">
-    <canvas id="replacePreviewCanvas" style="flex:1;min-width:0;height:min(380px,42vh);display:block;background:#0a0a0f;border:1px solid #2a3a4a;border-radius:6px;cursor:crosshair"></canvas>
+    <canvas id="replacePreviewCanvas" style="flex:1;min-width:0;height:min(380px,42vh);display:block;background:#0a0a0f;border:1px solid var(--border);border-radius:6px;cursor:crosshair"></canvas>
     <div id="replaceTrimCol" style="display:flex;flex-direction:column;align-items:center;gap:3px;width:34px;padding:2px 0" title="Accorcia il CAD SORGENTE dall'origine x0/y0/z0 lungo l'asse: tieni solo la parte (cap) esposta nella scansione, cosi' l'accoppiamento si concentra sulla zona realmente scansionata.">
-      <span style="font-size:8px;color:#8fb4d6;font-weight:700;letter-spacing:.03em;line-height:1">taglio</span>
+      <span style="font-size:8px;color:var(--gray);font-weight:700;letter-spacing:.03em;line-height:1">taglio</span>
       <input type="range" id="replaceTrimSlider" min="0" max="95" step="1" value="0" oninput="replaceOnSrcTrim(this.value)" style="writing-mode:vertical-lr;direction:rtl;width:12px;flex:1;accent-color:#8090A8;cursor:pointer" aria-label="Taglio del sorgente dall'origine (tieni il cap esposto)">
-      <span id="replaceTrimLbl" style="font-size:9px;color:#c6d4e2;font-family:var(--mono);min-height:11px;line-height:1">intero</span>
+      <span id="replaceTrimLbl" style="font-size:9px;color:var(--gray);font-family:var(--mono);min-height:11px;line-height:1">intero</span>
     </div>
   </div>
-  <div id="replaceGuideStep" style="font-size:11px;color:#c6d4e2;margin-top:8px;line-height:1.45;min-height:32px"></div>
+  <div id="replaceGuideStep" style="font-size:11px;color:var(--dark);margin-top:8px;line-height:1.45;min-height:32px"></div>
   <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-    <span id="replaceSeedCounter" style="font-size:10px;color:#8fb4d6;font-weight:700"></span>
-    <button id="replaceSeedUndo" onclick="replaceSeedUndo()" style="display:none;margin-left:auto;padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
-    <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:5px 9px;background:#1a2632;border:1px solid #2a3a4a;border-radius:5px;color:#c6d4e2;font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
+    <span id="replaceSeedCounter" style="font-size:10px;color:var(--gray);font-weight:700"></span>
+    <button id="replaceSeedUndo" onclick="replaceSeedUndo()" style="display:none;margin-left:auto;padding:5px 9px;background:#fff;border:1px solid var(--border);border-radius:5px;color:var(--dark);font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
+    <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:5px 9px;background:#fff;border:1px solid var(--border);border-radius:5px;color:var(--dark);font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
     <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:var(--green);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
   </div>
-  <div id="replaceViewRow" style="display:none;align-items:center;gap:10px;margin-top:6px;font-size:10px;color:#8fb4d6;flex-wrap:wrap">
+  <div id="replaceViewRow" style="display:none;align-items:center;gap:10px;margin-top:6px;font-size:10px;color:var(--gray);flex-wrap:wrap">
     <span style="font-weight:700">Vista:</span>
     <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="CAD MADRE (sorgente) accoppiato alla scansione dall'ICP"><input type="checkbox" id="replaceViewSrc" checked onchange="replaceSetPendingMeshVis('src',this.checked)"><span style="color:var(--ghost);font-weight:700">Madre</span> (sorgente)</label>
     <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="CAD FIGLIO (sostituto IPD) che eredita la posa via origine condivisa"><input type="checkbox" id="replaceViewSub" checked onchange="replaceSetPendingMeshVis('sub',this.checked)"><span style="color:#9aa7b3;font-weight:700">Figlio</span> (sostituto)</label>
@@ -1996,12 +1996,6 @@ if (document.readyState === 'loading') {
 
     <div class="panel-section" id="panelReplace" style="display:none">
       <div class="panel-label">Replace-iT — sostituzione da libreria</div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:8px;line-height:1.5">
-        Carica la scansione, scegli libreria attiva e i type SORGENTE + SOSTITUTO, "+ Nuovo impianto" e clicca lo scanbody, poi "▶ Allinea (3 punti)": allinei il sorgente con 3 punti di repere e il sostituto eredita la posa.
-      </div>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--dark);background:var(--pearl);border:1px solid var(--border);border-radius:4px;padding:6px 8px;margin-bottom:10px;line-height:1.45">
-        Flusso: <b>+ Nuovo impianto</b> → clicca lo <b>scanbody</b> → <b>▶ Allinea (3 punti)</b> → <b>3 punti</b> sul marker (anteprima) + <b>3 gemelli</b> sulla scansione → <b>✓ Conferma</b> → <b>Avanti</b> per il prossimo. Vedi MADRE (grigio-blu) + FIGLIO + origine. La finestra guida è in basso a sinistra.
-      </div>
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:4px;line-height:1.5">Scansione (STL):</div>
       <div class="file-slot" id="replaceSlotScan" onclick="document.getElementById('replaceInputScan').click()" style="cursor:pointer">
@@ -2034,9 +2028,6 @@ if (document.readyState === 'loading') {
       <!-- 2b-3b: counter / Annulla / Ricomincia / Conferma vivono nella finestra
            guida #replacePreviewBox (sotto), accanto al canvas marker. -->
 
-      <div id="replaceGuide" style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:8px;line-height:1.5">
-        Modello <b>sorgente→sostituto</b>: clicchi lo scanbody, poi <b>▶ Allinea (3 punti)</b> → 3 punti di repere sul marker (anteprima) + 3 gemelli sulla scansione → il CAD <b>sorgente</b> (madre) si allinea alla scansione; il <b>sostituto</b> IPD (figlio) eredita la posa via origine condivisa.
-      </div>
 
       <div id="replacePlacedList" style="display:none;margin-top:10px">
         <div id="replacePlacedItems"></div>
@@ -2429,7 +2420,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.43.0';
+window.ANALIZZA_BUILD = '8.44.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-11';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16067,7 +16058,7 @@ function replaceGuideRender(){
     for(var i = 0; i < defs.length; i++){
       var on = (i + 1) === cur;
       html += '<span style="flex:1;text-align:center;padding:3px 2px;border-radius:4px;font-weight:700;' +
-              (on ? 'background:var(--green);color:#fff;' : 'background:#1a2632;color:#7a8a9a;') + '">' +
+              (on ? 'background:var(--green);color:#fff;' : 'background:var(--pearl);color:var(--gray);') + '">' +
               defs[i][0] + ' ' + defs[i][1] + '</span>';
     }
     stepsEl.innerHTML = html;
