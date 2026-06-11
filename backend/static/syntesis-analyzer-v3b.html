@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.42.0</title>
+<title>Syntesis-ICP - Analizzare v8.43.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -1478,7 +1478,14 @@ if (document.readyState === 'loading') {
     <span id="replaceGuideTitle" style="margin-left:auto;font-size:11px;color:#8fb4d6;font-weight:700"></span>
   </div>
   <div id="replaceGuideSteps" style="display:flex;gap:6px;margin-bottom:8px;font-size:10px"></div>
-  <canvas id="replacePreviewCanvas" style="width:100%;height:min(380px,42vh);display:block;background:#0a0a0f;border:1px solid #2a3a4a;border-radius:6px;cursor:crosshair"></canvas>
+  <div style="display:flex;gap:8px;align-items:stretch">
+    <canvas id="replacePreviewCanvas" style="flex:1;min-width:0;height:min(380px,42vh);display:block;background:#0a0a0f;border:1px solid #2a3a4a;border-radius:6px;cursor:crosshair"></canvas>
+    <div id="replaceTrimCol" style="display:flex;flex-direction:column;align-items:center;gap:3px;width:34px;padding:2px 0" title="Accorcia il CAD SORGENTE dall'origine x0/y0/z0 lungo l'asse: tieni solo la parte (cap) esposta nella scansione, cosi' l'accoppiamento si concentra sulla zona realmente scansionata.">
+      <span style="font-size:8px;color:#8fb4d6;font-weight:700;letter-spacing:.03em;line-height:1">taglio</span>
+      <input type="range" id="replaceTrimSlider" min="0" max="95" step="1" value="0" oninput="replaceOnSrcTrim(this.value)" style="writing-mode:vertical-lr;direction:rtl;width:12px;flex:1;accent-color:#8090A8;cursor:pointer" aria-label="Taglio del sorgente dall'origine (tieni il cap esposto)">
+      <span id="replaceTrimLbl" style="font-size:9px;color:#c6d4e2;font-family:var(--mono);min-height:11px;line-height:1">intero</span>
+    </div>
+  </div>
   <div id="replaceGuideStep" style="font-size:11px;color:#c6d4e2;margin-top:8px;line-height:1.45;min-height:32px"></div>
   <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
     <span id="replaceSeedCounter" style="font-size:10px;color:#8fb4d6;font-weight:700"></span>
@@ -2422,7 +2429,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.42.0';
+window.ANALIZZA_BUILD = '8.43.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-11';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15679,6 +15686,9 @@ function _replaceDisposeGroup(group){
         if(_wo.material) _wo.material.dispose();
         c.userData.wireframeOverlay = null;
       }
+      // 8.43.0 (review): se la geometria e' OWNED (sorgente TAGLIATO, non la cache condivisa),
+      // disponila qui -> evita leak alla cancellazione/abbandono del marker (delete + pending).
+      if(c.geometry && c.geometry.userData && c.geometry.userData.replaceOwned){ try { c.geometry.dispose(); } catch(e){} }
       if(c.material.map) c.material.map.dispose();
       c.material.dispose();
     }
@@ -15759,6 +15769,74 @@ function replacePreviewUpdateCam(){
   replacePreviewCamera.quaternion.copy(q);
   replacePreviewCamera.updateMatrixWorld();
 }
+// 8.43.0 (F2): TAGLIO del CAD SORGENTE dall'origine x0/y0/z0 lungo l'asse occlusale. La
+// scansione spesso non presenta tutta la superficie dello scanbody: accorciare il sorgente
+// alla sola parte ESPOSTA (cap) concentra l'accoppiamento (3 punti + Raffina ICP che campiona
+// p.srcGeo) su cio' che e' davvero scansionato. Stato + helper geometrici (frame CAD).
+var replaceSrcTrim = { full: null, axis: { x: 0, y: 0, z: 1 }, lo: 0, hi: 0, threshold: 0 };
+function _replaceTrimAxisVec(axisObj){
+  var ax = new THREE.Vector3((axisObj && axisObj.x) || 0, (axisObj && axisObj.y) || 0, (axisObj && axisObj.z) || 0);
+  if(ax.lengthSq() < 1e-9) ax.set(0, 0, 1);
+  return ax.normalize();
+}
+function replaceGeoAxialRange(geo, axisObj){
+  var ax = _replaceTrimAxisVec(axisObj);
+  var pos = geo.attributes.position.array, n = pos.length / 3, lo = Infinity, hi = -Infinity;
+  for(var i = 0; i < n; i++){
+    var a = pos[i*3]*ax.x + pos[i*3+1]*ax.y + pos[i*3+2]*ax.z;
+    if(a < lo) lo = a; if(a > hi) hi = a;
+  }
+  if(!isFinite(lo)){ lo = 0; hi = 0; }
+  return { lo: lo, hi: hi };
+}
+// nuova BufferGeometry coi SOLI triangoli col centroide a coord assiale >= soglia (rimuove la
+// parte apicale vicino all'origine, tiene il cap occlusale = alta coord assiale su axis_occlusal).
+function replaceTrimGeoAlongAxis(geo, axisObj, threshold){
+  if(!geo || !geo.attributes || !geo.attributes.position) return geo;
+  if(geo.index){ try { geo = geo.toNonIndexed(); } catch(e){} }   // 8.43.0 (review): il taglio assume non-indicizzata (9 float/tri)
+  var ax = _replaceTrimAxisVec(axisObj);
+  var pos = geo.attributes.position.array;
+  var nrm = geo.attributes.normal ? geo.attributes.normal.array : null;
+  if(nrm && nrm.length < pos.length) nrm = null;   // 8.43.0 (review): normal disallineata -> ricomputa
+  var nTri = pos.length / 9, kp = [], kn = nrm ? [] : null;
+  for(var i = 0; i < nTri; i++){
+    var o = i*9;
+    var cx = (pos[o]+pos[o+3]+pos[o+6])/3, cy = (pos[o+1]+pos[o+4]+pos[o+7])/3, cz = (pos[o+2]+pos[o+5]+pos[o+8])/3;
+    if((cx*ax.x + cy*ax.y + cz*ax.z) < threshold) continue;
+    for(var v = 0; v < 9; v++){ kp.push(pos[o+v]); if(kn) kn.push(nrm[o+v]); }
+  }
+  var ng = new THREE.BufferGeometry();
+  ng.setAttribute('position', new THREE.Float32BufferAttribute(kp, 3));
+  if(kn && kn.length) ng.setAttribute('normal', new THREE.Float32BufferAttribute(kn, 3));
+  else ng.computeVertexNormals();
+  if(!ng.userData) ng.userData = {};
+  ng.userData.replaceOwned = true;   // 8.43.0 (review): geometria OWNED -> da disporre (dispose group/preview)
+  return ng;
+}
+function _replaceTrimThresholdFromSlider(val){
+  var f = Math.max(0, Math.min(95, parseFloat(val) || 0)) / 100;
+  return replaceSrcTrim.lo + f * (replaceSrcTrim.hi - replaceSrcTrim.lo);
+}
+// handler slider: ri-taglia il sorgente e aggiorna l'anteprima LIVE (il marker non si sposta:
+// l'offset baricentro resta quello del geo PIENO; sparisce solo la parte tagliata).
+function replaceOnSrcTrim(val){
+  if(!replaceSrcTrim.full || !replacePreviewMesh) return;
+  replaceSrcTrim.threshold = _replaceTrimThresholdFromSlider(val);
+  var f = parseFloat(val) || 0;
+  var ng = (f <= 0.5) ? replaceSrcTrim.full : replaceTrimGeoAlongAxis(replaceSrcTrim.full, replaceSrcTrim.axis, replaceSrcTrim.threshold);
+  if(replacePreviewMesh.geometry && replacePreviewMesh.geometry !== replaceSrcTrim.full){ try { replacePreviewMesh.geometry.dispose(); } catch(e){} }
+  replacePreviewMesh.geometry = ng;
+  // 8.43.0 (review): ri-tagliare dopo aver gia' piazzato dei punti marker li scarta (potrebbero
+  // cadere sulla parte rimossa) -> si ripicca sul nuovo cap.
+  if(replaceSeed.markerPts && replaceSeed.markerPts.length > 0){
+    (replaceSeed.markerDots || []).forEach(_replaceDisposeDot);
+    replaceSeed.markerPts = []; replaceSeed.markerDots = [];
+    replaceSeedUpdateUI();
+  }
+  replacePreviewRender();
+  var lbl = document.getElementById('replaceTrimLbl');
+  if(lbl) lbl.textContent = (f <= 0.5) ? 'intero' : ('\u2212' + Math.round(f) + '%');
+}
 function replacePreviewInit(geo){
   var canvas = document.getElementById('replacePreviewCanvas');
   var box = document.getElementById('replacePreviewBox');
@@ -15779,6 +15857,21 @@ function replacePreviewInit(geo){
   var bs = geo.boundingSphere, rad = (bs && bs.radius) || 10;
   if(bs) replacePreviewMesh.position.copy(bs.center).multiplyScalar(-1); // baricentro -> origine
   replacePreviewScene.add(replacePreviewMesh);
+  // 8.43.0 (F2): inizializza il contesto di taglio del sorgente (asse occlusale dalla libreria,
+  // fallback +Z); reset slider/etichetta a "intero". Il taglio agisce nel frame CAD (origine 0,0,0).
+  replaceSrcTrim.full = geo;
+  // 8.43.0 (review): orienta l'asse di taglio verso il CAP. axis_occlusal dovrebbe puntare
+  // occlusalmente (origine/platform -> cap); se una libreria lo desse invertito il taglio
+  // terrebbe l'apicale. Flip robusto: l'asse deve puntare verso il baricentro del marker
+  // (la massa e' dal lato del cap rispetto all'origine CAD 0,0,0).
+  var _trimAx = _replaceTrimAxisVec((replaceCurrentDetail && replaceCurrentDetail.axis_occlusal) || { x: 0, y: 0, z: 1 });
+  var _ctr = (geo.boundingSphere && geo.boundingSphere.center) ? geo.boundingSphere.center : new THREE.Vector3();
+  if(_trimAx.dot(_ctr) < 0) _trimAx.multiplyScalar(-1);
+  replaceSrcTrim.axis = { x: _trimAx.x, y: _trimAx.y, z: _trimAx.z };
+  var _ar = replaceGeoAxialRange(geo, replaceSrcTrim.axis);
+  replaceSrcTrim.lo = _ar.lo; replaceSrcTrim.hi = _ar.hi; replaceSrcTrim.threshold = _ar.lo;
+  var _ts = document.getElementById('replaceTrimSlider'); if(_ts) _ts.value = 0;
+  var _tl = document.getElementById('replaceTrimLbl'); if(_tl) _tl.textContent = 'intero';
   replacePreviewCamera = new THREE.PerspectiveCamera(40, w / h, Math.max(rad * 0.02, 0.05), rad * 100);
   replacePreviewCam = { q: new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.35, 0.6, 0, 'XYZ')), rad: rad * 3.4 };
   replacePreviewUpdateCam();
@@ -15853,7 +15946,12 @@ function replacePreviewDispose(){
   // resta nella cache, NON la disposo).
   (replaceSeed.markerDots || []).forEach(_replaceDisposeDot);
   replaceSeed.markerDots = [];
-  if(replacePreviewMesh){ if(replacePreviewMesh.material) replacePreviewMesh.material.dispose(); replacePreviewMesh = null; }
+  if(replacePreviewMesh){
+    // 8.43.0 (F2): se l'anteprima mostra una geometria TAGLIATA (owned, non la full in cache), disponila
+    if(replacePreviewMesh.geometry && replacePreviewMesh.geometry !== replaceSrcTrim.full){ try { replacePreviewMesh.geometry.dispose(); } catch(e){} }
+    if(replacePreviewMesh.material) replacePreviewMesh.material.dispose(); replacePreviewMesh = null;
+  }
+  replaceSrcTrim.full = null; replaceSrcTrim.threshold = 0;
   if(replacePreviewRenderer){ try { replacePreviewRenderer.dispose(); } catch(e){} replacePreviewRenderer = null; }
   replacePreviewScene = null; replacePreviewCamera = null; replacePreviewCam = null;
 }
@@ -16373,6 +16471,11 @@ function replacePlaceFromSeed(){
     if(_gen !== replaceSeedGen) return;   // reset/cambio workflow durante il fetch -> scarta
     var geoSrc = geos[0], geoSub = geos[1];
     if(!geoSrc || !geoSub){ replaceShowStatus('Impossibile caricare gli STL sorgente/sostituto.', true); return; }
+    // 8.43.0 (F2): se l'utente ha accorciato il sorgente (slider taglio dall'origine), usa il CAD
+    // tagliato per la MADRE visibile + per il fit (srcGeo -> _replaceDoRefine campiona il cap esposto).
+    if(typeof replaceSrcTrim !== 'undefined' && replaceSrcTrim.full && replaceSrcTrim.threshold > replaceSrcTrim.lo + 1e-6){
+      try { geoSrc = replaceTrimGeoAlongAxis(geoSrc, replaceSrcTrim.axis, replaceSrcTrim.threshold); } catch(e){}
+    }
     var matSub = new THREE.MeshPhongMaterial({ color: 0x9aa7b3, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: true });
     var meshSub = new THREE.Mesh(geoSub, matSub); meshSub.name = 'replace-marker';            // FIGLIO children[0]
     var matSrc = new THREE.MeshPhongMaterial({ color: 0x8090A8, specular: 0x222222, shininess: 40, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false });
