@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.37.0</title>
+<title>Syntesis-ICP - Analizzare v8.38.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2424,7 +2424,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.37.0';
+window.ANALIZZA_BUILD = '8.38.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15732,6 +15732,31 @@ function replaceToggleMarkerOrigin(num, on){
     if(replacePlaced[i].num === num){ replacePlaced[i].showOrigin = !!on; _replaceApplyView(replacePlaced[i]); break; }
   }
 }
+// 8.38.0: CAMBIA FIGLIO dall'albero — richiama un altro IPD della stessa MADRE (stessa libreria/
+// origine condivisa) senza ri-accoppiare: fetcha il nuovo STL e fa lo SWAP della sola geometria del
+// figlio (meshSub) alla STESSA posa. Madre, terna e posa restano. La vecchia geometria e' in cache
+// (replaceMarkerGeoCache, condivisa) -> NON va disposta.
+function replaceSwapFiglio(num, ord){
+  var p = null;
+  for(var i = 0; i < replacePlaced.length; i++){ if(replacePlaced[i].num === num){ p = replacePlaced[i]; break; } }
+  if(!p || !p.meshSub) return;
+  if(ord === p.typeOrd) return;   // nessun cambio
+  var t = (p.libTypes || []).filter(function(x){ return x.ord === ord; })[0];
+  if(!t || !t.sha){ replaceShowStatus('Type figlio non valido.', true); return; }
+  // 8.38.0 (review): token monotono per-record anti-stale -> due swap rapidi (uno in cache, uno
+  // in rete) non si scambiano l'ordine; e re-check che il marker esista ancora (swap durante delete).
+  var _g = (p._swapGen = (p._swapGen || 0) + 1);
+  replaceShowStatus('Carico il sostituto «' + t.label + '»…');
+  replaceFetchMarkerGeo(t.sha).then(function(geo){
+    if(replacePlaced.indexOf(p) < 0 || _g !== p._swapGen) return;   // marker eliminato o swap piu' recente vinto -> scarta
+    if(!geo){ replaceShowStatus('Impossibile caricare il sostituto.', true); replaceRebuildPlacedList(); return; }   // re-sync dropdown sul type vecchio
+    p.meshSub.geometry = geo;   // swap geometria figlio (stessa posa via origine condivisa)
+    p.typeOrd = ord; p.markerSha = t.sha; p.typeLabel = t.label;
+    // (la posa/asse non cambiano -> il "Taglia scansione" resta valido, niente rebuild)
+    replaceRebuildPlacedList();   // ricostruisce albero + lista pannello
+    replaceShowStatus('Impianto #' + num + ': FIGLIO cambiato in «' + t.label + '» (stessa posa, niente ri-accoppiamento).');
+  }).catch(function(st){ replaceShowStatus('Sostituto: ' + _replaceFetchErrMsg(st), true); if(replacePlaced.indexOf(p) >= 0) replaceRebuildPlacedList(); });   // re-sync dropdown su errore
+}
 
 // --- DOT marcatore del punto di riferimento (clone idioma ensurePivotMarker) ---
 // Sfera rossa piccola, MeshBasicMaterial depthTest:false -> sempre visibile sopra
@@ -16525,7 +16550,12 @@ function replacePlaceFromSeed(){
       srcMarkerSha: _tSrc.marker_sha256,
       libId: replaceCurrentLibId, typeOrd: _tSub.ord, markerSha: _tSub.marker_sha256,
       typeLabel: (_tSub.display || _tSub.keyword || ('type ' + _tSub.ord)),
-      srcTypeLabel: (_tSrc.display || _tSrc.keyword || ('type ' + _tSrc.ord))
+      srcTypeLabel: (_tSrc.display || _tSrc.keyword || ('type ' + _tSrc.ord)),
+      // 8.38.0: snapshot dei type della libreria (stessa connessione/origine) per il dropdown
+      // "cambia FIGLIO" nell'albero -> richiami un altro IPD senza ri-accoppiare.
+      libTypes: ((replaceCurrentDetail && replaceCurrentDetail.types) || []).map(function(_t){
+        return { ord: _t.ord, sha: _t.marker_sha256, eng: !!_t.is_eng, label: (_t.display || _t.keyword || ('type ' + _t.ord)) };
+      })
     };
     _replaceApplyView(p);
     // 8.37.0: mostra SUBITO la posa 3-punti (madre+figlio+origine), poi lancia la Raffina ICP in un
@@ -16906,10 +16936,23 @@ function replaceRebuildTree(){
                '<input type="color" class="tree-color" value="' + srcHex + '" title="Colore MADRE" onchange="setSceneObjectColor(\'replacesrc:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
                '<span class="lbl">Madre · ' + (p.srcTypeLabel || 'sorgente') + '</span>' +
                '</div>';
-          h += '<div class="tree-node sub" style="padding-left:36px;display:flex;align-items:center;gap:2px" title="CAD FIGLIO (sostituto IPD) che eredita la posa via origine condivisa">' +
+          // 8.38.0: il FIGLIO e' un DROPDOWN -> richiami un altro IPD della stessa madre (swap geometria, stessa posa)
+          var _figSel;
+          if(p.libTypes && p.libTypes.length){
+            var _opts = '';
+            for(var _ti = 0; _ti < p.libTypes.length; _ti++){
+              var _lt = p.libTypes[_ti];
+              _opts += '<option value="' + _lt.ord + '"' + (_lt.ord === p.typeOrd ? ' selected' : '') + '>' + _lt.label + (_lt.eng ? ' ·ENG' : ' ·Non-ENG') + '</option>';
+            }
+            _figSel = '<select title="Cambia il figlio (sostituto IPD) — stessa posa, niente ri-accoppiamento" onchange="replaceSwapFiglio(' + p.num + ', parseInt(this.value,10))" onclick="event.stopPropagation()" style="flex:1;min-width:0;font-family:var(--mono);font-size:10px;padding:1px 2px;border:1px solid var(--border);border-radius:3px;background:#fff;color:var(--dark)">' + _opts + '</select>';
+          } else {
+            _figSel = '<span class="lbl">' + (p.typeLabel || ('type ' + p.typeOrd)) + '</span>';
+          }
+          h += '<div class="tree-node sub" style="padding-left:36px;display:flex;align-items:center;gap:2px" title="CAD FIGLIO (sostituto IPD) — cambialo dal menu, stessa posa">' +
                '<input type="checkbox" ' + ((p.showSub !== false) ? 'checked' : '') + ' onchange="replaceSetMarkerMeshVis(' + p.num + ',\'sub\',this.checked)">' +
                '<input type="color" class="tree-color" value="' + hex + '" title="Colore FIGLIO" onchange="setSceneObjectColor(\'replace:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
-               '<span class="lbl">Figlio · ' + (p.typeLabel || ('type ' + p.typeOrd)) + '</span>' +
+               '<span class="lbl" style="flex:0 0 auto;color:var(--gray)">Figlio</span>' +
+               _figSel +
                '</div>';
           h += '<div class="tree-node sub" style="padding-left:36px;display:flex;align-items:center;gap:2px">' +
                '<input type="checkbox" ' + (p.showOrigin ? 'checked' : '') + ' onchange="replaceToggleMarkerOrigin(' + p.num + ',this.checked)">' +
