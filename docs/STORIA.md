@@ -4,6 +4,17 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.41.0: Replace-iT — design system finestra guida + colore Madre
+
+6° intervento dall'audit (autonomo). Solo blocco `replace*`/markup; logica e altri workflow invariati (gemello Sostituire intatto).
+
+- Colore **Madre** (CAD sorgente, overlay di riferimento) da verde `#2DBE8B` (conflitto col verde clinico "Ottimo" `#639922`) a grigio-blu ghost `#8090A8` (scelta utente). Token `--ghost:#8090A8`; 4 siti (materiale 3D, label `#replaceViewRow`, default albero, accent slider) + testi "verde"→"grigio-blu".
+- Box "Flusso" del `#panelReplace` da oliva off-palette a callout tokenizzato (`var(--dark)`/`var(--pearl)`/`var(--border)`).
+- Verde `#0D9E6E` di `#replaceBtnConfirm`/`#replaceBtnPlace`/badge passo → `var(--green)`.
+- Tema scuro della finestra guida mantenuto (gemello `#cutViewOverlay` anch'esso scuro).
+
+Verifica browser (mock): Madre rgb(128,144,168), Conferma `var(--green)`, Flusso tokenizzato (screenshot). `node --check` 8/8 OK. Deploy canary LEGACY→BACKEND commit `bb05ed5` (LEGACY `750aeb32`, BACKEND `787c2a21`); verifica live 8.41.0 + gating 403 su entrambi + alias.
+
 ## 2026-06-11 — 8.40.0: Replace-iT — cleanup dead-code auto-ICP
 
 5° intervento dall'audit (autonomo). Passo dedicato (CLAUDE.md §3.4): rimozione fisica del binario auto-ICP, disattivato dal 8.35.0 (flusso unico a 3 punti scelto dall'utente) e annotato. Solo blocco `replace*`; flusso 3-punti live e ogni altro workflow invariati. **Net −241 righe.**
