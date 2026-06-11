@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.36.0</title>
+<title>Syntesis-ICP - Analizzare v8.36.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2424,7 +2424,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.36.0';
+window.ANALIZZA_BUILD = '8.36.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-10';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -4991,6 +4991,9 @@ function selectWorkflow(wf){
     try { _setAnalyzaArtifactsVisible(true); } catch(e){}
     var panReplExit = document.getElementById('panelReplace');
     if(panReplExit) panReplExit.style.display = 'none';
+    // 8.36.1: ripristina l'altezza piena dell'albero (era limitata durante il piazzamento replace)
+    var _lpExit = document.getElementById('layersPanel');
+    if(_lpExit) _lpExit.style.maxHeight = 'calc(100% - 28px)';
   }
 
   if(wf === 'analizza'){
@@ -15945,6 +15948,20 @@ function replaceSeedUndo(){
 
 function replaceSeedUpdateUI(){
   var ph = replaceSeed.phase;
+  // 8.36.1 (fix sovrapposizione finestra guida ↔ albero scena, segnalato dall'utente):
+  // la finestra guida #replacePreviewBox vive SOLO durante il piazzamento attivo
+  // (pickMarker/pickScan/pendingConfirm); quando idle si nasconde -> l'Albero scena torna
+  // pienamente cliccabile (prima la guida z25 copriva l'albero z8 e si bloccavano a vicenda).
+  // Durante il piazzamento l'albero e' limitato al TOP (riservando in basso lo spazio della
+  // guida: ~42vh canvas + ~190px chrome) cosi' non finisce sotto la finestra; quando idle
+  // riprende l'altezza piena. Tutto gated su analysisMode==='replace' (zero impatto sugli altri).
+  if(typeof analysisMode !== 'undefined' && analysisMode === 'replace'){
+    var _placing = (ph === 'pickMarker' || ph === 'pickScan' || ph === 'pendingConfirm');
+    var _gbox = document.getElementById('replacePreviewBox');
+    if(_gbox) _gbox.style.display = _placing ? '' : 'none';
+    var _lp = document.getElementById('layersPanel');
+    if(_lp) _lp.style.maxHeight = _placing ? 'max(120px, calc(100% - 28px - 42vh - 190px))' : 'calc(100% - 28px)';
+  }
   var c = document.getElementById('replaceSeedCounter');
   if(c){
     if(ph === 'pickMarker') c.textContent = '① Marker: ' + replaceSeed.markerPts.length + '/3';
