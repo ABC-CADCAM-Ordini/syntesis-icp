@@ -4,6 +4,16 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.40.0: Replace-iT — cleanup dead-code auto-ICP
+
+5° intervento dall'audit (autonomo). Passo dedicato (CLAUDE.md §3.4): rimozione fisica del binario auto-ICP, disattivato dal 8.35.0 (flusso unico a 3 punti scelto dall'utente) e annotato. Solo blocco `replace*`; flusso 3-punti live e ogni altro workflow invariati. **Net −241 righe.**
+
+Rimossi: `replaceAutoPlaceFromSource` (~126 righe) con `REPLACE_AUTO_RMSD_GATE`; `_replaceEstimateCadRadius`; `replaceStartPlacement`; ramo `pickSource` in `replaceOnViewportClick`; fasi morte `pickSource`/`chooseType`/`posed` in `replaceSeedUpdateUI`/`replaceGuideRender`; stati `replaceSeed.sourceCenter`/`sourceAxis`/`sourceDot` + rami `hasSource`/`hasSourceLib` negli handler dropdown (sempre falsi nel live: scritti solo dal ramo pickSource); markup pulsanti `#replaceBtnAlign`/`#replaceBtn3pt`; commenti storici falsi.
+
+Conservati (whitelist condivisi/vivi): `replacePlacementMode`, `findScanbodyCenter`, `replaceEstimateCylinderAxis`, `_replaceDoRefine`, `sostRobustCenter`, `replaceStartThreePoint` (caller live = `replaceStartNewImplant`), `replaceMaybeAutoPlace` (no-op vestigiale, solo commento aggiornato).
+
+Metodo: audit multi-agente (5 lenti map + sintesi piano line-cited) → verifica manuale riga-per-riga (risolta l'ambiguità `chooseType` = fase morta) → rimozione bottom-to-top via script con assert sul contenuto → smoke test browser (mock): funzioni vive presenti, morte undefined, FSM senza throw, pulsanti assenti dal DOM → review avversariale (3 lenti) → 0 finding. `node --check` 8/8 OK. Bump 8.40.0, MAPPA aggiornata. Deploy canary LEGACY→BACKEND commit `bfa6e2d` (LEGACY `1c4ea9c0`, BACKEND `02322ab1`); verifica live 8.40.0 + dead-code assente nell'HTML servito + gating anon→403 su entrambi + alias.
+
 ## 2026-06-11 — 8.39.0: Replace-iT — visualizzazione (render mode + trasparenza per-oggetto)
 
 4° intervento dall'audit (autonomo). Richiesta utente: solido/reticolo/entrambi + trasparenza, "stesso metodo di Analizza". Solo blocco `replace*`; altri workflow invariati.
