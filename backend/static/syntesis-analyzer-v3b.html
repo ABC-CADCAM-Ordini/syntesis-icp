@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.47.0</title>
+<title>Syntesis-ICP - Analizzare v8.48.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2420,7 +2420,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.47.0';
+window.ANALIZZA_BUILD = '8.48.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-11';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -3425,6 +3425,20 @@ function onSostCenterChange(value){
     optL.style.background = (value === 'legacy') ? '#F0F9FF' : '#fff';
     optR.style.borderColor = (value === 'robust') ? 'var(--blue)' : 'var(--border)';
     optR.style.background = (value === 'robust') ? '#F0F9FF' : '#fff';
+  }
+}
+
+// 8.48.0: Motore ICP Replace-iT (syntesis_replace_icp): point-to-point (default) vs point-to-plane (beta).
+function onReplaceICPChange(value){
+  if(value !== 'p2point' && value !== 'p2plane') return;
+  try { localStorage.setItem('syntesis_replace_icp', value); } catch(e){}
+  var optP = document.getElementById('replaceICPOptPoint');
+  var optL = document.getElementById('replaceICPOptPlane');
+  if(optP && optL){
+    optP.style.borderColor = (value === 'p2point') ? 'var(--blue)' : 'var(--border)';
+    optP.style.background = (value === 'p2point') ? '#F0F9FF' : '#fff';
+    optL.style.borderColor = (value === 'p2plane') ? 'var(--blue)' : 'var(--border)';
+    optL.style.background = (value === 'p2plane') ? '#F0F9FF' : '#fff';
   }
 }
 
@@ -12767,6 +12781,10 @@ function switchSettingsTab(which){
       var savedSc = localStorage.getItem('syntesis_sost_center') || 'legacy';
       document.querySelectorAll('input[name="sostCenterOpt"]').forEach(function(r){ r.checked = (r.value === savedSc); });
       if(typeof onSostCenterChange === 'function') onSostCenterChange(savedSc);
+      // 8.48.0: Motore ICP Replace-iT (syntesis_replace_icp): riallinea radio + stile
+      var savedIcp = localStorage.getItem('syntesis_replace_icp') || 'p2point';
+      document.querySelectorAll('input[name="replaceICPOpt"]').forEach(function(r){ r.checked = (r.value === savedIcp); });
+      if(typeof onReplaceICPChange === 'function') onReplaceICPChange(savedIcp);
     } catch(e){}
     if(typeof refreshAlgoDiagnostics === 'function') refreshAlgoDiagnostics();
   }
@@ -16977,10 +16995,44 @@ function replaceNextScanbody(){
 //   4. applica il delta rigido (Rm) al group (decompose -> position/quaternion).
 // Riusa kabsch()/matMul; NON tocca Sostituisci. Match fine, NON Exocad-grade
 // garantito (floor del rumore scan) ma molto meglio del seme grezzo.
+// 8.48.0 (feedback utente "migliorare il best fit ICP madre<->scansione"): ICP POINT-TO-PLANE.
+// Il point-to-point sotto-recupera gli shift laterali su superfici lisce (sliding); il point-to-plane
+// usa le NORMALI della scansione -> vincola bene il laterale via i muri dello scanbody. + rifiuto delle
+// corrispondenze per incompatibilita' di normali (scarta gengiva/back-face). Reti di sicurezza: guardia
+// anti-passo-instabile + fallback a Kabsch se il sistema 6x6 e' singolare/degenerato; il gate RMSD del
+// bounded-refine in posa resta. Flag REPLACE_ICP_P2P per A/B (false = point-to-point legacy).
+var REPLACE_NORMAL_REJECT_COS = 0.3;   // |cos| min tra normale sorgente e scan per accettare (>72 gradi -> scarta). Attivo solo in point-to-plane.
+// 8.48.0: motore ICP Replace (syntesis_replace_icp): 'p2point' (DEFAULT = produzione attuale, Kabsch senza rifiuto) | 'p2plane' (BETA: point-to-plane + rifiuto-normali). Toggle in Impostazioni > Algoritmo. Default OFF: validazione sintetica non conclusiva (cilindro liscio = test debole), serve A/B su scan reale.
+function replaceICPRead(){ try { return localStorage.getItem('syntesis_replace_icp') === 'p2plane'; } catch(e){ return false; } }
+// Solver lineare n x n (eliminazione di Gauss + pivot parziale). Ritorna x oppure null se singolare.
+function _replaceSolveLin(A, b){
+  var n = b.length, M = [];
+  for(var i = 0; i < n; i++){ M.push(A[i].slice()); M[i].push(b[i]); }
+  for(var col = 0; col < n; col++){
+    var piv = col, mx = Math.abs(M[col][col]);
+    for(var r = col + 1; r < n; r++){ var v = Math.abs(M[r][col]); if(v > mx){ mx = v; piv = r; } }
+    if(mx < 1e-12) return null;
+    if(piv !== col){ var tmp = M[piv]; M[piv] = M[col]; M[col] = tmp; }
+    var d = M[col][col];
+    for(var r2 = 0; r2 < n; r2++){ if(r2 === col) continue; var f = M[r2][col] / d; if(f === 0) continue; for(var c = col; c <= n; c++) M[r2][c] -= f * M[col][c]; }
+  }
+  var x = []; for(var i2 = 0; i2 < n; i2++) x.push(M[i2][n] / M[i2][i2]); return x;
+}
+// matrice di rotazione 3x3 da un vettore di rotazione omega (Rodrigues); th = |omega|.
+function _replaceRotFromOmega(om, th){
+  if(th < 1e-9) return [[1,0,0],[0,1,0],[0,0,1]];
+  var kx = om[0]/th, ky = om[1]/th, kz = om[2]/th, c = Math.cos(th), s = Math.sin(th), v = 1 - c;
+  return [
+    [c + kx*kx*v,    kx*ky*v - kz*s, kx*kz*v + ky*s],
+    [ky*kx*v + kz*s, c + ky*ky*v,    ky*kz*v - kx*s],
+    [kz*kx*v - ky*s, kz*ky*v + kx*s, c + kz*kz*v]
+  ];
+}
 function _replaceDoRefine(p){
   if(!replaceMesh || !p || !p.group) return null;
   var mesh = p.group.children && p.group.children[0];
   if(!mesh || !mesh.geometry) return null;
+  var _useP2P = (typeof replaceICPRead === 'function') ? replaceICPRead() : false;   // 8.48.0: point-to-plane + rifiuto-normali solo se beta ON; default = produzione (Kabsch, no rifiuto)
   p.group.updateMatrixWorld(true);
   var m = p.group.matrixWorld.elements;
   var nmat = new THREE.Matrix3().getNormalMatrix(p.group.matrixWorld);
@@ -16996,7 +17048,7 @@ function _replaceDoRefine(p){
 
   // 1. campiona ~400 punti marker nel mondo + pesi
   var step = Math.max(1, Math.floor((nCadTri * 3) / 400));
-  var tplWorld = [], tplW = [], cen = [0, 0, 0];
+  var tplWorld = [], tplW = [], tplN = [], cen = [0, 0, 0];
   for(var ti = 0; ti < nCadTri; ti++){
     for(var vi = 0; vi < 3; vi++){
       if(((ti * 3) + vi) % step !== 0) continue;
@@ -17006,12 +17058,13 @@ function _replaceDoRefine(p){
       var wy = m[1]*lx + m[5]*ly + m[9]*lz  + m[13];
       var wz = m[2]*lx + m[6]*ly + m[10]*lz + m[14];
       tplWorld.push([wx, wy, wz]); cen[0]+=wx; cen[1]+=wy; cen[2]+=wz;
-      var w = 1.0;
+      var w = 1.0, _tn = null;
       if(cadNorm){
         var wn = new THREE.Vector3(cadNorm[o], cadNorm[o+1], cadNorm[o+2]).applyMatrix3(nmat).normalize();
         if(Math.abs(wn.x*axx + wn.y*axy + wn.z*axz) > 0.8) w = 5.0; // faccia piatta -> planarita'
+        _tn = [wn.x, wn.y, wn.z];
       }
-      tplW.push(w);
+      tplW.push(w); tplN.push(_tn);
     }
   }
   if(tplWorld.length < 50) return null;
@@ -17031,7 +17084,7 @@ function _replaceDoRefine(p){
   //    mai tagliata -> il "Taglia scansione" non svuota il crop della Raffina, 2b-3d)
   var scanPos = (replaceOriginalGeo || replaceMesh.geometry).attributes.position.array;
   var nScanTri = scanPos.length / 9;
-  var scanPts = [];
+  var scanPts = [], scanN = [];
   for(var i = 0; i < nScanTri; i++){
     var oi = i * 9;
     var px = (scanPos[oi]   + scanPos[oi+3] + scanPos[oi+6]) / 3;
@@ -17040,45 +17093,77 @@ function _replaceDoRefine(p){
     var dx = px-cen[0], dy = py-cen[1], dz = pz-cen[2];
     var zp = dx*axx + dy*axy + dz*axz; if(zp < zLo || zp > zHi) continue;
     var rx = dx - zp*axx, ry = dy - zp*axy, rz = dz - zp*axz; if(rx*rx + ry*ry + rz*rz > radLim2) continue;
-    scanPts.push([px, py, pz]);
+    var e1x = scanPos[oi+3]-scanPos[oi], e1y = scanPos[oi+4]-scanPos[oi+1], e1z = scanPos[oi+5]-scanPos[oi+2];
+    var e2x = scanPos[oi+6]-scanPos[oi], e2y = scanPos[oi+7]-scanPos[oi+1], e2z = scanPos[oi+8]-scanPos[oi+2];
+    var snx = e1y*e2z - e1z*e2y, sny = e1z*e2x - e1x*e2z, snz = e1x*e2y - e1y*e2x;
+    var sl = Math.sqrt(snx*snx + sny*sny + snz*snz) || 1;
+    scanPts.push([px, py, pz]); scanN.push([snx/sl, sny/sl, snz/sl]);
   }
   if(scanPts.length < 50) return null;
-  if(scanPts.length > 1500){ var stride = Math.ceil(scanPts.length / 1500); var sub = []; for(var k = 0; k < scanPts.length; k += stride) sub.push(scanPts[k]); scanPts = sub; }
+  if(scanPts.length > 1500){ var stride = Math.ceil(scanPts.length / 1500); var sub = [], subN = []; for(var k = 0; k < scanPts.length; k += stride){ sub.push(scanPts[k]); subN.push(scanN[k]); } scanPts = sub; scanN = subN; }
 
-  // 3. ICP pesato + outlier rejection (clone sostAlignAll)
+  // 3. ICP point-to-plane (8.48.0) + outlier + rifiuto-normali (fallback point-to-point Kabsch)
   var moving = tplWorld.map(function(pt){ return pt.slice(); });
   var Racc = [[1,0,0],[0,1,0],[0,0,1]], tAcc = [0,0,0], prevR = Infinity;
   for(var it = 0; it < 35; it++){
-    var pairD = [], pairF = [], pairM = [];
+    var pairD = [], pairF = [], pairM = [], pairN = [], pairOK = [];
     for(var mi = 0; mi < moving.length; mi++){
       var bD = Infinity, bJ = -1, mp = moving[mi];
       for(var fj = 0; fj < scanPts.length; fj++){
         var fp = scanPts[fj]; var a = mp[0]-fp[0], b = mp[1]-fp[1], c = mp[2]-fp[2]; var d2 = a*a + b*b + c*c;
         if(d2 < bD){ bD = d2; bJ = fj; }
       }
-      pairD.push(Math.sqrt(bD)); pairF.push(scanPts[bJ]); pairM.push(mp);
+      // rifiuto per incompatibilita' di NORMALI (sorgente<->scansione): |cos| basso => gengiva/back-face.
+      var _ok = true;
+      if(_useP2P && REPLACE_NORMAL_REJECT_COS >= 0 && tplN[mi] && bJ >= 0 && scanN[bJ]){
+        var _dn = tplN[mi][0]*scanN[bJ][0] + tplN[mi][1]*scanN[bJ][1] + tplN[mi][2]*scanN[bJ][2];
+        if(Math.abs(_dn) < REPLACE_NORMAL_REJECT_COS) _ok = false;
+      }
+      pairD.push(Math.sqrt(bD)); pairF.push(scanPts[bJ]); pairM.push(mp); pairN.push(bJ >= 0 ? scanN[bJ] : null); pairOK.push(_ok);
     }
     var sd = pairD.slice().sort(function(a,b){ return a-b; });
     var th = sd[Math.floor(sd.length/2)] * 2.5 + 0.05;
-    var gM = [], gF = [], gW = [];
-    for(var pi = 0; pi < pairD.length; pi++){ if(pairD[pi] <= th){ gM.push(pairM[pi]); gF.push(pairF[pi]); gW.push(tplW[pi]); } }
+    var gM = [], gF = [], gW = [], gN = [];
+    for(var pi = 0; pi < pairD.length; pi++){ if(pairD[pi] <= th && pairOK[pi]){ gM.push(pairM[pi]); gF.push(pairF[pi]); gW.push(tplW[pi]); gN.push(pairN[pi]); } }
     if(gM.length < 15) break;
-    var kb = kabsch(gM, gF, gW);
-    for(var mi = 0; mi < moving.length; mi++){
-      var pt = moving[mi];
-      moving[mi] = [
-        kb.R[0][0]*pt[0] + kb.R[0][1]*pt[1] + kb.R[0][2]*pt[2] + kb.t[0],
-        kb.R[1][0]*pt[0] + kb.R[1][1]*pt[1] + kb.R[1][2]*pt[2] + kb.t[1],
-        kb.R[2][0]*pt[0] + kb.R[2][1]*pt[1] + kb.R[2][2]*pt[2] + kb.t[2]
+    // SOLVE: point-to-plane (min sum_i w ((R p_i + t - q_i).n_i)^2, lineariz. -> 6x6) o fallback Kabsch.
+    var Rstep = null, tStep = null;
+    if(_useP2P){
+      var ATA = [[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0]], ATb = [0,0,0,0,0,0], usable = true;
+      for(var gi = 0; gi < gM.length; gi++){
+        var P = gM[gi], Q = gF[gi], N = gN[gi], wv = gW[gi];
+        if(!N){ usable = false; break; }
+        var cx = P[1]*N[2]-P[2]*N[1], cy = P[2]*N[0]-P[0]*N[2], cz = P[0]*N[1]-P[1]*N[0];
+        var aRow = [cx, cy, cz, N[0], N[1], N[2]];
+        var e = -((P[0]-Q[0])*N[0] + (P[1]-Q[1])*N[1] + (P[2]-Q[2])*N[2]);
+        for(var rr = 0; rr < 6; rr++){ var aw = wv*aRow[rr]; for(var cc = 0; cc < 6; cc++) ATA[rr][cc] += aw*aRow[cc]; ATb[rr] += aw*e; }
+      }
+      if(usable){
+        var x = _replaceSolveLin(ATA, ATb);
+        if(x && isFinite(x[0]+x[1]+x[2]+x[3]+x[4]+x[5])){
+          var om = [x[0], x[1], x[2]], thw = Math.sqrt(om[0]*om[0]+om[1]*om[1]+om[2]*om[2]), tmag = Math.sqrt(x[3]*x[3]+x[4]*x[4]+x[5]*x[5]);
+          if(thw < 0.5 && tmag < 2.0){   // guardia anti-passo-instabile per singolo step (rad/mm)
+            Rstep = _replaceRotFromOmega(om, thw); tStep = [x[3], x[4], x[5]];
+          }
+        }
+      }
+    }
+    if(!Rstep){ var kb = kabsch(gM, gF, gW); Rstep = kb.R; tStep = kb.t; }
+    for(var mi2 = 0; mi2 < moving.length; mi2++){
+      var pt = moving[mi2];
+      moving[mi2] = [
+        Rstep[0][0]*pt[0] + Rstep[0][1]*pt[1] + Rstep[0][2]*pt[2] + tStep[0],
+        Rstep[1][0]*pt[0] + Rstep[1][1]*pt[1] + Rstep[1][2]*pt[2] + tStep[1],
+        Rstep[2][0]*pt[0] + Rstep[2][1]*pt[1] + Rstep[2][2]*pt[2] + tStep[2]
       ];
     }
-    Racc = matMul(kb.R, Racc);
+    Racc = matMul(Rstep, Racc);
     tAcc = [
-      kb.R[0][0]*tAcc[0] + kb.R[0][1]*tAcc[1] + kb.R[0][2]*tAcc[2] + kb.t[0],
-      kb.R[1][0]*tAcc[0] + kb.R[1][1]*tAcc[1] + kb.R[1][2]*tAcc[2] + kb.t[1],
-      kb.R[2][0]*tAcc[0] + kb.R[2][1]*tAcc[1] + kb.R[2][2]*tAcc[2] + kb.t[2]
+      Rstep[0][0]*tAcc[0] + Rstep[0][1]*tAcc[1] + Rstep[0][2]*tAcc[2] + tStep[0],
+      Rstep[1][0]*tAcc[0] + Rstep[1][1]*tAcc[1] + Rstep[1][2]*tAcc[2] + tStep[1],
+      Rstep[2][0]*tAcc[0] + Rstep[2][1]*tAcc[1] + Rstep[2][2]*tAcc[2] + tStep[2]
     ];
-    var s2 = 0; for(var gi = 0; gi < gM.length; gi++){ var a = gM[gi][0]-gF[gi][0], b = gM[gi][1]-gF[gi][1], c = gM[gi][2]-gF[gi][2]; s2 += a*a + b*b + c*c; }
+    var s2 = 0; for(var gi3 = 0; gi3 < gM.length; gi3++){ var a = gM[gi3][0]-gF[gi3][0], b = gM[gi3][1]-gF[gi3][1], c = gM[gi3][2]-gF[gi3][2]; s2 += a*a + b*b + c*c; }
     var rmsd = Math.sqrt(s2 / Math.max(gM.length, 1));
     if(Math.abs(prevR - rmsd) < 1e-4){ prevR = rmsd; break; }
     prevR = rmsd;
@@ -19198,6 +19283,31 @@ window.addEventListener('DOMContentLoaded',init);
               <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Robust click-invariante (beta, SR)</div>
               <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
                 Centro da fit full-surface ancorato all&apos;asse (ri-crop iterato della parete), indipendente dal punto di click. Solo SR; fail-soft se la copertura della parete e&apos; insufficiente. Sperimentale (A/B vs Legacy).
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 8.48.0: Motore ICP Replace-iT (syntesis_replace_icp): point-to-point vs point-to-plane (beta) -->
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-family:var(--mono);font-size:12px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Motore ICP Replace-iT (Raffina)</label>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="replaceICPOptPoint">
+            <input type="radio" name="replaceICPOpt" value="p2point" checked onchange="onReplaceICPChange(this.value)" style="margin-top:2px">
+            <div style="flex:1">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Point-to-point (default)</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
+                ICP nearest-neighbor + Kabsch. Comportamento storico, buono su scan ad alta risoluzione.
+              </div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="replaceICPOptPlane">
+            <input type="radio" name="replaceICPOpt" value="p2plane" onchange="onReplaceICPChange(this.value)" style="margin-top:2px">
+            <div style="flex:1">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Point-to-plane (beta)</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
+                Usa le normali della scansione (min. distanza lungo la normale) + rifiuto delle corrispondenze gengiva/back-face. Recupera meglio la rotazione su superfici lisce; da validare su scan reale (A/B vs point-to-point). Reti: guardia anti-passo + fallback Kabsch.
               </div>
             </div>
           </label>
