@@ -4,6 +4,14 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.48.0: Replace-iT — ICP point-to-plane (beta, dietro toggle)
+
+Item 3 del feedback ICP ("possiamo migliorare il best fit madre↔scansione?"), dopo la scelta utente "implementa ora, validi tu su reale". Solo blocco `replace*`; DEFAULT = point-to-point (= produzione, identico).
+
+Toggle Impostazioni>Algoritmo "Motore ICP Replace-iT" (`syntesis_replace_icp`: p2point default | p2plane beta). In beta, `_replaceDoRefine` usa point-to-plane (6×6 `_replaceSolveLin` + Rodrigues, normali scansione) + rifiuto-normali (gengiva/back-face). Reti: guardia anti-passo + fallback Kabsch + gate RMSD.
+
+Validazione sintetica: su mesh grossolana point-to-plane nettamente migliore (rmsd 0.322→0.021); su mesh fine il point-to-point è leggermente meglio in posizione (0.049 vs 0.148) → cilindro liscio = test debole → default point-to-point, beta da validare su scan reale. Default identico alla produzione. Review avversariale 2 lenti → 0 finding. `node --check` 8/8 OK. Deploy canary LEGACY→BACKEND commit `e72dc7f` (LEGACY `6a3219e2`, BACKEND `b3a7389c`).
+
 ## 2026-06-11 — 8.47.0: Replace-iT — Conferma = conferma + raffina + auto-taglio scansione
 
 Feedback utente: il pulsante Conferma deve attivare conferma e raffina; una volta raffinato deve attivarsi il taglia scansione sull'albero. Solo blocco `replace*`; altri workflow invariati.
