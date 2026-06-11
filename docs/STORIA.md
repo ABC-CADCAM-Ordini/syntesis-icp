@@ -4,6 +4,17 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-10 — 8.37.0: Replace-iT — robustezza (Raffina feedback + gate + protezioni)
+
+2° intervento dall'audit (autonomo). Solo blocco `replace*`; altri workflow invariati.
+
+- Raffina con feedback: posa 3-punti mostrata subito, Raffina ICP in tick separato (`setTimeout 0`) con status "Raffino…" + cursor wait (prima freeze muto); gate rafforzato — accettata solo se `p.rmsd` ≤0.15mm & drift ≤0.3mm & rot ≤3°, altrimenti torna alla posa 3-punti. Guardia `replacePending!==p` nel timeout (+ ripristino cursore su uscita, da review).
+- Protezione seme: dropdown libreria/type disabilitati durante il piazzamento (cambiarli azzererebbe i punti); riabilitati a idle e all'ingresso in replace (da review).
+- Ctrl+Z workflow-aware in replace (seeding→`replaceSeedUndo`, idle→elimina ultimo impianto).
+- Errori fetch `/api/rit/*` leggibili (`_replaceFetchErrMsg`: 401/403→login, 404, rete) nei 4 catch + catch anteprima sorgente.
+
+Review avversariale pre-deploy (2 dim, 0 blocker, 0 major, 2 minor) → 2 fix. Bump 8.37.0, MAPPA aggiornata, `node --check` TUTTI OK. Deploy commit `8cd4c58` (LEGACY `b544a437`, BACKEND `5da6973f`).
+
 ## 2026-06-10 — 8.36.1: Replace-iT — fix sovrapposizione finestra guida ↔ Albero scena
 
 1° intervento dall'audit Replace-iT. Fix UI segnalato dall'utente: la finestra "Accoppiamento guidato" (`#replacePreviewBox`, fixed bottom-left z25) e l'"Albero scena" (`#layersPanel`, absolute top-left z8), entrambe sulla colonna sinistra del viewport, si sovrapponevano e si bloccavano a vicenda. Causa: l'albero è cresciuto dal 8.33.0 (ogni impianto = 5 righe: #N impianto + Madre + Figlio + origine + Taglia) → finisce sotto la guida che lo copre (z25>z8).
