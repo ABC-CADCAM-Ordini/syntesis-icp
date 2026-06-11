@@ -4,6 +4,14 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.42.0: Replace-iT — rimossa la "calamita" sui 3 clic scansione
+
+Feedback utente live: durante `pickScan` un dot rosso semi-trasparente (0.45mm r, opacity 0.55) seguiva il cursore su `replaceMesh` per mostrare dove sarebbe caduto il clic (nessuno snap) → "scomoda e grossolana, o migliora o la togliamo" → scelta: TOGLI. Solo blocco `replace*`; flusso 3-punti e altri workflow invariati.
+
+Rimossi (−63 righe): `replaceOnViewportHover` + listener `mousemove`, stato `replaceHoverDot`, funzione `replaceHideHoverDot` (+ 2 chiamate vive), dispose in `_hardResetReplace`; orfani `replaceMakeDot` + `REPLACE_DOT_COLOR` (l'altro caller `sourceDot` era sparito in 8.40.0). Conservato `REPLACE_DOT_R`. Ora i 3 clic si fanno liberamente (cursore a croce).
+
+`node --check` 8/8 OK; smoke test browser (mock): funzioni hover undefined, flusso intatto. Deploy canary LEGACY→BACKEND commit `69ea254` (LEGACY `cbf18b5a`, BACKEND `dbc17881`); verifica live 8.42.0 + hover assente nel servito + gating 403 su entrambi + alias.
+
 ## 2026-06-11 — 8.41.0: Replace-iT — design system finestra guida + colore Madre
 
 6° intervento dall'audit (autonomo). Solo blocco `replace*`/markup; logica e altri workflow invariati (gemello Sostituire intatto).
