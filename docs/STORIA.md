@@ -4,6 +4,16 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.49.0: Replace-iT — focus camera (doppio-clic) + nome dente (FDI)
+
+Item audit minore (multi-impianto). Solo blocco `replace*`; additivo, altri workflow INVARIATI.
+
+Due interazioni nuove sull'albero scena per ogni impianto piazzato. **(1) Focus camera** (`replaceFocusImplant`): doppio-clic sul nome dell'impianto → la camera lo inquadra. Bbox del figlio in mondo (`THREE.Box3().setFromObject`, su `p.meshSub`/`p.meshSrc`/`p.group` — non il group, per non includere la terna AxesHelper); `controls.target` sul centro + camera avvicinata mantenendo la direzione di vista corrente; animazione ease-out ~280ms (lerp, pattern di `installAltClickPivot`). **(2) Nome dente** (`replaceRenameImplant`): pulsante ✎ → `prompt()` numero dente FDI (es. "26") → `p.toothLabel` (vuoto = ripristina "#N impianto"); input ≤6 char escapato via `_escHtml`; etichetta "#N · 26". Modificate le righe header di entrambi i rami albero (madre+figlio e single-mesh legacy). NB: non persistito (saveCase non salva ancora replace).
+
+Review avversariale (Workflow, 3 lenti correttezza/sicurezza/isolamento + sintesi) → CLEAN: i "major" delle lenti erano falsi positivi verificati sul sorgente (la race focus-durante-delete non esiste — la closure cattura snapshot Vector3; l'XSS non esiste — `replaceShowStatus` usa textContent). 2 migliorie opzionali applicate (init `toothLabel`; fallback focus su mesh). `node --check` tutti i blocchi OK; harness Node sulle funzioni reali estratte 19/19. Deploy canary LEGACY→BACKEND commit `9de1c06` (LEGACY `2d5404db`, BACKEND `29ad0269`); verifica live 8.49.0 + funzioni nel servito + gating 403 + alias.
+
+---
+
 ## 2026-06-11 — 8.48.0: Replace-iT — ICP point-to-plane (beta, dietro toggle)
 
 Item 3 del feedback ICP ("possiamo migliorare il best fit madre↔scansione?"), dopo la scelta utente "implementa ora, validi tu su reale". Solo blocco `replace*`; DEFAULT = point-to-point (= produzione, identico).
