@@ -4,6 +4,15 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-11 — 8.44.0: Replace-iT — pulizia testi pannello + finestra guida tema Albero Scena
+
+Feedback utente: ripulire i testi spiegazione nella colonna destra + finestra anteprima coi colori della finestra Albero Scena. Solo markup/CSS `replace*`; logica e altri workflow invariati.
+
+- (A) Rimossi da `#panelReplace` i 3 testi esplicativi lunghi: intro "Carica la scansione...", callout "Flusso: ...", `#replaceGuide` "Modello sorgente→sostituto..." (non referenziato da JS). Restano i label dei campi e i controlli.
+- (B) Finestra guida `#replacePreviewBox` ri-tematizzata come l'Albero Scena `#layersPanel`: fondo bianco translucido `rgba(255,255,255,0.82)` + `var(--border)` + shadow leggera + blur; testi scuri (`var(--dark)`/`var(--gray)`/`var(--blue)`); bottoni Annulla/Ricomincia chiari; badge inattivo `var(--pearl)`/`var(--gray)`; canvas 3D resta scuro. Supera la scelta "tema scuro mantenuto" di 8.41.0 su richiesta esplicita.
+
+Verifica browser (mock): boxBg chiaro, 3 testi assenti. `node --check` 8/8 OK. Deploy canary LEGACY→BACKEND commit `fc6dd6a` (LEGACY `582ccabe`, BACKEND `6b6817c9`); verifica live 8.44.0 + gating 403 su entrambi + alias.
+
 ## 2026-06-11 — 8.43.0: Replace-iT — taglio del CAD sorgente dall'origine (slider, tieni il cap)
 
 Feedback utente live (stile Exocad): la scansione spesso non presenta tutta la superficie dello scanbody → accorciare il CAD sorgente alla sola parte esposta concentra l'accoppiamento sulla zona realmente scansionata. Solo blocco `replace*`; altri workflow invariati.
