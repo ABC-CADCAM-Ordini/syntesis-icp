@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.38.0</title>
+<title>Syntesis-ICP - Analizzare v8.39.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2424,8 +2424,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.38.0';
-window.ANALIZZA_BUILD_DATE = '2026-06-10';
+window.ANALIZZA_BUILD = '8.39.0';
+window.ANALIZZA_BUILD_DATE = '2026-06-11';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -12497,6 +12497,9 @@ function applyRenderModeToScene(){
   if(typeof misICP_meshB !== 'undefined' && misICP_meshB){
     applyRenderModeToMesh(misICP_meshB);
   }
+  // 8.39.0: Replace-iT (scansione + madre/figlio di ogni impianto + anteprima) ->
+  // la barra globale #vmBar/Impostazioni raggiunge anche le mesh del workflow replace.
+  if(typeof replaceApplyRenderMode === 'function') replaceApplyRenderMode();
 }
 
 // Crea una CanvasTexture lineare con due colori e angolo
@@ -15702,6 +15705,14 @@ function _replaceDisposeGroup(group){
         if(o.material){ if(o.material.map) o.material.map.dispose(); o.material.dispose(); }
       });
     } else if(c.material){
+      // 8.39.0: l'overlay wireframe (modalita' "both") e' figlio della mesh -> disponilo
+      // qui, altrimenti resta orfano (la geometria marker e' cache condivisa e NON si disposa).
+      if(c.userData && c.userData.wireframeOverlay){
+        var _wo = c.userData.wireframeOverlay;
+        if(_wo.geometry) _wo.geometry.dispose();
+        if(_wo.material) _wo.material.dispose();
+        c.userData.wireframeOverlay = null;
+      }
       if(c.material.map) c.material.map.dispose();
       c.material.dispose();
     }
@@ -16831,6 +16842,40 @@ function replaceSetScanOpacity(pctStr){
   }
   var lbl = document.getElementById('replaceOpLblScan'); if(lbl) lbl.textContent = Math.round(v * 100) + '%';
 }
+// 8.39.0: trasparenza PER-OGGETTO di MADRE (src) e FIGLIO (sub) di un impianto. Il materiale
+// e' la sorgente di verita' (creato transparent:true, src 0.5 / sub 0.9); lo slider lo aggiorna.
+function replaceSetMarkerOpacity(num, which, pctStr){
+  var v = Math.max(0.1, Math.min(1.0, parseFloat(pctStr) / 100));
+  for(var i = 0; i < replacePlaced.length; i++){
+    if(replacePlaced[i].num === num){
+      var mesh = (which === 'src') ? replacePlaced[i].meshSrc : replacePlaced[i].meshSub;
+      if(mesh && mesh.material){
+        mesh.material.transparent = v < 1.0;
+        mesh.material.opacity = v;
+        mesh.material.needsUpdate = true;
+      }
+      var lbl = document.getElementById('replaceOpLbl_' + which + '_' + num);
+      if(lbl) lbl.textContent = Math.round(v * 100) + '%';
+      break;
+    }
+  }
+}
+// 8.39.0: applica la modalita' di render globale (envSettings.renderMode = solid|wireframe|both)
+// alle mesh di Replace-iT. Chiamata da applyRenderModeToScene (barra globale) e in coda a
+// replaceRebuildTree, cosi' mesh nuove o ri-geometrizzate (load, conferma, swap figlio, taglio
+// scansione) prendono subito la modalita' corrente senza un re-toggle manuale.
+function replaceApplyRenderMode(){
+  if(typeof applyRenderModeToMesh !== 'function') return;
+  if(replaceMesh) applyRenderModeToMesh(replaceMesh);
+  replacePlaced.forEach(function(p){
+    if(p.meshSub) applyRenderModeToMesh(p.meshSub);
+    if(p.meshSrc) applyRenderModeToMesh(p.meshSrc);
+  });
+  if(typeof replacePending !== 'undefined' && replacePending){
+    if(replacePending.meshSub) applyRenderModeToMesh(replacePending.meshSub);
+    if(replacePending.meshSrc) applyRenderModeToMesh(replacePending.meshSrc);
+  }
+}
 function replaceTogglePlacedVisibility(num, on){
   for(var i = 0; i < replacePlaced.length; i++){
     if(replacePlaced[i].num === num){ if(replacePlaced[i].group) replacePlaced[i].group.visible = !!on; break; }
@@ -16936,6 +16981,13 @@ function replaceRebuildTree(){
                '<input type="color" class="tree-color" value="' + srcHex + '" title="Colore MADRE" onchange="setSceneObjectColor(\'replacesrc:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
                '<span class="lbl">Madre · ' + (p.srcTypeLabel || 'sorgente') + '</span>' +
                '</div>';
+          // 8.39.0: slider trasparenza Madre (per-oggetto)
+          var _srcOp = (p.meshSrc.material && p.meshSrc.material.opacity != null) ? p.meshSrc.material.opacity : 0.5;
+          h += '<div class="tree-node sub" style="padding-left:54px;padding-right:4px;margin-top:-2px;margin-bottom:2px;display:flex;align-items:center;gap:4px">' +
+               '<input type="range" min="10" max="100" step="1" value="' + Math.round(_srcOp * 100) + '"' +
+               ' oninput="replaceSetMarkerOpacity(' + p.num + ',\'src\',this.value)" onclick="event.stopPropagation()" style="flex:1;accent-color:#2dbe8b;height:4px" title="Trasparenza Madre">' +
+               '<span id="replaceOpLbl_src_' + p.num + '" style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:26px;text-align:right">' + Math.round(_srcOp * 100) + '%</span>' +
+               '</div>';
           // 8.38.0: il FIGLIO e' un DROPDOWN -> richiami un altro IPD della stessa madre (swap geometria, stessa posa)
           var _figSel;
           if(p.libTypes && p.libTypes.length){
@@ -16953,6 +17005,13 @@ function replaceRebuildTree(){
                '<input type="color" class="tree-color" value="' + hex + '" title="Colore FIGLIO" onchange="setSceneObjectColor(\'replace:' + p.num + '\', this.value)" onclick="event.stopPropagation()">' +
                '<span class="lbl" style="flex:0 0 auto;color:var(--gray)">Figlio</span>' +
                _figSel +
+               '</div>';
+          // 8.39.0: slider trasparenza Figlio (per-oggetto)
+          var _subOp = (p.meshSub.material && p.meshSub.material.opacity != null) ? p.meshSub.material.opacity : 0.9;
+          h += '<div class="tree-node sub" style="padding-left:54px;padding-right:4px;margin-top:-2px;margin-bottom:2px;display:flex;align-items:center;gap:4px">' +
+               '<input type="range" min="10" max="100" step="1" value="' + Math.round(_subOp * 100) + '"' +
+               ' oninput="replaceSetMarkerOpacity(' + p.num + ',\'sub\',this.value)" onclick="event.stopPropagation()" style="flex:1;accent-color:' + hex + ';height:4px" title="Trasparenza Figlio">' +
+               '<span id="replaceOpLbl_sub_' + p.num + '" style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:26px;text-align:right">' + Math.round(_subOp * 100) + '%</span>' +
                '</div>';
           h += '<div class="tree-node sub" style="padding-left:36px;display:flex;align-items:center;gap:2px">' +
                '<input type="checkbox" ' + (p.showOrigin ? 'checked' : '') + ' onchange="replaceToggleMarkerOrigin(' + p.num + ',this.checked)">' +
@@ -16990,6 +17049,9 @@ function replaceRebuildTree(){
   }
   layerTree.innerHTML = h;
   layerTree.querySelectorAll('input[data-indet="1"]').forEach(function(cb){ cb.indeterminate = true; });
+  // 8.39.0: dopo ogni ricostruzione (load/conferma/swap figlio/taglio scansione) riapplico
+  // la modalita' di render globale alle mesh replace (mesh nuove o ri-geometrizzate incluse).
+  try { replaceApplyRenderMode(); } catch(e){}
 }
 
 // Elimina un marker piazzato (group + i suoi 3 dot) dalla scena e dal record.
