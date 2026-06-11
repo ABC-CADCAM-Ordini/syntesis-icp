@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.41.0</title>
+<title>Syntesis-ICP - Analizzare v8.42.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
@@ -2422,7 +2422,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.41.0';
+window.ANALIZZA_BUILD = '8.42.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-11';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2616,10 +2616,6 @@ function init(){
   document.addEventListener('dragleave',function(e){if(e.relatedTarget===null||!document.body.contains(e.relatedTarget)){document.getElementById('dropOverlay').classList.remove('active')}});
   document.addEventListener('drop',function(e){e.preventDefault();e.stopPropagation();document.getElementById('dropOverlay').classList.remove('active');if(e.dataTransfer&&e.dataTransfer.files.length>0){var file=e.dataTransfer.files[0];if(file.name.toLowerCase().endsWith('.stl')){loadScanFile(file)}}});
   renderer.domElement.addEventListener('click',onViewportClick);
-  // Replace-iT 2b-1.1: hover dot live durante il placement. Listener UNICO e PASSIVO,
-  // gated internamente a (currentWorkflow==='replace' && replacePlacementMode) ->
-  // nessuna interferenza con gli altri workflow ne' col controller camera (no preventDefault).
-  renderer.domElement.addEventListener('mousemove',replaceOnViewportHover,{passive:true});
   // Click puro (senza drag) cambia il pivot di rotazione al punto cliccato
   (function(){
     var downX=0, downY=0, downT=0, isDown=false;
@@ -15564,10 +15560,7 @@ var replaceSubstType  = null;       // type SOSTITUTO (= replaceCurrentType)
 var replaceMarkerGeoCache = {};     // cache sha256 -> THREE.BufferGeometry (read-only, condivisa)
 var replacePaletteIdx = 0;
 var REPLACE_COLORS = [0x0065B3, 0x0D9E6E, 0xD97706, 0xA855F7, 0xEF4444, 0x14B8A6];
-// 2b-1.1: marcatore punto-di-riferimento. Rosso, piccolo.
-var REPLACE_DOT_COLOR = 0xFF3B30;
 var REPLACE_DOT_R = 0.45;           // mm, piu' piccolo dei marker
-var replaceHoverDot = null;         // dot "preview" semi-trasparente che segue il cursore in placement
 // 2b-1.2: seeding a 3 punti (sostituisce il click_center). I 3 punti hanno
 // colori distinti, uguali tra anteprima-marker e scansione, per accoppiarli a vista.
 var REPLACE_SEED_N = 3;
@@ -15746,54 +15739,6 @@ function replaceSwapFiglio(num, ord){
 // Sfera rossa piccola, MeshBasicMaterial depthTest:false -> sempre visibile sopra
 // le mesh. Persistente (niente fade). Usata sia per i dot dei marker piazzati sia
 // (lazy) per il dot di hover.
-function replaceMakeDot(point, opts){
-  opts = opts || {};
-  var geo = new THREE.SphereGeometry(REPLACE_DOT_R, 16, 12);
-  var mat = new THREE.MeshBasicMaterial({
-    color: (opts.color != null ? opts.color : REPLACE_DOT_COLOR),
-    transparent: true,
-    opacity: (opts.opacity != null ? opts.opacity : 1.0),
-    depthTest: false,
-    depthWrite: false
-  });
-  var dot = new THREE.Mesh(geo, mat);
-  dot.renderOrder = 10001;
-  dot.userData.isReplace = true;
-  dot.userData.replaceRole = opts.role || 'dot';
-  if(point) dot.position.copy(point);
-  scene.add(dot);
-  return dot;
-}
-
-function replaceHideHoverDot(){
-  if(replaceHoverDot) replaceHoverDot.visible = false;
-}
-
-// Hover dot live: segue il raycast sulla scansione DURANTE il placement, cosi'
-// l'utente vede dove cadra' il punto di riferimento PRIMA di cliccare.
-// Listener UNICO e PASSIVO agganciato a init; gate ISOLATO qui dentro: agisce solo
-// in Replace-iT durante il placement, esce subito in ogni altro caso (nessuna
-// interferenza con Sostituisci/Analizza/altri workflow ne' col controller camera).
-function replaceOnViewportHover(event){
-  if(typeof currentWorkflow === 'undefined' || currentWorkflow !== 'replace'
-     || replaceSeed.phase !== 'pickScan' || !replaceMesh){ replaceHideHoverDot(); return; }
-  var rect = renderer.domElement.getBoundingClientRect();
-  var mouse = new THREE.Vector2(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1
-  );
-  var raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera(mouse, camera);
-  var hits = raycaster.intersectObject(replaceMesh);
-  if(hits.length > 0){
-    if(!replaceHoverDot) replaceHoverDot = replaceMakeDot(null, { opacity: 0.55, role: 'hover' });
-    replaceHoverDot.position.copy(hits[0].point);
-    replaceHoverDot.visible = true;
-  } else {
-    replaceHideHoverDot();
-  }
-}
-
 // ===== 2b-1.2: ANTEPRIMA INTERATTIVA (secondo renderer) + SEEDING A 3 PUNTI =====
 // L'anteprima e' un piccolo viewport Three PROPRIO (canvas #replacePreviewCanvas),
 // indipendente dal viewer principale. La camera orbita attorno all'origine; la mesh
@@ -15930,7 +15875,6 @@ function replaceSeedClear(keepSource){
   replaceSeed.markerPts = []; replaceSeed.scanPts = []; replaceSeed.scanNormals = []; replaceSeed.markerDots = []; replaceSeed.scanDots = [];
   replaceSeed.phase = 'idle';
   replacePlacementMode = false;
-  replaceHideHoverDot();
   if(typeof renderer !== 'undefined' && renderer && renderer.domElement) renderer.domElement.style.cursor = 'default';
   if(replacePreviewRenderer) replacePreviewRender();
   replaceSeedUpdateUI();
@@ -16271,7 +16215,6 @@ function replaceOnViewportClick(event){
   replaceSeed.scanDots.push(dot);
   replaceSeedUpdateUI();
   if(replaceSeed.scanPts.length >= REPLACE_SEED_N){
-    replaceHideHoverDot();
     replacePlaceFromSeed();
   }
   return true;
@@ -17074,12 +17017,6 @@ function _hardResetReplace(){
   try {
     replaceClearScene();
     replacePlacementMode = false;
-    if(replaceHoverDot){
-      scene.remove(replaceHoverDot);
-      if(replaceHoverDot.geometry) replaceHoverDot.geometry.dispose();
-      if(replaceHoverDot.material) replaceHoverDot.material.dispose();
-      replaceHoverDot = null;
-    }
     // 2b-1.2: smonta l'anteprima (secondo renderer) e nascondi il box.
     replacePreviewDispose();
     var pbox = document.getElementById('replacePreviewBox'); if(pbox) pbox.style.display = 'none';
