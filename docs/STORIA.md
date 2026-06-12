@@ -4,6 +4,20 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.55.0: "Taglia scansione" segue la silhouette del madre (profilo per-angolo)
+
+Feedback utente sul 8.54.0: *"il taglia scansione dipende dalla forma del figlio mentre dovrebbe dipendere dalla forma della madre che si accoppia alla scansione."* Solo blocco `replace*` del monolite `v3b`.
+
+**Diagnosi**: in 8.54.0 il *raggio* del buco veniva già dal madre (`p.meshSrc`), ma il taglio restava un **cilindro circolare capato a 3mm** → (a) un cerchio non cattura la *forma* della sezione; (b) madre e figlio finivano spesso entrambi contro il cap di 3mm → stesso buco → "sembra ancora il figlio".
+
+**Fix**: nuovo `_replaceMadreProfile(p)` costruisce il **profilo radiale per-angolo** del madre — 48 settori attorno a `p.axisDir`, per ogni settore l'**85° percentile** del raggio dei vertici del madre (in mondo, ⊥ all'asse): ignora il flare del cap e gli outlier, i settori vuoti ereditano la mediana globale, guardia anti-runaway 8mm. `replaceRebuildScanGeometry` usa la soglia **per-settore** `prof[settore] + offset` (confronto su raggio², niente `sqrt`; un `atan2` per il settore) invece del raggio² unico → il buco segue la **sezione reale** dello scanbody, senza cap fisso. Fallback al cerchio (`replaceEstimateMarkerRadius`, che include l'offset) per i marker single-mesh "Allinea a 3 punti" o se il profilo non si costruisce. Lo slider OFFSET (8.54.0) continua ad allargare uniformemente.
+
+**Review avversariale** (3 lenti + verify): **0 blocker/major**, 2 minor cosmetici corretti (vettore di riferimento allineato alla convenzione `ax.z` del codebase; documentata l'asimmetria 85°/90° tra profilo e fallback). Base/uso `(u,w)` coerenti build↔taglio, transform mondo come `replaceEstimateMarkerRadius`, offset applicato una volta sola per ramo, nessun NaN/div-zero.
+
+Validazione: `node --check` 7/7 `<script>` OK; marker versione allineati 8.55.0. `docs/MAPPA_FUNZIONALE.md` aggiornata (riga Taglia scansione). Deploy canary su entrambi i servizi.
+
+---
+
 ## 2026-06-12 — 8.54.0: Taglio "Taglia scansione" guidato dal madre + offset slider + picking 3 punti con Shift+clic
 
 Tre interventi Replace-iT dal collaudo live (solo blocco `replace*` del monolite `v3b`).

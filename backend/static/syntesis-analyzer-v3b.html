@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.54.0</title>
+<title>Syntesis-ICP - Analizzare v8.55.0</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2427,7 +2427,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.54.0';
+window.ANALIZZA_BUILD = '8.55.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-12';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16844,11 +16844,64 @@ function replaceEstimateMarkerRadius(p){
     return Math.min(REPLACE_CUT_RADIUS, p90 + 0.3) + _off;   // footprint madre (cap 3mm) + offset utente
   } catch(e){ return REPLACE_CUT_RADIUS + _off; }
 }
+// 8.55.0: profilo radiale PER-ANGOLO del MADRE (la sua silhouette vista lungo l'asse) -> il
+// "Taglia scansione" segue la FORMA reale dello scanbody che si accoppia alla scansione, non un
+// cerchio capato a 3mm. Per ogni settore angolare prende l'85° percentile del raggio dei vertici
+// del madre (in MONDO, ⊥ all'asse) -> ignora il flare del cap e gli outlier; i settori vuoti
+// ereditano la mediana globale; guardia anti-runaway 8mm per madre con tessuto. null = fallback cerchio.
+function _replaceMadreProfile(p){
+  var mesh = (p.meshSrc) || (p.meshSub) || (p.group && p.group.children && p.group.children[0]);
+  if(!mesh || !mesh.geometry || !mesh.geometry.attributes || !mesh.geometry.attributes.position) return null;
+  try {
+    p.group.updateMatrixWorld(true);
+    var m = p.group.matrixWorld.elements;
+    var ax = p.axisDir.clone().normalize();
+    var ref = (Math.abs(ax.z) < 0.9) ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);   // 8.55.0: convenzione asse del codebase
+    var u = new THREE.Vector3().crossVectors(ax, ref).normalize();
+    var w = new THREE.Vector3().crossVectors(ax, u).normalize();   // base ⊥ asse: (u, w)
+    var NB = 48, bins = [];
+    for(var b = 0; b < NB; b++) bins.push([]);
+    var posA = mesh.geometry.attributes.position.array, n = posA.length / 3;
+    if(n < 16) return null;
+    for(var i = 0; i < n; i++){
+      var lx = posA[i*3], ly = posA[i*3+1], lz = posA[i*3+2];
+      var wx = m[0]*lx + m[4]*ly + m[8]*lz  + m[12];
+      var wy = m[1]*lx + m[5]*ly + m[9]*lz  + m[13];
+      var wz = m[2]*lx + m[6]*ly + m[10]*lz + m[14];
+      var dx = wx - p.position.x, dy = wy - p.position.y, dz = wz - p.position.z;
+      var axial = dx*ax.x + dy*ax.y + dz*ax.z;
+      var rx = dx - axial*ax.x, ry = dy - axial*ax.y, rz = dz - axial*ax.z;
+      var r = Math.sqrt(rx*rx + ry*ry + rz*rz);
+      var cu = rx*u.x + ry*u.y + rz*u.z, cw = rx*w.x + ry*w.y + rz*w.z;
+      var bi = Math.floor((Math.atan2(cw, cu) + Math.PI) / (2*Math.PI) * NB);
+      if(bi < 0) bi = 0; else if(bi >= NB) bi = NB - 1;
+      bins[bi].push(r);
+    }
+    var prof = new Float32Array(NB), glob = [];
+    for(var b2 = 0; b2 < NB; b2++){
+      if(bins[b2].length){
+        bins[b2].sort(function(a, c){ return a - c; });
+        var rr = bins[b2][Math.floor(bins[b2].length * 0.85)];   // 85° per settore (un filo più stretto del fallback circolare 90°, voluto)
+        if(rr > 8) rr = 8;   // guardia anti-runaway
+        prof[b2] = rr; glob.push(rr);
+      } else prof[b2] = -1;
+    }
+    if(!glob.length) return null;
+    glob.sort(function(a, c){ return a - c; });
+    var fb = glob[Math.floor(glob.length * 0.5)];   // mediana -> settori vuoti
+    for(var b3 = 0; b3 < NB; b3++) if(prof[b3] < 0) prof[b3] = fb;
+    return { u: u, w: w, NB: NB, prof: prof };
+  } catch(e){ return null; }
+}
 function replaceRebuildScanGeometry(){
   if(!replaceOriginalGeo || !replaceMesh) return;
   var cyls = replacePlaced.filter(function(p){ return p.cutScan === true && p.position && p.axisDir; })
-    .map(function(p){ var _R = replaceEstimateMarkerRadius(p); return { cp: p.position, ax: p.axisDir.clone().normalize(),
-                               R2: _R * _R, halfH: REPLACE_CUT_HALFH }; });
+    .map(function(p){
+      var prof = _replaceMadreProfile(p);            // 8.55.0: silhouette PER-ANGOLO del madre
+      var _R = replaceEstimateMarkerRadius(p);       // fallback circolare (single-mesh / profilo assente; _R include l'offset)
+      return { cp: p.position, ax: p.axisDir.clone().normalize(), prof: prof, off: (p.cutOffset || 0),
+               R2: _R * _R, halfH: REPLACE_CUT_HALFH };
+    });
   if(!cyls.length){
     replaceMesh.geometry.dispose();
     replaceMesh.geometry = replaceOriginalGeo.clone();
@@ -16866,7 +16919,14 @@ function replaceRebuildScanGeometry(){
       var axial = dx*k.ax.x + dy*k.ax.y + dz*k.ax.z;
       if(Math.abs(axial) > k.halfH) continue;
       var rx = dx - axial*k.ax.x, ry = dy - axial*k.ax.y, rz = dz - axial*k.ax.z;
-      if(rx*rx + ry*ry + rz*rz <= k.R2){ inside = true; break; }
+      var r2v = rx*rx + ry*ry + rz*rz;
+      if(k.prof){   // 8.55.0: soglia PER-ANGOLO = raggio del madre nel settore + offset utente
+        var cu = rx*k.prof.u.x + ry*k.prof.u.y + rz*k.prof.u.z, cw = rx*k.prof.w.x + ry*k.prof.w.y + rz*k.prof.w.z;
+        var bi = Math.floor((Math.atan2(cw, cu) + Math.PI) / (2*Math.PI) * k.prof.NB);
+        if(bi < 0) bi = 0; else if(bi >= k.prof.NB) bi = k.prof.NB - 1;
+        var thr = k.prof.prof[bi] + k.off;
+        if(r2v <= thr*thr){ inside = true; break; }
+      } else if(r2v <= k.R2){ inside = true; break; }
     }
     if(!inside){ for(var v = 0; v < 9; v++) kept.push(pos[ni + v]); }
   }
