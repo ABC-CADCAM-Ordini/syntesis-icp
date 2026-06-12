@@ -4,6 +4,23 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.56.0: Raffina solo sul marker corrente, non su tutti
+
+Richiesta utente: *"Raffina non puo' tutte le volte interessare tutti gli oggetti presenti ma solo quello che stiamo posizionando."* Solo blocco `replace*` del monolite `v3b`.
+
+**Cosa fa**: la Raffina (ICP) ora agisce SOLO sull'impianto **attivo**, senza perturbare quelli già confermati. Marker attivo (`replaceActiveNum`): **default = ultimo piazzato**; **selezionabile** cliccando il nome dell'impianto nell'albero scena (highlight `▸` + colore blu; doppio-clic resta = focus camera). Il **✓ Conferma** raffina solo l'impianto appena confermato.
+
+Implementazione:
+- `replaceRefineAll(onDone, targetNum)`: se `targetNum != null` costruisce `targets` con quel solo marker, altrimenti tutti (legacy retrocompat). Le due iterazioni (round ICP + somma RMSD) ora usano `targets`.
+- `_replaceRefineTargetNum()` (attivo se esiste, altrimenti ultimo), `replaceSetActiveImplant(num)` (valida l'esistenza + highlight), `replaceRefineCurrent()` (pulsante Raffina → risolve e imposta l'attivo per coerenza).
+- `replaceConfirmSeed`: imposta `replaceActiveNum = P.num` e chiama `replaceRefineAll(cb, P.num)`; eliminazione dell'attivo → `replaceActiveNum = null` (resolver torna all'ultimo).
+
+**Review avversariale** (2 lenti + verify) — ha colto una **regressione reale** che ho introdotto e ho corretto: lo snapshot `targets` (filter/slice) cattura i riferimenti una volta sola, mentre il vecchio codice iterava `replacePlaced` fresco a ogni round; un marker eliminato durante la raffina async (`setTimeout` round-dopo-round) sarebbe rimasto "zombie". Fix: `doRound` **ri-filtra `targets`** contro `replacePlaced` ad ogni round (stesso pattern già usato dal flusso swap, ~riga 15760). Altri fix dalla review: `replaceRefineCurrent` imposta l'attivo (highlight coerente); `replaceSetActiveImplant` valida il num; la callback del Conferma ri-lookup il marker per `num` (P può essere eliminato durante la raffina); grammatica "convergiuta"→"a convergenza".
+
+Validazione: `node --check` 7/7 `<script>` OK; marker versione allineati 8.56.0. `docs/MAPPA_FUNZIONALE.md` aggiornata (riga Raffina + riga Albero). Deploy canary su entrambi i servizi.
+
+---
+
 ## 2026-06-12 — 8.55.0: "Taglia scansione" segue la silhouette del madre (profilo per-angolo)
 
 Feedback utente sul 8.54.0: *"il taglia scansione dipende dalla forma del figlio mentre dovrebbe dipendere dalla forma della madre che si accoppia alla scansione."* Solo blocco `replace*` del monolite `v3b`.
