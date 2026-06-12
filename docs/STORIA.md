@@ -4,6 +4,22 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.56.1: Picking 3 punti preciso — stop inerzia camera durante la posa (fix "punto lontano dal clic")
+
+Feedback utente: *"i 3 punti sulla scansione per accoppiare la madre è sempre molto incerto, clicco ma il punto spesso si posiziona lontano dal mio clic"* (a volte spostato sullo schermo, a volte sotto il cursore ma nel punto sbagliato). Solo blocco `replace*` + controls camera condivisi (`v3b`).
+
+**Diagnosi (indagine multi-agente con sintesi avversariale)** — due esiti importanti:
+1. **NON è lo zoom.** Prima ipotesi (mismatch `clientX`/`getBoundingClientRect` sotto `body.zoom` 130%) **smontata**: il picking MUA di Analizza usa la formula NDC **byte-identica e non compensata** e funziona al 130% di zoom. Applicare `×zoomF` avrebbe **rotto** il picking (e su Firefox `syntesisGetUiZoom` ritorna 1.0 → no-op lì, danno su Chrome). La compensazione zoom serve solo per `style.left` (riscritto×zoom dal browser), non per il rapporto read-only del raycast.
+2. **È l'inerzia di rotazione.** I controls hanno `enableDamping`/`dampingFactor=0.12`: dopo aver ruotato per vedere lo scanbody, la vista **deriva ~0.5s**; un Shift+clic durante la deriva colpisce la vista spostata → "punto lontano". Intermittente perché dipende se clicchi a vista ferma o ancora in deriva. Il MUA non lo mostra (`findScanbodyCenter` aggancia al centro, assorbe l'errore); il 3-punti usa il punto **grezzo** → lo espone.
+
+**Fix**: flag `controls.noInertia` (default off → comportamento invariato). In `controls.update()` la velocità di rotazione residua viene azzerata se `noInertia` (invece del decadimento per inerzia). `replaceSeedUpdateUI` imposta `controls.noInertia = _placing` (dentro la guardia `analysisMode==='replace'`); reset a `false` su `selectWorkflow` (cambio workflow a metà posa) e all'uscita dalla posa (idle). Risultato: durante i 3-punti la vista si ferma di colpo al rilascio → il clic cade dove miri. Fuori dalla posa resta l'inerzia attuale.
+
+**Review avversariale** (Explore mirato sui controls condivisi): fix **corretto e senza leak** — `scope`=istanza controls; il drag continuo funziona (onMM aggiunge velocità ogni frame, applicata poi azzerata); tutti gli exit ripristinano il flag; `else` byte-identico all'originale → zero impatto su Analizza/Sostituisci/Vedere.
+
+Validazione: `node --check` 7/7 OK; marker versione allineati 8.56.1. `docs/MAPPA_FUNZIONALE.md` aggiornata. **Non riproducibile in locale** (serve il flusso reale STL + 3 clic) → collaudo utente post-deploy. Deploy canary su entrambi i servizi.
+
+---
+
 ## 2026-06-12 — 8.56.0: Raffina solo sul marker corrente, non su tutti
 
 Richiesta utente: *"Raffina non puo' tutte le volte interessare tutti gli oggetti presenti ma solo quello che stiamo posizionando."* Solo blocco `replace*` del monolite `v3b`.
