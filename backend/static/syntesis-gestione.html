@@ -138,6 +138,28 @@
   .rit-existing .nm{font-weight:600;color:var(--ink)}
   .rit-existing .meta{font-size:12.5px;color:var(--ink-soft);margin-top:4px}
   .rit-modal .row{display:flex;gap:8px;margin-top:8px}
+  /* ===== 8.50.0: archivio STL + crea libreria ===== */
+  .pill.madre{background:#E6F1FB;color:var(--accent-deep)}
+  .pill.figlio{background:#F1EDFB;color:#534AB7}
+  .pill.lock{background:#FBF3E2;color:var(--warn)}
+  .pill.free{background:#EEF2F6;color:var(--ink-soft)}
+  .linkbtn{border:0;background:none;color:var(--accent);cursor:pointer;
+    font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:600;padding:4px 6px}
+  .linkbtn.danger{color:var(--err)}
+  .ed-table input,.ed-table select{font-family:'IBM Plex Sans',sans-serif;font-size:13px;color:var(--ink);
+    border:1px solid var(--line);border-radius:7px;padding:7px 8px;width:100%;background:#fff;min-width:60px}
+  .ed-table input:focus,.ed-table select:focus{outline:0;border-color:var(--accent)}
+  .ed-table td{padding:8px 6px}
+  .ed-table th{padding:12px 8px}
+  .ed-file{display:flex;align-items:center;gap:4px}
+  #stl-prev-canvas{width:100%;height:420px;background:#10161D;border-radius:12px;overflow:hidden}
+  .codefield{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;
+    font-family:'IBM Plex Mono',monospace;font-size:14px;margin-bottom:10px}
+  .codefield:focus{outline:0;border-color:var(--accent)}
+  .rit-conf-item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:13.5px;cursor:pointer}
+  .rit-conf-item .nm{font-family:'IBM Plex Mono',monospace;font-size:12.5px;flex:1;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -193,7 +215,7 @@
     <div class="ritsep"></div>
     <div class="pagehead" style="margin-top:30px">
       <h1>Librerie Replace-iT</h1>
-      <p>Importa una libreria Exocad (ZIP), verifica i parametri e attivala. L'attivazione è manuale, dopo il controllo.</p>
+      <p>Importa una libreria da ZIP — Exocad (config.xml) oppure manuale (libreria.csv + STL) — verifica i parametri e attivala. L'attivazione è manuale, dopo il controllo.</p>
     </div>
 
     <div class="rit-upload">
@@ -213,6 +235,47 @@
     </div>
 
     <div class="rit-detail hidden" id="rit-detail"></div>
+
+    <!-- ===== 8.50.0: Archivio STL (cartella unica) ===== -->
+    <div class="pagehead" style="margin-top:34px">
+      <h1>Archivio STL</h1>
+      <p>Cartella unica dei file STL: i figli condivisi tra più marche e modelli stanno qui una volta sola. Un file bloccato dal lucchetto non si cancella né si sovrascrive senza il codice di sicurezza.</p>
+    </div>
+    <div class="rit-upload">
+      <input type="file" id="stl-files" multiple accept=".stl">
+      <button class="btn authorize" id="stl-upload-btn">Carica STL</button>
+      <button class="btn revoke" id="stl-code-btn">Codice lucchetto…</button>
+      <span class="rit-msg" id="stl-msg"></span>
+    </div>
+    <div class="tablecard">
+      <table>
+        <thead>
+          <tr><th>File</th><th>Dimensione</th><th>Usato da</th><th>Lucchetto</th><th>Aggiornato</th><th></th></tr>
+        </thead>
+        <tbody id="stl-rows"></tbody>
+      </table>
+      <div class="empty hidden" id="stl-empty">Nessun file in archivio.</div>
+    </div>
+
+    <!-- ===== 8.50.0: Crea libreria (editor in-pannello) ===== -->
+    <div class="pagehead" style="margin-top:34px">
+      <h1>Crea libreria</h1>
+      <p>Una riga per file STL. Marca + modello + diametro identificano la libreria: ogni diametro diventa una libreria separata, con i suoi file madre e figli. Tutti gli STL devono essere esportati sulla <strong>stessa origine</strong>.</p>
+    </div>
+    <div class="rit-upload">
+      <button class="btn authorize" id="ed-add-row">+ Aggiungi riga</button>
+      <button class="btn authorize" id="ed-save">Salva libreria</button>
+      <button class="btn revoke" id="ed-template">Scarica template CSV</button>
+      <span class="rit-msg" id="ed-msg"></span>
+    </div>
+    <div class="tablecard">
+      <table class="ed-table">
+        <thead>
+          <tr><th>Marca</th><th>Modello</th><th>Ø</th><th>Asse occl.</th><th>Ruolo</th><th>File STL</th><th>Nome</th><th>ENG</th><th></th></tr>
+        </thead>
+        <tbody id="ed-rows"></tbody>
+      </table>
+    </div>
   </div>
 
   <!-- modal chiave generata -->
@@ -236,7 +299,52 @@
     <div class="modal rit-modal" id="rit-conflict"></div>
   </div>
 
+  <!-- 8.50.0: modal conferma CSV/editor (conflitti STL per nome + librerie esistenti) -->
+  <div class="overlay" id="rit-confirm-overlay">
+    <div class="modal rit-modal" id="rit-confirm"></div>
+  </div>
+
+  <!-- 8.50.0: modal codice lucchetto -->
+  <div class="overlay" id="stl-code-overlay">
+    <div class="modal rit-modal" id="stl-code-modal"></div>
+  </div>
+
+  <!-- 8.50.0: modal anteprima STL 3D -->
+  <div class="overlay" id="stl-prev-overlay">
+    <div class="modal rit-modal" style="max-width:760px">
+      <h3 id="stl-prev-title">Anteprima STL</h3>
+      <div id="stl-prev-canvas"></div>
+      <p style="margin:10px 0 0;font-size:12.5px">Origine (0,0,0) = sfera bianca con terna assi:
+        <span style="color:#D64545;font-weight:600">X rosso</span> ·
+        <span style="color:#0D9E6E;font-weight:600">Y verde</span> ·
+        <span style="color:#0065B3;font-weight:600">Z blu</span>.
+        Trascina per ruotare, rotella per zoom, tasto destro per pan.</p>
+      <div class="row" style="margin-top:14px">
+        <button class="btn revoke" id="stl-prev-close">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
+
+<!-- 8.50.0: Three.js r169 per l'anteprima STL — stesso pattern loader di /vedere
+     (importmap ESM + bridge window.THREE; vedi syntesis-icp-vedere.html ~1199). -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  const T = Object.assign({}, THREE);
+  T.OrbitControls = OrbitControls;
+  window.THREE = T;
+  window.dispatchEvent(new Event('three-ready'));
+</script>
 
 <script>
 (function(){
@@ -500,14 +608,23 @@
       .catch(function(){ btn.disabled=false; toast("Errore nel cambio stato."); });
   }
 
+  // Decisioni accumulate tra i round di conferma di UNA singola importazione
+  // (un ZIP Exocad puo' richiedere prima la conferma STL, poi quella keyword:
+  // la decisione STL va ricordata nel secondo round). Reset a ogni upload
+  // iniziato dall'utente (ritUpload() senza argomenti).
+  var ritAcc = {};
   function ritUpload(opts){
-    opts = opts || {};
+    if(opts===undefined){ ritAcc = {}; }        // click utente: nuova importazione
+    else { for(var k in opts){ ritAcc[k]=opts[k]; } }
     var f=$("rit-file").files[0];
     if(!f){ ritMsg("Seleziona un file ZIP.","err"); return; }
     var fd=new FormData(); fd.append("file", f);
-    if(opts.mode){ fd.append("mode", opts.mode); }
-    if(opts.import_name){ fd.append("import_name", opts.import_name); }
-    if(opts.target_library_id!=null){ fd.append("target_library_id", String(opts.target_library_id)); }
+    if(ritAcc.mode){ fd.append("mode", ritAcc.mode); }
+    if(ritAcc.import_name){ fd.append("import_name", ritAcc.import_name); }
+    if(ritAcc.target_library_id!=null){ fd.append("target_library_id", String(ritAcc.target_library_id)); }
+    if(ritAcc.stl_overwrite){ fd.append("stl_overwrite", JSON.stringify(ritAcc.stl_overwrite)); }
+    if(ritAcc.lib_overwrite){ fd.append("lib_overwrite","1"); }
+    if(ritAcc.code){ fd.append("code", ritAcc.code); }
     $("rit-upload-btn").disabled=true; ritMsg("Caricamento…");
     // NB: niente Content-Type manuale -> il browser imposta il boundary multipart.
     fetch(API+"/admin/rit/libraries",{method:"POST",headers:adminHeaders(),body:fd})
@@ -516,9 +633,30 @@
       .then(function(res){
         $("rit-upload-btn").disabled=false;
         if(res.status===200 && res.body.status==="ok"){
-          $("rit-file").value="";
-          ritMsg('Importata "'+res.body.import_name+'" ('+res.body.n_types+' type, '+res.body.n_markers+' STL). Verifica i parametri, poi attivala.',"ok");
-          ritLoad();
+          $("rit-file").value=""; ritAcc={};
+          if(res.body.kind==="rows"){
+            ritMsg(ritRowsOkMsg(res.body),"ok");
+          } else {
+            var extra=(res.body.stl_overwritten&&res.body.stl_overwritten.length)
+              ? ' ('+res.body.stl_overwritten.length+' STL aggiornati in archivio)':'';
+            ritMsg('Importata "'+res.body.import_name+'" ('+res.body.n_types+' type, '+res.body.n_markers+' STL'+extra+'). Verifica i parametri, poi attivala.',"ok");
+          }
+          ritLoad(); stlLoad();
+          return;
+        }
+        if(res.status===409 && res.body.status==="confirm_needed"){
+          ritMsg("");
+          ritShowConfirm(res.body, function(dec){
+            ritUpload({stl_overwrite:dec.overwrite, lib_overwrite:true, code:dec.code});
+          });
+          return;
+        }
+        // Exocad: conflitto STL (un marker condiviso esiste con contenuto diverso)
+        if(res.status===409 && res.body.status==="stl_conflict"){
+          ritMsg("");
+          ritShowConfirm({stl_conflicts:res.body.conflicts||[]}, function(dec){
+            ritUpload({stl_overwrite:dec.overwrite, code:dec.code});
+          });
           return;
         }
         if(res.status===409 && res.body.status==="keyword_conflict"){ ritShowConflict(res.body); ritMsg(""); return; }
@@ -595,7 +733,9 @@
   function ritRenderDetail(d){
     var el=$("rit-detail");
     var html='<h4>'+escapeHtml(d.import_name)+'</h4>'+
-      '<div class="sub">Parametri letti dal config.xml (sola lettura). '+
+      '<div class="sub">'+((d.source==="csv"||d.source==="editor")
+          ? 'Parametri della libreria (sola lettura). '
+          : 'Parametri letti dal config.xml (sola lettura). ')+
         (d.active?'Libreria attiva.':'Non ancora attiva.')+'</div>'+
       '<div class="rit-root">'+
         ritFld("Keyword", d.keyword)+
@@ -609,7 +749,7 @@
       '</div>'+
       '<div class="tablecard"><table><thead><tr>'+
         '<th>#</th><th>Display</th><th>Keyword</th><th>Marker</th>'+
-        '<th>Click center</th><th>Axis asym.</th><th>ENG</th></tr></thead><tbody>';
+        '<th>Click center</th><th>Axis asym.</th><th>Ruolo</th><th>ENG</th></tr></thead><tbody>';
     (d.types||[]).forEach(function(t){
       html+='<tr>'+
         '<td class="umeta num">'+(t.ord!=null?t.ord:"")+'</td>'+
@@ -618,7 +758,12 @@
         '<td class="umeta rit-mono">'+escapeHtml(t.marker_filename||"—")+'</td>'+
         '<td class="umeta rit-mono">'+ritVec(t.click_center)+'</td>'+
         '<td class="umeta rit-mono">'+ritVec(t.axis_asymmetric)+'</td>'+
-        '<td>'+(t.is_eng?'<span class="pill eng">ENG</span>':'<span class="pill neng">Non-ENG</span>')+'</td>'+
+        '<td>'+(t.role==="madre"?'<span class="pill madre">Madre</span>'
+               :t.role==="figlio"?'<span class="pill figlio">Figlio</span>'
+               :'<span class="umeta">—</span>')+'</td>'+
+        '<td>'+(t.is_eng===true?'<span class="pill eng">ENG</span>'
+               :t.is_eng===false?'<span class="pill neng">Non-ENG</span>'
+               :'<span class="umeta">—</span>')+'</td>'+
       '</tr>';
     });
     html+='</tbody></table></div>'+
@@ -640,9 +785,572 @@
   $("rit-upload-btn").addEventListener("click", function(){ ritUpload(); });
   $("rit-overlay").addEventListener("click", function(e){ if(e.target===$("rit-overlay")) ritCloseConflict(); });
 
+  // ========== 8.50.0: Archivio STL (cartella unica) ==========
+  var stlAssets = [];
+  var lockCodeSet = false;
+
+  function stlMsg(t, cls){
+    var el=$("stl-msg"); el.textContent=t||"";
+    el.className="rit-msg"+(cls?(" "+cls):"");
+  }
+  function fmtBytes(n){
+    if(n==null) return "—";
+    if(n<1024) return n+" B";
+    if(n<1048576) return (Math.round(n/102.4)/10)+" KB";
+    return (Math.round(n/104857.6)/10)+" MB";
+  }
+
+  function stlCodeStatus(){
+    // GET /admin/rit/lock-code -> { is_set } (solo SE impostato, mai il valore)
+    fetch(API+"/admin/rit/lock-code",{headers:adminHeaders()})
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(d){ lockCodeSet=!!d.is_set; })
+      .catch(function(){});
+  }
+
+  function stlLoad(){
+    // GET /admin/rit/stl -> { assets:[...] }
+    fetch(API+"/admin/rit/stl",{headers:adminHeaders()})
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(d){ stlAssets=(d.assets||[]); stlRender(); edRefreshFileSelects(); })
+      .catch(function(status){ if(status!==401 && status!==403){ toast("Errore nel caricamento dell'archivio STL."); } });
+  }
+
+  function stlRender(){
+    var tb=$("stl-rows"); tb.innerHTML="";
+    if(!stlAssets.length){ $("stl-empty").classList.remove("hidden"); return; }
+    $("stl-empty").classList.add("hidden");
+    stlAssets.forEach(function(a){
+      var tr=document.createElement("tr");
+      tr.innerHTML =
+        '<td class="rit-mono" style="color:var(--accent-deep);font-weight:600">'+escapeHtml(a.name)+'</td>'+
+        '<td class="umeta num">'+fmtBytes(a.size_bytes)+'</td>'+
+        '<td class="umeta num">'+(a.used_by>0 ? a.used_by+(a.used_by===1?' libreria':' librerie') : '—')+'</td>'+
+        '<td>'+(a.locked?'<span class="pill lock"><span class="dot"></span>Bloccato</span>'
+                        :'<span class="pill free">Libero</span>')+'</td>'+
+        '<td class="umeta">'+fmtDate(a.updated_at||a.uploaded_at)+
+          (a.uploaded_by?'<br><span class="uemail">'+escapeHtml(a.uploaded_by)+'</span>':'')+'</td>'+
+        '<td class="actcell"></td>';
+      var act=tr.querySelector(".actcell");
+      var pv=document.createElement("button");
+      pv.className="linkbtn"; pv.textContent="Anteprima";
+      pv.addEventListener("click", function(){ stlPreviewAsset(a.name); });
+      act.appendChild(pv);
+      var lk=document.createElement("button");
+      lk.className="linkbtn"; lk.textContent=a.locked?"Sblocca":"Blocca";
+      lk.addEventListener("click", function(){ stlToggleLock(a); });
+      act.appendChild(lk);
+      var del=document.createElement("button");
+      del.className="linkbtn danger"; del.textContent="Elimina";
+      del.addEventListener("click", function(){ stlDelete(a); });
+      act.appendChild(del);
+      tb.appendChild(tr);
+    });
+  }
+
+  function stlToggleLock(a){
+    if(a.locked){
+      // lo SBLOCCO richiede il codice; la verifica sta sul server
+      var code=prompt('Codice di sicurezza per sbloccare "'+a.name+'":');
+      if(code==null) return;
+      fetch(API+"/admin/rit/stl/"+encodeURIComponent(a.name)+"/unlock",
+        {method:"POST",
+         headers:{"Authorization":"Bearer "+ADMIN_TOKEN,"Content-Type":"application/json"},
+         body:JSON.stringify({code:code})})
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+        .then(function(res){
+          if(res.ok){ toast("File sbloccato."); stlLoad(); }
+          else { toast(res.body.detail||"Errore nello sblocco."); }
+        })
+        .catch(function(){ toast("Errore di rete."); });
+    } else {
+      if(!lockCodeSet){ toast("Imposta prima il codice di sicurezza."); stlCodeOpen(); return; }
+      if(!confirm('Bloccare "'+a.name+'"?\nNon sarà cancellabile né sovrascrivibile senza il codice.')) return;
+      fetch(API+"/admin/rit/stl/"+encodeURIComponent(a.name)+"/lock",
+        {method:"POST",headers:adminHeaders()})
+        .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function(){ toast("File bloccato."); stlLoad(); })
+        .catch(function(){ toast("Errore nel blocco."); });
+    }
+  }
+
+  function stlDelete(a){
+    if(a.locked){ toast("File bloccato: sbloccalo prima con il codice."); return; }
+    if(!confirm('Eliminare "'+a.name+'" dall\'archivio?')) return;
+    fetch(API+"/admin/rit/stl/"+encodeURIComponent(a.name),
+      {method:"DELETE",headers:adminHeaders()})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+      .then(function(res){
+        if(res.ok){ toast("File eliminato."); stlLoad(); }
+        else { toast(res.body.detail||"Errore nell'eliminazione."); }
+      })
+      .catch(function(){ toast("Errore di rete."); });
+  }
+
+  function stlUpload(decided){
+    var files=$("stl-files").files;
+    if(!files || !files.length){ stlMsg("Seleziona uno o più file STL.","err"); return; }
+    var fd=new FormData();
+    for(var i=0;i<files.length;i++){ fd.append("files", files[i]); }
+    if(decided){
+      // presenza di stl_overwrite (anche vuoto) = decisione presa:
+      // i nomi elencati si sovrascrivono, gli altri duplicati non si caricano
+      fd.append("stl_overwrite", JSON.stringify(decided.overwrite||[]));
+      if(decided.code){ fd.append("code", decided.code); }
+    }
+    $("stl-upload-btn").disabled=true; stlMsg("Caricamento…");
+    fetch(API+"/admin/rit/stl",{method:"POST",headers:adminHeaders(),body:fd})
+      .then(function(r){ return r.json().then(function(j){ return {status:r.status, body:j}; },
+                                              function(){ return {status:r.status, body:{}}; }); })
+      .then(function(res){
+        $("stl-upload-btn").disabled=false;
+        if(res.status===200 && res.body.status==="ok"){
+          $("stl-files").value="";
+          var b=res.body, parts=[];
+          if((b.created||[]).length) parts.push(b.created.length+" caricati");
+          if((b.overwritten||[]).length) parts.push(b.overwritten.length+" sovrascritti");
+          if((b.unchanged||[]).length) parts.push(b.unchanged.length+" già presenti (identici)");
+          if((b.skipped||[]).length) parts.push(b.skipped.length+" non caricati");
+          stlMsg((parts.join(", ")||"Nessuna modifica")+".","ok");
+          stlLoad();
+          return;
+        }
+        if(res.status===409 && res.body.status==="stl_conflict"){
+          stlMsg("");
+          ritShowConfirm({stl_conflicts:res.body.conflicts||[]}, function(dec){
+            stlUpload({overwrite:dec.overwrite, code:dec.code});
+          });
+          return;
+        }
+        stlMsg("Errore: "+(res.body.detail||("HTTP "+res.status)),"err");
+      })
+      .catch(function(){ $("stl-upload-btn").disabled=false; stlMsg("Errore di rete.","err"); });
+  }
+
+  // Modale conferma condivisa (upload archivio / CSV / editor): conflitti STL
+  // per nome (checkbox "sovrascrivi" per file; default = NON caricare il
+  // duplicato e usare il file già in archivio) + librerie esistenti da
+  // sovrascrivere. onConfirm({overwrite:[nomi], code}).
+  function ritShowConfirm(body, onConfirm){
+    var box=$("rit-confirm");
+    var stl=(body.stl_conflicts||[]), libs=(body.existing_libraries||[]);
+    var html='<h3>Conferma necessaria</h3>';
+    if(stl.length){
+      html+='<p>Questi file esistono già in archivio con contenuto diverso. Spunta quelli da <strong>sovrascrivere</strong> (le librerie che li usano si aggiornano al nuovo file); gli altri non verranno caricati e si userà il file già in archivio.</p>';
+      stl.forEach(function(c){
+        html+='<label class="rit-conf-item"><input type="checkbox" data-cfn="'+escapeHtml(c.name)+'">'+
+          '<span class="nm">'+escapeHtml(c.name)+'</span>'+
+          (c.locked?'<span class="pill lock">Bloccato</span>':'')+'</label>';
+      });
+    }
+    if(libs.length){
+      html+='<p style="margin-top:14px">Queste librerie esistono già e verranno <strong>sovrascritte</strong>:</p>';
+      libs.forEach(function(e){
+        html+='<div class="rit-existing"><div class="nm">'+escapeHtml(e.import_name)+
+          (e.active?' <span class="pill ok"><span class="dot"></span>attiva</span>':'')+'</div>'+
+          '<div class="meta">'+(e.n_types!=null?e.n_types:0)+' type · caricata '+fmtDate(e.uploaded_at)+
+          (e.uploaded_by?' da '+escapeHtml(e.uploaded_by):'')+'</div></div>';
+      });
+    }
+    html+='<div id="rit-conf-code" class="hidden" style="margin-top:12px">'+
+      '<p style="margin-bottom:6px">Tra i file da sovrascrivere ce n\'è almeno uno <strong>bloccato</strong>: serve il codice di sicurezza.</p>'+
+      '<input type="password" class="codefield" id="rit-conf-code-in" placeholder="Codice di sicurezza"></div>';
+    html+='<div class="row" style="margin-top:16px">'+
+      '<button class="btn authorize" id="rit-conf-ok">Conferma</button>'+
+      '<button class="btn revoke" id="rit-conf-cancel">Annulla</button></div>';
+    box.innerHTML=html;
+    function refreshCode(){
+      var need=false;
+      box.querySelectorAll("[data-cfn]").forEach(function(cb){
+        if(cb.checked){
+          var c=stl.filter(function(x){ return x.name===cb.getAttribute("data-cfn"); })[0];
+          if(c && c.locked) need=true;
+        }
+      });
+      $("rit-conf-code").classList.toggle("hidden", !need);
+    }
+    box.querySelectorAll("[data-cfn]").forEach(function(cb){ cb.addEventListener("change", refreshCode); });
+    box.querySelector("#rit-conf-ok").addEventListener("click", function(){
+      var ow=[];
+      box.querySelectorAll("[data-cfn]").forEach(function(cb){
+        if(cb.checked) ow.push(cb.getAttribute("data-cfn"));
+      });
+      var needCode=!$("rit-conf-code").classList.contains("hidden");
+      var codeEl=box.querySelector("#rit-conf-code-in");
+      var code=codeEl?codeEl.value:"";
+      if(needCode && !code){ codeEl.focus(); return; }
+      $("rit-confirm-overlay").classList.remove("show");
+      onConfirm({overwrite:ow, code:(needCode?code:null)});
+    });
+    box.querySelector("#rit-conf-cancel").addEventListener("click", function(){
+      $("rit-confirm-overlay").classList.remove("show");
+    });
+    $("rit-confirm-overlay").classList.add("show");
+  }
+
+  function ritRowsOkMsg(b){
+    var libs=(b.libraries||[]);
+    var created=libs.filter(function(l){ return l.action==="created"; }).length;
+    var updated=libs.length-created;
+    var m="Librerie: "+created+" create"+(updated?", "+updated+" aggiornate":"")+".";
+    var s=[];
+    if((b.stl_created||[]).length) s.push(b.stl_created.length+" nuovi");
+    if((b.stl_overwritten||[]).length) s.push(b.stl_overwritten.length+" sovrascritti");
+    if((b.stl_unchanged||[]).length) s.push(b.stl_unchanged.length+" già presenti");
+    if(s.length) m+=" STL: "+s.join(", ")+".";
+    return m+" Verifica i parametri, poi attiva.";
+  }
+
+  // ---------- codice lucchetto ----------
+  function stlCodeOpen(){
+    var box=$("stl-code-modal");
+    var html='<h3>'+(lockCodeSet?'Cambia codice di sicurezza':'Imposta codice di sicurezza')+'</h3>'+
+      '<p>Il codice protegge i file con lucchetto: serve per sbloccarli o sovrascriverli. Viene salvato solo in forma cifrata.</p>';
+    if(lockCodeSet){ html+='<input type="password" class="codefield" id="stl-code-cur" placeholder="Codice attuale">'; }
+    html+='<input type="password" class="codefield" id="stl-code-new" placeholder="Nuovo codice (min 4 caratteri)">'+
+      '<input type="password" class="codefield" id="stl-code-new2" placeholder="Ripeti nuovo codice">'+
+      '<div class="row" style="margin-top:8px">'+
+      '<button class="btn authorize" id="stl-code-save">Salva</button>'+
+      '<button class="btn revoke" id="stl-code-cancel">Annulla</button></div>'+
+      '<p class="rit-msg err" id="stl-code-err" style="margin-top:8px"></p>';
+    box.innerHTML=html;
+    box.querySelector("#stl-code-save").addEventListener("click", function(){
+      var nw=box.querySelector("#stl-code-new").value;
+      var nw2=box.querySelector("#stl-code-new2").value;
+      var err=box.querySelector("#stl-code-err");
+      if(nw.length<4){ err.textContent="Codice troppo corto (minimo 4 caratteri)."; return; }
+      if(nw!==nw2){ err.textContent="I due codici non coincidono."; return; }
+      var payload={code_new:nw};
+      var cur=box.querySelector("#stl-code-cur");
+      if(cur){ payload.code_current=cur.value; }
+      fetch(API+"/admin/rit/lock-code",
+        {method:"POST",
+         headers:{"Authorization":"Bearer "+ADMIN_TOKEN,"Content-Type":"application/json"},
+         body:JSON.stringify(payload)})
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+        .then(function(res){
+          if(res.ok){ lockCodeSet=true; $("stl-code-overlay").classList.remove("show"); toast("Codice salvato."); }
+          else { err.textContent=res.body.detail||"Errore nel salvataggio."; }
+        })
+        .catch(function(){ err.textContent="Errore di rete."; });
+    });
+    box.querySelector("#stl-code-cancel").addEventListener("click", function(){
+      $("stl-code-overlay").classList.remove("show");
+    });
+    $("stl-code-overlay").classList.add("show");
+  }
+
+  // ---------- anteprima 3D (Three r169, loader importmap come /vedere) ----------
+  var prevState=null;
+  var prevGen=0;   // token generazione: invalida fetch pendenti su chiusura/riapertura
+
+  function whenThree(cb){
+    if(window.THREE){ cb(); return; }
+    window.addEventListener("three-ready", function h(){
+      window.removeEventListener("three-ready", h); cb();
+    });
+  }
+
+  function parseSTL(buf){
+    // STL binario (header 80B + uint32 + 50B/triangolo) o ASCII (solid/facet)
+    var THREE=window.THREE;
+    var pos=[], norm=[];
+    var headBytes=new Uint8Array(buf, 0, Math.min(512, buf.byteLength));
+    var head=""; for(var i=0;i<headBytes.length;i++){ head+=String.fromCharCode(headBytes[i]); }
+    var isAscii=/^\s*solid/.test(head) && head.indexOf("facet")>=0;
+    if(!isAscii){
+      if(buf.byteLength<84) throw new Error("file troppo corto");
+      var dv=new DataView(buf);
+      var n=dv.getUint32(80,true);
+      if(84+n*50>buf.byteLength){ n=Math.floor((buf.byteLength-84)/50); }
+      var off=84;
+      for(var t=0;t<n;t++){
+        var nx=dv.getFloat32(off,true), ny=dv.getFloat32(off+4,true), nz=dv.getFloat32(off+8,true);
+        off+=12;
+        for(var v=0;v<3;v++){
+          pos.push(dv.getFloat32(off,true), dv.getFloat32(off+4,true), dv.getFloat32(off+8,true));
+          norm.push(nx,ny,nz); off+=12;
+        }
+        off+=2;
+      }
+    } else {
+      var txt=new TextDecoder().decode(buf);
+      var re=/facet\s+normal\s+(\S+)\s+(\S+)\s+(\S+)[\s\S]*?outer\s+loop([\s\S]*?)endloop/g, m;
+      while((m=re.exec(txt))){
+        var ax=parseFloat(m[1]), ay=parseFloat(m[2]), az=parseFloat(m[3]);
+        var vre=/vertex\s+(\S+)\s+(\S+)\s+(\S+)/g, vm, cnt=0;
+        while((vm=vre.exec(m[4])) && cnt<3){
+          pos.push(parseFloat(vm[1]), parseFloat(vm[2]), parseFloat(vm[3]));
+          norm.push(ax,ay,az); cnt++;
+        }
+      }
+    }
+    if(!pos.length) throw new Error("nessun triangolo riconosciuto");
+    var g=new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+    g.setAttribute("normal", new THREE.Float32BufferAttribute(norm,3));
+    return g;
+  }
+
+  function stlPreviewAsset(name){
+    stlPreviewOpen(name,
+      fetch(API+"/admin/rit/stl/"+encodeURIComponent(name)+"/content",{headers:adminHeaders()})
+        .then(function(r){ return r.ok ? r.arrayBuffer() : Promise.reject(r.status); }));
+  }
+
+  function stlPreviewOpen(title, bufPromise){
+    var gen=++prevGen;
+    $("stl-prev-title").textContent="Anteprima — "+title;
+    $("stl-prev-overlay").classList.add("show");
+    whenThree(function(){
+      bufPromise.then(function(buf){ if(gen===prevGen){ stlPreviewRender(buf); } })
+        .catch(function(){ if(gen===prevGen){ toast("Errore nel caricamento dello STL."); stlPreviewClose(); } });
+    });
+  }
+
+  function stlPreviewRender(buf){
+    var THREE=window.THREE;
+    stlPreviewDispose();
+    var holder=$("stl-prev-canvas");
+    var w=holder.clientWidth||680, h=holder.clientHeight||420;
+    var renderer=new THREE.WebGLRenderer({antialias:true});
+    renderer.setPixelRatio(window.devicePixelRatio||1);
+    renderer.setSize(w,h);
+    holder.appendChild(renderer.domElement);
+    var scene=new THREE.Scene();
+    scene.background=new THREE.Color(0x10161D);
+    var geo;
+    try{ geo=parseSTL(buf); }
+    catch(e){ toast("STL non valido: "+e.message); stlPreviewClose(); return; }
+    geo.computeBoundingSphere();
+    var bs=geo.boundingSphere, R=Math.max(bs.radius,0.5), C=bs.center;
+    // raggio che include SEMPRE l'origine (0,0,0): mesh + terna inquadrate insieme
+    var Rall=Math.max(R, C.length()+R)*1.15;
+    var cam=new THREE.PerspectiveCamera(45, w/h, Rall/200, Rall*40);
+    cam.up.set(0,0,1);
+    var mid=new THREE.Vector3(C.x/2, C.y/2, C.z/2);
+    cam.position.set(mid.x+Rall*1.5, mid.y-Rall*1.5, mid.z+Rall*0.9);
+    var controls=new THREE.OrbitControls(cam, renderer.domElement);
+    controls.target.copy(mid);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x33414F, 1.0));
+    var dl=new THREE.DirectionalLight(0xffffff, 1.4);
+    dl.position.set(1,-1,2); scene.add(dl);
+    var mesh=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x9FB2C4, metalness:0.15, roughness:0.6}));
+    scene.add(mesh);
+    // origine (0,0,0): terna AxesHelper (X rosso, Y verde, Z blu) + sfera bianca
+    scene.add(new THREE.AxesHelper(Rall*0.9));
+    var dot=new THREE.Mesh(new THREE.SphereGeometry(Math.max(Rall*0.018,0.05),16,12),
+                           new THREE.MeshBasicMaterial({color:0xFFFFFF}));
+    scene.add(dot);
+    prevState={renderer:renderer, controls:controls, geo:geo, alive:true};
+    (function loop(){
+      if(!prevState || !prevState.alive) return;
+      controls.update();
+      renderer.render(scene, cam);
+      requestAnimationFrame(loop);
+    })();
+  }
+
+  function stlPreviewDispose(){
+    if(prevState){
+      prevState.alive=false;
+      try{ prevState.controls.dispose(); }catch(e){}
+      try{ prevState.geo.dispose(); }catch(e){}
+      try{ prevState.renderer.dispose(); }catch(e){}
+      prevState=null;
+    }
+    $("stl-prev-canvas").innerHTML="";
+  }
+  function stlPreviewClose(){
+    prevGen++;   // invalida eventuali fetch ancora in volo
+    $("stl-prev-overlay").classList.remove("show");
+    stlPreviewDispose();
+  }
+
+  // ========== 8.50.0: Crea libreria (editor in-pannello) ==========
+  var edSeq=0;
+  var edFiles={};   // rowid -> File (upload nuovo scelto per quella riga)
+
+  function edMsg(t, cls){
+    var el=$("ed-msg"); el.textContent=t||"";
+    el.className="rit-msg"+(cls?(" "+cls):"");
+  }
+
+  function edFileOptions(sel, current){
+    var html='<option value="">— scegli —</option><option value="__upload__">Carica nuovo…</option>';
+    var inArchive=false;
+    stlAssets.forEach(function(a){
+      if(a.name===current) inArchive=true;
+      html+='<option value="'+escapeHtml(a.name)+'">'+escapeHtml(a.name)+' (archivio)</option>';
+    });
+    if(current && current!=="__upload__" && !inArchive){
+      html+='<option value="'+escapeHtml(current)+'">'+escapeHtml(current)+' (nuovo)</option>';
+    }
+    sel.innerHTML=html;
+    sel.value=current||"";
+  }
+
+  function edRefreshFileSelects(){
+    document.querySelectorAll('#ed-rows select[data-ed="file"]').forEach(function(sel){
+      edFileOptions(sel, sel.value);
+    });
+  }
+
+  function edAddRow(){
+    var id=++edSeq;
+    var tr=document.createElement("tr");
+    tr.setAttribute("data-rowid", String(id));
+    tr.innerHTML=
+      '<td><input data-ed="marca" placeholder="Megagen"></td>'+
+      '<td><input data-ed="modello" placeholder="AnyRidge"></td>'+
+      '<td style="width:76px"><input data-ed="diametro" placeholder="4.0"></td>'+
+      '<td style="width:100px"><input data-ed="asse" placeholder="0,0,1"></td>'+
+      '<td style="width:110px"><select data-ed="ruolo">'+
+        '<option value="madre">Madre</option><option value="figlio">Figlio</option></select></td>'+
+      '<td><div class="ed-file"><select data-ed="file"></select>'+
+        '<button class="linkbtn" data-ed="prev" title="Anteprima 3D con origine">Anteprima</button></div>'+
+        '<input type="file" accept=".stl" data-ed="fpick" class="hidden"></td>'+
+      '<td><input data-ed="nome" placeholder="Abutment ENG"></td>'+
+      '<td style="width:84px"><select data-ed="eng">'+
+        '<option value="">—</option><option value="si">Sì</option><option value="no">No</option></select></td>'+
+      '<td class="actcell"><button class="linkbtn danger" data-ed="del" title="Cancella riga" style="font-size:17px">×</button></td>';
+    var fsel=tr.querySelector('select[data-ed="file"]');
+    edFileOptions(fsel, "");
+    var fpick=tr.querySelector('input[data-ed="fpick"]');
+    fsel.addEventListener("change", function(){
+      if(fsel.value==="__upload__"){ fpick.click(); fsel.value=""; }
+      else if(edFiles[id] && edFiles[id].name!==fsel.value){
+        // upload locale scartato: ricostruisci le opzioni cosi' la voce
+        // "(nuovo)" orfana sparisce e non resta selezionabile senza File
+        delete edFiles[id];
+        edFileOptions(fsel, fsel.value);
+      }
+    });
+    fpick.addEventListener("change", function(){
+      var f=fpick.files[0];
+      if(!f) return;
+      if(!/\.stl$/i.test(f.name)){ edMsg("Solo file .stl.","err"); fpick.value=""; return; }
+      edFiles[id]=f;
+      edFileOptions(fsel, f.name);
+      edMsg("");
+    });
+    tr.querySelector('button[data-ed="prev"]').addEventListener("click", function(){
+      var v=fsel.value;
+      if(!v || v==="__upload__"){ edMsg("Scegli prima un file per questa riga.","err"); return; }
+      if(edFiles[id] && edFiles[id].name===v){ stlPreviewOpen(v, edFiles[id].arrayBuffer()); }
+      else { stlPreviewAsset(v); }
+    });
+    tr.querySelector('button[data-ed="del"]').addEventListener("click", function(){
+      delete edFiles[id]; tr.remove();
+    });
+    $("ed-rows").appendChild(tr);
+  }
+
+  function edReadRows(){
+    var out=[], trs=$("ed-rows").querySelectorAll("tr");
+    for(var i=0;i<trs.length;i++){
+      var tr=trs[i];
+      var gv=function(k){
+        var el=tr.querySelector('[data-ed="'+k+'"]');
+        return el?String(el.value||"").trim():"";
+      };
+      var r={marca:gv("marca"), modello:gv("modello"), diametro:gv("diametro"),
+             asse_occlusale:gv("asse"), ruolo:gv("ruolo"), file:gv("file"),
+             nome:gv("nome"), eng:gv("eng")};
+      if(!r.marca && !r.modello && !r.file){ continue; }   // riga vuota: salta
+      if(!r.marca || !r.modello || !r.diametro){
+        return {err:"Riga "+(i+1)+": marca, modello e diametro sono obbligatori."};
+      }
+      if(!r.file || r.file==="__upload__"){
+        return {err:"Riga "+(i+1)+": scegli un file STL."};
+      }
+      out.push(r);
+    }
+    if(!out.length){ return {err:"Nessuna riga compilata."}; }
+    return {rows:out};
+  }
+
+  function edSave(decided){
+    var rd=edReadRows();
+    if(rd.err){ edMsg(rd.err,"err"); return; }
+    var fd=new FormData();
+    fd.append("rows", JSON.stringify(rd.rows));
+    var added={}, dupName=null;
+    Object.keys(edFiles).forEach(function(id){
+      var f=edFiles[id];
+      var used=rd.rows.some(function(r){ return r.file===f.name; });
+      if(!used) return;
+      var prev=added[f.name];
+      if(prev){
+        // stesso nome su piu' righe: ok solo se e' lo STESSO file
+        if(prev.size!==f.size || prev.lastModified!==f.lastModified){ dupName=f.name; }
+        return;
+      }
+      fd.append("stl_files", f, f.name);
+      added[f.name]=f;
+    });
+    if(dupName){
+      edMsg('Il file "'+dupName+'" è stato caricato su più righe con contenuti diversi: rinominane uno.',"err");
+      return;
+    }
+    if(decided){
+      fd.append("stl_overwrite", JSON.stringify(decided.overwrite||[]));
+      fd.append("lib_overwrite","1");
+      if(decided.code){ fd.append("code", decided.code); }
+    }
+    $("ed-save").disabled=true; edMsg("Salvataggio…");
+    fetch(API+"/admin/rit/libraries",{method:"POST",headers:adminHeaders(),body:fd})
+      .then(function(r){ return r.json().then(function(j){ return {status:r.status, body:j}; },
+                                              function(){ return {status:r.status, body:{}}; }); })
+      .then(function(res){
+        $("ed-save").disabled=false;
+        if(res.status===200 && res.body.status==="ok"){
+          edMsg(ritRowsOkMsg(res.body),"ok");
+          ritLoad(); stlLoad();
+          return;
+        }
+        if(res.status===409 && res.body.status==="confirm_needed"){
+          edMsg("");
+          ritShowConfirm(res.body, function(dec){ edSave(dec); });
+          return;
+        }
+        edMsg("Errore: "+(res.body.detail||("HTTP "+res.status)),"err");
+      })
+      .catch(function(){ $("ed-save").disabled=false; edMsg("Errore di rete.","err"); });
+  }
+
+  function edTemplate(){
+    // CSV d'esempio: 2 diametri -> 2 librerie; BOM per Excel
+    var csv='marca,modello,diametro,asse_occlusale,ruolo,file,nome,eng\n'+
+      'Megagen,AnyRidge,3.5,"0,0,1",madre,sb_35.stl,Scanbody Ø3.5,\n'+
+      'Megagen,AnyRidge,3.5,,figlio,abut_eng_35.stl,Abutment ENG,si\n'+
+      'Megagen,AnyRidge,4.0,"0,0,1",madre,sb_40.stl,Scanbody Ø4.0,\n'+
+      'Megagen,AnyRidge,4.0,,figlio,abut_neng_40.stl,Abutment Non-ENG,no\n';
+    var blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="libreria_template.csv";
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },400);
+  }
+
+  // ---------- wiring 8.50.0 ----------
+  $("stl-upload-btn").addEventListener("click", function(){ stlUpload(); });
+  $("stl-code-btn").addEventListener("click", function(){ stlCodeOpen(); });
+  $("stl-prev-close").addEventListener("click", stlPreviewClose);
+  $("stl-prev-overlay").addEventListener("click", function(e){ if(e.target===$("stl-prev-overlay")) stlPreviewClose(); });
+  $("stl-code-overlay").addEventListener("click", function(e){ if(e.target===$("stl-code-overlay")) $("stl-code-overlay").classList.remove("show"); });
+  $("rit-confirm-overlay").addEventListener("click", function(e){ if(e.target===$("rit-confirm-overlay")) $("rit-confirm-overlay").classList.remove("show"); });
+  $("ed-add-row").addEventListener("click", function(){ edAddRow(); });
+  $("ed-save").addEventListener("click", function(){ edSave(); });
+  $("ed-template").addEventListener("click", edTemplate);
+
   // ---------- init ----------
   loadUsers();
   ritLoad();
+  stlLoad();
+  stlCodeStatus();
+  edAddRow();
 
 })();
 </script>

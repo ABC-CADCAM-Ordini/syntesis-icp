@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.49.0 — **Data:** 2026-06-11
+> **Versione software mappata:** 8.50.0 — **Data:** 2026-06-12
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -20,7 +20,7 @@ Sorgenti primarie:
 | **Analizzare** | `/analizzare` | `syntesis-analyzer-v3b.html` | [169-174](../backend/main.py#L169) | App di analisi di precisione (~3.87 MB monolite). 5 workflow interni — analizza, accoppia, misurare, sostituire, **replace (Replace-iT, 8.18.0)** — gestiti da `selectWorkflow`. |
 | **Dashboard** | `/dashboard` | `syntesis-dashboard-v1.html` | [186-192](../backend/main.py#L186) | Area personale utente (mie analisi, profilo). |
 | **Accedi** | `/accedi` | `syntesis-accedi.html` | [194-201](../backend/main.py#L194) | Accesso a 3 stati: login, registrazione senza licenza (utente pending), pannello attesa con polling `/auth/me` + vista autorizzato. |
-| **Gestione** | `/gestione` | `syntesis-gestione.html` | [203-210](../backend/main.py#L203) | Pannello admin: lista registrati, autorizza (genera chiave) / revoca. **8.16.0**: sezione "Librerie Replace-iT" (ingest/lista/verifica/attivazione librerie scanbody Exocad). API `/admin/*` e `/admin/rit/*` protette da `require_admin`. |
+| **Gestione** | `/gestione` | `syntesis-gestione.html` | [203-210](../backend/main.py#L203) | Pannello admin: lista registrati, autorizza (genera chiave) / revoca. **8.16.0**: sezione "Librerie Replace-iT" (ingest/lista/verifica/attivazione librerie scanbody Exocad). **8.50.0**: sezioni "Archivio STL" (cartella unica per nome, lucchetto + codice, anteprima 3D) e "Crea libreria" (editor a righe madre/figlio + import CSV + template). API `/admin/*` e `/admin/rit/*` protette da `require_admin`. |
 
 Note di completezza:
 - I 6 file `.html` in `backend/static/` (accedi, analyzer-v3b, dashboard, gestione, icp-vedere, **synthesis-home**) sono **tutti** serviti dalle route sopra — nessun HTML orfano.
@@ -350,7 +350,7 @@ Pannello accesso a 3 stati (login/registrazione/attesa→autorizzato), ~468 righ
 
 ## Vista: Gestione (`/gestione` → `syntesis-gestione.html`)
 
-Pannello admin (~390 righe). **Wiring via `addEventListener`**; righe utente generate da `render()` [262]. Righe = `syntesis-gestione.html`.
+Pannello admin (~1320 righe da 8.50.0). **Wiring via `addEventListener`**; righe utente generate da `render()`. Righe = `syntesis-gestione.html` (i numeri pre-8.50 sono shiftati: localizzare con `grep -n`).
 
 | Elemento | id / selettore | Evento | Funzione | Effetto | Righe markup | Righe binding |
 |---|---|---|---|---|---|---|
@@ -369,15 +369,35 @@ Aggiunta sotto il pannello utenti, **stessa IIFE e stesso wiring `addEventListen
 
 | Elemento | id / selettore | Evento | Funzione | Effetto | Endpoint |
 |---|---|---|---|---|---|
-| Input ZIP + Carica | `#rit-file` / `#rit-upload-btn` | click | `ritUpload` | upload multipart libreria Exocad | `POST /admin/rit/libraries` |
+| Input ZIP + Carica | `#rit-file` / `#rit-upload-btn` | click | `ritUpload` | upload multipart libreria — ZIP Exocad (config.xml) **o, da 8.50.0, ZIP manuale (libreria.csv + STL)**; risposta `kind:"rows"` → `ritRowsOkMsg`; 409 `confirm_needed` → `ritShowConfirm` (ri-POST con `stl_overwrite`/`lib_overwrite`/`code`) | `POST /admin/rit/libraries` |
 | Tabella librerie | `#rit-rows` (render) | — | `ritLoad` → `ritRender` | lista import_name/keyword/display/fornitore/n.type/stato | `GET /admin/rit/libraries` |
-| **(per riga)** Dettagli | (injected) | click | `ritDetail` → `ritRenderDetail` | pannello read-only root-params + type (click_center/axis/ENG) + preview PNG | `GET /admin/rit/libraries/{id}` (+ `/preview`) |
+| **(per riga)** Dettagli | (injected) | click | `ritDetail` → `ritRenderDetail` | pannello read-only root-params + type (click_center/axis/**Ruolo madre-figlio 8.50.0**/ENG a 3 stati) + preview PNG; sottotitolo per `source` (exocad/csv/editor) | `GET /admin/rit/libraries/{id}` (+ `/preview`) |
 | **(per riga)** toggle Attiva/Disattiva | (injected) | click | `ritToggle` | attiva/disattiva libreria | `PATCH /admin/rit/libraries/{id}/active` |
 | Dialog conflitto keyword | `#rit-overlay` / `#rit-conflict` | click | `ritShowConflict` / `ritCloseConflict` | da 409 `keyword_conflict`: elenca **esplicitamente** ogni libreria sovrascrivibile (import_name, caricata, n.type, uploaded_by) da `existing[]`; per-riga "Sovrascrivi" (`mode=overwrite`+`target_library_id`) o "Importa come nuova" (`mode=new`+`import_name`) | (ri-`POST` con `mode`) |
 
 **Comportamento ingest** (server): salta `__MACOSX/` e `._*`, ignora subtype/`.sdfa`/firme RSA; **validazione bloccante** = ogni `MarkerFilename` deve esistere come STL nello ZIP (altrimenti 400, rollback totale); dedup STL per `sha256` del contenuto (`rit_marker_stl` globale); `active=FALSE` di default; `uploaded_by` = email admin dal JWT. Conflitto keyword senza `mode` → **409** con `existing[]`, nessuna scrittura.
 
 > **Empty-state e visibilità (`.hidden`)** — gli empty-state `#rit-empty` ("Nessuna libreria importata") e `#empty` (tabella utenti), più il pannello dettaglio `#rit-detail`, si nascondono/mostrano via toggle JS della classe `.hidden` (`ritRender` `.classList.add/remove("hidden")`, `render` utenti, close/open `#rit-detail`). **Fix 8.16.1**: la classe `.hidden` non aveva regola CSS nel `<style>` → il toggle non aveva effetto visivo e `#rit-empty` restava visibile a lista popolata (e `#empty` latente, mascherato dalla tabella sempre popolata). Aggiunta `.hidden{display:none}` (dopo `.empty`): il toggle ora funziona per tutti e tre. Solo CSS, nessuna modifica JS.
+
+### Sezione "Archivio STL" + "Crea libreria" (8.50.0 — creazione librerie dal pannello)
+
+Due sezioni sotto "Librerie Replace-iT", stessa IIFE/wiring. Backend: `admin.py` (`_rit_resolve_files`/`_rit_write_resolved` condivisi da TUTTE le porte, `_rit_ingest_rows` CSV/editor, `_rit_build_libraries_from_rows`, `_rit_check_lock_code`); DB: `database.py` (NUOVE `rit_stl_asset` = **cartella unica** per nome → sha256, `rit_lock_secret` = codice lucchetto hashed pbkdf2; colonne additive `rit_scanbody_type.role`, `rit_library.source`). **Archivio UNIFICATO (8.50.0)**: anche l'import Exocad passa dalla cartella → gli STL di **tutte** le librerie (Exocad incluse) vivono lì una sola volta; i marker condivisi (0T3/1T3/2T3 = scanbody IPD usato su più marche) si riusano. Backfill idempotente in `init_db` (normalizza `marker_filename` storici a basename + popola `rit_stl_asset` dai type esistenti). **Modello "live per nome" GLOBALE**: sovrascrivere un asset ripunta i `marker_sha256` dei type di **ogni** libreria che usa quel nome (lucchetto = protezione dei master). Anteprima 3D: Three r169 via importmap+bridge `window.THREE` (stesso loader di `/vedere`), `OrbitControls`, parser STL inline `parseSTL` (binario+ASCII), `AxesHelper` + sfera bianca su origine (0,0,0). Il runtime Replace-iT (v3b) **non è toccato**.
+
+| Elemento | id / selettore | Evento | Funzione | Effetto | Endpoint |
+|---|---|---|---|---|---|
+| Upload STL multiplo | `#stl-files` / `#stl-upload-btn` | click | `stlUpload` | carica in archivio; 409 `stl_conflict` → `ritShowConfirm` (per-file sovrascrivi/non caricare; bloccati → campo codice) | `POST /admin/rit/stl` |
+| Tabella archivio | `#stl-rows` (render) | — | `stlLoad` → `stlRender` | file/dimensione/usato-da/lucchetto/aggiornato; empty `#stl-empty` | `GET /admin/rit/stl` |
+| **(per riga)** Anteprima | (injected `.linkbtn`) | click | `stlPreviewAsset` → `stlPreviewOpen/Render` | modale `#stl-prev-overlay` con mesh + terna origine (X rosso/Y verde/Z blu) + sfera su (0,0,0) | `GET /admin/rit/stl/{name}/content` |
+| **(per riga)** Blocca/Sblocca | (injected `.linkbtn`) | click | `stlToggleLock` | blocco libero (se codice impostato); sblocco chiede il codice (`prompt`), verifica server-side | `POST /admin/rit/stl/{name}/lock` · `/unlock` |
+| **(per riga)** Elimina | (injected `.linkbtn.danger`) | click | `stlDelete` | confirm; il server rifiuta se `locked` (409) o `in_use` da librerie CSV/editor (409) | `DELETE /admin/rit/stl/{name}` |
+| Codice lucchetto… | `#stl-code-btn` | click | `stlCodeOpen` | modale `#stl-code-overlay`: imposta/cambia (richiede attuale se già impostato); stato via `stlCodeStatus` | `GET`/`POST /admin/rit/lock-code` |
+| + Aggiungi riga | `#ed-add-row` | click | `edAddRow` | nuova riga editor (marca/modello/Ø/asse/ruolo/file/nome/ENG); select file = archivio o "Carica nuovo…" (`input file` nascosto per riga, `edFiles[rowid]`) | — |
+| **(per riga)** Anteprima / × | (injected `[data-ed=prev]` / `[data-ed=del]`) | click | (inline) | anteprima del file della riga (upload locale via `File.arrayBuffer()` o archivio) / cancella riga | — |
+| Salva libreria | `#ed-save` | click | `edReadRows` → `edSave` | POST `rows` JSON + `stl_files` multipart; ok → `ritRowsOkMsg` + refresh; 409 `confirm_needed` → `ritShowConfirm` → ri-`edSave` | `POST /admin/rit/libraries` |
+| Scarica template CSV | `#ed-template` | click | `edTemplate` | Blob client-side `libreria_template.csv` (BOM Excel, 4 righe esempio, 2 diametri) | — |
+| Modale conferma | `#rit-confirm-overlay` / `#rit-confirm` | click | `ritShowConfirm` | conflitti STL per nome (checkbox per file; bloccati → `#rit-conf-code`) + librerie esistenti da sovrascrivere | (ri-POST con decisioni) |
+
+**Schema CSV / righe editor**: `marca,modello,diametro,asse_occlusale,ruolo,file,nome,eng` — obbligatorie marca/modello/diametro/ruolo(`madre`\|`figlio`)/file; separatore `,` o `;` auto; ogni (marca,modello,diametro) → una libreria (`display` "Marca Modello ØD", `import_name`/`keyword` slug, `supplier`=marca) con ≥1 madre e ≥1 figlio; upsert per `import_name` previa conferma. Vincolo fisico: **tutti gli STL esportati sulla stessa origine** (è ciò che fa ereditare la posa al figlio).
 
 ### API pubblica di lettura `/api/rit/*` (8.17.0 — Replace-iT Passo 2a, senza UI)
 

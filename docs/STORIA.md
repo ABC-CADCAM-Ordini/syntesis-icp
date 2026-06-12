@@ -4,6 +4,26 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.50.0: Crea librerie Replace-iT dal pannello admin + Archivio STL unificato
+
+Richiesta utente: *"un flusso semplice per creare librerie nuove dal pannello di Synthesis"*. Backend + pannello `/gestione`; **runtime `v3b` NON toccato** (`ANALIZZA_BUILD`/`<title>` invariati).
+
+**Tre porte sullo stesso `POST /admin/rit/libraries`, tutte verso un archivio unico:**
+1. ZIP Exocad (`config.xml`) — il flusso storico;
+2. ZIP manuale (`libreria.csv` + STL);
+3. **editor in-pannello** — griglia a righe (marca/modello/diametro/asse/ruolo/file/nome/ENG), `+`/`×`/Salva, file per riga dall'archivio o caricato al momento.
+
+Schema CSV (separatore `,`/`;` auto, BOM Excel): `marca,modello,diametro,asse_occlusale,ruolo,file,nome,eng`; ogni `(marca,modello,diametro)` → una `rit_library` (`source` csv|editor), con ≥1 madre e ≥1 figlio; `role` su `rit_scanbody_type`.
+
+**Archivio STL unificato** (`rit_stl_asset`, chiave = nome → `sha256`): la "cartella unica" del sistema. **Anche l'import Exocad passa di qui** → i marker condivisi (0T3/1T3/2T3 = scanbody IPD usato su più marche) vivono una sola volta. Collisione per nome con contenuto diverso → 409, conferma per-file sovrascrivi/salta. **"Live per nome" globale**: sovrascrivere un asset ripunta `marker_sha256` di tutte le librerie che lo usano. **Lucchetto** (`locked`) + **codice di sicurezza** unico (`rit_lock_secret`, hash pbkdf2 via `auth.hash_password`, gating SEMPRE server-side): blocca delete/overwrite dei master validati. **Anteprima 3D** in modale (Three r169 importmap come `/vedere`, parser STL inline) con terna assi + sfera bianca sull'origine (0,0,0). **Scarica template CSV** (Blob client-side).
+
+Implementazione:
+- `database.py`: tabelle `rit_stl_asset`, `rit_lock_secret`; colonne additive `rit_scanbody_type.role`, `rit_library.source`; backfill idempotente in `init_db` (normalizza i `marker_filename` storici a basename + popola l'archivio dai type esistenti, **guard anti-collisione**: i nomi storici con contenuti divergenti restano fuori dall'archivio e vengono loggati).
+- `admin.py`: helper condivisi `_rit_resolve_files` (fase pura) + `_rit_write_resolved`; parser CSV/righe; 8 endpoint archivio/lucchetto/codice; import Exocad a due gate (STL poi keyword, nessuna scrittura finché entrambi non sono decisi).
+- `syntesis-gestione.html`: sezioni "Archivio STL" e "Crea libreria", anteprima 3D, modale conferma, accumulatore decisioni client (`ritAcc`).
+- Versione: `registry.BACKEND_VERSION` 8.50.0; `docs/MAPPA_FUNZIONALE.md` aggiornata.
+- QA: `py_compile` + `node --check` OK; smoke-test resolver 5/5 + builder; **due review avversariali** (≈30 agenti), tutti i finding reali chiusi (MAJOR backfill collision-safe; dedup upload diretto; pre-check `import_name` Exocad prima delle scritture).
+
 ## 2026-06-11 — 8.49.0: Replace-iT — focus camera (doppio-clic) + nome dente (FDI)
 
 Item audit minore (multi-impianto). Solo blocco `replace*`; additivo, altri workflow INVARIATI.

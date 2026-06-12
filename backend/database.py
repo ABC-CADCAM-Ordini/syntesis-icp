@@ -6,8 +6,11 @@ PostgreSQL via asyncpg
 import os
 import asyncpg
 import re
+import logging
 from typing import Optional
 from datetime import datetime
+
+log = logging.getLogger("syntesis.db")
 
 _pool: Optional[asyncpg.Pool] = None
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/syntesis")
@@ -347,6 +350,93 @@ async def init_db():
 
         CREATE INDEX IF NOT EXISTS idx_rit_type_library ON rit_scanbody_type(library_id);
         CREATE INDEX IF NOT EXISTS idx_rit_library_active ON rit_library(active);
+        """)
+
+        # === v8.50.0 - Replace-iT: archivio STL + librerie da CSV/editor ===
+        # rit_stl_asset = la "cartella unica" visibile per NOME: ogni riga e' un
+        # nome-file che punta a un contenuto in rit_marker_stl (dedup per sha256).
+        # Modello "live per nome": sovrascrivere un asset ripunta i type delle
+        # librerie con source csv/editor che usano quel nome (match su
+        # marker_filename); le librerie Exocad NON seguono. locked = lucchetto
+        # anti cancellazione/sovrascrittura, si sblocca solo col codice di
+        # sicurezza (rit_lock_secret, riga singola id=1, hash pbkdf2 via
+        # auth.hash_password — MAI in chiaro). rit_library.source discrimina
+        # exocad|csv|editor (NULL = exocad, librerie pre-8.50);
+        # rit_scanbody_type.role = madre|figlio (NULL per le Exocad).
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS rit_stl_asset (
+            name         TEXT PRIMARY KEY,
+            sha256       CHAR(64) NOT NULL REFERENCES rit_marker_stl(sha256),
+            locked       BOOLEAN NOT NULL DEFAULT FALSE,
+            size_bytes   INTEGER,
+            uploaded_by  TEXT,
+            uploaded_at  TIMESTAMPTZ DEFAULT NOW(),
+            updated_at   TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS rit_lock_secret (
+            id           INTEGER PRIMARY KEY CHECK (id = 1),
+            code_hash    TEXT NOT NULL,
+            code_salt    TEXT NOT NULL,
+            updated_by   TEXT,
+            updated_at   TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        ALTER TABLE rit_scanbody_type ADD COLUMN IF NOT EXISTS role TEXT;
+        ALTER TABLE rit_library ADD COLUMN IF NOT EXISTS source TEXT;
+        """)
+
+        # v8.50.0 archivio UNICO: le librerie gia' importate (Exocad incluse)
+        # devono comparire nella cartella. (1) normalizzo i marker_filename
+        # storici a basename (chiave di match per nome dell'archivio); (2)
+        # backfillo rit_stl_asset con un asset per nome dai type esistenti.
+        # Idempotente: la UPDATE tocca solo righe con '/', l'INSERT e' ON
+        # CONFLICT DO NOTHING. Non resuscita asset cancellati: la delete e'
+        # permessa solo per asset NON referenziati, che qui non verrebbero
+        # ricreati (il SELECT parte dai type esistenti).
+        await conn.execute("""
+        UPDATE rit_scanbody_type
+           SET marker_filename = regexp_replace(marker_filename, '^.*/', '')
+         WHERE marker_filename LIKE '%/%';
+        """)
+
+        # COLLISIONI STORICHE: prima dell'archivio unico, due librerie Exocad
+        # potevano avere un marker con lo STESSO basename ma contenuto DIVERSO
+        # (dedup solo per sha, i path completi li distinguevano). NON li fondo
+        # alla cieca: questi nomi NON entrano in archivio (esclusi sotto) e li
+        # segnalo nei log per revisione admin — cosi' un overwrite "live per
+        # nome" non muta in silenzio una libreria mai rappresentata.
+        collisions = await conn.fetch("""
+            SELECT marker_filename, COUNT(DISTINCT marker_sha256) AS n
+              FROM rit_scanbody_type
+             WHERE marker_filename IS NOT NULL AND marker_filename <> ''
+               AND marker_sha256 IS NOT NULL
+             GROUP BY marker_filename
+            HAVING COUNT(DISTINCT marker_sha256) > 1
+        """)
+        if collisions:
+            log.warning(
+                "rit backfill: %d nomi con contenuti divergenti, NON messi in "
+                "archivio (revisione admin): %s",
+                len(collisions),
+                ", ".join(f"{r['marker_filename']} ({r['n']} sha)" for r in collisions))
+
+        await conn.execute("""
+        INSERT INTO rit_stl_asset (name, sha256, size_bytes)
+        SELECT DISTINCT ON (t.marker_filename)
+               t.marker_filename, t.marker_sha256, m.size_bytes
+          FROM rit_scanbody_type t
+          JOIN rit_marker_stl m ON m.sha256 = t.marker_sha256
+         WHERE t.marker_filename IS NOT NULL AND t.marker_filename <> ''
+           AND t.marker_sha256 IS NOT NULL
+           AND t.marker_filename NOT IN (
+               SELECT marker_filename FROM rit_scanbody_type
+                WHERE marker_filename IS NOT NULL AND marker_filename <> ''
+                  AND marker_sha256 IS NOT NULL
+                GROUP BY marker_filename
+               HAVING COUNT(DISTINCT marker_sha256) > 1)
+         ORDER BY t.marker_filename, t.id
+        ON CONFLICT (name) DO NOTHING;
         """)
 
         # Migrazione retroattiva: i contatti esistenti hanno gia\' role (TEXT libero)
@@ -1526,7 +1616,7 @@ async def rit_get_library_detail(library_id: int, active_only: bool = False) -> 
             SELECT id, import_name, keyword, display, connection_id,
                    rotation_lock_count, ref_rotation_offset,
                    axis_occlusal_x, axis_occlusal_y, axis_occlusal_z,
-                   supplier, supplier_version, active, uploaded_by, uploaded_at,
+                   supplier, supplier_version, source, active, uploaded_by, uploaded_at,
                    (preview_png IS NOT NULL) AS has_preview,
                    (logo_png IS NOT NULL) AS has_logo
             FROM rit_library WHERE id = $1{_act}
@@ -1537,7 +1627,7 @@ async def rit_get_library_detail(library_id: int, active_only: bool = False) -> 
             SELECT id, display, keyword, marker_filename, marker_sha256,
                    click_center_x, click_center_y, click_center_z,
                    axis_asymmetric_x, axis_asymmetric_y, axis_asymmetric_z,
-                   is_eng, ord
+                   is_eng, role, ord
             FROM rit_scanbody_type
             WHERE library_id = $1
             ORDER BY ord NULLS LAST, id
@@ -1553,6 +1643,7 @@ async def rit_get_library_detail(library_id: int, active_only: bool = False) -> 
         "axis_occlusal": {"x": lib["axis_occlusal_x"], "y": lib["axis_occlusal_y"], "z": lib["axis_occlusal_z"]},
         "supplier": lib["supplier"],
         "supplier_version": lib["supplier_version"],
+        "source": lib["source"],
         "active": lib["active"],
         "uploaded_by": lib["uploaded_by"],
         "uploaded_at": _iso(lib["uploaded_at"]),
@@ -1567,6 +1658,7 @@ async def rit_get_library_detail(library_id: int, active_only: bool = False) -> 
             "click_center": {"x": t["click_center_x"], "y": t["click_center_y"], "z": t["click_center_z"]},
             "axis_asymmetric": {"x": t["axis_asymmetric_x"], "y": t["axis_asymmetric_y"], "z": t["axis_asymmetric_z"]},
             "is_eng": t["is_eng"],
+            "role": t["role"],
             "ord": t["ord"],
         } for t in types],
     }
@@ -1608,21 +1700,30 @@ async def rit_set_library_active(library_id: int, active: bool) -> bool:
 
 async def rit_import_library(*, parsed: dict, import_name: Optional[str],
                              uploaded_by: Optional[str],
-                             overwrite_target_id: Optional[int] = None) -> int:
+                             overwrite_target_id: Optional[int] = None,
+                             preserve_active: bool = False) -> int:
     """Scrive una libreria in UNICA transazione. Se overwrite_target_id e\'
     dato, cancella prima quella libreria (CASCADE sui type; gli STL marker
     deduplicati sopravvivono) e ne eredita l\'import_name se non fornito.
     Gli STL sono inseriti con ON CONFLICT DO NOTHING (dedup per sha256).
+    preserve_active=True (upsert CSV/editor 8.50.0): la libreria ricreata
+    eredita il flag active della precedente (default False = comportamento
+    storico Exocad: import -> attivazione manuale).
     Solleva asyncpg.UniqueViolationError se import_name e\' gia\' preso ->
     l\'intera transazione viene annullata. Ritorna l\'id della nuova libreria."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
+            new_active = False
             if overwrite_target_id is not None:
-                if not import_name:
-                    import_name = await conn.fetchval(
-                        "SELECT import_name FROM rit_library WHERE id = $1", overwrite_target_id
-                    )
+                old = await conn.fetchrow(
+                    "SELECT import_name, active FROM rit_library WHERE id = $1",
+                    overwrite_target_id)
+                if old is not None:
+                    if not import_name:
+                        import_name = old["import_name"]
+                    if preserve_active:
+                        new_active = bool(old["active"])
                 await conn.execute("DELETE FROM rit_library WHERE id = $1", overwrite_target_id)
             if not import_name:
                 import_name = parsed.get("default_import_name")
@@ -1642,14 +1743,15 @@ async def rit_import_library(*, parsed: dict, import_name: Optional[str],
                     rotation_lock_count, ref_rotation_offset,
                     axis_occlusal_x, axis_occlusal_y, axis_occlusal_z,
                     supplier, supplier_version, preview_png, logo_png,
-                    active, uploaded_by
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, FALSE, $14)
+                    active, uploaded_by, source
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
                 RETURNING id
             """, import_name, parsed.get("keyword"), parsed.get("display"),
                  parsed.get("connection_id"), parsed.get("rotation_lock_count"),
                  parsed.get("ref_rotation_offset"), ax[0], ax[1], ax[2],
                  parsed.get("supplier"), parsed.get("supplier_version"),
-                 parsed.get("preview_png"), parsed.get("logo_png"), uploaded_by)
+                 parsed.get("preview_png"), parsed.get("logo_png"), new_active,
+                 uploaded_by, parsed.get("source"))
 
             for t in parsed["types"]:
                 cc = t["click_center"]
@@ -1659,11 +1761,181 @@ async def rit_import_library(*, parsed: dict, import_name: Optional[str],
                         library_id, display, keyword, marker_filename, marker_sha256,
                         click_center_x, click_center_y, click_center_z,
                         axis_asymmetric_x, axis_asymmetric_y, axis_asymmetric_z,
-                        is_eng, ord
-                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+                        is_eng, ord, role
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
                 """, lib_id, t["display"], t["keyword"], t["marker_filename"],
                      t["marker_sha256"], cc[0], cc[1], cc[2], aa[0], aa[1], aa[2],
-                     t["is_eng"], t["ord"])
+                     t["is_eng"], t["ord"], t.get("role"))
 
             return lib_id
+
+
+# ─── v8.50.0: archivio STL ("cartella unica" per nome) + lucchetto ──────────
+
+_RIT_ORPHAN_SWEEP = """
+    DELETE FROM rit_marker_stl m WHERE m.sha256 = $1
+      AND NOT EXISTS (SELECT 1 FROM rit_stl_asset a WHERE a.sha256 = m.sha256)
+      AND NOT EXISTS (SELECT 1 FROM rit_scanbody_type t WHERE t.marker_sha256 = m.sha256)
+"""
+
+
+async def rit_list_stl_assets() -> list[dict]:
+    """Archivio STL per nome (cartella unica). used_by = n. librerie che usano
+    l'asset, di QUALSIASI sorgente (Exocad/CSV/editor): match per nome su
+    marker_filename (gia' basename per tutte le righe dopo la normalizzazione
+    in init_db)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT a.name, a.sha256, a.locked, a.size_bytes, a.uploaded_by,
+                   a.uploaded_at, a.updated_at,
+                   (SELECT COUNT(DISTINCT t.library_id)
+                      FROM rit_scanbody_type t
+                     WHERE t.marker_filename = a.name) AS used_by
+            FROM rit_stl_asset a
+            ORDER BY a.name
+        """)
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["uploaded_at"] = _iso(d.get("uploaded_at"))
+        d["updated_at"] = _iso(d.get("updated_at"))
+        d["used_by"] = int(d.get("used_by") or 0)
+        out.append(d)
+    return out
+
+
+async def rit_get_stl_asset(name: str) -> Optional[dict]:
+    """Asset per nome (name, sha256, locked, size_bytes). None se non esiste."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT name, sha256, locked, size_bytes FROM rit_stl_asset WHERE name = $1",
+            name)
+    return dict(row) if row else None
+
+
+async def rit_save_stl_asset(*, name: str, content: bytes,
+                             uploaded_by: Optional[str],
+                             overwrite: bool = False,
+                             allow_locked: bool = False) -> dict:
+    """Crea o sovrascrive un asset dell'archivio. status:
+    created | unchanged (stesso contenuto) | conflict (nome esistente con
+    contenuto diverso e overwrite=False; include locked) | locked (asset
+    bloccato e allow_locked=False: il lucchetto e' verificato QUI, dentro la
+    transazione — il caller passa allow_locked=True SOLO dopo aver verificato
+    il codice con _rit_check_lock_code) | overwritten (con n_types = type
+    CSV/editor ripuntati al nuovo contenuto, "live per nome")."""
+    import hashlib
+    sha = hashlib.sha256(content).hexdigest()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            ex = await conn.fetchrow(
+                "SELECT sha256, locked FROM rit_stl_asset WHERE name = $1", name)
+            if ex is not None and ex["sha256"] == sha:
+                return {"status": "unchanged", "name": name, "sha256": sha}
+            if ex is not None and not overwrite:
+                return {"status": "conflict", "name": name, "locked": ex["locked"]}
+            if ex is not None and ex["locked"] and not allow_locked:
+                return {"status": "locked", "name": name}
+            await conn.execute("""
+                INSERT INTO rit_marker_stl (sha256, content, original_filename, size_bytes)
+                VALUES ($1, $2, $3, $4) ON CONFLICT (sha256) DO NOTHING
+            """, sha, content, name, len(content))
+            if ex is None:
+                await conn.execute("""
+                    INSERT INTO rit_stl_asset (name, sha256, size_bytes, uploaded_by)
+                    VALUES ($1, $2, $3, $4)
+                """, name, sha, len(content), uploaded_by)
+                return {"status": "created", "name": name, "sha256": sha}
+            old_sha = ex["sha256"]
+            await conn.execute("""
+                UPDATE rit_stl_asset SET sha256 = $2, size_bytes = $3,
+                       uploaded_by = $4, updated_at = NOW()
+                WHERE name = $1
+            """, name, sha, len(content), uploaded_by)
+            # propagazione "live per nome" GLOBALE: ogni type (qualsiasi
+            # sorgente, Exocad inclusa) che usa questo nome segue il nuovo
+            # contenuto. Il lucchetto e' la protezione dei master validati.
+            res = await conn.execute("""
+                UPDATE rit_scanbody_type SET marker_sha256 = $2
+                WHERE marker_filename = $1
+            """, name, sha)
+            n_types = int(res.split()[-1])
+            await conn.execute(_RIT_ORPHAN_SWEEP, old_sha)
+            return {"status": "overwritten", "name": name, "sha256": sha,
+                    "n_types": n_types}
+
+
+async def rit_delete_stl_asset(name: str) -> dict:
+    """Cancella un asset. status: deleted | not_found | locked (sbloccare
+    prima) | in_use (usato da librerie CSV/editor, con used_by)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            ex = await conn.fetchrow(
+                "SELECT sha256, locked FROM rit_stl_asset WHERE name = $1", name)
+            if ex is None:
+                return {"status": "not_found"}
+            if ex["locked"]:
+                return {"status": "locked"}
+            used = await conn.fetchval("""
+                SELECT COUNT(DISTINCT t.library_id) FROM rit_scanbody_type t
+                WHERE t.marker_filename = $1
+            """, name)
+            if int(used or 0) > 0:
+                return {"status": "in_use", "used_by": int(used)}
+            await conn.execute("DELETE FROM rit_stl_asset WHERE name = $1", name)
+            await conn.execute(_RIT_ORPHAN_SWEEP, ex["sha256"])
+            return {"status": "deleted"}
+
+
+async def rit_set_stl_asset_locked(name: str, locked: bool) -> bool:
+    """Imposta il lucchetto. False se l'asset non esiste. La verifica del
+    codice (per lo SBLOCCO) sta nell'endpoint, non qui."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        res = await conn.execute(
+            "UPDATE rit_stl_asset SET locked = $2 WHERE name = $1", name, locked)
+    return res.split()[-1] != "0"
+
+
+async def rit_get_lock_secret() -> Optional[dict]:
+    """Hash+salt del codice di sicurezza del lucchetto (riga unica id=1)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT code_hash, code_salt FROM rit_lock_secret WHERE id = 1")
+    return dict(row) if row else None
+
+
+async def rit_set_lock_secret(code_hash: str, code_salt: str,
+                              updated_by: Optional[str]) -> None:
+    """Imposta/cambia il codice (gia' hashed dal caller via auth.hash_password)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO rit_lock_secret (id, code_hash, code_salt, updated_by, updated_at)
+            VALUES (1, $1, $2, $3, NOW())
+            ON CONFLICT (id) DO UPDATE
+               SET code_hash = $1, code_salt = $2, updated_by = $3, updated_at = NOW()
+        """, code_hash, code_salt, updated_by)
+
+
+async def rit_find_library_by_import_name(import_name: str) -> Optional[dict]:
+    """Libreria per import_name esatto (per l'upsert CSV/editor). None se assente."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT l.id, l.import_name, l.display, l.active, l.uploaded_by, l.uploaded_at,
+                   (SELECT COUNT(*) FROM rit_scanbody_type t WHERE t.library_id = l.id) AS n_types
+            FROM rit_library l WHERE l.import_name = $1
+        """, import_name)
+    if row is None:
+        return None
+    d = dict(row)
+    d["uploaded_at"] = _iso(d.get("uploaded_at"))
+    d["n_types"] = int(d.get("n_types") or 0)
+    return d
 
