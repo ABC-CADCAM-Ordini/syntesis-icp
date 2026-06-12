@@ -13,8 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.49.0</title>
-<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
+<title>Syntesis-ICP - Analizzare v8.50.1</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -38,7 +37,7 @@ body{
 @keyframes syntSpin{to{--synt-sa:360deg}}
 
 
-:root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--ghost:#8090A8;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Source Sans 3','Source Sans Pro',sans-serif;--mono:'Source Sans 3','Source Sans Pro',sans-serif}
+:root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--ghost:#8090A8;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Helvetica Neue',Helvetica,Arial,sans-serif;--mono:'Helvetica Neue',Helvetica,Arial,sans-serif}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100vh;display:flex;flex-direction:column;font-feature-settings:"tnum";font-variant-numeric:tabular-nums}
 .header{display:flex;align-items:center;gap:6px;padding:10px 16px;background:var(--white);border-bottom:1px solid var(--border);z-index:10;flex-shrink:0;flex-wrap:wrap;border-top-left-radius:10px;border-top-right-radius:10px}
@@ -980,20 +979,20 @@ body .panel {
   font-size:8px;font-weight:800;letter-spacing:.1em;
   padding:2px 5px;border-radius:3px;
   background:#F59E0B;color:#0F1923;
-  font-family:'Source Sans 3', sans-serif;
+  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
 }
 .slp-title{
   font-size:10px;font-weight:800;letter-spacing:.12em;
   color:#e8f0f7;
   flex:1;
-  font-family:'Source Sans 3', sans-serif;
+  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
 }
 .slp-count{
   font-size:10px;font-weight:700;
   background:rgba(255,255,255,0.1);
   color:#a0b4c8;
   padding:2px 7px;border-radius:9px;
-  font-family:'Source Sans 3', sans-serif;
+  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
 }
 .slp-toggle{
   width:20px;height:20px;
@@ -1017,7 +1016,7 @@ body .panel {
   color:#7A90A4;text-transform:uppercase;
   padding:8px 4px 4px;
   display:flex;align-items:center;gap:6px;
-  font-family:'Source Sans 3', sans-serif;
+  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
 }
 .slp-group-badge{
   background:rgba(0,101,179,0.25);color:#a0b4c8;
@@ -1028,7 +1027,7 @@ body .panel {
   padding:5px 6px;border-radius:4px;
   margin-bottom:1px;
   color:#c8d6e5;
-  font-family:'Source Sans 3', sans-serif;
+  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
 }
 .slp-item-icon{
   width:12px;height:12px;color:#7A90A4;flex-shrink:0;
@@ -1044,7 +1043,7 @@ body .panel {
 }
 .slp-item-meta{
   color:#5A6E82;font-size:10px;
-  font-family:'Source Sans 3', sans-serif;
+  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
 }
 
 /* === Fase 3: bottoni e slider opacità === */
@@ -1108,7 +1107,7 @@ body .panel {
   border:1.5px solid #fff;
 }
 .slp-opacity-value{
-  font-family:'Source Sans 3', sans-serif;
+  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
   font-size:9px;font-weight:700;
   color:#7A90A4;
   min-width:30px;text-align:right;
@@ -1126,7 +1125,7 @@ body .panel {
 }
 .slp-global-btn{
   flex:1;
-  font-family:'Source Sans 3', sans-serif;
+  font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
   font-size:9px;font-weight:700;letter-spacing:.05em;
   text-transform:uppercase;
   background:rgba(0,101,179,0.18);
@@ -2420,8 +2419,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.49.0';
-window.ANALIZZA_BUILD_DATE = '2026-06-11';
+window.ANALIZZA_BUILD = '8.50.1';
+window.ANALIZZA_BUILD_DATE = '2026-06-12';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;

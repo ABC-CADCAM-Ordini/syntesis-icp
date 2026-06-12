@@ -38,6 +38,6 @@
   --syn-space-xl:    24px;
 
   /* === Tipografia === */
-  --syn-font:        'Source Sans 3', 'Source Sans Pro', sans-serif;
-  --syn-mono:        'Source Sans 3', 'Source Sans Pro', sans-serif;
+  --syn-font:        'Helvetica Neue',Helvetica,Arial,sans-serif;
+  --syn-mono:        'Helvetica Neue',Helvetica,Arial,sans-serif;
 }
