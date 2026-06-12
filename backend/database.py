@@ -345,7 +345,8 @@ async def init_db():
             axis_asymmetric_y    DOUBLE PRECISION,
             axis_asymmetric_z    DOUBLE PRECISION,
             is_eng               BOOLEAN,
-            ord                  INTEGER
+            ord                  INTEGER,
+            active               BOOLEAN NOT NULL DEFAULT TRUE
         );
 
         CREATE INDEX IF NOT EXISTS idx_rit_type_library ON rit_scanbody_type(library_id);
@@ -383,6 +384,7 @@ async def init_db():
         );
 
         ALTER TABLE rit_scanbody_type ADD COLUMN IF NOT EXISTS role TEXT;
+        ALTER TABLE rit_scanbody_type ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
         ALTER TABLE rit_library ADD COLUMN IF NOT EXISTS source TEXT;
         """)
 
@@ -1588,7 +1590,7 @@ async def rit_list_active_libraries() -> list[dict]:
         rows = await conn.fetch("""
             SELECT l.id, l.import_name, l.keyword, l.display, l.supplier,
                    l.supplier_version,
-                   (SELECT COUNT(*) FROM rit_scanbody_type t WHERE t.library_id = l.id) AS n_types
+                   (SELECT COUNT(*) FROM rit_scanbody_type t WHERE t.library_id = l.id AND t.active = TRUE) AS n_types
             FROM rit_library l
             WHERE l.active = TRUE
             ORDER BY l.display NULLS LAST, l.import_name
@@ -1623,13 +1625,16 @@ async def rit_get_library_detail(library_id: int, active_only: bool = False) -> 
         """, library_id)
         if lib is None:
             return None
-        types = await conn.fetch("""
+        # superficie clinica (active_only): mostra solo i type ATTIVI; l'admin
+        # (active_only=False) li vede tutti, anche i disattivati, per gestirli.
+        _tact = " AND active = TRUE" if active_only else ""
+        types = await conn.fetch(f"""
             SELECT id, display, keyword, marker_filename, marker_sha256,
                    click_center_x, click_center_y, click_center_z,
                    axis_asymmetric_x, axis_asymmetric_y, axis_asymmetric_z,
-                   is_eng, role, ord
+                   is_eng, role, active, ord
             FROM rit_scanbody_type
-            WHERE library_id = $1
+            WHERE library_id = $1{_tact}
             ORDER BY ord NULLS LAST, id
         """, library_id)
     return {
@@ -1659,9 +1664,84 @@ async def rit_get_library_detail(library_id: int, active_only: bool = False) -> 
             "axis_asymmetric": {"x": t["axis_asymmetric_x"], "y": t["axis_asymmetric_y"], "z": t["axis_asymmetric_z"]},
             "is_eng": t["is_eng"],
             "role": t["role"],
+            "active": t["active"],
             "ord": t["ord"],
         } for t in types],
     }
+
+
+class _RitInvariantError(Exception):
+    """Sentinella interna: l'op lascerebbe una libreria ATTIVA senza madre o
+    senza figlio. Sollevata DENTRO la transazione -> rollback."""
+
+
+async def _rit_active_caps(conn, library_id: int):
+    """(madre_capace, figlio_capace) tra i type ATTIVI della libreria."""
+    rows = await conn.fetch(
+        "SELECT role FROM rit_scanbody_type WHERE library_id = $1 AND active = TRUE",
+        library_id)
+    roles = [r["role"] for r in rows]
+    return (any(r in ("madre", "entrambi") for r in roles),
+            any(r in ("figlio", "entrambi") for r in roles))
+
+
+async def rit_update_scanbody_type(*, type_id: int, library_id: int,
+                                   updates: dict) -> str:
+    """PATCH dei campi editabili di un type (SOLO quelli presenti in `updates`:
+    display/role/is_eng/active — semantica PATCH). La geometria NON e' editabile.
+    Scopato per library_id. Ritorna: updated | noop | not_found | would_break
+    (l'op lascerebbe una libreria ATTIVA senza madre o senza figlio)."""
+    cols = ("display", "role", "is_eng", "active")
+    fields = [(c, updates[c]) for c in cols if c in updates]
+    if not fields:
+        return "noop"
+    sets = ", ".join(f"{c} = ${i+3}" for i, (c, _) in enumerate(fields))
+    vals = [v for _, v in fields]
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        try:
+            async with conn.transaction():
+                lib_active = await conn.fetchval(
+                    "SELECT active FROM rit_library WHERE id = $1", library_id)
+                mb0, fb0 = await _rit_active_caps(conn, library_id)
+                res = await conn.execute(
+                    f"UPDATE rit_scanbody_type SET {sets} WHERE id = $1 AND library_id = $2",
+                    type_id, library_id, *vals)
+                if res.split()[-1] == "0":
+                    return "not_found"
+                if lib_active:
+                    mb1, fb1 = await _rit_active_caps(conn, library_id)
+                    # blocca solo se l'invariante ERA soddisfatta e ora si rompe
+                    # (non penalizza librerie con ruoli ancora NULL)
+                    if (mb0 and fb0) and not (mb1 and fb1):
+                        raise _RitInvariantError()
+                return "updated"
+        except _RitInvariantError:
+            return "would_break"
+
+
+async def rit_delete_scanbody_type(type_id: int, library_id: int) -> str:
+    """Cancella un type da una libreria. Ritorna: deleted | not_found |
+    would_break (lascerebbe una libreria ATTIVA senza madre o senza figlio)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        try:
+            async with conn.transaction():
+                lib_active = await conn.fetchval(
+                    "SELECT active FROM rit_library WHERE id = $1", library_id)
+                mb0, fb0 = await _rit_active_caps(conn, library_id)
+                res = await conn.execute(
+                    "DELETE FROM rit_scanbody_type WHERE id = $1 AND library_id = $2",
+                    type_id, library_id)
+                if res.split()[-1] == "0":
+                    return "not_found"
+                if lib_active:
+                    mb1, fb1 = await _rit_active_caps(conn, library_id)
+                    if (mb0 and fb0) and not (mb1 and fb1):
+                        raise _RitInvariantError()
+                return "deleted"
+        except _RitInvariantError:
+            return "would_break"
 
 
 async def rit_get_library_image(library_id: int, which: str, active_only: bool = False) -> Optional[bytes]:
@@ -1715,6 +1795,7 @@ async def rit_import_library(*, parsed: dict, import_name: Optional[str],
     async with pool.acquire() as conn:
         async with conn.transaction():
             new_active = False
+            preserved = {}   # (marker_filename, display) -> {"active","role"}
             if overwrite_target_id is not None:
                 old = await conn.fetchrow(
                     "SELECT import_name, active FROM rit_library WHERE id = $1",
@@ -1724,6 +1805,15 @@ async def rit_import_library(*, parsed: dict, import_name: Optional[str],
                         import_name = old["import_name"]
                     if preserve_active:
                         new_active = bool(old["active"])
+                # I flag per-type (active disattivato a mano, role assegnato a
+                # mano alle LITE) NON sono nell'import: li preservo attraverso
+                # l'overwrite, altrimenti un re-upload li azzererebbe.
+                for r in await conn.fetch(
+                    "SELECT marker_filename, display, active, role "
+                    "FROM rit_scanbody_type WHERE library_id = $1",
+                    overwrite_target_id):
+                    preserved[(r["marker_filename"], r["display"])] = {
+                        "active": r["active"], "role": r["role"]}
                 await conn.execute("DELETE FROM rit_library WHERE id = $1", overwrite_target_id)
             if not import_name:
                 import_name = parsed.get("default_import_name")
@@ -1756,16 +1846,22 @@ async def rit_import_library(*, parsed: dict, import_name: Optional[str],
             for t in parsed["types"]:
                 cc = t["click_center"]
                 aa = t["axis_asymmetric"]
+                prev = preserved.get((t["marker_filename"], t["display"]))
+                # role: dall'import se presente (CSV/editor), altrimenti il
+                # preservato (es. assegnato a mano a una LITE). active: il
+                # preservato (nessun import lo porta), default TRUE.
+                t_role = t.get("role") or (prev["role"] if prev else None)
+                t_active = prev["active"] if prev else True
                 await conn.execute("""
                     INSERT INTO rit_scanbody_type (
                         library_id, display, keyword, marker_filename, marker_sha256,
                         click_center_x, click_center_y, click_center_z,
                         axis_asymmetric_x, axis_asymmetric_y, axis_asymmetric_z,
-                        is_eng, ord, role
-                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+                        is_eng, ord, role, active
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
                 """, lib_id, t["display"], t["keyword"], t["marker_filename"],
                      t["marker_sha256"], cc[0], cc[1], cc[2], aa[0], aa[1], aa[2],
-                     t["is_eng"], t["ord"], t.get("role"))
+                     t["is_eng"], t["ord"], t_role, t_active)
 
             return lib_id
 

@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.50.1 — **Data:** 2026-06-12
+> **Versione software mappata:** 8.51.0 — **Data:** 2026-06-12
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -20,7 +20,7 @@ Sorgenti primarie:
 | **Analizzare** | `/analizzare` | `syntesis-analyzer-v3b.html` | [169-174](../backend/main.py#L169) | App di analisi di precisione (~3.87 MB monolite). 5 workflow interni — analizza, accoppia, misurare, sostituire, **replace (Replace-iT, 8.18.0)** — gestiti da `selectWorkflow`. |
 | **Dashboard** | `/dashboard` | `syntesis-dashboard-v1.html` | [186-192](../backend/main.py#L186) | Area personale utente (mie analisi, profilo). |
 | **Accedi** | `/accedi` | `syntesis-accedi.html` | [194-201](../backend/main.py#L194) | Accesso a 3 stati: login, registrazione senza licenza (utente pending), pannello attesa con polling `/auth/me` + vista autorizzato. |
-| **Gestione** | `/gestione` | `syntesis-gestione.html` | [203-210](../backend/main.py#L203) | Pannello admin: lista registrati, autorizza (genera chiave) / revoca. **8.16.0**: sezione "Librerie Replace-iT" (ingest/lista/verifica/attivazione librerie scanbody Exocad). **8.50.0**: sezioni "Archivio STL" (cartella unica per nome, lucchetto + codice, anteprima 3D) e "Crea libreria" (editor a righe madre/figlio + import CSV + template). API `/admin/*` e `/admin/rit/*` protette da `require_admin`. |
+| **Gestione** | `/gestione` | `syntesis-gestione.html` | [203-210](../backend/main.py#L203) | Pannello admin: lista registrati, autorizza (genera chiave) / revoca. **8.16.0**: sezione "Librerie Replace-iT" (ingest/lista/verifica/attivazione librerie scanbody Exocad). **8.50.0**: sezioni "Archivio STL" (cartella unica per nome, lucchetto + codice, anteprima 3D) e "Crea libreria" (editor a righe madre/figlio + import CSV + template). **8.51.0**: pannello in **4 TAB** (`.admin-tabs` + `<section class=tabpane>` + `switchAdminTab`): Richieste di accesso / Librerie Replace-iT / Archivio STL / Crea libreria; **"Carica ZIP"** nella tab Crea libreria; ruolo a 3 stati (madre/figlio/**entrambi**); dettaglio libreria **editabile** (componenti modificabili/disattivabili/eliminabili). API `/admin/*` e `/admin/rit/*` protette da `require_admin`. |
 
 Note di completezza:
 - I 6 file `.html` in `backend/static/` (accedi, analyzer-v3b, dashboard, gestione, icp-vedere, **synthesis-home**) sono **tutti** serviti dalle route sopra — nessun HTML orfano.
@@ -371,7 +371,7 @@ Aggiunta sotto il pannello utenti, **stessa IIFE e stesso wiring `addEventListen
 |---|---|---|---|---|---|
 | Input ZIP + Carica | `#rit-file` / `#rit-upload-btn` | click | `ritUpload` | upload multipart libreria — ZIP Exocad (config.xml) **o, da 8.50.0, ZIP manuale (libreria.csv + STL)**; risposta `kind:"rows"` → `ritRowsOkMsg`; 409 `confirm_needed` → `ritShowConfirm` (ri-POST con `stl_overwrite`/`lib_overwrite`/`code`) | `POST /admin/rit/libraries` |
 | Tabella librerie | `#rit-rows` (render) | — | `ritLoad` → `ritRender` | lista import_name/keyword/display/fornitore/n.type/stato | `GET /admin/rit/libraries` |
-| **(per riga)** Dettagli | (injected) | click | `ritDetail` → `ritRenderDetail` | pannello read-only root-params + type (click_center/axis/**Ruolo madre-figlio 8.50.0**/ENG a 3 stati) + preview PNG; sottotitolo per `source` (exocad/csv/editor) | `GET /admin/rit/libraries/{id}` (+ `/preview`) |
+| **(per riga)** Dettagli | (injected) | click | `ritDetail` → `ritRenderDetail` | root-params (read-only) + tabella **componenti EDITABILE (8.51.0)**: per riga Nome / Ruolo (—/Madre/Figlio/Entrambi) / ENG editabili + checkbox Attivo + **Salva** (`ritSaveType`→PATCH) + **Elimina** (`ritDeleteType`→DELETE); marker read-only; preview PNG; sottotitolo per `source` | `GET /admin/rit/libraries/{id}` · `PATCH`/`DELETE …/types/{type}` (+ `/preview`) |
 | **(per riga)** toggle Attiva/Disattiva | (injected) | click | `ritToggle` | attiva/disattiva libreria | `PATCH /admin/rit/libraries/{id}/active` |
 | Dialog conflitto keyword | `#rit-overlay` / `#rit-conflict` | click | `ritShowConflict` / `ritCloseConflict` | da 409 `keyword_conflict`: elenca **esplicitamente** ogni libreria sovrascrivibile (import_name, caricata, n.type, uploaded_by) da `existing[]`; per-riga "Sovrascrivi" (`mode=overwrite`+`target_library_id`) o "Importa come nuova" (`mode=new`+`import_name`) | (ri-`POST` con `mode`) |
 

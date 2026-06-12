@@ -4,6 +4,26 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.51.0: Admin Librerie Replace-iT — 4 tab, ruolo "entrambi", componenti editabili
+
+Richieste utente sul pannello admin `/gestione`. Solo admin + backend rit; **runtime `v3b` NON toccato**.
+
+**4 tab** (`.admin-tabs` + `<section class=tabpane>` + `switchAdminTab`): Richieste di accesso / Librerie Replace-iT / Archivio STL / Crea libreria.
+
+**Crea libreria** — editor a griglia + **Scarica template** (ora si scarica già come `libreria.csv`) + **Carica ZIP (CSV+STL)** nello stesso posto. `ritUpload` refactorizzato con target parametrici (`ritSrcEl`/`ritBtnEl`/`ritMsgEl` + `ritUploadFrom`) così i due upload — import Exocad/manuale (tab Librerie) e ZIP CSV (tab Crea) — condividono il flusso di conferma. Parser `_rit_csv_from_zip` tollerante: usa `libreria.csv` se c'è, altrimenti l'unico `.csv` dello ZIP (se niente `config.xml`).
+
+**Ruolo a 3 stati** madre / figlio / **entrambi** (un file "entrambi" conta sia come madre sia come figlio nella validazione). Rimossa la colonna *Asse occl.* dalla griglia (default `0,0,1` lato server; opzionale nel CSV).
+
+**Dettaglio libreria EDITABILE** (importate **e** create): ogni componente (`rit_scanbody_type`) modificabile in **ruolo/nome/ENG**, **disattivabile** (nuovo flag `active`, default TRUE; i disattivati spariscono dalla superficie clinica `/api/rit`) ed **eliminabile**. Nuovi endpoint `require_admin`: `PATCH`/`DELETE /admin/rit/libraries/{lib}/types/{type}`. Serve soprattutto per assegnare i ruoli alle LITE importate (che li hanno NULL) → prerequisito della futura cascata Marca→Modello→Ø nel runtime.
+
+Implementazione e robustezza (da due review avversariali):
+- DB additivo retrocompatibile: `ALTER ... ADD COLUMN IF NOT EXISTS active`.
+- Overwrite di una libreria **preserva** `active`/`role` per-componente (snapshot prima del cascade DELETE, ri-applicati per chiave `marker_filename`+`display`; per CSV/editor il ruolo dell'import vince, per le LITE il ruolo assegnato a mano sopravvive).
+- Conteggio `n_type` della superficie clinica filtra i type attivi (coerente col detail `active_only`).
+- PATCH **parziale** vero (aggiorna solo i campi inviati via `model_fields_set`).
+- Disattiva/elimina **rifiutati (409)** se lascerebbero una libreria ATTIVA senza madre o senza figlio (guardia in transazione; non penalizza librerie con ruoli ancora NULL).
+- QA: `py_compile` + `node --check` OK; smoke-test (ruolo entrambi, tolleranza CSV, predicato invariante) + 2 review avversariali. `registry.BACKEND_VERSION` 8.51.0; `docs/MAPPA_FUNZIONALE.md` aggiornata.
+
 ## 2026-06-12 — 8.50.1: Font unico Synthesis (Helvetica), via Google Fonts
 
 Richiesta utente: *"un unico font meno identificabile con Claude, tipo Helvetica"*. Cambio puramente tipografico, nessuna modifica funzionale.

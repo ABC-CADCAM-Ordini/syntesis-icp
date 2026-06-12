@@ -332,15 +332,17 @@ def _rit_zip_read(z: zipfile.ZipFile, entry: str) -> bytes:
 
 
 def _rit_csv_from_zip(zip_bytes: bytes):
-    """ZIP manuale (libreria.csv + STL). Ritorna (rows, name->bytes) oppure
-    None se lo ZIP non contiene libreria.csv (-> path Exocad). Errore se
-    contiene SIA config.xml SIA libreria.csv (ambiguo), o se un file
-    referenziato esiste in piu' cartelle con contenuti DIVERSI."""
+    """ZIP manuale (CSV + STL). Ritorna (rows, name->bytes) oppure None se non
+    e' un pacchetto manuale (-> path Exocad). Il CSV puo' chiamarsi 'libreria.csv'
+    (esplicito) oppure essere l'UNICO .csv dello ZIP (cosi' il template scaricato
+    funziona senza rinominare). Errore se: config.xml + libreria.csv (ambiguo);
+    piu' .csv senza un 'libreria.csv'; un file referenziato in piu' cartelle con
+    contenuti DIVERSI."""
     try:
         z = zipfile.ZipFile(io.BytesIO(zip_bytes))
     except zipfile.BadZipFile:
         return None
-    basemap, dupes, csv_entry, cfg_entry = {}, {}, None, None
+    basemap, dupes, cfg_entry = {}, {}, None
     for name in z.namelist():
         if name.startswith("__MACOSX") or "/__MACOSX/" in name:
             continue
@@ -351,14 +353,19 @@ def _rit_csv_from_zip(zip_bytes: bytes):
         if k in basemap and basemap[k] != name:
             dupes.setdefault(k, []).append(name)
         basemap.setdefault(k, name)
-        if k == "libreria.csv":
-            csv_entry = name
-        elif k == "config.xml":
+        if k == "config.xml":
             cfg_entry = name
-    if csv_entry is None:
-        return None
-    if cfg_entry is not None:
-        raise RitIngestError("ZIP ambiguo: contiene sia config.xml sia libreria.csv.")
+    csv_names = [k for k in basemap if k.endswith(".csv")]
+    if "libreria.csv" in basemap:
+        if cfg_entry is not None:
+            raise RitIngestError("ZIP ambiguo: contiene sia config.xml sia libreria.csv.")
+        csv_entry = basemap["libreria.csv"]
+    elif cfg_entry is None and len(csv_names) == 1:
+        csv_entry = basemap[csv_names[0]]
+    elif cfg_entry is None and len(csv_names) > 1:
+        raise RitIngestError("ZIP con piu' file CSV: rinomina quello della libreria 'libreria.csv'.")
+    else:
+        return None   # config.xml presente, o nessun CSV -> non e' un pacchetto manuale
     text = _rit_zip_read(z, csv_entry).decode("utf-8-sig", errors="replace")
     rows = _rit_read_csv_rows(text)
     name_to_bytes = {}
@@ -392,8 +399,8 @@ def _rit_build_libraries_from_rows(rows: list[dict], name_to_sha: dict,
         if miss:
             raise RitIngestError(f"{where}: campi obbligatori mancanti: {', '.join(miss)}.")
         ruolo = row["ruolo"].strip().lower()
-        if ruolo not in ("madre", "figlio"):
-            raise RitIngestError(f"{where}: ruolo '{row['ruolo']}' non valido (madre|figlio).")
+        if ruolo not in ("madre", "figlio", "entrambi"):
+            raise RitIngestError(f"{where}: ruolo '{row['ruolo']}' non valido (madre|figlio|entrambi).")
         fname = posixpath.basename(row["file"].strip())
         if fname not in name_to_sha:
             raise RitIngestError(f"{where}: file '{fname}' non trovato (ne' caricato ne' in archivio).")
@@ -426,10 +433,11 @@ def _rit_build_libraries_from_rows(rows: list[dict], name_to_sha: dict,
     for key in order:
         g = groups[key]
         label = f"{g['marca']} {g['modello']} Ø{g['diametro']}"
-        if not any(t["role"] == "madre" for t in g["types"]):
-            raise RitIngestError(f"{label}: nessun file madre (serve almeno 1).")
-        if not any(t["role"] == "figlio" for t in g["types"]):
-            raise RitIngestError(f"{label}: nessun file figlio (serve almeno 1).")
+        # ruolo "entrambi" conta SIA come madre SIA come figlio
+        if not any(t["role"] in ("madre", "entrambi") for t in g["types"]):
+            raise RitIngestError(f"{label}: nessun file madre (serve almeno 1 con ruolo madre o entrambi).")
+        if not any(t["role"] in ("figlio", "entrambi") for t in g["types"]):
+            raise RitIngestError(f"{label}: nessun file figlio (serve almeno 1 con ruolo figlio o entrambi).")
         slug = _rit_slug(f"{g['marca']}-{g['modello']}-{g['diametro']}")
         # gruppi DIVERSI possono collassare sullo stesso slug (accenti/punteggiatura
         # rimossi dalla normalizzazione ascii): senza questo check la seconda
@@ -882,6 +890,64 @@ async def rit_set_active_endpoint(library_id: int, body: RitActiveBody,
     if not ok:
         raise HTTPException(404, detail="Libreria non trovata.")
     return {"library_id": library_id, "active": body.active}
+
+
+class RitTypeUpdate(BaseModel):
+    display: Optional[str] = None
+    role: Optional[str] = None        # None | madre | figlio | entrambi
+    is_eng: Optional[bool] = None     # None | true | false
+    active: bool = True
+
+
+_RIT_TYPE_BREAK = ("Operazione rifiutata: lascerebbe la libreria ATTIVA senza una "
+                   "madre o un figlio. Disattiva prima la libreria, oppure tieni "
+                   "almeno una madre e un figlio attivi.")
+
+
+@router.patch("/rit/libraries/{library_id}/types/{type_id}")
+async def rit_update_type_endpoint(library_id: int, type_id: int,
+                                   body: RitTypeUpdate,
+                                   admin: dict = Depends(require_admin)):
+    """Modifica i campi editabili di un componente (type): SOLO quelli inviati nel
+    body (semantica PATCH) tra display/ruolo/eng/attivo. Vale per librerie importate
+    E create (es. assegnare il ruolo ai componenti di una LITE che li ha NULL). La
+    geometria resta dal file."""
+    from database import rit_update_scanbody_type
+    sent = body.model_fields_set
+    updates = {}
+    if "role" in sent:
+        role = (body.role or "").strip().lower() or None
+        if role not in (None, "madre", "figlio", "entrambi"):
+            raise HTTPException(400, detail=f"Ruolo '{body.role}' non valido (madre|figlio|entrambi).")
+        updates["role"] = role
+    if "display" in sent:
+        updates["display"] = (body.display or "").strip() or None
+    if "is_eng" in sent:
+        updates["is_eng"] = body.is_eng
+    if "active" in sent:
+        updates["active"] = body.active
+    if not updates:
+        raise HTTPException(400, detail="Nessun campo da aggiornare.")
+    status = await rit_update_scanbody_type(
+        type_id=type_id, library_id=library_id, updates=updates)
+    if status == "not_found":
+        raise HTTPException(404, detail="Componente non trovato in questa libreria.")
+    if status == "would_break":
+        raise HTTPException(409, detail=_RIT_TYPE_BREAK)
+    return {"library_id": library_id, "type_id": type_id, **updates}
+
+
+@router.delete("/rit/libraries/{library_id}/types/{type_id}")
+async def rit_delete_type_endpoint(library_id: int, type_id: int,
+                                   admin: dict = Depends(require_admin)):
+    """Cancella un componente (type) da una libreria."""
+    from database import rit_delete_scanbody_type
+    status = await rit_delete_scanbody_type(type_id, library_id)
+    if status == "not_found":
+        raise HTTPException(404, detail="Componente non trovato in questa libreria.")
+    if status == "would_break":
+        raise HTTPException(409, detail=_RIT_TYPE_BREAK)
+    return {"library_id": library_id, "type_id": type_id, "deleted": True}
 
 
 # =====================================================================

@@ -157,6 +157,20 @@
     border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:13.5px;cursor:pointer}
   .rit-conf-item .nm{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;flex:1;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ===== 8.51.0: tab admin ===== */
+  .admin-tabs{display:flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:11px;
+    padding:4px;margin-bottom:26px;flex-wrap:wrap}
+  .admin-tabs .atab{border:0;background:transparent;cursor:pointer;font-family:inherit;font-size:14px;
+    font-weight:500;color:var(--ink-soft);padding:10px 18px;border-radius:8px;transition:all .18s}
+  .admin-tabs .atab:hover{color:var(--ink)}
+  .admin-tabs .atab.active{background:var(--accent);color:#fff}
+  .tabpane{display:none} .tabpane.active{display:block}
+  .cl-or{font-size:12.5px;color:var(--ink-soft)}
+  /* dettaglio libreria editabile */
+  .td-in{width:100%;min-width:64px;border:1px solid var(--line);border-radius:6px;padding:6px 7px;
+    font-family:inherit;font-size:13px;background:#fff;color:var(--ink)}
+  .td-in:focus{outline:0;border-color:var(--accent)}
+  tr.row-off{opacity:.5}
 </style>
 </head>
 <body>
@@ -166,6 +180,14 @@
   </div>
 
   <div class="wrap">
+    <div class="admin-tabs">
+      <button class="atab active" data-pane="utenti">Richieste di accesso</button>
+      <button class="atab" data-pane="librerie">Librerie Replace-iT</button>
+      <button class="atab" data-pane="archivio">Archivio STL</button>
+      <button class="atab" data-pane="crea">Crea libreria</button>
+    </div>
+
+    <section class="tabpane active" id="pane-utenti">
     <div class="pagehead">
       <h1>Richieste di accesso</h1>
       <p>Verifica i nuovi registrati e autorizza la generazione delle chiavi di licenza.</p>
@@ -208,9 +230,11 @@
       <div class="empty hidden" id="empty">Nessun utente in questa categoria.</div>
     </div>
 
+    </section>
+
+    <section class="tabpane" id="pane-librerie">
     <!-- ===== Replace-iT: librerie scanbody (Passo 1) ===== -->
-    <div class="ritsep"></div>
-    <div class="pagehead" style="margin-top:30px">
+    <div class="pagehead">
       <h1>Librerie Replace-iT</h1>
       <p>Importa una libreria da ZIP — Exocad (config.xml) oppure manuale (libreria.csv + STL) — verifica i parametri e attivala. L'attivazione è manuale, dopo il controllo.</p>
     </div>
@@ -233,8 +257,11 @@
 
     <div class="rit-detail hidden" id="rit-detail"></div>
 
+    </section>
+
+    <section class="tabpane" id="pane-archivio">
     <!-- ===== 8.50.0: Archivio STL (cartella unica) ===== -->
-    <div class="pagehead" style="margin-top:34px">
+    <div class="pagehead">
       <h1>Archivio STL</h1>
       <p>Cartella unica dei file STL: i figli condivisi tra più marche e modelli stanno qui una volta sola. Un file bloccato dal lucchetto non si cancella né si sovrascrive senza il codice di sicurezza.</p>
     </div>
@@ -254,10 +281,13 @@
       <div class="empty hidden" id="stl-empty">Nessun file in archivio.</div>
     </div>
 
+    </section>
+
+    <section class="tabpane" id="pane-crea">
     <!-- ===== 8.50.0: Crea libreria (editor in-pannello) ===== -->
-    <div class="pagehead" style="margin-top:34px">
+    <div class="pagehead">
       <h1>Crea libreria</h1>
-      <p>Una riga per file STL. Marca + modello + diametro identificano la libreria: ogni diametro diventa una libreria separata, con i suoi file madre e figli. Tutti gli STL devono essere esportati sulla <strong>stessa origine</strong>.</p>
+      <p>Due modi: compila la <strong>griglia</strong> qui sotto, oppure <strong>scarica il template</strong>, riempilo, mettilo in una cartella con gli STL, zippa e <strong>carica lo ZIP</strong>. Marca + modello + diametro identificano la libreria (un diametro = una libreria); ogni file ha ruolo <strong>madre</strong>, <strong>figlio</strong> o <strong>entrambi</strong>. Tutti gli STL esportati sulla <strong>stessa origine</strong>.</p>
     </div>
     <div class="rit-upload">
       <button class="btn authorize" id="ed-add-row">+ Aggiungi riga</button>
@@ -265,14 +295,21 @@
       <button class="btn revoke" id="ed-template">Scarica template CSV</button>
       <span class="rit-msg" id="ed-msg"></span>
     </div>
+    <div class="rit-upload" style="align-items:center">
+      <span class="cl-or">— oppure carica uno ZIP (libreria.csv + STL) —</span>
+      <input type="file" id="cl-zip-file" accept=".zip,application/zip,application/x-zip-compressed">
+      <button class="btn authorize" id="cl-zip-btn">Carica ZIP</button>
+      <span class="rit-msg" id="cl-zip-msg"></span>
+    </div>
     <div class="tablecard">
       <table class="ed-table">
         <thead>
-          <tr><th>Marca</th><th>Modello</th><th>Ø</th><th>Asse occl.</th><th>Ruolo</th><th>File STL</th><th>Nome</th><th>ENG</th><th></th></tr>
+          <tr><th>Marca</th><th>Modello</th><th>Ø</th><th>Ruolo</th><th>File STL</th><th>Nome</th><th>ENG</th><th></th></tr>
         </thead>
         <tbody id="ed-rows"></tbody>
       </table>
     </div>
+    </section>
   </div>
 
   <!-- modal chiave generata -->
@@ -550,7 +587,7 @@
   var ritLibs = [];
 
   function ritMsg(t, cls){
-    var el=$("rit-msg"); el.textContent=t||"";
+    var el=$(ritMsgEl); el.textContent=t||"";
     el.className="rit-msg"+(cls?(" "+cls):"");
   }
 
@@ -609,11 +646,17 @@
   // (un ZIP Exocad puo' richiedere prima la conferma STL, poi quella keyword:
   // la decisione STL va ricordata nel secondo round). Reset a ogni upload
   // iniziato dall'utente (ritUpload() senza argomenti).
-  var ritAcc = {};
+  // sorgente/bottone/messaggio dell'upload corrente: l'import Exocad/manuale
+  // arriva dalla tab Librerie (#rit-*), lo ZIP CSV+STL dalla tab Crea libreria
+  // (#cl-zip-*). ritUploadFrom() imposta i tre target e azzera l'accumulatore.
+  var ritAcc = {}, ritSrcEl='rit-file', ritBtnEl='rit-upload-btn', ritMsgEl='rit-msg';
+  function ritUploadFrom(srcId, btnId, msgId){
+    ritSrcEl=srcId; ritBtnEl=btnId; ritMsgEl=msgId; ritAcc={};
+    ritUpload();
+  }
   function ritUpload(opts){
-    if(opts===undefined){ ritAcc = {}; }        // click utente: nuova importazione
-    else { for(var k in opts){ ritAcc[k]=opts[k]; } }
-    var f=$("rit-file").files[0];
+    if(opts){ for(var k in opts){ ritAcc[k]=opts[k]; } }   // continuazione (conferme)
+    var f=$(ritSrcEl).files[0];
     if(!f){ ritMsg("Seleziona un file ZIP.","err"); return; }
     var fd=new FormData(); fd.append("file", f);
     if(ritAcc.mode){ fd.append("mode", ritAcc.mode); }
@@ -622,15 +665,15 @@
     if(ritAcc.stl_overwrite){ fd.append("stl_overwrite", JSON.stringify(ritAcc.stl_overwrite)); }
     if(ritAcc.lib_overwrite){ fd.append("lib_overwrite","1"); }
     if(ritAcc.code){ fd.append("code", ritAcc.code); }
-    $("rit-upload-btn").disabled=true; ritMsg("Caricamento…");
+    $(ritBtnEl).disabled=true; ritMsg("Caricamento…");
     // NB: niente Content-Type manuale -> il browser imposta il boundary multipart.
     fetch(API+"/admin/rit/libraries",{method:"POST",headers:adminHeaders(),body:fd})
       .then(function(r){ return r.json().then(function(j){ return {status:r.status, body:j}; },
                                               function(){ return {status:r.status, body:{}}; }); })
       .then(function(res){
-        $("rit-upload-btn").disabled=false;
+        $(ritBtnEl).disabled=false;
         if(res.status===200 && res.body.status==="ok"){
-          $("rit-file").value=""; ritAcc={};
+          $(ritSrcEl).value=""; ritAcc={};
           if(res.body.kind==="rows"){
             ritMsg(ritRowsOkMsg(res.body),"ok");
           } else {
@@ -662,7 +705,7 @@
         }
         ritMsg("Errore: "+(res.body.detail||res.body.message||("HTTP "+res.status)),"err");
       })
-      .catch(function(){ $("rit-upload-btn").disabled=false; ritMsg("Errore di rete durante il caricamento.","err"); });
+      .catch(function(){ $(ritBtnEl).disabled=false; ritMsg("Errore di rete durante il caricamento.","err"); });
   }
 
   // 409 keyword_conflict: mostra ESPLICITAMENTE ogni libreria sovrascrivibile
@@ -727,12 +770,41 @@
       .catch(function(){ toast("Errore nel caricamento del dettaglio."); });
   }
 
+  // PATCH dei campi editabili di un componente (ruolo/nome/eng/attivo).
+  function ritSaveType(libId, tr){
+    var engv=tr.querySelector('[data-tf="eng"]').value;
+    var body={display:tr.querySelector('[data-tf="display"]').value.trim(),
+              role:(tr.querySelector('[data-tf="role"]').value||null),
+              is_eng:(engv===""?null:(engv==="true")),
+              active:tr.querySelector('[data-tf="active"]').checked};
+    var btn=tr.querySelector('[data-act="save"]'); btn.disabled=true;
+    fetch(API+"/admin/rit/libraries/"+libId+"/types/"+tr.getAttribute("data-tid"),
+      {method:"PATCH",
+       headers:{"Authorization":"Bearer "+ADMIN_TOKEN,"Content-Type":"application/json"},
+       body:JSON.stringify(body)})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+      .then(function(res){ btn.disabled=false;
+        if(res.ok){ tr.classList.toggle("row-off", !body.active); toast("Componente salvato."); }
+        else { toast(res.body.detail||"Errore nel salvataggio."); } })
+      .catch(function(){ btn.disabled=false; toast("Errore di rete."); });
+  }
+  function ritDeleteType(libId, tr){
+    if(!confirm("Eliminare questo componente dalla libreria?")) return;
+    fetch(API+"/admin/rit/libraries/"+libId+"/types/"+tr.getAttribute("data-tid"),
+      {method:"DELETE",headers:adminHeaders()})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+      .then(function(res){
+        if(res.ok){ tr.remove(); toast("Componente eliminato."); ritLoad(); }
+        else { toast(res.body.detail||"Errore nell'eliminazione."); } })
+      .catch(function(){ toast("Errore di rete."); });
+  }
+
   function ritRenderDetail(d){
     var el=$("rit-detail");
     var html='<h4>'+escapeHtml(d.import_name)+'</h4>'+
       '<div class="sub">'+((d.source==="csv"||d.source==="editor")
-          ? 'Parametri della libreria (sola lettura). '
-          : 'Parametri letti dal config.xml (sola lettura). ')+
+          ? 'Libreria creata. ' : 'Libreria importata (config.xml). ')+
+        'Parametri root in sola lettura; i componenti sotto sono <strong>modificabili</strong> (ruolo, nome, ENG), disattivabili o eliminabili — la geometria (marker, click center, asse) viene dal file. '+
         (d.active?'Libreria attiva.':'Non ancora attiva.')+'</div>'+
       '<div class="rit-root">'+
         ritFld("Keyword", d.keyword)+
@@ -745,27 +817,32 @@
         ritFld("Caricata da", d.uploaded_by)+
       '</div>'+
       '<div class="tablecard"><table><thead><tr>'+
-        '<th>#</th><th>Display</th><th>Keyword</th><th>Marker</th>'+
-        '<th>Click center</th><th>Axis asym.</th><th>Ruolo</th><th>ENG</th></tr></thead><tbody>';
+        '<th>#</th><th>Nome</th><th>Marker</th><th>Ruolo</th><th>ENG</th><th>Attivo</th><th></th></tr></thead><tbody>';
+    function ritOpt(v,l,sel){ return '<option value="'+v+'"'+(sel?' selected':'')+'>'+l+'</option>'; }
     (d.types||[]).forEach(function(t){
-      html+='<tr>'+
+      var roleSel='<select class="td-in" data-tf="role">'+
+        ritOpt("","—",!t.role)+ritOpt("madre","Madre",t.role==="madre")+
+        ritOpt("figlio","Figlio",t.role==="figlio")+ritOpt("entrambi","Entrambi",t.role==="entrambi")+'</select>';
+      var engSel='<select class="td-in" data-tf="eng">'+
+        ritOpt("","—",t.is_eng==null)+ritOpt("true","Sì",t.is_eng===true)+ritOpt("false","No",t.is_eng===false)+'</select>';
+      html+='<tr data-tid="'+t.id+'"'+(t.active?'':' class="row-off"')+'>'+
         '<td class="umeta num">'+(t.ord!=null?t.ord:"")+'</td>'+
-        '<td class="umeta">'+escapeHtml(t.display||"—")+'</td>'+
-        '<td class="umeta rit-mono">'+escapeHtml(t.keyword||"—")+'</td>'+
+        '<td><input class="td-in" data-tf="display" value="'+escapeHtml(t.display||"")+'" placeholder="—"></td>'+
         '<td class="umeta rit-mono">'+escapeHtml(t.marker_filename||"—")+'</td>'+
-        '<td class="umeta rit-mono">'+ritVec(t.click_center)+'</td>'+
-        '<td class="umeta rit-mono">'+ritVec(t.axis_asymmetric)+'</td>'+
-        '<td>'+(t.role==="madre"?'<span class="pill madre">Madre</span>'
-               :t.role==="figlio"?'<span class="pill figlio">Figlio</span>'
-               :'<span class="umeta">—</span>')+'</td>'+
-        '<td>'+(t.is_eng===true?'<span class="pill eng">ENG</span>'
-               :t.is_eng===false?'<span class="pill neng">Non-ENG</span>'
-               :'<span class="umeta">—</span>')+'</td>'+
+        '<td>'+roleSel+'</td>'+
+        '<td>'+engSel+'</td>'+
+        '<td style="text-align:center"><input type="checkbox" data-tf="active"'+(t.active?' checked':'')+'></td>'+
+        '<td class="actcell"><button class="linkbtn" data-act="save">Salva</button>'+
+          '<button class="linkbtn danger" data-act="del">Elimina</button></td>'+
       '</tr>';
     });
     html+='</tbody></table></div>'+
       '<div class="row" style="margin-top:14px"><button class="btn revoke" id="rit-detail-close">Chiudi dettaglio</button></div>';
     el.innerHTML=html;
+    el.querySelectorAll('tr[data-tid]').forEach(function(tr){
+      tr.querySelector('[data-act="save"]').addEventListener("click", function(){ ritSaveType(d.id, tr); });
+      tr.querySelector('[data-act="del"]').addEventListener("click", function(){ ritDeleteType(d.id, tr); });
+    });
     el.querySelector("#rit-detail-close").addEventListener("click", function(){ el.classList.add("hidden"); el.innerHTML=""; });
     if(d.has_preview){
       // preview dietro auth: fetch come blob (un <img src> non porta il Bearer)
@@ -779,7 +856,7 @@
     el.scrollIntoView({behavior:"smooth", block:"start"});
   }
 
-  $("rit-upload-btn").addEventListener("click", function(){ ritUpload(); });
+  $("rit-upload-btn").addEventListener("click", function(){ ritUploadFrom('rit-file','rit-upload-btn','rit-msg'); });
   $("rit-overlay").addEventListener("click", function(e){ if(e.target===$("rit-overlay")) ritCloseConflict(); });
 
   // ========== 8.50.0: Archivio STL (cartella unica) ==========
@@ -1201,9 +1278,8 @@
       '<td><input data-ed="marca" placeholder="Megagen"></td>'+
       '<td><input data-ed="modello" placeholder="AnyRidge"></td>'+
       '<td style="width:76px"><input data-ed="diametro" placeholder="4.0"></td>'+
-      '<td style="width:100px"><input data-ed="asse" placeholder="0,0,1"></td>'+
       '<td style="width:110px"><select data-ed="ruolo">'+
-        '<option value="madre">Madre</option><option value="figlio">Figlio</option></select></td>'+
+        '<option value="madre">Madre</option><option value="figlio">Figlio</option><option value="entrambi">Entrambi</option></select></td>'+
       '<td><div class="ed-file"><select data-ed="file"></select>'+
         '<button class="linkbtn" data-ed="prev" title="Anteprima 3D con origine">Anteprima</button></div>'+
         '<input type="file" accept=".stl" data-ed="fpick" class="hidden"></td>'+
@@ -1251,8 +1327,10 @@
         var el=tr.querySelector('[data-ed="'+k+'"]');
         return el?String(el.value||"").trim():"";
       };
+      // asse_occlusale NON in editor (default 0,0,1 lato server); resta colonna
+      // opzionale solo nel CSV per il caso raro del file esportato "storto".
       var r={marca:gv("marca"), modello:gv("modello"), diametro:gv("diametro"),
-             asse_occlusale:gv("asse"), ruolo:gv("ruolo"), file:gv("file"),
+             ruolo:gv("ruolo"), file:gv("file"),
              nome:gv("nome"), eng:gv("eng")};
       if(!r.marca && !r.modello && !r.file){ continue; }   // riga vuota: salta
       if(!r.marca || !r.modello || !r.diametro){
@@ -1317,16 +1395,19 @@
   }
 
   function edTemplate(){
-    // CSV d'esempio: 2 diametri -> 2 librerie; BOM per Excel
-    var csv='marca,modello,diametro,asse_occlusale,ruolo,file,nome,eng\n'+
-      'Megagen,AnyRidge,3.5,"0,0,1",madre,sb_35.stl,Scanbody Ø3.5,\n'+
-      'Megagen,AnyRidge,3.5,,figlio,abut_eng_35.stl,Abutment ENG,si\n'+
-      'Megagen,AnyRidge,4.0,"0,0,1",madre,sb_40.stl,Scanbody Ø4.0,\n'+
-      'Megagen,AnyRidge,4.0,,figlio,abut_neng_40.stl,Abutment Non-ENG,no\n';
+    // CSV d'esempio (1 madre + 2 figli + 1 entrambi); BOM per Excel. Si
+    // scarica gia' come "libreria.csv": compili, metti in cartella con gli
+    // STL, zippi e carichi -> nessuna rinomina. La colonna asse_occlusale e'
+    // opzionale (default 0,0,1): solo per file con asse non standard.
+    var csv='marca,modello,diametro,ruolo,file,nome,eng\n'+
+      'Megagen,AnyRidge,4.0,madre,scanbody_1t3.stl,Scanbody 1T3,\n'+
+      'Megagen,AnyRidge,4.0,figlio,abutment_eng.stl,Abutment ENG,si\n'+
+      'Megagen,AnyRidge,4.0,figlio,abutment_neng.stl,Abutment Non-ENG,no\n'+
+      'Megagen,AnyRidge,4.0,entrambi,pezzo_doppio.stl,Pezzo doppio,\n';
     var blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
     var a=document.createElement("a");
     a.href=URL.createObjectURL(blob);
-    a.download="libreria_template.csv";
+    a.download="libreria.csv";
     document.body.appendChild(a); a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },400);
   }
@@ -1341,6 +1422,20 @@
   $("ed-add-row").addEventListener("click", function(){ edAddRow(); });
   $("ed-save").addEventListener("click", function(){ edSave(); });
   $("ed-template").addEventListener("click", edTemplate);
+  $("cl-zip-btn").addEventListener("click", function(){ ritUploadFrom('cl-zip-file','cl-zip-btn','cl-zip-msg'); });
+
+  // ---------- tab admin ----------
+  function switchAdminTab(pane){
+    document.querySelectorAll('.admin-tabs .atab').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-pane')===pane);
+    });
+    document.querySelectorAll('.tabpane').forEach(function(s){
+      s.classList.toggle('active', s.id==='pane-'+pane);
+    });
+  }
+  document.querySelectorAll('.admin-tabs .atab').forEach(function(b){
+    b.addEventListener('click', function(){ switchAdminTab(b.getAttribute('data-pane')); });
+  });
 
   // ---------- init ----------
   loadUsers();
