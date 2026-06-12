@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.53.1</title>
+<title>Syntesis-ICP - Analizzare v8.54.0</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2427,7 +2427,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.53.1';
+window.ANALIZZA_BUILD = '8.54.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-12';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2621,6 +2621,10 @@ function init(){
   document.addEventListener('dragleave',function(e){if(e.relatedTarget===null||!document.body.contains(e.relatedTarget)){document.getElementById('dropOverlay').classList.remove('active')}});
   document.addEventListener('drop',function(e){e.preventDefault();e.stopPropagation();document.getElementById('dropOverlay').classList.remove('active');if(e.dataTransfer&&e.dataTransfer.files.length>0){var file=e.dataTransfer.files[0];if(file.name.toLowerCase().endsWith('.stl')){loadScanFile(file)}}});
   renderer.domElement.addEventListener('click',onViewportClick);
+  // 8.54.0: registra il pointerdown (solo tasto SX, solo durante il picking replace) per distinguere
+  // clic-pulito da trascinamento e catturare lo stato di Shift AL PRESS (non al rilascio). Scopato a
+  // replacePlacementMode -> nessuna contaminazione di coordinate da altri workflow.
+  renderer.domElement.addEventListener('pointerdown',function(_e){ if(_e.button !== 0 || !replacePlacementMode) return; replacePickDownX = _e.clientX; replacePickDownY = _e.clientY; replacePickDownShift = !!_e.shiftKey; });
   // Click puro (senza drag) cambia il pivot di rotazione al punto cliccato
   (function(){
     var downX=0, downY=0, downT=0, isDown=false;
@@ -15569,6 +15573,7 @@ function sostUpdateLabels(){
 var replaceMesh = null;             // THREE.Mesh della scansione (separata da sostMesh)
 var replaceOriginalGeo = null;
 var replacePlacementMode = false;   // true in attesa di click
+var replacePickDownX = 0, replacePickDownY = 0, replacePickDownShift = false;   // 8.54.0: pos + Shift catturati al pointerDOWN -> distingue clic-pulito da trascinamento e Shift-al-press
 var replacePlaced = [];             // [{id,num,group,dotMeshes,seedMarkerPts,seedScanPts,position,axisDir,libId,typeOrd,markerSha,typeLabel,color,labelEl,rmsd,toothLabel}]
 var replaceCounter = 0;
 var replaceLibs = [];               // cache lista librerie attive
@@ -15895,8 +15900,8 @@ function replacePreviewInit(geo){
   replacePreviewRender();
 }
 function replacePreviewAttachInput(canvas){
-  var down = false, moved = false, sx = 0, sy = 0;
-  canvas._replDown = function(e){ down = true; moved = false; sx = e.clientX; sy = e.clientY; };
+  var down = false, moved = false, sx = 0, sy = 0, shiftAtDown = false;
+  canvas._replDown = function(e){ down = true; moved = false; sx = e.clientX; sy = e.clientY; shiftAtDown = !!e.shiftKey; };   // 8.54.0: Shift al press
   replacePreviewMoveH = function(e){
     if(!down) return;
     var dx = e.clientX - sx, dy = e.clientY - sy;
@@ -15911,7 +15916,13 @@ function replacePreviewAttachInput(canvas){
     sx = e.clientX; sy = e.clientY;
     replacePreviewUpdateCam(); replacePreviewRender();
   };
-  replacePreviewUpH = function(e){ if(down && !moved) replacePreviewPickAt(e.clientX, e.clientY); down = false; };
+  replacePreviewUpH = function(e){
+    if(down && !moved){
+      if(shiftAtDown) replacePreviewPickAt(e.clientX, e.clientY);   // 8.54.0: Shift catturato al press posa, trascina ruota
+      else replaceShowStatus('Tieni premuto Shift e clicca per posare il punto sul marker · trascina per ruotare.');
+    }
+    down = false;
+  };
   canvas.addEventListener('mousedown', canvas._replDown);
   window.addEventListener('mousemove', replacePreviewMoveH);
   window.addEventListener('mouseup', replacePreviewUpH);
@@ -15949,7 +15960,7 @@ function replacePreviewPickAt(clientX, clientY){
       return;
     }
     replaceSeed.phase = 'pickScan';
-    replaceShowStatus('Ora indica i 3 punti GEMELLI sulla scansione, nello stesso ordine: 1 rosso, 2 verde, 3 blu.');
+    replaceShowStatus('Ora posa i 3 punti GEMELLI sulla scansione con SHIFT+CLIC, nello stesso ordine: 1 rosso, 2 verde, 3 blu. Trascina (senza Shift) per ruotare.');
   }
   replaceSeedUpdateUI();
 }
@@ -16092,8 +16103,8 @@ function replaceGuideRender(){
   if(stepEl){
     var C = '<span style="color:#FF3B30;font-weight:700">1</span>·<span style="color:#00C853;font-weight:700">2</span>·<span style="color:#2979FF;font-weight:700">3</span>';
     var t;
-    if(ph === 'pickMarker') t = '<b>① Marker</b> — clicca il punto <b>' + (replaceSeed.markerPts.length + 1) + ' di 3</b> sul <b>MARKER</b> nell\'anteprima qui sopra (ordine ' + C + '). Trascina per ruotare il marker. Scegli 3 punti ben distanti tra loro (no in linea).';
-    else if(ph === 'pickScan') t = '<b>② Scansione</b> — clicca il punto <b>' + (replaceSeed.scanPts.length + 1) + ' di 3</b> <b>GEMELLO</b> sulla <b>scansione</b> (viewport grande), <b>stesso ordine</b> ' + C + ' del marker. <b>Annulla punto</b> se sbagli.';
+    if(ph === 'pickMarker') t = '<b>① Marker</b> — <b>SHIFT+CLIC</b> sul punto <b>' + (replaceSeed.markerPts.length + 1) + ' di 3</b> sul <b>MARKER</b> nell\'anteprima qui sopra (ordine ' + C + '). Trascina (senza Shift) per ruotare. Scegli 3 punti ben distanti tra loro (no in linea).';
+    else if(ph === 'pickScan') t = '<b>② Scansione</b> — <b>SHIFT+CLIC</b> sul punto <b>' + (replaceSeed.scanPts.length + 1) + ' di 3</b> <b>GEMELLO</b> sulla <b>scansione</b> (viewport grande), <b>stesso ordine</b> ' + C + ' del marker. Trascina (senza Shift) per ruotare. <b>Annulla punto</b> se sbagli.';
     else if(ph === 'pendingConfirm') t = '<b>③ Conferma</b> — posa pronta: <b>madre</b> (grigio-blu) + <b>figlio</b> + <b>origine</b>. Controlla l\'incastro, poi <b>✓ Conferma</b>. <b>Annulla punto</b> per correggere o <b>Ricomincia</b> da capo.';
     else t = 'Scegli i type <b>SORGENTE</b> + <b>SOSTITUTO</b>, poi <b>+ Nuovo impianto</b> per allineare con 3 punti.';
     stepEl.innerHTML = t;
@@ -16371,6 +16382,10 @@ function replaceOnViewportClick(event){
   // Collector dei punti GEMELLI sulla scansione (fase pickScan del seme 3-punti, ramo "Allinea a 3 punti").
   if(replaceSeed.phase !== 'pickScan' || !replaceMesh) return false;
   if(replaceSeed.scanPts.length >= REPLACE_SEED_N) return false;
+  // 8.54.0 (feedback utente: ruotando il modello il clic finiva fuori posizione): posa SOLO con
+  // SHIFT+CLIC PULITO. Un trascinamento (rotazione) non posa mai; un clic senza Shift dà solo un hint.
+  if(Math.abs(event.clientX - replacePickDownX) > 6 || Math.abs(event.clientY - replacePickDownY) > 6) return false;   // era un trascinamento = rotazione
+  if(!replacePickDownShift){ replaceShowStatus('Tieni premuto Shift e clicca per posare il punto · trascina (senza Shift) per ruotare.'); return false; }
   var rect = renderer.domElement.getBoundingClientRect();
   var mouse = new THREE.Vector2(
     ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -16656,7 +16671,7 @@ function replaceStartThreePoint(){
   renderer.domElement.style.cursor = 'crosshair';
   if(replacePreviewRenderer) replacePreviewRender();
   replaceSeedUpdateUI();
-  replaceShowStatus('Allinea a 3 punti: clicca 3 punti di repere SUL MARKER nell\'anteprima (1·2·3).');
+  replaceShowStatus('Allinea a 3 punti: SHIFT+CLIC su 3 punti di repere SUL MARKER nell\'anteprima (1·2·3). Trascina per ruotare.');
 }
 
 // Conferma la posa di anteprima: finalizza il marker (entra in replacePlaced).
@@ -16803,8 +16818,11 @@ var REPLACE_CUT_HALFH  = 30.0;   // mm: taglio passante ±30mm lungo l'asse
 // MONDO, + piccolo margine -> taglia ~il footprint dello scanbody e poco altro, non un'ampia fascia
 // di gengiva. Cap al vecchio fisso (mai PIU' largo di prima). Fallback fisso se geometria assente.
 function replaceEstimateMarkerRadius(p){
-  var mesh = (p.meshSub) || (p.group && p.group.children && p.group.children[0]);
-  if(!mesh || !mesh.geometry || !mesh.geometry.attributes || !mesh.geometry.attributes.position) return REPLACE_CUT_RADIUS;
+  // 8.54.0: il buco è GUIDATO DAL MADRE (meshSrc = scanbody scansionato, ciò che occupa davvero lo
+  // spazio nella scansione) — non più dal figlio (meshSub). + offset utente dallo slider dell'albero.
+  var _off = (p.cutOffset || 0);
+  var mesh = (p.meshSrc) || (p.meshSub) || (p.group && p.group.children && p.group.children[0]);
+  if(!mesh || !mesh.geometry || !mesh.geometry.attributes || !mesh.geometry.attributes.position) return REPLACE_CUT_RADIUS + _off;
   try {
     p.group.updateMatrixWorld(true);
     var m = p.group.matrixWorld.elements;
@@ -16820,11 +16838,11 @@ function replaceEstimateMarkerRadius(p){
       var rx = dx - axial*ax.x, ry = dy - axial*ax.y, rz = dz - axial*ax.z;
       rs.push(Math.sqrt(rx*rx + ry*ry + rz*rz));
     }
-    if(rs.length < 8) return REPLACE_CUT_RADIUS;
+    if(rs.length < 8) return REPLACE_CUT_RADIUS + _off;
     rs.sort(function(a, b){ return a - b; });
-    var p90 = rs[Math.floor(rs.length * 0.90)];   // ~raggio scanbody (ignora outlier del cap)
-    return Math.min(REPLACE_CUT_RADIUS, p90 + 0.3);   // + margine; mai piu' largo del vecchio fisso
-  } catch(e){ return REPLACE_CUT_RADIUS; }
+    var p90 = rs[Math.floor(rs.length * 0.90)];   // ~raggio scanbody MADRE (ignora outlier del cap)
+    return Math.min(REPLACE_CUT_RADIUS, p90 + 0.3) + _off;   // footprint madre (cap 3mm) + offset utente
+  } catch(e){ return REPLACE_CUT_RADIUS + _off; }
 }
 function replaceRebuildScanGeometry(){
   if(!replaceOriginalGeo || !replaceMesh) return;
@@ -16859,12 +16877,32 @@ function replaceRebuildScanGeometry(){
   replaceMesh.geometry = ng;
 }
 function replaceToggleMarkerCut(num, on){
+  if(_replaceCutRebuildTimer){ clearTimeout(_replaceCutRebuildTimer); _replaceCutRebuildTimer = null; }   // 8.54.0: annulla debounce pendente
   for(var i = 0; i < replacePlaced.length; i++){ if(replacePlaced[i].num === num){ replacePlaced[i].cutScan = !!on; break; } }
   replaceRebuildScanGeometry(); replaceRebuildTree();
 }
 function replaceToggleAllCuts(on){
   replacePlaced.forEach(function(p){ p.cutScan = !!on; });
   replaceRebuildScanGeometry(); replaceRebuildTree();
+}
+// 8.54.0: offset di taglio per-marker dallo slider dell'albero scena. Allarga il buco "Taglia
+// scansione" oltre il footprint del MADRE -> rimuove la gengiva attorno quanto serve. Solo geometria
+// (no rebuild dell'albero: lo slider non perde il focus durante il drag).
+var _replaceCutRebuildTimer = null;
+function replaceSetMarkerCutOffset(num, mmStr){
+  var mm = Math.max(0, Math.min(5, parseFloat(mmStr) || 0));   // 8.54.0: step 0.1mm, max 5mm (zona utile)
+  for(var i = 0; i < replacePlaced.length; i++){
+    if(replacePlaced[i].num === num){
+      replacePlaced[i].cutOffset = mm;
+      var lbl = document.getElementById('replaceCutLbl_' + num);
+      if(lbl) lbl.textContent = '+' + mm.toFixed(1) + 'mm';
+      break;
+    }
+  }
+  // 8.54.0 (review perf): la ricostruzione della geometria scansione (~240k triangoli) è pesante;
+  // debounce ~120ms -> anteprima quasi-live durante il drag senza ricostruire a ogni tick.
+  if(_replaceCutRebuildTimer) clearTimeout(_replaceCutRebuildTimer);
+  _replaceCutRebuildTimer = setTimeout(function(){ _replaceCutRebuildTimer = null; replaceRebuildScanGeometry(); }, 120);
 }
 
 // ===== 8.46.0 (feedback utente "arriva il pulsante concludi e esporta file"): CONCLUDI / EXPORT STL =====
@@ -17074,6 +17112,13 @@ function replaceRebuildTree(){
              '<input type="checkbox" ' + (p.cutScan ? 'checked' : '') + ' onchange="replaceToggleMarkerCut(' + p.num + ', this.checked)">' +
              '<span class="dot" style="background:#889aad;border:1px dashed #333"></span>' +
              '<span class="lbl">Taglia scansione</span>' +
+             // 8.54.0: slider offset di taglio (solo se attivo) -> allarga il buco attorno al MADRE
+             (p.cutScan ? (
+               '<input type="range" min="0" max="5" step="0.1" value="' + (p.cutOffset || 0) + '"' +
+               ' oninput="replaceSetMarkerCutOffset(' + p.num + ', this.value)" onclick="event.stopPropagation()"' +
+               ' style="flex:1;accent-color:#889aad;height:4px" title="Offset di taglio attorno al ' + (p.meshSrc ? 'madre' : 'marker') + ': allarga il buco nella scansione">' +
+               '<span id="replaceCutLbl_' + p.num + '" style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:34px;text-align:right">+' + (p.cutOffset || 0).toFixed(1) + 'mm</span>'
+             ) : '') +
              '</div>';
       });
     }
@@ -17101,6 +17146,7 @@ function replaceDeletePlaced(id){
   var i = -1;
   for(var k = 0; k < replacePlaced.length; k++){ if(replacePlaced[k].id === id){ i = k; break; } }
   if(i < 0) return;
+  if(_replaceCutRebuildTimer){ clearTimeout(_replaceCutRebuildTimer); _replaceCutRebuildTimer = null; }   // 8.54.0: annulla debounce pendente (no rebuild tardivo dopo delete)
   var p = replacePlaced[i];
   if(p.group){ _replaceDisposeGroup(p.group); scene.remove(p.group); }   // 8.32.0: mesh (cache) + sorgente + terna origine
   (p.dotMeshes || []).forEach(_replaceDisposeDot);

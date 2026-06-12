@@ -4,6 +4,22 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.54.0: Taglio "Taglia scansione" guidato dal madre + offset slider + picking 3 punti con Shift+clic
+
+Tre interventi Replace-iT dal collaudo live (solo blocco `replace*` del monolite `v3b`).
+
+**1. Taglio guidato dal madre + offset regolabile** (*"il taglio deve togliere tutto attorno al file… deve essere guidato dal file madre… devo poter aumentare l'offset di taglio dall'albero scena"*). Il buco di "Taglia scansione" prendeva il raggio dal **figlio**; ora lo prende dal **MADRE** (`p.meshSrc` = scanbody scansionato, ciò che occupa davvero lo spazio nella scansione). Aggiunto un **offset per-marker** regolabile da uno **slider** sulla riga "Taglia scansione" dell'albero (`replaceSetMarkerCutOffset`, 0-5mm step **0.1**, label `+X.Xmm`), sommato DOPO il cap di 3mm → può superarlo per rimuovere la gengiva attorno quanto serve. Default 0 (parte aderente, +0.3mm di margine già esistente). Ricostruzione geometria **debounce 120ms** (review perf: la rebuild ~240k triangoli scattava a ogni tick dello slider); timer azzerato su toggle/elimina marker.
+
+**2. Picking 3 punti con SHIFT+CLIC** (*"i 3 punti sulla scansione non sono mai precisi… ruotando il file il sistema registra un clic fuori posizione… ruotare e cliccare dovrebbero essere più distinti"*). **Causa**: lo scan-pick era agganciato all'evento `click`, che il browser emette **anche dopo un trascinamento** → ruotare posava un punto al rilascio. **Fix**: marker (anteprima) e scansione posano SOLO con **Shift+clic pulito** — Shift catturato al **pointerDOWN** (`replacePickDownShift` / `shiftAtDown`, non al rilascio, su raccomandazione della review) + guardia movimento **>6px** = trascinamento → nessuna posa. Listener `pointerdown` scopato a `replacePlacementMode` + solo tasto sinistro (no contaminazione cross-workflow). Testi-guida aggiornati a "SHIFT+CLIC"; hint se si clicca senza Shift. Trascinare (senza Shift) ruota e non posa mai un punto fuori posizione — risolve anche la precisione (al momento del tap la vista è ferma).
+
+**Review avversariali** (Workflow, 3 lenti + verify, due campagne):
+- *Cut*: 1 major confermato (rebuild per-tick) → **debounce** applicato. Nit (title slider per single-mesh) → corretto.
+- *Picking*: 6 "major" segnalati ma **nessuno confermato dalla verifica** (edge case: Shift catturato a mouseup, coord stale cross-workflow, mouseup fuori canvas, ecc.). Applicati comunque i miglioramenti a basso costo: **Shift catturato al press**, **scoping del listener**, **clear del timer debounce** su toggle/delete.
+
+Validazione: `node --check` 7/7 blocchi `<script>` OK; marker versione allineati 8.54.0. `docs/MAPPA_FUNZIONALE.md` aggiornata (riga Taglia scansione + prosa picking + versione mappata). Deploy canary su entrambi i servizi.
+
+---
+
 ## 2026-06-12 — 8.53.1: Etichetta impianto staccata dal marker con linea guida (fix scorcio)
 
 Feedback utente sul 8.53.0: *"il label è attaccato sul riferimento mentre dovrebbe avere una linea che lo allontana e lo posiziona più alto, come su Analizza"*. Solo blocco `replace*` del monolite `v3b` → bump `<title>`/`ANALIZZA_BUILD` 8.53.1.
