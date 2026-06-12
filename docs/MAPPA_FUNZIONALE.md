@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.57.0 — **Data:** 2026-06-12
+> **Versione software mappata:** 8.58.0 — **Data:** 2026-06-12
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 
@@ -153,7 +153,7 @@ App monolite (~3.87 MB). 4 workflow interni commutati da `selectWorkflow(wf)` ([
 |---|---|---|---|---|---|---|
 | Livelli | `#btnLivelli` `.analisi-only` | `toggleLayersPanel` | analizza+accoppia | toggle albero scena (`layersPanel`) | [1337] | |
 | Livelli (dup) | `.sostituire-only` | `toggleLayersPanel` | solo sostituire | toggle albero scena | [1345] | `display:none` default; visibilità centralizzata in `selectWorkflow` (corretto 8.4.6) |
-| **Posiziona** | `.green .analisi-only` | `startPlacement` | analizza+accoppia | `placementMode=true` → al click `placeMUA` | [1353] | |
+| **Posiziona** | `.green .analisi-only` | `startPlacement` | analizza+accoppia | `placementMode=true` → **8.58.0: SHIFT+CLIC pulito** posa il MUA (`placeMUA`); guardia movimento >6px = trascinamento → niente posa (ruotare non posa); clic senza Shift → hint. Shift/pos catturati al pointerdown via `replacePickDown*` (condivisi tra tutte le pose) | [1353] | |
 | **Raffina** | `#btnRaffina` `.analisi-only` | `alignAll` | analizza+accoppia | ICP refine di tutti i MUA | [1363] | |
 | Crea gruppo | `.analisi-only` | `openGroupDialog` | analizza+accoppia | apre dialog gruppi | [1373] | |
 | Mostra assi | `#btnAxes` `.analisi-only` | `toggleAxes` | analizza+accoppia | toggle assi 3D | [1383] | |
@@ -259,7 +259,7 @@ Sostituzione scan body con ICP. Pannello `panelSostituire` [1915]:
 | Drop scansione partenza | `#sostSlotScan` / `#sostInputScan` | onclick/onchange | `sostInputScan.click()` / `sostOnScanPicked` | — | carica STL partenza | [1922-1925] |
 | **Radio "Scansione di partenza" 1T3/SR/OS (Box B)** | `#sostSourceRadio` | onchange | `sostOnSourceChange` | `sostSourceTemplate`, `sostActiveTemplate` | tipo marker presente (allineamento) | [1928-1931] |
 | Upload custom | `#sostInputCustom` | onchange | `sostOnCustomPicked` | — | template custom | [1934] |
-| + Posiziona | `#sostBtnPlace` | onclick | `sostStartPlacement` | — | placement marker | [1938] |
+| + Posiziona | `#sostBtnPlace` | onclick | `sostStartPlacement` | — | placement marker; **8.58.0: SHIFT+CLIC pulito** posa (`sostOnViewportClick`→`sostPlaceTemplate`), guardia movimento >6px = rotazione + hint senza Shift; aggiunta guardia `.face` (come Analizza) | [1938] |
 | Raffina | `#sostBtnRefine` | onclick | `sostAlignAll` | — | ICP sostituzione — il point-ICP **centra** soltanto; l'**asse** del marker viene da un fit lateral-wall della parete scansionata. Gate motore (**8.14.0**): `auto` (default) = lateral solo se `sostSourceTemplate==='SR'`; `lateralwall` = sempre (era incondizionato in 8.13.0); `cap` = mai (→ asse dal point-ICP). Fallback `R·seed` se <8 triangoli parete — vedi `sostAlignAll` [15820]/[15995] | [1939] | disabled di default |
 | Esporta STL | `#sostBtnExport` | onclick | `sostExportSTL` | `_sostExportPending` | apre **`#sostExportDialog`** (nome file precompilato) → Conferma scarica col nome scelto (sanificato, `.stl` auto); Annulla non scarica | [1946] | `display:none` default; dialog nome file (8.4.7) |
 

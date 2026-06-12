@@ -4,6 +4,20 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.58.0: SHIFT+CLIC esteso ad Analizza (posa MUA) e Sostituisci
+
+Richiesta utente (roadmap #1 da `replaceit-coupling-roadmap`): estendere a **tutti** i workflow di accoppiamento il gesto Shift+clic introdotto in 8.54.0 per Replace-iT. Solo `v3b`. Analizza è il workflow principale → review avversariale dedicata.
+
+**Causa comune** (come Replace pre-8.54.0): la posa (clic singolo sullo scanbody) era agganciata all'evento `click` grezzo, che scatta **anche dopo un trascinamento** → ruotando si posava un MUA / marker fuori posizione.
+
+**Fix**: il listener `pointerdown` (già presente per Replace) ora cattura pos+Shift (`replacePickDownX/Y/Shift`, **condivisi**) per **qualsiasi** modalità di posa (`placementMode || sostPlacementMode || replacePlacementMode`). Il **fallback Analizza** in `onViewportClick` e **`sostOnViewportClick`** posano SOLO con **Shift+clic pulito**: guardia movimento >6px = trascinamento → niente posa; clic senza Shift → hint (`showStatus` / `sostShowStatus`). Testi-guida `startPlacement` + `sostStartPlacement` → "SHIFT+CLIC … trascina per ruotare". Trascinare (senza Shift) ruota e non posa mai. *(La posa MUA aggancia comunque al centro scanbody via `findScanbodyCenter`; il gate uniforma il gesto ed evita pose accidentali in rotazione.)*
+
+**Review avversariale dedicata** (2 lenti su Analizza + Sost/stato condiviso): Analizza gate **corretto** (Shift+clic posa, drag/no-shift no-op, nessun altro click rotto, lab-place non toccato), sost gate corretto, `sostShowStatus` ok, stato condiviso ok (modi mutuamente esclusivi, no doppio-dispatch). Unico finding reale = **guardia `.face` mancante** in `sostOnViewportClick` (preesistente, latente: oggi non crasha perché a `sostMesh` non sono attaccati figli wireframe, ma incoerente col pattern Analizza/Replace) → **aggiunta** `&& hits[0].face` come Analizza. (Il "render mode su sostMesh" segnalato = preesistente, fuori scope.)
+
+Validazione: `node --check` 7/7 OK; marker versione allineati 8.58.0. `docs/MAPPA_FUNZIONALE.md` aggiornata (righe Posiziona Analizza + Sost). Deploy canary su entrambi i servizi.
+
+---
+
 ## 2026-06-12 — 8.57.0: Auto-config albero dopo Raffina (Madre nascosta + offset taglio +0.5mm di default)
 
 Richiesta utente (con screenshot): *"una volta cliccato raffina e accoppiato, i parametri da usare e gli oggetti da visualizzare dovrebbero essere così settati e fleggati."* Solo blocco `replace*` del monolite `v3b`.
