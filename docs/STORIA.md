@@ -4,6 +4,24 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.50.1: Font unico Synthesis (Helvetica), via Google Fonts
+
+Richiesta utente: *"un unico font meno identificabile con Claude, tipo Helvetica"*. Cambio puramente tipografico, nessuna modifica funzionale.
+
+Sostituiti **tutti** i font del prodotto con lo stack di sistema **Helvetica** (`'Helvetica Neue',Helvetica,Arial,sans-serif`) e rimosse **tutte** le dipendenze Google Fonts (niente più `<link>` a `fonts.googleapis`/`fonts.gstatic`). Il prodotto aveva due sistemi font, entrambi eliminati perché "Claude-like" (serif+sans):
+- **admin** (`accedi`, `gestione`): Fraunces (serif) + IBM Plex Sans + IBM Plex Mono;
+- **app principale** (`v3b`, `dashboard`, `vedere`, `home`, `ds/tokens.css`): Source Sans 3.
+
+Principio *"cambio identità, preservo il ruolo"*: ogni testo sans (compresi i titoli che erano in Fraunces serif) → Helvetica; il **solo** monospace reale (IBM Plex Mono, usato nelle pagine admin per dati tabellari/chiavi) → system-mono (`ui-monospace,Menlo,Consolas,monospace`); le variabili `--mono` dell'app principale (che già puntavano a un sans, non a un mono reale) → Helvetica, senza introdurre nuovi monospace.
+
+Implementazione:
+- App principale: cambiate solo le **definizioni** delle variabili CSS `--font`/`--mono` nei `:root` (v3b riga 41, dashboard, vedere, home) e `--syn-font`/`--syn-mono` in `ds/tokens.css`.
+- Admin: sostituzione delle `font-family` esplicite (accedi 17×, gestione 26×).
+- Rimossi i `<link>` Google Fonts + preconnect in tutti i 6 HTML.
+- v3b toccato → bump `<title>`/`ANALIZZA_BUILD` **8.50.1** (era 8.49.0, non toccato in 8.50.0); `registry.BACKEND_VERSION` 8.50.1; MAPPA "Versione software mappata" 8.50.1 (nessun UI-element aggiunto/rimosso).
+- QA: `node --check` 8/8 sui blocchi script di v3b OK (cambi solo CSS + 3 stringhe versione); verifica automatica zero residui Fraunces/IBM Plex/Source Sans/`fonts.googleapis`.
+- Deploy canary LEGACY→BACKEND commit `3cd1a3b` (LEGACY `d9f0f9c4`, BACKEND `60cdaff7`); verifica live 8.50.1 + **Helvetica servito** (home/accedi/analizzare) + **zero Google Fonts** su entrambi i domini + alias `app.syntesis-icp.com`.
+
 ## 2026-06-12 — 8.50.0: Crea librerie Replace-iT dal pannello admin + Archivio STL unificato
 
 Richiesta utente: *"un flusso semplice per creare librerie nuove dal pannello di Synthesis"*. Backend + pannello `/gestione`; **runtime `v3b` NON toccato** (`ANALIZZA_BUILD`/`<title>` invariati).
