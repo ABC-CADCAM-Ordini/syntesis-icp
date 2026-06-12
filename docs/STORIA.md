@@ -4,6 +4,25 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.53.0: Etichetta impianto = "#N Marca Modello Ømm" (3D come i MUA in Analizza)
+
+Richiesta utente: *"il label deve indicare anche marca, connessione e diametro. Esempio #1 Megagen Anyridge 4mm"* + *"posizionali come in Analizza, stessa grafica e posizione"*. Solo blocco `replace*` del monolite `v3b`; additivo, altri workflow invariati → bump `<title>`/`ANALIZZA_BUILD` 8.53.0.
+
+**Cosa fa:** ogni etichetta dell'impianto Replace-iT mostra l'identità della libreria (`#1 Megagen AnyRidge 4mm`) invece del solo numero / codice figlio, e l'etichetta 3D in scena ha la stessa grafica e posizione delle label MUA del flusso Analizzare.
+
+Implementazione:
+- **Helper `_replaceLibId(rec)`** (dopo `_replaceLibKey`): ritorna `"Marca Modello Ømm"` dai campi dell'impianto; diametro normalizzato (strip `Ø` e trailing `.0` → `"4.0"`→`"4mm"`). Stringa vuota se mancano marca/modello/diametro → i chiamanti ricadono sul vecchio `typeLabel`/"impianto" (retrocompat librerie LITE non assegnate).
+- **Congelamento alla posa**: alla creazione dell'oggetto impianto `p` (prima del `var p = {…}`) si risolve `replaceLibs` per `replaceCurrentLibId` (fallback `replaceCurrentDetail`) e si scrivono `p.marca/modello/diametro`. Così le etichette restano immutabili anche se l'utente cambia poi la cascata.
+- **3 siti testuali**: voce lista pannello (`replaceRebuildPlacedList` → `#1 Megagen AnyRidge 4mm · 0.228mm`) + nodo albero principale (`replaceRebuildTree` ~16989) + ramo single-mesh legacy (~17049). Priorità conservata al nome-dente FDI (rinomina 8.49.0).
+- **Etichetta 3D allineata ai MUA**: `replaceUpdateLabels` riscritta come clone di `updateDivergenceLabels` — pillola `.divergence-label` del colore dell'impianto (`p.color`), offset `posizione + asse×10mm` (già identico), **linea guida SVG** (line + circle ancora) su `#labelLines`, compensazione `body.zoom` (`syntesisGetUiZoom`) prima assente, testo = identità. Rimosso lo sfondo scuro forzato `#0D1B2A` in `replaceEnsureLabelElements` (classe `replace-label` conservata: serve solo alla pulizia DOM).
+- **Backend (coerenza)**: il dettaglio `GET /api/rit/libraries/{id}` (`main.py`) ora espone `marca/modello/diametro` — erano già letti da `rit_get_library_detail` ma omessi dalla response, mentre il list endpoint li espone. Allinea il fallback `replaceCurrentDetail` al percorso primario (`replaceLibs`).
+
+**Review avversariale** (Workflow, 3 lenti correttezza/render-loop/integrità-dati + verify) → fix integrati: (a) `_replaceLibId` ritorna `''` se il diametro è solo-simbolo (`Ø`/`ø`/`⌀`) dopo lo strip → niente "marca modello mm" senza numero; (b) ramo albero single-mesh riusa `_libNm` (rimossa la doppia chiamata a `_replaceLibId`); (c) commento sull'invariante `#labelLines` (svuotato ogni frame da `updateDivergenceLabels`, stessi guard → qui solo append). I due "blocker" segnalati (leak SVG, API che non espone i campi) **verificati come NON reali**: il path primario usa `replaceLibs` (che espone già i campi) e lo svuotamento di `#labelLines` è garantito dagli stessi guard `camera/renderer/vp` che gateano `replaceUpdateLabels`.
+
+Validazione: `node --check` 7/7 blocchi `<script>` OK; `py_compile main.py/registry.py` OK; marker versione allineati (title v8.53.0 / ANALIZZA_BUILD / BACKEND_VERSION 8.53.0). `docs/MAPPA_FUNZIONALE.md` aggiornata (righe Label 2D / albero / lista marker + versione mappata). Deploy canary su entrambi i servizi.
+
+---
+
 ## 2026-06-12 — 8.52.0: Cascata Marca→Modello→Diametro + Madre/Figlio per ruolo (runtime)
 
 Richiesta utente: *"il front mostra scegli marca, modello, diametro… poi scegli il figlio"*. Chiude il flusso end-to-end (pannello admin → runtime). Tocca il monolite `v3b` (solo blocco `replace*`) → bump `<title>`/`ANALIZZA_BUILD` 8.52.0.
