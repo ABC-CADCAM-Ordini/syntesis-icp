@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.56.1</title>
+<title>Syntesis-ICP - Analizzare v8.57.0</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2427,7 +2427,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.56.1';
+window.ANALIZZA_BUILD = '8.57.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-12';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16604,6 +16604,7 @@ function replacePlaceFromSeed(){
       srcMarkerSha: _tSrc.marker_sha256,
       libId: replaceCurrentLibId, typeOrd: _tSub.ord, markerSha: _tSub.marker_sha256,
       marca: (_libMMD.marca || null), modello: (_libMMD.modello || null), diametro: (_libMMD.diametro != null ? _libMMD.diametro : null),
+      cutOffset: 0.5,   // 8.57.0 (scelta utente): offset di taglio di default +0.5mm (margine attorno alla silhouette del madre); regolabile dallo slider
       typeLabel: (_tSub.display || _tSub.keyword || ('type ' + _tSub.ord)),
       srcTypeLabel: (_tSrc.display || _tSrc.keyword || ('type ' + _tSrc.ord)),
       // 8.38.0: snapshot dei type della libreria (stessa connessione/origine) per il dropdown
@@ -16711,6 +16712,7 @@ function replaceConfirmSeed(){
     var _m = replacePlaced.filter(function(m){ return m.num === P.num; })[0];   // 8.56.0: rilookup (P può essere stato eliminato durante la raffina)
     if(!_m){ try { replaceRebuildScanGeometry(); } catch(e){} replaceRebuildTree(); return; }
     _m.cutScan = true;
+    _m.showSrc = false; try { _replaceApplyView(_m); } catch(e){}   // 8.57.0 (scelta utente): dopo Raffina nascondi la MADRE -> vista pulita del risultato (Figlio + taglio); ri-attivabile dall'albero
     try { replaceRebuildScanGeometry(); } catch(e){}
     replaceRebuildTree();
     replaceShowStatus('Impianto #' + _m.num + ' confermato, raffinato e scansione tagliata. + Nuovo impianto per il prossimo.' + (typeof _m.rmsd === 'number' ? (' RMSD ' + (Math.round(_m.rmsd * 1000) / 1000) + 'mm.') : ''));

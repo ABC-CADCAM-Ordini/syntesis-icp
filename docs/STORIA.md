@@ -4,6 +4,18 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.57.0: Auto-config albero dopo Raffina (Madre nascosta + offset taglio +0.5mm di default)
+
+Richiesta utente (con screenshot): *"una volta cliccato raffina e accoppiato, i parametri da usare e gli oggetti da visualizzare dovrebbero essere così settati e fleggati."* Solo blocco `replace*` del monolite `v3b`.
+
+Due default per la vista-risultato dopo il ✓ Conferma+Raffina:
+1. **Madre nascosta.** Nella callback `onDone` di `replaceConfirmSeed` (dove dal 8.47.0 si attiva `cutScan`), ora `_m.showSrc = false` + `_replaceApplyView(_m)` → resti con **Figlio + taglio scansione** = vista pulita del risultato. La Madre (scanbody di riferimento) resta **ri-attivabile** dall'albero per ispezionare l'accoppiamento. Prima (8.33.0) restava visibile (grigio-blu translucida sopra il Figlio).
+2. **Offset taglio +0.5mm di default.** L'oggetto impianto alla posa nasce con `cutOffset: 0.5` (era 0) → il "Taglia scansione" parte con +0.5mm di margine attorno alla silhouette del madre, regolabile dallo slider 0-5 (l'utente, dopo collaudo, preferisce +0.5 al precedente 0 "aderente").
+
+Confermati via `AskUserQuestion` (Madre nascosta = sì; offset = +0.5mm). `node --check` 7/7 OK; marker versione allineati 8.57.0. `docs/MAPPA_FUNZIONALE.md` aggiornata. Deploy canary su entrambi i servizi.
+
+---
+
 ## 2026-06-12 — 8.56.1: Picking 3 punti preciso — stop inerzia camera durante la posa (fix "punto lontano dal clic")
 
 Feedback utente: *"i 3 punti sulla scansione per accoppiare la madre è sempre molto incerto, clicco ma il punto spesso si posiziona lontano dal mio clic"* (a volte spostato sullo schermo, a volte sotto il cursore ma nel punto sbagliato). Solo blocco `replace*` + controls camera condivisi (`v3b`).
