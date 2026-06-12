@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.53.0</title>
+<title>Syntesis-ICP - Analizzare v8.53.1</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2427,7 +2427,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.53.0';
+window.ANALIZZA_BUILD = '8.53.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-12';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -17402,26 +17402,32 @@ function replaceUpdateLabels(){
   if(analysisMode !== 'replace') return;
   var vp = document.getElementById('viewport');
   if(!vp) return;
-  // 8.53.0: stessa grafica/posizione delle label MUA in Analizza (.divergence-label,
-  // offset asse×10mm, linea guida SVG su #labelLines, compensazione body.zoom).
-  // NB: #labelLines è SVUOTATO ogni frame da updateDivergenceLabels() (chiamata subito prima
-  // in animate(), stessi guard camera/renderer/vp) -> qui si fa solo append, niente accumulo;
-  // stesso pattern di coesistenza dei sistemi label MUA/sost.
+  // 8.53.1: come le label MUA di Analizza ma ROBUSTO ALLO SCORCIO. L'offset 3D asse×10mm
+  // collassava sul marker quando l'asse punta verso la camera (i 10mm si proiettano a ~2px).
+  // Qui la pillola sta a OFF_PX px FISSI dal marker, lungo la direzione dell'asse PROIETTATA,
+  // sempre orientata verso l'ALTO dello schermo -> distacco e linea guida sempre visibili.
+  // #labelLines è svuotato ogni frame da updateDivergenceLabels() (subito prima in animate()).
+  var OFF_PX = 54;
   var zoomF = (typeof syntesisGetUiZoom === 'function') ? syntesisGetUiZoom() : 1.0;
   var rect = renderer.domElement.getBoundingClientRect();
   var vpRect = vp.getBoundingClientRect();
   var W = rect.width, H = rect.height;
   var offX = rect.left - vpRect.left, offY = rect.top - vpRect.top;
   var svg = document.getElementById('labelLines');
+  function _toPx(v){ return { x: (offX + (v.x * 0.5 + 0.5) * W) / zoomF, y: (offY + (-v.y * 0.5 + 0.5) * H) / zoomF }; }
   replacePlaced.forEach(function(p){
     if(!p.labelEl) return;
     if(!p.position || !p.axisDir){ p.labelEl.style.display = 'none'; return; }
-    var anchor = p.position.clone();
-    var labelPos = p.position.clone().add(p.axisDir.clone().multiplyScalar(10));
-    var va = anchor.clone().project(camera), vl = labelPos.clone().project(camera);
-    if(va.z > 1 || vl.z > 1 || va.z < -1 || vl.z < -1){ p.labelEl.style.display = 'none'; return; }
-    var anchorX = (offX + (va.x * 0.5 + 0.5) * W) / zoomF, anchorY = (offY + (-va.y * 0.5 + 0.5) * H) / zoomF;
-    var labelX = (offX + (vl.x * 0.5 + 0.5) * W) / zoomF, labelY = (offY + (-vl.y * 0.5 + 0.5) * H) / zoomF;
+    var va = p.position.clone().project(camera);
+    if(va.z > 1 || va.z < -1){ p.labelEl.style.display = 'none'; return; }
+    var aPx = _toPx(va);
+    // direzione dell'asse impianto proiettata in schermo, orientata verso l'alto (screen -Y)
+    var tPx = _toPx(p.position.clone().add(p.axisDir.clone()).project(camera));
+    var sdx = tPx.x - aPx.x, sdy = tPx.y - aPx.y;
+    var len = Math.sqrt(sdx * sdx + sdy * sdy);
+    if(len < 0.5){ sdx = 0; sdy = -1; } else { sdx /= len; sdy /= len; }
+    if(sdy > 0){ sdx = -sdx; sdy = -sdy; }   // garantisce label sopra il marker
+    var labelX = aPx.x + sdx * OFF_PX, labelY = aPx.y + sdy * OFF_PX;
     var hex = '#' + ('000000' + (p.color >>> 0).toString(16)).slice(-6);
     var _lib = _replaceLibId(p);
     p.labelEl.style.display = 'block';
@@ -17431,12 +17437,12 @@ function replaceUpdateLabels(){
     p.labelEl.textContent = '#' + p.num + (_lib ? ' ' + _lib : '');
     if(svg){
       var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', anchorX); line.setAttribute('y1', anchorY);
+      line.setAttribute('x1', aPx.x); line.setAttribute('y1', aPx.y);
       line.setAttribute('x2', labelX); line.setAttribute('y2', labelY);
       line.setAttribute('stroke', hex);
       svg.appendChild(line);
       var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      dot.setAttribute('cx', anchorX); dot.setAttribute('cy', anchorY);
+      dot.setAttribute('cx', aPx.x); dot.setAttribute('cy', aPx.y);
       dot.setAttribute('r', 3); dot.setAttribute('fill', hex); dot.setAttribute('opacity', '0.9');
       svg.appendChild(dot);
     }

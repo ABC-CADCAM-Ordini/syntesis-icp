@@ -4,6 +4,18 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.53.1: Etichetta impianto staccata dal marker con linea guida (fix scorcio)
+
+Feedback utente sul 8.53.0: *"il label è attaccato sul riferimento mentre dovrebbe avere una linea che lo allontana e lo posiziona più alto, come su Analizza"*. Solo blocco `replace*` del monolite `v3b` → bump `<title>`/`ANALIZZA_BUILD` 8.53.1.
+
+**Root cause**: in 8.53.0 l'etichetta era un clone esatto dei MUA — offset 3D `posizione + asse×10mm`. Ma nel Replace-iT la vista è spesso quasi-occlusale (camera che guarda lungo l'asse dell'impianto): per **scorcio prospettico** i 10 mm 3D si proiettano a ~2 px sullo schermo → la pillola resta sul marker e la linea guida è lunga ~2 px (invisibile). Gli stessi MUA soffrirebbero lo stesso problema, ma in Analizza si guarda di solito più di lato.
+
+**Fix** (`replaceUpdateLabels`): offset non più 3D ma in **coordinate schermo**. La pillola sta a `OFF_PX = 54` px **fissi** dal marker, lungo la **direzione dell'asse proiettata** in schermo, sempre orientata verso l'**alto** (se la proiezione dell'asse punta in basso si inverte; caso degenere asse ⊥ schermo → verticale). Distacco e linea guida sempre visibili in qualsiasi inquadratura — più robusto degli stessi MUA. Grafica invariata (`.divergence-label`, colore impianto, linea + ancora su `#labelLines`).
+
+Validazione: `node --check` 7/7 v3b OK; marker versione allineati 8.53.1. `docs/MAPPA_FUNZIONALE.md` aggiornata (riga Label 2D). Deploy canary su entrambi i servizi.
+
+---
+
 ## 2026-06-12 — 8.53.0: Etichetta impianto = "#N Marca Modello Ømm" (3D come i MUA in Analizza)
 
 Richiesta utente: *"il label deve indicare anche marca, connessione e diametro. Esempio #1 Megagen Anyridge 4mm"* + *"posizionali come in Analizza, stessa grafica e posizione"*. Solo blocco `replace*` del monolite `v3b`; additivo, altri workflow invariati → bump `<title>`/`ANALIZZA_BUILD` 8.53.0.
