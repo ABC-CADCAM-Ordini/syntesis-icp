@@ -184,15 +184,19 @@ def _rit_parse_zip(zip_bytes: bytes) -> dict:
         ent = basemap.get(posixpath.basename(fn).lower())
         return z.read(ent) if ent else None
 
+    from database import rit_parse_display_mmd
+    _display = _rit_text(root, "DisplayInformation")
+    _mc, _md, _di = rit_parse_display_mmd(_display)   # marca/modello/Ø per la cascata
     parsed = {
         "keyword": keyword,
-        "display": _rit_text(root, "DisplayInformation"),
+        "display": _display,
         "connection_id": conn_id,
         "rotation_lock_count": _rit_int(root, "RotationLockCount"),
         "ref_rotation_offset": _rit_float(root, "ReferenceRotationOffset"),
         "axis_occlusal": _rit_vec(root, "AxisOcclusal"),
         "supplier": _rit_text(root, "Supplier"),
         "supplier_version": _rit_text(root, "SupplierVersion"),
+        "marca": _mc, "modello": _md, "diametro": _di,
         "preview_png": _read_image("PreviewV4IconFilename"),
         "logo_png": _read_image("SupplierV4IconFilename"),
         "markers": {},   # sha256 -> {content, filename, size}
@@ -457,6 +461,9 @@ def _rit_build_libraries_from_rows(rows: list[dict], name_to_sha: dict,
             "axis_occlusal": g["axis"] or (0.0, 0.0, 1.0),
             "supplier": g["marca"],
             "supplier_version": None,
+            "marca": g["marca"],
+            "modello": g["modello"],
+            "diametro": g["diametro"],
             "preview_png": None,
             "logo_png": None,
             "markers": {},

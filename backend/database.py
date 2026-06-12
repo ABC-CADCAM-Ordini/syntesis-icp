@@ -12,6 +12,30 @@ from datetime import datetime
 
 log = logging.getLogger("syntesis.db")
 
+
+def rit_parse_display_mmd(display):
+    """(marca, modello, diametro) best-effort dal display libreria, es.
+    '(IPD Lite) Megagen AnyRidge Ø4.0' o 'Megagen AnyRidge Ø4.0' ->
+    ('Megagen','AnyRidge','4.0'). Per le LITE e il backfill della cascata
+    Marca>Modello>Diametro; usato anche da admin._rit_parse_zip.
+    (None,None,None) se vuoto."""
+    s = (display or "").strip()
+    while s.startswith("("):                 # strip prefissi parentetici (anche annidati)
+        end = s.find(")")
+        if end == -1:
+            break
+        s = s[end + 1:].lstrip()
+    toks = s.split()
+    if not toks:
+        return (None, None, None)
+    marca = toks[0]
+    if len(toks) == 1:
+        return (marca, None, None)
+    last = toks[-1]
+    diam = last[1:] if last[:1] in ("Ø", "ø", "⌀") else last
+    modello = " ".join(toks[1:-1]) or None
+    return (marca, modello, diam or None)
+
 _pool: Optional[asyncpg.Pool] = None
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/syntesis")
 
@@ -324,6 +348,9 @@ async def init_db():
             axis_occlusal_z      DOUBLE PRECISION,
             supplier             TEXT,
             supplier_version     TEXT,
+            marca                TEXT,
+            modello              TEXT,
+            diametro             TEXT,
             preview_png          BYTEA,
             logo_png             BYTEA,
             active               BOOLEAN DEFAULT FALSE,
@@ -386,7 +413,22 @@ async def init_db():
         ALTER TABLE rit_scanbody_type ADD COLUMN IF NOT EXISTS role TEXT;
         ALTER TABLE rit_scanbody_type ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
         ALTER TABLE rit_library ADD COLUMN IF NOT EXISTS source TEXT;
+        ALTER TABLE rit_library ADD COLUMN IF NOT EXISTS marca TEXT;
+        ALTER TABLE rit_library ADD COLUMN IF NOT EXISTS modello TEXT;
+        ALTER TABLE rit_library ADD COLUMN IF NOT EXISTS diametro TEXT;
         """)
+
+        # v8.52.0 cascata: marca/modello/diametro strutturati su rit_library
+        # (la cascata Marca>Modello>Diametro nel runtime li legge). Backfill
+        # delle librerie esistenti (CSV/editor e LITE) parsando il display.
+        # Idempotente: tocca solo le righe con marca NULL.
+        for _r in await conn.fetch(
+                "SELECT id, display FROM rit_library WHERE marca IS NULL"):
+            _mc, _md, _di = rit_parse_display_mmd(_r["display"])
+            if _mc:
+                await conn.execute(
+                    "UPDATE rit_library SET marca=$2, modello=$3, diametro=$4 WHERE id=$1",
+                    _r["id"], _mc, _md, _di)
 
         # v8.50.0 archivio UNICO: le librerie gia' importate (Exocad incluse)
         # devono comparire nella cartella. (1) normalizzo i marker_filename
@@ -1589,7 +1631,7 @@ async def rit_list_active_libraries() -> list[dict]:
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT l.id, l.import_name, l.keyword, l.display, l.supplier,
-                   l.supplier_version,
+                   l.supplier_version, l.marca, l.modello, l.diametro,
                    (SELECT COUNT(*) FROM rit_scanbody_type t WHERE t.library_id = l.id AND t.active = TRUE) AS n_types
             FROM rit_library l
             WHERE l.active = TRUE
@@ -1602,6 +1644,9 @@ async def rit_list_active_libraries() -> list[dict]:
         "display": r["display"],
         "supplier": r["supplier"],
         "supplier_version": r["supplier_version"],
+        "marca": r["marca"],
+        "modello": r["modello"],
+        "diametro": r["diametro"],
         "n_type": int(r["n_types"] or 0),
     } for r in rows]
 
@@ -1618,7 +1663,8 @@ async def rit_get_library_detail(library_id: int, active_only: bool = False) -> 
             SELECT id, import_name, keyword, display, connection_id,
                    rotation_lock_count, ref_rotation_offset,
                    axis_occlusal_x, axis_occlusal_y, axis_occlusal_z,
-                   supplier, supplier_version, source, active, uploaded_by, uploaded_at,
+                   supplier, supplier_version, source, marca, modello, diametro,
+                   active, uploaded_by, uploaded_at,
                    (preview_png IS NOT NULL) AS has_preview,
                    (logo_png IS NOT NULL) AS has_logo
             FROM rit_library WHERE id = $1{_act}
@@ -1649,6 +1695,9 @@ async def rit_get_library_detail(library_id: int, active_only: bool = False) -> 
         "supplier": lib["supplier"],
         "supplier_version": lib["supplier_version"],
         "source": lib["source"],
+        "marca": lib["marca"],
+        "modello": lib["modello"],
+        "diametro": lib["diametro"],
         "active": lib["active"],
         "uploaded_by": lib["uploaded_by"],
         "uploaded_at": _iso(lib["uploaded_at"]),
@@ -1833,15 +1882,16 @@ async def rit_import_library(*, parsed: dict, import_name: Optional[str],
                     rotation_lock_count, ref_rotation_offset,
                     axis_occlusal_x, axis_occlusal_y, axis_occlusal_z,
                     supplier, supplier_version, preview_png, logo_png,
-                    active, uploaded_by, source
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+                    active, uploaded_by, source, marca, modello, diametro
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
                 RETURNING id
             """, import_name, parsed.get("keyword"), parsed.get("display"),
                  parsed.get("connection_id"), parsed.get("rotation_lock_count"),
                  parsed.get("ref_rotation_offset"), ax[0], ax[1], ax[2],
                  parsed.get("supplier"), parsed.get("supplier_version"),
                  parsed.get("preview_png"), parsed.get("logo_png"), new_active,
-                 uploaded_by, parsed.get("source"))
+                 uploaded_by, parsed.get("source"),
+                 parsed.get("marca"), parsed.get("modello"), parsed.get("diametro"))
 
             for t in parsed["types"]:
                 cc = t["click_center"]

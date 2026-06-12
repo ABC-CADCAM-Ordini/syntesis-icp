@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.50.1</title>
+<title>Syntesis-ICP - Analizzare v8.52.0</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2002,18 +2002,26 @@ if (document.readyState === 'loading') {
       </div>
       <input type="file" id="replaceInputScan" accept=".stl,.STL" style="display:none" onchange="replaceOnScanPicked(event)">
 
-      <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin:12px 0 4px 0;line-height:1.5">Libreria attiva:</div>
-      <select id="replaceLibSelect" onchange="replaceOnLibChange(this)" style="width:100%;padding:7px 8px;font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--dark)">
-        <option value="">— scegli libreria —</option>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin:12px 0 4px 0;line-height:1.5">Libreria — marca / modello / diametro:</div>
+      <select id="replaceMarcaSelect" onchange="replaceOnMarcaChange()" style="width:100%;padding:7px 8px;font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--dark)">
+        <option value="">— marca —</option>
       </select>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <select id="replaceModelloSelect" onchange="replaceOnModelloChange()" style="flex:1;padding:7px 8px;font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--dark)">
+          <option value="">— modello —</option>
+        </select>
+        <select id="replaceDiamSelect" onchange="replaceOnDiamChange()" style="width:92px;padding:7px 8px;font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--dark)">
+          <option value="">— Ø —</option>
+        </select>
+      </div>
 
-      <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin:10px 0 4px 0;line-height:1.5">Type SORGENTE <span style="color:var(--gray)">(scanbody nella scansione):</span></div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin:10px 0 4px 0;line-height:1.5">Madre <span style="color:var(--gray)">(scanbody scansionato):</span></div>
       <select id="replaceSourceTypeSelect" onchange="replaceOnSourceTypeChange(this)" style="width:100%;padding:7px 8px;font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--dark)">
-        <option value="">— scegli sorgente —</option>
+        <option value="">— scegli madre —</option>
       </select>
-      <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin:10px 0 4px 0;line-height:1.5">Type SOSTITUTO <span style="color:var(--gray)">(IPD da piazzare):</span></div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin:10px 0 4px 0;line-height:1.5">Figlio <span style="color:var(--gray)">(sostituto IPD da piazzare):</span></div>
       <select id="replaceTypeSelect" onchange="replaceOnTypeChange(this)" style="width:100%;padding:7px 8px;font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--dark)">
-        <option value="">— scegli sostituto —</option>
+        <option value="">— scegli figlio —</option>
       </select>
 
       <!-- 2b-3b: l'anteprima marker + scelta 3 punti vivono nella finestra guida
@@ -2419,7 +2427,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.50.1';
+window.ANALIZZA_BUILD = '8.52.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-12';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -5116,7 +5124,7 @@ function selectWorkflow(wf){
     if(layPan)  layPan.style.display  = 'flex';
     // 8.37.0 (review): assicura i dropdown libreria/type ABILITATI all'ingresso (potrebbero essere
     // rimasti .disabled da un piazzamento interrotto da un cambio workflow). Il piazzamento li ri-disabilita.
-    ['replaceLibSelect','replaceSourceTypeSelect','replaceTypeSelect'].forEach(function(_id){ var _s = document.getElementById(_id); if(_s){ _s.disabled = false; _s.style.opacity = ''; _s.style.cursor = ''; } });
+    ['replaceMarcaSelect','replaceModelloSelect','replaceDiamSelect','replaceSourceTypeSelect','replaceTypeSelect'].forEach(function(_id){ var _s = document.getElementById(_id); if(_s){ _s.disabled = false; _s.style.opacity = ''; _s.style.cursor = ''; } });
     // Nascondo i pulsanti toolbar degli altri workflow
     analisiBtns.forEach(function(el){ el.style.display = 'none'; });
     misurareBtns.forEach(function(el){ el.style.display = 'none'; });
@@ -16029,7 +16037,7 @@ function replaceSeedUpdateUI(){
     if(_lp) _lp.style.maxHeight = _placing ? 'max(120px, calc(100% - 28px - 42vh - 190px))' : 'calc(100% - 28px)';
     // 8.37.0 (protezione seme, fix audit): durante il piazzamento DISABILITA i dropdown libreria/type
     // -> cambiarli a meta' azzererebbe in silenzio i punti gia' cliccati (replaceSeedClear). Riabilitati a idle.
-    ['replaceLibSelect','replaceSourceTypeSelect','replaceTypeSelect'].forEach(function(_id){
+    ['replaceMarcaSelect','replaceModelloSelect','replaceDiamSelect','replaceSourceTypeSelect','replaceTypeSelect'].forEach(function(_id){
       var _s = document.getElementById(_id); if(_s){ _s.disabled = _placing; _s.style.opacity = _placing ? '0.55' : ''; _s.style.cursor = _placing ? 'not-allowed' : ''; }
     });
   }
@@ -16109,45 +16117,105 @@ function _replaceFetchErrMsg(st){
 function replaceFetchLibraries(){
   return fetch('/api/rit/libraries', { headers: _replaceAuthHeaders() })
     .then(function(r){ if(!r.ok) throw r.status; return r.json(); })
-    .then(function(d){ replaceLibs = (d && d.libraries) || []; replacePopulateLibSelect(); })
+    .then(function(d){ replaceLibs = (d && d.libraries) || []; replaceBuildCascade(); })
     .catch(function(st){ replaceShowStatus('Librerie: ' + _replaceFetchErrMsg(st), true); });
 }
 
-function replacePopulateLibSelect(){
-  var sel = document.getElementById('replaceLibSelect');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">— scegli libreria —</option>';
-  replaceLibs.forEach(function(L){
-    var o = document.createElement('option');
-    o.value = L.id;
-    o.textContent = (L.display || L.import_name) + ' (' + (L.n_type || 0) + ' type)';
-    sel.appendChild(o);
-  });
+// 8.52.0 cascata Marca>Modello>Diametro: ogni livello filtra il successivo;
+// l'ultimo (Ø) atterra sulla libreria e ne carica i type (madre/figlio).
+function _replaceLibKey(L, field){
+  return field === 'marca' ? (L.marca || '(altre)')
+       : field === 'modello' ? (L.modello || '(—)')
+       : (L.diametro || '(—)');
+}
+function replaceBuildCascade(){
+  var msel = document.getElementById('replaceMarcaSelect');
+  if(!msel) return;
+  var marche = [];
+  replaceLibs.forEach(function(L){ var m = _replaceLibKey(L, 'marca'); if(marche.indexOf(m) < 0) marche.push(m); });
+  marche.sort();
+  msel.innerHTML = '<option value="">— marca —</option>';
+  marche.forEach(function(m){ var o = document.createElement('option'); o.value = m; o.textContent = m; msel.appendChild(o); });
+  msel.value = '';
+  replaceCascadeReset('marca');
+}
+function replaceCascadeReset(level){
+  var osel = document.getElementById('replaceModelloSelect');
+  var dsel = document.getElementById('replaceDiamSelect');
+  if(level === 'marca' && osel) osel.innerHTML = '<option value="">— modello —</option>';
+  if((level === 'marca' || level === 'modello') && dsel) dsel.innerHTML = '<option value="">— Ø —</option>';
+  replaceLoadLibrary(null);
+}
+function replaceOnMarcaChange(){
+  var marca = document.getElementById('replaceMarcaSelect').value;
+  replaceCascadeReset('marca');
+  if(!marca) return;
+  var modelli = [];
+  replaceLibs.forEach(function(L){ if(_replaceLibKey(L,'marca') === marca){ var md = _replaceLibKey(L,'modello'); if(modelli.indexOf(md) < 0) modelli.push(md); } });
+  modelli.sort();
+  var osel = document.getElementById('replaceModelloSelect');
+  osel.innerHTML = '<option value="">— modello —</option>';
+  modelli.forEach(function(md){ var o = document.createElement('option'); o.value = md; o.textContent = md; osel.appendChild(o); });
+}
+function replaceOnModelloChange(){
+  var marca = document.getElementById('replaceMarcaSelect').value;
+  var modello = document.getElementById('replaceModelloSelect').value;
+  replaceCascadeReset('modello');
+  if(!modello) return;
+  var diams = [];
+  replaceLibs.forEach(function(L){ if(_replaceLibKey(L,'marca') === marca && _replaceLibKey(L,'modello') === modello){ var di = _replaceLibKey(L,'diametro'); if(diams.indexOf(di) < 0) diams.push(di); } });
+  diams.sort();
+  var dsel = document.getElementById('replaceDiamSelect');
+  dsel.innerHTML = '<option value="">— Ø —</option>';
+  diams.forEach(function(di){ var o = document.createElement('option'); o.value = di; o.textContent = di; dsel.appendChild(o); });
+}
+function replaceOnDiamChange(){
+  var marca = document.getElementById('replaceMarcaSelect').value;
+  var modello = document.getElementById('replaceModelloSelect').value;
+  var diam = document.getElementById('replaceDiamSelect').value;
+  if(!diam){ replaceLoadLibrary(null); return; }
+  var matches = replaceLibs.filter(function(x){ return _replaceLibKey(x,'marca') === marca && _replaceLibKey(x,'modello') === modello && _replaceLibKey(x,'diametro') === diam; });
+  if(matches.length > 1){ replaceShowStatus('Attenzione: ' + matches.length + ' librerie con la stessa marca/modello/Ø; uso la prima (id ' + matches[0].id + '). Verifica le librerie importate.', true); }
+  replaceLoadLibrary(matches.length ? matches[0].id : null);
 }
 
-function replaceOnLibChange(sel){
-  var id = sel.value ? parseInt(sel.value, 10) : null;
+// carica la libreria scelta dalla cascata e popola Madre/Figlio (per ruolo).
+function replaceLoadLibrary(id){
+  id = (id != null) ? parseInt(id, 10) : null;
   replaceCurrentLibId = id;
   replaceCurrentDetail = null;
   replaceCurrentType = null; replaceSourceType = null; replaceSubstType = null;
-  var tsel = document.getElementById('replaceTypeSelect'); if(tsel) tsel.innerHTML = '<option value="">— scegli sostituto —</option>';
-  var ssel = document.getElementById('replaceSourceTypeSelect'); if(ssel) ssel.innerHTML = '<option value="">— scegli sorgente —</option>';
+  var tsel = document.getElementById('replaceTypeSelect'); if(tsel) tsel.innerHTML = '<option value="">— scegli figlio —</option>';
+  var ssel = document.getElementById('replaceSourceTypeSelect'); if(ssel) ssel.innerHTML = '<option value="">— scegli madre —</option>';
   if(id == null) return;
   fetch('/api/rit/libraries/' + id, { headers: _replaceAuthHeaders() })
     .then(function(r){ if(!r.ok) throw r.status; return r.json(); })
-    .then(function(d){ replaceCurrentDetail = d; replacePopulateTypeOptions('replaceSourceTypeSelect', '— scegli sorgente —'); replacePopulateTypeOptions('replaceTypeSelect', '— scegli sostituto —'); })
+    .then(function(d){ replaceCurrentDetail = d;
+      replacePopulateTypeOptions('replaceSourceTypeSelect', '— scegli madre —', 'madre');
+      replacePopulateTypeOptions('replaceTypeSelect', '— scegli figlio —', 'figlio'); })
     .catch(function(st){ replaceShowStatus('Type: ' + _replaceFetchErrMsg(st), true); });
 }
 
-// popola un dropdown di type (sorgente o sostituto) dalla detail libreria corrente.
-function replacePopulateTypeOptions(selId, placeholder){
+// popola un dropdown type filtrato per RUOLO: 'madre' -> madre|entrambi,
+// 'figlio' -> figlio|entrambi. Se la libreria non ha ruoli assegnati (es. LITE
+// importata) -> fallback: mostra TUTTI i type (retrocompatibile).
+function replacePopulateTypeOptions(selId, placeholder, want){
   var sel = document.getElementById(selId);
   if(!sel || !replaceCurrentDetail) return;
+  var types = replaceCurrentDetail.types || [];
+  var cands = want ? types.filter(function(t){ return t.role === want || t.role === 'entrambi'; }) : types;
+  // fallback a TUTTI solo se la libreria non ha PROPRIO ruoli (LITE non
+  // assegnata); con ruoli parziali un dropdown senza match resta vuoto, niente
+  // type del ruolo sbagliato (label 'figlio' non deve elencare le madri).
+  if(want && !cands.length){
+    var anyRole = types.some(function(t){ return t.role === 'madre' || t.role === 'figlio' || t.role === 'entrambi'; });
+    if(!anyRole) cands = types;
+  }
   sel.innerHTML = '<option value="">' + placeholder + '</option>';
-  (replaceCurrentDetail.types || []).forEach(function(t){
+  cands.forEach(function(t){
     var o = document.createElement('option');
     o.value = (t.ord != null ? t.ord : '');
-    var tag = t.is_eng ? '[ENG] ' : '[Non-ENG] ';
+    var tag = (t.is_eng === true) ? '[ENG] ' : (t.is_eng === false) ? '[Non-ENG] ' : '';
     o.textContent = tag + (t.display || t.keyword || ('type ' + t.ord));
     sel.appendChild(o);
   });
@@ -17351,9 +17419,11 @@ function _hardResetReplace(){
     if(slot) slot.classList.remove('loaded');
     if(ph){ ph.style.display = ''; ph.textContent = 'Clicca o trascina .stl'; }
     var inp = document.getElementById('replaceInputScan'); if(inp) inp.value = '';
-    var lsel = document.getElementById('replaceLibSelect'); if(lsel) lsel.value = '';
-    var tsel = document.getElementById('replaceTypeSelect'); if(tsel) tsel.innerHTML = '<option value="">— scegli sostituto —</option>';
-    var ssel = document.getElementById('replaceSourceTypeSelect'); if(ssel) ssel.innerHTML = '<option value="">— scegli sorgente —</option>';
+    var _msel = document.getElementById('replaceMarcaSelect'); if(_msel) _msel.value = '';
+    var _osel = document.getElementById('replaceModelloSelect'); if(_osel) _osel.innerHTML = '<option value="">— modello —</option>';
+    var _dsel = document.getElementById('replaceDiamSelect'); if(_dsel) _dsel.innerHTML = '<option value="">— Ø —</option>';
+    var tsel = document.getElementById('replaceTypeSelect'); if(tsel) tsel.innerHTML = '<option value="">— scegli figlio —</option>';
+    var ssel = document.getElementById('replaceSourceTypeSelect'); if(ssel) ssel.innerHTML = '<option value="">— scegli madre —</option>';
     var wrap = document.getElementById('replacePlacedList'); if(wrap) wrap.style.display = 'none';
     var items = document.getElementById('replacePlacedItems'); if(items) items.innerHTML = '';
     var flow = document.getElementById('replaceFlow'); if(flow) flow.style.display = 'none';

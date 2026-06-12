@@ -4,6 +4,24 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-12 — 8.52.0: Cascata Marca→Modello→Diametro + Madre/Figlio per ruolo (runtime)
+
+Richiesta utente: *"il front mostra scegli marca, modello, diametro… poi scegli il figlio"*. Chiude il flusso end-to-end (pannello admin → runtime). Tocca il monolite `v3b` (solo blocco `replace*`) → bump `<title>`/`ANALIZZA_BUILD` 8.52.0.
+
+**Backend** (additivo, retrocompatibile):
+- 3 colonne `rit_library.marca/modello/diametro` (`ALTER ADD COLUMN IF NOT EXISTS`).
+- CSV/editor le scrive **esatte** (`_rit_build_libraries_from_rows`); LITE Exocad le ricava dal `display` via `database.rit_parse_display_mmd` (`'(IPD Lite) Megagen AnyRidge Ø4.0' → Megagen/AnyRidge/4.0`; robusto a parentesi annidate).
+- Backfill idempotente in `init_db` (UPDATE solo righe con `marca` NULL → le librerie già importate prendono i 3 livelli).
+- `/api/rit/libraries` e il detail le espongono.
+
+**Runtime `v3b`** (blocco `replace*`):
+- Il menù unico `#replaceLibSelect` (+ `replaceOnLibChange`/`replacePopulateLibSelect`, rimossi) è sostituito da **3 tendine dipendenti** `#replaceMarcaSelect`/`#replaceModelloSelect`/`#replaceDiamSelect` (`replaceBuildCascade`, `replaceOnMarca/Modello/DiamChange`, `replaceCascadeReset`): raggruppano `replaceLibs` per marca/modello/diametro; il Ø atterra sulla libreria → nuova `replaceLoadLibrary(id)`.
+- Le tendine **Madre** (= ex SORGENTE) e **Figlio** (= ex SOSTITUTO) sono **filtrate per ruolo** in `replacePopulateTypeOptions(selId, placeholder, want)`: `madre`→role madre|entrambi, `figlio`→role figlio|entrambi. **Fallback a tutti i type SOLO se la libreria non ha proprio ruoli** (LITE non assegnata → retrocompatibile); con ruoli parziali il dropdown senza match resta vuoto (niente madri sotto "figlio").
+- Liste disable-durante-piazzamento (2 siti) e hard-reset aggiornati ai nuovi id; relabel UI SORGENTE→Madre, SOSTITUTO→Figlio; ENG tag a 3 stati.
+- Sblocca le LITE importate via i ruoli assegnabili dal pannello admin (8.51.0).
+
+Robustezza (2 review avversariali, fix integrati): parser display gestisce parentesi annidate; `replaceOnDiamChange` **avvisa** se due librerie condividono la stessa terna marca/modello/Ø (niente selezione silente); fallback ruolo distingue "nessun ruolo" (LITE) da "ruoli parziali". `py_compile` + `node --check` **8/8** su `v3b` OK; smoke-test parser; **0 riferimenti orfani** ai simboli rimossi. `registry.BACKEND_VERSION` 8.52.0; `docs/MAPPA_FUNZIONALE.md` aggiornata.
+
 ## 2026-06-12 — 8.51.0: Admin Librerie Replace-iT — 4 tab, ruolo "entrambi", componenti editabili
 
 Richieste utente sul pannello admin `/gestione`. Solo admin + backend rit; **runtime `v3b` NON toccato**.
