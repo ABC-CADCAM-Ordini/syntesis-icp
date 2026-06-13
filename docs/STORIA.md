@@ -4,6 +4,22 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-13 — 8.59.5: Replace-iT fix picking 3-punti — causa reale (raycast .point fuori dal raggio)
+
+Chiusura del problema "pallino spostato dal cursore" sulla scansione, dopo due ipotesi sbagliate (8.59.2 = mio falso fix sull'NDC/zoom, revocato in 8.59.3; inerzia camera = non era quello). Stavolta **diagnosi con misure reali nel browser dell'utente** (Chrome), via snippet console A/B non distruttivi, escludendo una per una tutte le cause:
+
+- NDC/zoom: `clientX/rect` corretto (su quel canvas `rect`=`client`, zoom non scala); camera coerente.
+- `projectionMatrixInverse` stantia: `projInv-dev`=0; round-trip `unproject→project` = identità.
+- deriva camera (inerzia): `dopo-400ms` = `offset-ora` (vista ferma).
+- viewport sotto-regione: `viewport`=0,0,canvas pieno.
+- disallineamento aspect/size: `camAspect`=`rectAspect`=`clientAspect`=1.1235, `rendererSize`=`client`.
+
+**Causa**: `raycaster.intersectObject(replaceMesh)` restituisce `hits[0].point` **fuori dal raggio di ~0.5-1mm** (`distToRay` misurato 0.4-1.0mm) → ~20-40px di offset proiettato. `replaceMesh.updateWorldMatrix(true,false)` prima del raycast non cambia il `distToRay` (non è una matrice-mondo stantia); nessun three-mesh-bvh nel file → è il raycast **nativo** del bridge THREE r169 che calcola male il `.point` su mesh grandi (240k triangoli). Il `.distance` è invece corretto.
+
+**Fix**: in `replaceOnViewportClick` (fase `pickScan`), il dot e il punto del seme (`scanPts`) usano `raycaster.ray.at(hits[0].distance, new THREE.Vector3())` — il punto **sul raggio** alla distanza del colpo, che è esattamente "dove hai cliccato sulla superficie". Misurato nel browser dell'utente: `onray-offNDC`=**0.0000** su ogni clic (offset azzerato). L'anteprima marker usa un'altra mesh/canvas → era già precisa (l'utente confermava preciso il pick anteprima e storto solo quello scansione). `onViewportClick` (MUA) e `sostOnViewportClick` invariati (snap al centro). `node --check` 7/7.
+
+**Lezione**: tre diagnosi, due sbagliate finché non ho misurato nel browser reale. Per i bug di picking 3D: misurare `distToRay` e il round-trip, non assumere.
+
 ## 2026-06-13 — 8.59.4: Replace-iT "Taglia scansione" rimuove le isole sospese
 
 Feedback utente (con screenshot): il "Taglia scansione" lasciava nella zona del marker dei frammenti di STL vaganti — piccole isole di triangoli staccate dal corpo principale — che vanno incluse nel taglio. Causa: `replaceRebuildScanGeometry` rimuoveva solo i triangoli **dentro** il profilo della madre; i triangoli appena fuori ma ormai disconnessi restavano fluttuanti.

@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.59.4</title>
+<title>Syntesis-ICP - Analizzare v8.59.5</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.59.4';
+window.ANALIZZA_BUILD = '8.59.5';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16413,9 +16413,14 @@ function replaceOnViewportClick(event){
   raycaster.setFromCamera(mouse, camera);
   var hits = raycaster.intersectObject(replaceMesh);
   if(hits.length === 0) return false;
-  // 8.36.0: rifiuta i punti GEMELLI troppo vicini tra loro (doppio-click / cluster -> posa mal
-  // vincolata). Min 0.6mm dagli altri gemelli gia' piazzati.
-  var _hp = hits[0].point;
+  // 8.59.5 (causa REALE del pallino spostato, trovata con diagnosi console A/B con l'utente): il
+  // raycast su replaceMesh restituisce un hits[0].point FUORI dal raggio di ~0.5-1mm (misurato:
+  // distToRay ~1mm; updateWorldMatrix NON aiuta -> non e' matrice stantia; nessuna BVH -> e' il
+  // raycast nativo del bridge r169 che calcola male il .point su mesh grandi). Lo 0.5-1mm laterale
+  // si proietta nei ~20-40px di offset che l'utente vedeva. Il .distance e' CORRETTO: il punto SUL
+  // raggio alla distanza del colpo ricade ESATTAMENTE sotto il cursore (misurato onray-offNDC=0.0000).
+  // Uso quel punto per il dot E per il seme. (L'anteprima usa un'altra mesh -> non aveva il problema.)
+  var _hp = raycaster.ray.at(hits[0].distance, new THREE.Vector3());
   for(var _j = 0; _j < replaceSeed.scanPts.length; _j++){
     if(_hp.distanceTo(replaceSeed.scanPts[_j]) < 0.6){
       replaceShowStatus('Punto troppo vicino al gemello ' + (_j + 1) + ': scegline uno più distante (servono 3 punti ben separati).', true);
@@ -16423,13 +16428,13 @@ function replaceOnViewportClick(event){
     }
   }
   var idx = replaceSeed.scanPts.length;
-  replaceSeed.scanPts.push(hits[0].point.clone());
+  replaceSeed.scanPts.push(_hp.clone());
   // normale della faccia colpita (replaceMesh ha trasform identita' -> world) per
   // l'asse outward del seme (2b-1.4).
   var fn = (hits[0].face && hits[0].face.normal) ? hits[0].face.normal.clone() : new THREE.Vector3(0,0,1);
   replaceSeed.scanNormals.push(fn);
   var dot = _replaceNumSprite(idx + 1, REPLACE_SEED_COLORS[idx]);
-  dot.position.copy(hits[0].point); scene.add(dot);
+  dot.position.copy(_hp); scene.add(dot);
   replaceSeed.scanDots.push(dot);
   replaceSeedUpdateUI();
   if(replaceSeed.scanPts.length >= REPLACE_SEED_N){
