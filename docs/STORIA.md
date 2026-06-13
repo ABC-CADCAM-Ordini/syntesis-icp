@@ -4,6 +4,17 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-13 — 8.59.1: Replace-iT "Raffina+" hardening (da revisione avversariale)
+
+Revisione avversariale multi-agente del 8.59.0 (18 agenti, 6 dimensioni, ogni finding verificato in modo indipendente sul codice). **Esito**: nessun blocker; la correttezza matematica del motore, la **direzione di R,t end-to-end** (il rischio principale), l'apply 4×4, il gating di sicurezza e la validazione input sono stati **confermati corretti** (anche con test numerici). Chiusi 4 finding reali emersi:
+
+- **Race [major]**: la "Raffina" client non era disabilitata durante la chiamata server → due raffinamenti concorrenti su pose diverse potevano sovrapporsi. Fix: `replaceRefineServer` ora disabilita anche `#replaceBtnRefine` e cattura uno **snapshot della posa** (`_poseSnap`, gli elementi di `matrixWorld`) all'estrazione; se alla risposta la posa è cambiata (soglia 1e-6) la risposta viene **scartata** ("ripremi").
+- **Guardia anti-delta [major]**: una convergenza a posa sbagliata (init 3-punti scadente, crop che cattura la gengiva, minimo locale sul clocking) si applicava in silenzio. Fix: prima dell'apply si misurano rotazione e traslazione del delta ritornato; se **>8°** o **>1.5mm** la posa **non si applica** e si avvisa.
+- **Comunicazione [minor]**: il ~1µm della validazione offline era su un test mesh 1:1 (corrispondenza esatta) e non rappresenta l'accuratezza reale CAD-vs-scan (~10-20µm di noise floor della scansione). Fix onestà: tooltip del pulsante riscritto senza claim µm assoluto; lo status mostra "**residuo fit**" invece di "RMSD" (un residuo di fit non è un'accuratezza di posa).
+- **Endpoint [minor]**: `rit_refine_icp` non interpola più l'eccezione raw `{e}` nei `detail` 400/500 (messaggio generico al client) e logga lato server (`logger.warning`/`logger.exception`).
+
+Il motore `refine_point_to_plane` e l'intero path client (`_replaceDoRefine`/`replaceRefineAll`) restano **invariati**: l'hardening tocca solo `replaceRefineServer`, il tooltip del pulsante e i rami d'errore dell'endpoint. `py_compile` OK; `node --check` 7/7. Refutati in verifica: NaN-guard (axisDir normalizzato), "basta alzare il cap del client" (il server è l'unico posto dove fare il nearest-neighbor full-res senza freezare il browser), rifiuto-normali `abs` (identico al client già validato).
+
 ## 2026-06-13 — 8.59.0: Replace-iT "Raffina+" — ICP point-to-plane SERVER full-res (opzione parallela)
 
 Richiesta utente: gli scanbody (figli) hanno forme e geometrie molto diverse e a volte la posa della **madre** sulla scansione non è precisa; *"creiamo un'opzione parallela da provare in live, togliamo incertezza a questo passaggio definitivamente"*.

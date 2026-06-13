@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.59.0</title>
+<title>Syntesis-ICP - Analizzare v8.59.1</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2043,7 +2043,7 @@ if (document.readyState === 'loading') {
       <!-- 2b-1.3: flusso per-scanbody. Raffina (2b-2) e Concludi (2b-3) sono scaffolding disabilitato. -->
       <div id="replaceFlow" style="display:none;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button id="replaceBtnRefine" class="replace-only" disabled onclick="replaceRefineCurrent()" title="Raffina (ICP) SOLO l'impianto attivo: l'ultimo piazzato, o quello selezionato nell'albero scena" style="flex:1;min-width:78px;padding:7px 8px;background:#0065B3;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina</button>
-        <button id="replaceBtnRefineSrv" class="replace-only" disabled onclick="replaceRefineServer()" title="Raffina SERVER (point-to-plane, piena risoluzione · beta): stesso impianto attivo, calcolata sul server con tutta la mesh -> piu' precisa del client (~1µm vs ~5-9µm). Confronto A/B con Raffina." style="flex:1;min-width:78px;padding:7px 8px;background:#0E8C6A;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina+</button>
+        <button id="replaceBtnRefineSrv" class="replace-only" disabled onclick="replaceRefineServer()" title="Raffina SERVER (point-to-plane, piena risoluzione · beta): stesso impianto attivo, calcolata sul server con TUTTA la mesh (il client sottocampiona) -> fit piu' fine. Mostra il residuo del fit per il confronto A/B con Raffina." style="flex:1;min-width:78px;padding:7px 8px;background:#0E8C6A;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina+</button>
         <button id="replaceBtnNext" class="replace-only" onclick="replaceNextScanbody()" style="flex:1;min-width:78px;padding:7px 8px;background:#fff;color:var(--dark);border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Avanti / nuovo</button>
         <button id="replaceBtnFinish" class="replace-only" onclick="replaceExportSTL()" title="Esporta i sostituti (figli) piazzati come file STL nelle loro posizioni in scena" style="flex:1;min-width:78px;padding:7px 8px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Concludi · Esporta</button>
       </div>
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.59.0';
+window.ANALIZZA_BUILD = '8.59.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -17502,12 +17502,15 @@ function replaceRefineServer(){
   for(var i = 0; i < replacePlaced.length; i++){ if(replacePlaced[i].num === tn){ p = replacePlaced[i]; break; } }
   if(!p || !p.group || !replaceMesh){ replaceShowStatus('Marker non valido per la raffina.', true); return; }
   var btn = document.getElementById('replaceBtnRefineSrv');
+  var btnCli = document.getElementById('replaceBtnRefine');   // 8.59.1: blocca anche la Raffina client durante la chiamata (anti doppio-apply su pose diverse)
   if(btn){ btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'wait'; }
-  function _restore(){ if(btn){ btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; } }
+  if(btnCli){ btnCli.disabled = true; btnCli.style.opacity = '0.5'; btnCli.style.cursor = 'not-allowed'; }
+  function _restore(){ if(btn){ btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; } if(btnCli){ btnCli.disabled = false; btnCli.style.opacity = '1'; btnCli.style.cursor = 'pointer'; } }
 
   // 1. MADRE (sorgente) in MONDO, piena risoluzione (stride solo oltre il cap)
   p.group.updateMatrixWorld(true);
   var m = p.group.matrixWorld.elements;
+  var _poseSnap = Array.prototype.slice.call(m);   // 8.59.1: snapshot posa -> scarta risposte stantie se la posa cambia durante la chiamata
   var nmat = new THREE.Matrix3().getNormalMatrix(p.group.matrixWorld);
   var mesh0 = p.group.children && p.group.children[0];
   var geo = p.srcGeo || (mesh0 && mesh0.geometry);
@@ -17573,8 +17576,22 @@ function replaceRefineServer(){
   }).then(function(res){
     _restore();
     if(replacePlaced.indexOf(p) < 0){ replaceShowStatus('Marker eliminato durante la raffina.', true); return; }
+    // 8.59.1: scarta risposta stantia se la posa è cambiata durante la chiamata (race con altre azioni)
+    p.group.updateMatrixWorld(true);
+    var _now = p.group.matrixWorld.elements, _moved = false;
+    for(var _qi = 0; _qi < 16; _qi++){ if(Math.abs(_now[_qi] - _poseSnap[_qi]) > 1e-6){ _moved = true; break; } }
+    if(_moved){ replaceShowStatus('Posa cambiata durante il calcolo: Raffina+ scartata, ripremi.', true); return; }
     var R = res.R, t = res.t;
     if(!R || !t){ replaceShowStatus('Server: risposta priva di trasformazione.', true); return; }
+    // 8.59.1: guardia anti-delta-anomalo — una convergenza a posa sbagliata (init scadente, crop su
+    // gengiva, minimo locale sul clocking) NON deve applicarsi in silenzio. Oltre soglia -> scarta.
+    var _trace = R[0][0] + R[1][1] + R[2][2];
+    var _rotDeg = Math.acos(Math.min(1, Math.max(-1, (_trace - 1) / 2))) * 180 / Math.PI;
+    var _trMag = Math.sqrt(t[0]*t[0] + t[1]*t[1] + t[2]*t[2]);
+    if(_rotDeg > 8 || _trMag > 1.5){
+      replaceShowStatus('Raffina+ scartata: delta anomalo (' + _rotDeg.toFixed(1) + '° / ' + _trMag.toFixed(2) + 'mm) — posa invariata. Riposiziona o usa Raffina.', true);
+      return;
+    }
     // 4. applica lo stesso delta rigido del path client (matrice 4x4 sul group)
     var Rm = new THREE.Matrix4().set(
       R[0][0], R[0][1], R[0][2], t[0],
@@ -17592,7 +17609,7 @@ function replaceRefineServer(){
     try { replaceRebuildScanGeometry(); } catch(e){}   // il taglio scansione segue la posa raffinata
     replaceRebuildPlacedList();
     var rmsUm = (typeof res.rmsd === 'number') ? Math.round(res.rmsd * 1000) : null;
-    replaceShowStatus('Impianto #' + tn + ': Raffina+ SERVER — RMSD ' + (rmsUm != null ? (rmsUm + ' µm') : 'n/d') + ' · ' + (res.n_pairs || '?') + ' coppie · ' + (res.iters || '?') + ' it · ' + (res.elapsed_ms || '?') + ' ms (piena ris.).');
+    replaceShowStatus('Impianto #' + tn + ': Raffina+ SERVER — residuo fit ' + (rmsUm != null ? (rmsUm + ' µm') : 'n/d') + ' · ' + (res.n_pairs || '?') + ' coppie · ' + (res.iters || '?') + ' it · ' + (res.elapsed_ms || '?') + ' ms (piena ris.).');
   }).catch(function(err){
     _restore();
     replaceShowStatus('Raffina+ server fallita: ' + (err && err.message ? err.message : err), true);

@@ -631,7 +631,9 @@ async def rit_refine_icp(req: RefineICPRequest, current_user: dict = Depends(req
             source_normals = _np.asarray(req.source_normals, dtype=_np.float64)
         axis = _np.asarray(req.axis, dtype=_np.float64) if req.axis else None
     except Exception as e:
-        raise HTTPException(400, detail=f"Input malformato: {e}")
+        # 8.59.1: messaggio generico al client (no {e} raw), dettaglio nei log server
+        logger.warning("rit_refine_icp input malformato: %s: %s", type(e).__name__, e)
+        raise HTTPException(400, detail="Input malformato: source/target/normali devono essere liste di [x,y,z].")
 
     # CPU-bound numpy -> fuori dall'event loop con executor + timeout (come /api/analyze)
     t0 = _time.time()
@@ -650,11 +652,14 @@ async def rit_refine_icp(req: RefineICPRequest, current_user: dict = Depends(req
             timeout=ICP_TIMEOUT_SECONDS
         )
     except asyncio.TimeoutError:
+        logger.warning("rit_refine_icp timeout (src=%d tgt=%d)", len(req.source), len(req.target))
         raise HTTPException(504, detail="Raffinamento ICP oltre il timeout.")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, detail=f"Errore raffinamento ICP: {e}")
+        # 8.59.1: logga lo stack lato server, al client un messaggio generico (no {e} raw)
+        logger.exception("rit_refine_icp errore: %s", type(e).__name__)
+        raise HTTPException(500, detail="Errore interno nel raffinamento ICP.")
 
     result["elapsed_ms"] = int((_time.time() - t0) * 1000)
     result["algorithm"] = "server_point_to_plane_fullres_v1"
