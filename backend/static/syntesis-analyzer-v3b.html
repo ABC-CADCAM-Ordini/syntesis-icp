@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.59.8</title>
+<title>Syntesis-ICP - Analizzare v8.59.9</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.59.8';
+window.ANALIZZA_BUILD = '8.59.9';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16845,6 +16845,7 @@ function replaceToggleMarkersCollapse(){ replaceTreeUI.markersCollapsed = !repla
 // La geometria ORIGINALE (replaceOriginalGeo) NON viene mai toccata (seed/Raffina la usano).
 var REPLACE_CUT_RADIUS = 3.0;    // mm: CAP/fallback del buco. 8.45.0: il raggio reale e' ADATTIVO per marker (replaceEstimateMarkerRadius) -> taglia ~il footprint dello scanbody, non un'ampia fascia.
 var REPLACE_CUT_HALFH  = 30.0;   // mm: taglio passante ±30mm lungo l'asse
+var REPLACE_PROFILE_CAP_K = 1.2;   // 8.59.9: tetto del profilo radiale = K × raggio del CORPO cilindrico. Rigetta le feature NON-round del madre (square engaging sub-gengivale, scan-flag) che nella scansione paziente sono solo mucosa -> niente strisce di over-cut nella gengiva.
 // 8.45.0 (feedback utente: il taglio scansione tagliava troppo in orizzontale x/y): raggio del
 // buco ADATTIVO = estensione radiale (90° percentile) del FIGLIO piazzato attorno all'asse, in
 // MONDO, + piccolo margine -> taglia ~il footprint dello scanbody e poco altro, non un'ampia fascia
@@ -16931,8 +16932,12 @@ function _replaceMadreProfile(p){
     }
     if(!glob.length) return null;
     glob.sort(function(a, c){ return a - c; });
-    var fb = glob[Math.floor(glob.length * 0.5)];   // mediana -> settori vuoti
-    for(var b3 = 0; b3 < NB; b3++) if(prof[b3] < 0) prof[b3] = fb;
+    var fb = glob[Math.floor(glob.length * 0.5)];   // mediana settori ≈ raggio del CORPO cilindrico
+    var rcap = fb * REPLACE_PROFILE_CAP_K;           // 8.59.9: tetto robusto -> rigetta le feature non-round del madre (square engaging sub-gengivale, scan-flag) che over-cuttano la mucosa
+    for(var b3 = 0; b3 < NB; b3++){
+      if(prof[b3] < 0) prof[b3] = fb;                // settori vuoti -> mediana
+      else if(prof[b3] > rcap) prof[b3] = rcap;      // clampa i settori anomali (silhouette non-round)
+    }
     return { u: u, w: w, NB: NB, prof: prof, axMin: axMin, axMax: axMax };
   } catch(e){ return null; }
 }
