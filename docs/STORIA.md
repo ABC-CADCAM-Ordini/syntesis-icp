@@ -4,6 +4,23 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-13 — 8.59.7: Replace-iT "Taglia scansione" usa il CAD madre INTERO, non il trim dell'anteprima
+
+Follow-up immediato dell'8.59.6. Feedback utente: *"solo un accorgimento: non tagliare con il file ridotto come da anteprima ma taglia con il file intero che hai in memoria."*
+
+**Causa**: dal **8.43.0** lo slider verticale "taglio dall'origine" accanto all'anteprima marker accorcia il CAD sorgente lungo l'asse (`replaceTrimGeoAlongAxis`, tiene il cap esposto) per concentrare il **fit** sulla parte realmente scansionata. Risultato: `meshSrc` (Madre visibile) e `p.srcGeo` (usato dalla Raffina) diventano il CAD **trimmato**. Il "Taglia scansione" 8.59.6 calcolava `axMin/axMax` e il profilo radiale per-angolo da `meshSrc` → se l'utente aveva accorciato il sorgente, il taglio risultava **più corto del reale** e lasciava non tagliata la parte bassa dello scanbody scansionato.
+
+**Fix** (solo blocco `replace*` del monolite `v3b`):
+- alla posa salvo il CAD sorgente **intero** su `p.srcGeoFull = geos[0]` — la geometria piena restituita da `replaceFetchMarkerGeo` **prima** del trim. Il trim crea una nuova geometria (non muta `geos[0]`), quindi il riferimento pieno resta valido.
+- nuovo helper `_replaceCutSourceGeo(p)`: ritorna `p.srcGeoFull` se presente, altrimenti `meshSrc.geometry` (fallback per impianti senza full / single-mesh). Lo usano `_replaceMadreProfile` e `replaceEstimateMarkerRadius` (le due funzioni che definiscono la geometria del taglio).
+- **frame coerente**: `replaceTrimGeoAlongAxis` rimuove solo triangoli, non ricentra → il CAD pieno e il trimmato condividono lo stesso frame locale, quindi `p.group.matrixWorld` (anche dopo la Raffina, che muove solo il group) li trasforma identicamente in mondo.
+- **niente leak / niente dispose errato**: `geos[0]` è una geometria **cache condivisa** (`replaceMarkerGeoCache[sha]`) e **non-owned** (nessun `userData.replaceOwned`, settato solo sui trim) → `_replaceDisposeGroup` non la dispone mai. `p.srcGeoFull` è solo una referenza.
+- il **FIT resta sul cap trimmato** (`p.srcGeo`, design 8.43.0 deliberato): si cambia *solo* la geometria del taglio, non quella dell'accoppiamento.
+
+`node --check` 8/8. Deploy canary **LEGACY → BACKEND** commit `47e4efc` (LEGACY deploy `b3e7e74f`, BACKEND `33808a8a`); verifica live 8.59.7 + `<title>`/`ANALIZZA_BUILD` 8.59.7 + gating `/api/leaderboard` no-token → 403 su entrambi i domini + alias `app.syntesis-icp.com`. **PENDING collaudo utente.**
+
+---
+
 ## 2026-06-13 — 8.59.6: Replace-iT "Taglia scansione" segue la FORMA del Madre (bound assiale)
 
 Feedback utente: *"la funzione taglia scansione taglia la scansione del marker madre correttamente e toglie pure le isole, bene. Ma taglia anche la parte di scansione che non è il marker, verso i tessuti e i denti adiacenti. Quella parte non dovrebbe essere interessata: il taglio da parte di Madre deve essere solo esclusivamente la forma del marker più offset impostato dall'albero scena."*
