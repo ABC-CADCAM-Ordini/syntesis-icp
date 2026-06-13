@@ -4,6 +4,19 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-13 — 8.59.0: Replace-iT "Raffina+" — ICP point-to-plane SERVER full-res (opzione parallela)
+
+Richiesta utente: gli scanbody (figli) hanno forme e geometrie molto diverse e a volte la posa della **madre** sulla scansione non è precisa; *"creiamo un'opzione parallela da provare in live, togliamo incertezza a questo passaggio definitivamente"*.
+
+**Diagnosi.** Il raffinamento client esistente (`_replaceDoRefine`, beta point-to-plane dal 8.48.0) per restare reattivo nel browser **sottocampiona** a ~400 punti madre / ≤1500 scan (nearest-neighbor brute-force O(N·M)). Su uno scanbody quasi-cilindrico il **clocking** (rotazione attorno all'asse) è il DOF più debole — vincolato dal solo flat anti-rotazione, una frazione piccola dell'area — quindi è il primo a risentire del rumore quando si butta via risoluzione.
+
+**Soluzione (opzione PARALLELA, additiva).** Nuovo pulsante **"Raffina+"** (`#replaceBtnRefineSrv`, verde, accanto a "Raffina") → `replaceRefineServer`: estrae la madre a piena risoluzione + il crop cilindrico della scansione (stessa logica di `_replaceDoRefine`, che **non viene toccato**) e chiama `POST /api/rit/refine-icp`. Il backend (`icp_engine.refine_point_to_plane`) esegue un ICP **point-to-plane** a **piena risoluzione** con `scipy.spatial.cKDTree` (O(N·logM) → niente cap), restituendo il delta rigido (R,t) che il frontend applica come matrice 4×4 al group (riuso del blocco di apply del client). In barra di stato: RMSD / coppie / iterazioni / ms per il confronto A/B col client.
+
+Implementazione:
+- Backend: `icp_engine.refine_point_to_plane()` (solve 6×6 linearizzato + fallback Kabsch, trimming mediana×2.5, rifiuto-normali, peso 5× sul cap, Rodrigues `_rot_from_omega`); endpoint `POST /api/rit/refine-icp` in `main.py` (`require_authorized`, Pydantic `RefineICPRequest`, executor + timeout `ICP_TIMEOUT_SECONDS`, cap 8000/20000 punti).
+- Frontend (solo blocco `replace*` v3b): `replaceRefineServer` + abilitazione pulsante in `replaceRebuildPlacedList`; self-contained, il path client resta intatto.
+- Validazione offline sui 3 scanbody reali utente (perturbazione 2° tilt + 1.5° clocking + 0.25mm, rumore 15µm): **server ~0.9-1.9µm** vs **client ~5-9µm** (~5-10× più preciso, err.rot ~10× più basso). `py_compile` OK; `node --check` 7/7.
+
 ## 2026-06-12 — 8.58.0: SHIFT+CLIC esteso ad Analizza (posa MUA) e Sostituisci
 
 Richiesta utente (roadmap #1 da `replaceit-coupling-roadmap`): estendere a **tutti** i workflow di accoppiamento il gesto Shift+clic introdotto in 8.54.0 per Replace-iT. Solo `v3b`. Analizza è il workflow principale → review avversariale dedicata.

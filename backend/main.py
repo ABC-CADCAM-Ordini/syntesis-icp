@@ -576,6 +576,91 @@ async def place_mua(req: PlaceMuaRequest, current_user: dict = Depends(require_a
     }
 
 
+# ── Replace-iT: raffinamento posa point-to-plane FULL-RES (server) ────────
+class RefineICPRequest(BaseModel):
+    source: list                          # [[x,y,z], ...] vertici MADRE in MONDO (gia' 3-punti)
+    target: list                          # [[x,y,z], ...] punti scansione (crop) in MONDO
+    target_normals: list                  # [[nx,ny,nz], ...] normali per punto target
+    source_normals: Optional[list] = None # opzionale: rifiuto per incompatibilita' normali
+    axis: Optional[list] = None           # asse inserzione [x,y,z] (peso 5x sul cap)
+    max_iter: int = 60
+    normal_reject_cos: float = 0.3
+
+
+MAX_REFINE_SRC = int(os.getenv("MAX_REFINE_SRC", "8000"))
+MAX_REFINE_TGT = int(os.getenv("MAX_REFINE_TGT", "20000"))
+
+
+@app.post("/api/rit/refine-icp")
+async def rit_refine_icp(req: RefineICPRequest, current_user: dict = Depends(require_authorized)):
+    """8.59.0: raffinamento posa Replace-iT con ICP point-to-plane FULL-RES server.
+
+    Opzione PARALLELA al raffinamento client-side (_replaceDoRefine, v3b 8.48.0).
+    Stesso input semantico (madre gia' posata a 3-punti + crop scansione), stesso
+    output (delta rigido R,t applicabile come matrice 4x4 sul group), ma calcolato
+    su mesh a PIENA RISOLUZIONE con KD-tree -> niente sottocampionamento a 400/1500
+    punti del client (limite imposto dal nearest-neighbor brute-force in browser).
+    Piu' punti = piu' media del rumore = piu' precisione (validato offline ~1um vs
+    ~5-9um client). Permette confronto A/B in live per validazione clinica.
+    """
+    import time as _time
+    import numpy as _np
+    from icp_engine import refine_point_to_plane
+
+    # Validazione
+    if not req.source or len(req.source) < 20:
+        raise HTTPException(400, detail="Sorgente (madre) troppo piccola (min 20 punti).")
+    if not req.target or len(req.target) < 20:
+        raise HTTPException(400, detail="Bersaglio (scansione) troppo piccolo (min 20 punti).")
+    if len(req.source) > MAX_REFINE_SRC:
+        raise HTTPException(413, detail=f"Sorgente troppo grande ({len(req.source)} > {MAX_REFINE_SRC} punti).")
+    if len(req.target) > MAX_REFINE_TGT:
+        raise HTTPException(413, detail=f"Bersaglio troppo grande ({len(req.target)} > {MAX_REFINE_TGT} punti).")
+    if not req.target_normals or len(req.target_normals) != len(req.target):
+        raise HTTPException(400, detail="target_normals deve avere la stessa lunghezza di target.")
+
+    # Conversione input
+    try:
+        source = _np.asarray(req.source, dtype=_np.float64)
+        target = _np.asarray(req.target, dtype=_np.float64)
+        target_normals = _np.asarray(req.target_normals, dtype=_np.float64)
+        if source.shape[1:] != (3,) or target.shape[1:] != (3,) or target_normals.shape[1:] != (3,):
+            raise ValueError("ogni punto/normale deve essere [x,y,z]")
+        source_normals = None
+        if req.source_normals is not None and len(req.source_normals) == len(source):
+            source_normals = _np.asarray(req.source_normals, dtype=_np.float64)
+        axis = _np.asarray(req.axis, dtype=_np.float64) if req.axis else None
+    except Exception as e:
+        raise HTTPException(400, detail=f"Input malformato: {e}")
+
+    # CPU-bound numpy -> fuori dall'event loop con executor + timeout (come /api/analyze)
+    t0 = _time.time()
+    try:
+        result = await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: refine_point_to_plane(
+                    source, target, target_normals,
+                    source_normals=source_normals, axis=axis,
+                    max_iter=max(1, min(int(req.max_iter), 200)),
+                    trim_k=2.5,
+                    normal_reject_cos=max(0.0, min(float(req.normal_reject_cos), 0.99)),
+                )
+            ),
+            timeout=ICP_TIMEOUT_SECONDS
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(504, detail="Raffinamento ICP oltre il timeout.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, detail=f"Errore raffinamento ICP: {e}")
+
+    result["elapsed_ms"] = int((_time.time() - t0) * 1000)
+    result["algorithm"] = "server_point_to_plane_fullres_v1"
+    return result
+
+
 # ── LAB: endpoint parallelo per il modulo /lab ───────────────────────────
 # Stessa logica di /api/place-mua. Endpoint separato preservato come hook
 # per future sperimentazioni: per provare un motore alternativo, sostituire

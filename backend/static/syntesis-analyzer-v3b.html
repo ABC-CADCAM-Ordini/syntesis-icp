@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.58.0</title>
+<title>Syntesis-ICP - Analizzare v8.59.0</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2043,6 +2043,7 @@ if (document.readyState === 'loading') {
       <!-- 2b-1.3: flusso per-scanbody. Raffina (2b-2) e Concludi (2b-3) sono scaffolding disabilitato. -->
       <div id="replaceFlow" style="display:none;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button id="replaceBtnRefine" class="replace-only" disabled onclick="replaceRefineCurrent()" title="Raffina (ICP) SOLO l'impianto attivo: l'ultimo piazzato, o quello selezionato nell'albero scena" style="flex:1;min-width:78px;padding:7px 8px;background:#0065B3;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina</button>
+        <button id="replaceBtnRefineSrv" class="replace-only" disabled onclick="replaceRefineServer()" title="Raffina SERVER (point-to-plane, piena risoluzione · beta): stesso impianto attivo, calcolata sul server con tutta la mesh -> piu' precisa del client (~1µm vs ~5-9µm). Confronto A/B con Raffina." style="flex:1;min-width:78px;padding:7px 8px;background:#0E8C6A;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina+</button>
         <button id="replaceBtnNext" class="replace-only" onclick="replaceNextScanbody()" style="flex:1;min-width:78px;padding:7px 8px;background:#fff;color:var(--dark);border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Avanti / nuovo</button>
         <button id="replaceBtnFinish" class="replace-only" onclick="replaceExportSTL()" title="Esporta i sostituti (figli) piazzati come file STL nelle loro posizioni in scena" style="flex:1;min-width:78px;padding:7px 8px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Concludi · Esporta</button>
       </div>
@@ -2427,8 +2428,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.58.0';
-window.ANALIZZA_BUILD_DATE = '2026-06-12';
+window.ANALIZZA_BUILD = '8.59.0';
+window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -16732,15 +16733,18 @@ function replaceRebuildPlacedList(){
   var flow = document.getElementById('replaceFlow');
   if(!wrap || !items) return;
   var rfn = document.getElementById('replaceBtnRefine');
+  var rfnS = document.getElementById('replaceBtnRefineSrv');   // 8.59.0: Raffina+ server
   if(!replacePlaced.length){
     wrap.style.display = 'none'; items.innerHTML = '';
     if(flow) flow.style.display = 'none';
     if(rfn){ rfn.disabled = true; rfn.style.opacity = '0.5'; rfn.style.cursor = 'not-allowed'; }
+    if(rfnS){ rfnS.disabled = true; rfnS.style.opacity = '0.5'; rfnS.style.cursor = 'not-allowed'; }
     return;
   }
   wrap.style.display = '';
   if(flow) flow.style.display = 'flex';
   if(rfn){ rfn.disabled = false; rfn.style.opacity = '1'; rfn.style.cursor = 'pointer'; }  // 2b-2: Raffina attiva con >=1 marker
+  if(rfnS){ rfnS.disabled = false; rfnS.style.opacity = '1'; rfnS.style.cursor = 'pointer'; }  // 8.59.0: idem Raffina+ server
   items.innerHTML = '';
   replacePlaced.forEach(function(p){
     var row = document.createElement('div');
@@ -17482,6 +17486,117 @@ function replaceRefineCurrent(){
   if(tn == null){ replaceShowStatus('Nessun marker da raffinare.', true); return; }
   replaceActiveNum = tn;   // 8.56.0: l'attivo riflette il marker che verrà raffinato (highlight coerente)
   replaceRefineAll(null, tn);
+}
+
+// 8.59.0: "Raffina+" SERVER. Opzione PARALLELA al raffinamento client (_replaceDoRefine):
+// stessi dati (madre 3-punti + crop scansione attorno al marker ATTIVO), ma calcolata
+// sul server con ICP point-to-plane a PIENA RISOLUZIONE (cKDTree) -> niente cap 400/1500
+// del client -> ~1µm vs ~5-9µm (validato offline). Self-contained: NON tocca il path
+// client. Applica lo stesso delta rigido (matrice 4x4) e mostra RMSD/coppie/tempi per A/B.
+var REPLACE_SRV_MAX_SRC = 8000, REPLACE_SRV_MAX_TGT = 20000;   // allineati ai cap backend
+function replaceRefineServer(){
+  var tn = _replaceRefineTargetNum();
+  if(tn == null){ replaceShowStatus('Nessun marker da raffinare.', true); return; }
+  replaceActiveNum = tn;
+  var p = null;
+  for(var i = 0; i < replacePlaced.length; i++){ if(replacePlaced[i].num === tn){ p = replacePlaced[i]; break; } }
+  if(!p || !p.group || !replaceMesh){ replaceShowStatus('Marker non valido per la raffina.', true); return; }
+  var btn = document.getElementById('replaceBtnRefineSrv');
+  if(btn){ btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'wait'; }
+  function _restore(){ if(btn){ btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; } }
+
+  // 1. MADRE (sorgente) in MONDO, piena risoluzione (stride solo oltre il cap)
+  p.group.updateMatrixWorld(true);
+  var m = p.group.matrixWorld.elements;
+  var nmat = new THREE.Matrix3().getNormalMatrix(p.group.matrixWorld);
+  var mesh0 = p.group.children && p.group.children[0];
+  var geo = p.srcGeo || (mesh0 && mesh0.geometry);
+  if(!geo || !geo.attributes || !geo.attributes.position){ _restore(); replaceShowStatus('Geometria madre assente.', true); return; }
+  var cadPos = geo.attributes.position.array;
+  var cadNorm = geo.attributes.normal ? geo.attributes.normal.array : null;
+  var nCadV = cadPos.length / 3;
+  var srcStep = Math.max(1, Math.ceil(nCadV / REPLACE_SRV_MAX_SRC));
+  var axis = p.axisDir.clone().normalize(); var axx = axis.x, axy = axis.y, axz = axis.z;
+  var src = [], srcN = [], cen = [0, 0, 0];
+  for(var vi = 0; vi < nCadV; vi += srcStep){
+    var o = vi * 3;
+    var lx = cadPos[o], ly = cadPos[o+1], lz = cadPos[o+2];
+    var wx = m[0]*lx + m[4]*ly + m[8]*lz  + m[12];
+    var wy = m[1]*lx + m[5]*ly + m[9]*lz  + m[13];
+    var wz = m[2]*lx + m[6]*ly + m[10]*lz + m[14];
+    src.push([wx, wy, wz]); cen[0]+=wx; cen[1]+=wy; cen[2]+=wz;
+    if(cadNorm){ var wn = new THREE.Vector3(cadNorm[o], cadNorm[o+1], cadNorm[o+2]).applyMatrix3(nmat).normalize(); srcN.push([wn.x, wn.y, wn.z]); }
+  }
+  if(src.length < 20){ _restore(); replaceShowStatus('Madre: troppi pochi punti.', true); return; }
+  cen[0]/=src.length; cen[1]/=src.length; cen[2]/=src.length;
+
+  // estensione madre lungo asse + radiale -> parametri crop scansione
+  var zMin = Infinity, zMax = -Infinity, rMax = 0;
+  for(var i2 = 0; i2 < src.length; i2++){
+    var dx = src[i2][0]-cen[0], dy = src[i2][1]-cen[1], dz = src[i2][2]-cen[2];
+    var zp = dx*axx + dy*axy + dz*axz; if(zp < zMin) zMin = zp; if(zp > zMax) zMax = zp;
+    var rx = dx - zp*axx, ry = dy - zp*axy, rz = dz - zp*axz; var r = Math.sqrt(rx*rx + ry*ry + rz*rz); if(r > rMax) rMax = r;
+  }
+  var MARG = 1.5, zLo = zMin - MARG, zHi = zMax + MARG, radLim2 = (rMax + MARG) * (rMax + MARG);
+
+  // 2. crop cilindrico SCANSIONE (geometria ORIGINALE, mai tagliata) + normali di faccia
+  var scanPos = (replaceOriginalGeo || replaceMesh.geometry).attributes.position.array;
+  var nScanTri = scanPos.length / 9;
+  var tgt = [], tgtN = [];
+  for(var si = 0; si < nScanTri; si++){
+    var oi = si * 9;
+    var px = (scanPos[oi]   + scanPos[oi+3] + scanPos[oi+6]) / 3;
+    var py = (scanPos[oi+1] + scanPos[oi+4] + scanPos[oi+7]) / 3;
+    var pz = (scanPos[oi+2] + scanPos[oi+5] + scanPos[oi+8]) / 3;
+    var ddx = px-cen[0], ddy = py-cen[1], ddz = pz-cen[2];
+    var zp2 = ddx*axx + ddy*axy + ddz*axz; if(zp2 < zLo || zp2 > zHi) continue;
+    var rrx = ddx - zp2*axx, rry = ddy - zp2*axy, rrz = ddz - zp2*axz; if(rrx*rrx + rry*rry + rrz*rrz > radLim2) continue;
+    var e1x = scanPos[oi+3]-scanPos[oi], e1y = scanPos[oi+4]-scanPos[oi+1], e1z = scanPos[oi+5]-scanPos[oi+2];
+    var e2x = scanPos[oi+6]-scanPos[oi], e2y = scanPos[oi+7]-scanPos[oi+1], e2z = scanPos[oi+8]-scanPos[oi+2];
+    var snx = e1y*e2z - e1z*e2y, sny = e1z*e2x - e1x*e2z, snz = e1x*e2y - e1y*e2x;
+    var sl = Math.sqrt(snx*snx + sny*sny + snz*snz) || 1;
+    tgt.push([px, py, pz]); tgtN.push([snx/sl, sny/sl, snz/sl]);
+  }
+  if(tgt.length < 20){ _restore(); replaceShowStatus('Scansione: crop vuoto attorno al marker.', true); return; }
+  if(tgt.length > REPLACE_SRV_MAX_TGT){ var stp = Math.ceil(tgt.length / REPLACE_SRV_MAX_TGT); var ta = [], tb = []; for(var k = 0; k < tgt.length; k += stp){ ta.push(tgt[k]); tb.push(tgtN[k]); } tgt = ta; tgtN = tb; }
+
+  // 3. POST al server (auth Bearer) -> R,t,rmsd,iters
+  replaceShowStatus('Raffina+ server: invio ' + src.length + ' madre / ' + tgt.length + ' scan…');
+  var token = ''; try { token = localStorage.getItem('syntesis_token') || ''; } catch(e){}
+  fetch('/api/rit/refine-icp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ source: src, source_normals: (srcN.length === src.length ? srcN : null), target: tgt, target_normals: tgtN, axis: [axx, axy, axz], max_iter: 80, normal_reject_cos: 0.3 })
+  }).then(function(resp){
+    if(!resp.ok) return resp.text().then(function(t){ throw new Error('HTTP ' + resp.status + (t ? (' · ' + t.slice(0, 160)) : '')); });
+    return resp.json();
+  }).then(function(res){
+    _restore();
+    if(replacePlaced.indexOf(p) < 0){ replaceShowStatus('Marker eliminato durante la raffina.', true); return; }
+    var R = res.R, t = res.t;
+    if(!R || !t){ replaceShowStatus('Server: risposta priva di trasformazione.', true); return; }
+    // 4. applica lo stesso delta rigido del path client (matrice 4x4 sul group)
+    var Rm = new THREE.Matrix4().set(
+      R[0][0], R[0][1], R[0][2], t[0],
+      R[1][0], R[1][1], R[1][2], t[1],
+      R[2][0], R[2][1], R[2][2], t[2],
+      0, 0, 0, 1
+    );
+    p.group.updateMatrix();
+    var newMat = new THREE.Matrix4().multiplyMatrices(Rm, p.group.matrix);
+    newMat.decompose(p.group.position, p.group.quaternion, p.group.scale);
+    p.group.updateMatrix();
+    p.position.applyMatrix4(Rm);
+    p.axisDir.applyMatrix4(new THREE.Matrix4().extractRotation(Rm)).normalize();
+    p.rmsd = (typeof res.rmsd === 'number') ? res.rmsd : p.rmsd;
+    try { replaceRebuildScanGeometry(); } catch(e){}   // il taglio scansione segue la posa raffinata
+    replaceRebuildPlacedList();
+    var rmsUm = (typeof res.rmsd === 'number') ? Math.round(res.rmsd * 1000) : null;
+    replaceShowStatus('Impianto #' + tn + ': Raffina+ SERVER — RMSD ' + (rmsUm != null ? (rmsUm + ' µm') : 'n/d') + ' · ' + (res.n_pairs || '?') + ' coppie · ' + (res.iters || '?') + ' it · ' + (res.elapsed_ms || '?') + ' ms (piena ris.).');
+  }).catch(function(err){
+    _restore();
+    replaceShowStatus('Raffina+ server fallita: ' + (err && err.message ? err.message : err), true);
+  });
 }
 function replaceRefineAll(onDone, targetNum){
   // 8.56.0: targetNum != null -> raffina SOLO quel marker (corrente), senza toccare gli altri; altrimenti tutti (legacy).

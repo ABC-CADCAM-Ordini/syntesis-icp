@@ -630,6 +630,147 @@ def run_icp(fixed: np.ndarray, moving: np.ndarray, max_iter: int = 80) -> dict:
     return {"R": R_acc, "t": t_acc, "aligned": Bt, "rmsd": rmsd, "angle": angle_deg}
 
 
+def _rot_from_omega(omega: np.ndarray) -> np.ndarray:
+    """Rodrigues: matrice di rotazione dal vettore asse-angolo omega (||omega||=theta)."""
+    theta = float(np.linalg.norm(omega))
+    if theta < 1e-12:
+        return np.eye(3)
+    k = omega / theta
+    K = np.array([[0, -k[2], k[1]],
+                  [k[2], 0, -k[0]],
+                  [-k[1], k[0], 0]])
+    return np.eye(3) + math.sin(theta) * K + (1 - math.cos(theta)) * (K @ K)
+
+
+def refine_point_to_plane(
+    source: np.ndarray,
+    target: np.ndarray,
+    target_normals: np.ndarray,
+    source_normals: Optional[np.ndarray] = None,
+    axis: Optional[np.ndarray] = None,
+    max_iter: int = 60,
+    trim_k: float = 2.5,
+    normal_reject_cos: float = 0.0,
+) -> dict:
+    """ICP point-to-plane full-resolution con cKDTree (server-side).
+
+    Gemello ad alta fedelta' del _replaceDoRefine client-side (v3b 8.48.0), ma:
+      - corrispondenze via KD-tree (O(N log M)) -> niente sottocampionamento
+        a 400/1500 punti: usa l'intera mesh -> piu' media del rumore -> piu'
+        precisione, in particolare sul clocking (rotazione attorno all'asse).
+      - solve point-to-plane linearizzato (6x6) per iterazione, fallback Kabsch
+        point-to-point se il sistema e' instabile.
+      - trimming robusto delle corrispondenze (soglia = mediana*trim_k) +
+        rifiuto opzionale per incompatibilita' di normali (gengiva/back-face).
+
+    Convenzione: source e target in coordinate MONDO; ritorna il delta rigido
+    (R, t) tale che R @ p_source + t ~= scansione (stessa convenzione del client
+    -> applicabile come matrice 4x4 sul group THREE).
+
+    Ritorna: {R(3x3 list), t(3 list), rmsd, iters, n_pairs, n_source, n_target}.
+    """
+    from scipy.spatial import cKDTree
+
+    src = np.asarray(source, dtype=np.float64)
+    tgt = np.asarray(target, dtype=np.float64)
+    tn = np.asarray(target_normals, dtype=np.float64)
+    # normalizza le normali target (robustezza a input non unitari)
+    tn = tn / (np.linalg.norm(tn, axis=1, keepdims=True) + 1e-12)
+
+    sn = None
+    if source_normals is not None and len(source_normals) == len(src):
+        sn = np.asarray(source_normals, dtype=np.float64)
+        sn = sn / (np.linalg.norm(sn, axis=1, keepdims=True) + 1e-12)
+
+    # pesi per-punto sorgente: cap (normale ~ asse) pesato 5x (parita' col client)
+    w = np.ones(len(src), dtype=np.float64)
+    if sn is not None and axis is not None:
+        ax = np.asarray(axis, dtype=np.float64)
+        ax = ax / (np.linalg.norm(ax) + 1e-12)
+        w[np.abs(sn @ ax) > 0.8] = 5.0
+
+    tree = cKDTree(tgt)
+    moving = src.copy()
+    R_acc = np.eye(3)
+    t_acc = np.zeros(3)
+    prev_rmsd = float("inf")
+    rmsd = float("inf")
+    n_pairs = 0
+    iters = 0
+
+    for it in range(max_iter):
+        iters = it + 1
+        dist, idx = tree.query(moving, k=1)
+        thr = float(np.median(dist)) * trim_k + 0.05
+        keep = dist <= thr
+
+        # rifiuto per incompatibilita' di normali (sorgente ruotata <-> scansione)
+        if sn is not None and normal_reject_cos > 0:
+            sn_rot = sn @ R_acc.T
+            cosv = np.abs(np.einsum("ij,ij->i", sn_rot, tn[idx]))
+            keep &= cosv >= normal_reject_cos
+
+        ks = np.where(keep)[0]
+        if len(ks) < 15:
+            break
+        n_pairs = int(len(ks))
+
+        P = moving[ks]
+        Q = tgt[idx[ks]]
+        N = tn[idx[ks]]
+        wv = w[ks]
+
+        # point-to-plane linearizzato: A x = b, x = [omega(3), t(3)]
+        # residuo ~= (p-q).n + omega.(p x n) + t.n  -> A_i = [p x n, n], b_i = (q-p).n
+        pxn = np.cross(P, N)
+        A = np.hstack([pxn, N])                      # (k, 6)
+        b = np.einsum("ij,ij->i", (Q - P), N)        # (k,)
+        Aw = A * wv[:, None]
+        ATA = Aw.T @ A
+        ATb = Aw.T @ b
+        ATA += np.eye(6) * 1e-9                       # regolarizzazione minima
+
+        R_step = None
+        t_step = None
+        try:
+            x = np.linalg.solve(ATA, ATb)
+            if np.all(np.isfinite(x)):
+                omega = x[:3]
+                th = float(np.linalg.norm(omega))
+                tmag = float(np.linalg.norm(x[3:6]))
+                if th < 0.5 and tmag < 2.0:           # guardia anti-passo instabile (rad/mm)
+                    R_step = _rot_from_omega(omega)
+                    t_step = x[3:6]
+        except np.linalg.LinAlgError:
+            pass
+
+        if R_step is None:                            # fallback point-to-point
+            R_step, t_step = kabsch(P, Q)
+
+        moving = moving @ R_step.T + t_step
+        R_acc = R_step @ R_acc
+        t_acc = R_step @ t_acc + t_step
+
+        d = moving[ks] - Q
+        rmsd = float(np.sqrt(np.mean(np.sum(d * d, axis=1))))
+        if abs(prev_rmsd - rmsd) < 1e-5:
+            break
+        prev_rmsd = rmsd
+
+    trace = float(np.trace(R_acc))
+    angle_deg = float(np.degrees(np.arccos(np.clip((trace - 1) / 2, -1, 1))))
+    return {
+        "R": R_acc.tolist(),
+        "t": t_acc.tolist(),
+        "rmsd": rmsd if np.isfinite(rmsd) else None,
+        "angle": angle_deg,
+        "iters": iters,
+        "n_pairs": n_pairs,
+        "n_source": int(len(src)),
+        "n_target": int(len(tgt)),
+    }
+
+
 # ── Cylinder axis ─────────────────────────────────────────────────────────────
 def cyl_axis(tris: np.ndarray) -> np.ndarray:
     """Face-normal method per l'asse del cilindro."""
