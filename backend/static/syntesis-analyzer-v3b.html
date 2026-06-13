@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.59.6</title>
+<title>Syntesis-ICP - Analizzare v8.59.7</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.59.6';
+window.ANALIZZA_BUILD = '8.59.7';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16618,7 +16618,8 @@ function replacePlaceFromSeed(){
       showSrc: true, showSub: true, showOrigin: true,
       seedMarkerPts: seedMarker, seedScanPts: seedScan,
       position: posV.clone(), axisDir: N.clone(),
-      srcGeo: geoSrc,                               // 8.31.1: la Raffina resta sul SORGENTE
+      srcGeo: geoSrc,                               // 8.31.1: la Raffina resta sul SORGENTE (cap trimmato per il fit)
+      srcGeoFull: geos[0],                          // 8.59.7: CAD MADRE INTERO (cache, mai accorciato) -> il "Taglia scansione" usa QUESTO, non il trim dell'anteprima
       srcMarkerSha: _tSrc.marker_sha256,
       libId: replaceCurrentLibId, typeOrd: _tSub.ord, markerSha: _tSub.marker_sha256,
       marca: (_libMMD.marca || null), modello: (_libMMD.modello || null), diametro: (_libMMD.diametro != null ? _libMMD.diametro : null),
@@ -16848,17 +16849,26 @@ var REPLACE_CUT_HALFH  = 30.0;   // mm: taglio passante ±30mm lungo l'asse
 // buco ADATTIVO = estensione radiale (90° percentile) del FIGLIO piazzato attorno all'asse, in
 // MONDO, + piccolo margine -> taglia ~il footprint dello scanbody e poco altro, non un'ampia fascia
 // di gengiva. Cap al vecchio fisso (mai PIU' largo di prima). Fallback fisso se geometria assente.
+// 8.59.7: il "Taglia scansione" usa il CAD MADRE INTERO (p.srcGeoFull = sorgente piena dalla cache,
+// MAI la versione accorciata dallo slider "taglio" dell'anteprima, che serve solo al fit del cap esposto).
+// Stesso frame locale del trim (replaceTrimGeoAlongAxis rimuove solo triangoli, non ricentra) -> il
+// transform p.group.matrixWorld vale identico. Fallback a meshSrc (impianti senza srcGeoFull / single-mesh).
+function _replaceCutSourceGeo(p){
+  if(p.srcGeoFull && p.srcGeoFull.attributes && p.srcGeoFull.attributes.position) return p.srcGeoFull;
+  var mesh = (p.meshSrc) || (p.meshSub) || (p.group && p.group.children && p.group.children[0]);
+  return (mesh && mesh.geometry) ? mesh.geometry : null;
+}
 function replaceEstimateMarkerRadius(p){
   // 8.54.0: il buco è GUIDATO DAL MADRE (meshSrc = scanbody scansionato, ciò che occupa davvero lo
   // spazio nella scansione) — non più dal figlio (meshSub). + offset utente dallo slider dell'albero.
   var _off = (p.cutOffset || 0);
-  var mesh = (p.meshSrc) || (p.meshSub) || (p.group && p.group.children && p.group.children[0]);
-  if(!mesh || !mesh.geometry || !mesh.geometry.attributes || !mesh.geometry.attributes.position) return REPLACE_CUT_RADIUS + _off;
+  var geo = _replaceCutSourceGeo(p);   // 8.59.7: CAD madre INTERO, non il trim dell'anteprima
+  if(!geo || !geo.attributes || !geo.attributes.position) return REPLACE_CUT_RADIUS + _off;
   try {
     p.group.updateMatrixWorld(true);
     var m = p.group.matrixWorld.elements;
     var ax = p.axisDir.clone().normalize();
-    var pos = mesh.geometry.attributes.position.array, n = pos.length / 3, rs = [];
+    var pos = geo.attributes.position.array, n = pos.length / 3, rs = [];
     for(var i = 0; i < n; i++){
       var lx = pos[i*3], ly = pos[i*3+1], lz = pos[i*3+2];
       var wx = m[0]*lx + m[4]*ly + m[8]*lz  + m[12];
@@ -16881,8 +16891,8 @@ function replaceEstimateMarkerRadius(p){
 // del madre (in MONDO, ⊥ all'asse) -> ignora il flare del cap e gli outlier; i settori vuoti
 // ereditano la mediana globale; guardia anti-runaway 8mm per madre con tessuto. null = fallback cerchio.
 function _replaceMadreProfile(p){
-  var mesh = (p.meshSrc) || (p.meshSub) || (p.group && p.group.children && p.group.children[0]);
-  if(!mesh || !mesh.geometry || !mesh.geometry.attributes || !mesh.geometry.attributes.position) return null;
+  var geo = _replaceCutSourceGeo(p);   // 8.59.7: CAD madre INTERO, non il trim dell'anteprima
+  if(!geo || !geo.attributes || !geo.attributes.position) return null;
   try {
     p.group.updateMatrixWorld(true);
     var m = p.group.matrixWorld.elements;
@@ -16893,7 +16903,7 @@ function _replaceMadreProfile(p){
     var NB = 48, bins = [];
     var axMin = Infinity, axMax = -Infinity;   // 8.59.6: bound assiale del taglio = estensione reale del madre (no piu' tubo passante)
     for(var b = 0; b < NB; b++) bins.push([]);
-    var posA = mesh.geometry.attributes.position.array, n = posA.length / 3;
+    var posA = geo.attributes.position.array, n = posA.length / 3;
     if(n < 16) return null;
     for(var i = 0; i < n; i++){
       var lx = posA[i*3], ly = posA[i*3+1], lz = posA[i*3+2];
