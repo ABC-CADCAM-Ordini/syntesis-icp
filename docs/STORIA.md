@@ -4,6 +4,21 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-13 — 8.59.8: Replace-iT label impianto ancorata al cap del figlio + lift in alto
+
+Feedback utente: *"loro su altri workflow sono differenti, hanno una linea che si sposta e porta il label più alto; lui qui dovrebbe partire dal file figlio e spostarsi in alto per essere visto senza dare noia."* Confermato in chat: **cap del figlio** + **verso l'alto del figlio**.
+
+**Causa**: `replaceUpdateLabels` (8.53.1) ancorava il dot e la linea guida a `p.position` = l'**origine/connessione** dell'impianto (CAD locale 0,0,0, la base vicino alla gengiva, spesso coperta). La pillola, sollevata di `OFF_PX=54` px da lì, finiva **sopra il corpo del figlio** → "dava noia".
+
+**Fix** (solo blocco `replace*` del monolite `v3b`):
+- **anchor = cap del figlio**: calcolo la bounding box mondo di `meshSub` (`new THREE.Box3().setFromObject`), prendo i due estremi lungo l'asse (`center ± axisDir·halfExtent`) e scelgo come cap quello **più lontano dalla connessione** (`p.position`). La bbox usa gli 8 corner cache della geometria → economico per-frame; segue `matrixWorld`, quindi resta corretto dopo Raffina e cambio-figlio.
+- **lift verso l'alto del figlio**: la pillola si stacca di `OFF_PX=54` px lungo l'asse **verso il cap** (la direzione "su" del figlio), proiettato in schermo. Se il cap punta verso la camera (asse proiettato collassato, `len<0.5`px) → fallback all'alto-schermo, robusto allo scorcio come il 8.53.1.
+- linea SVG, dot, testo (`#N Marca Modello Ømm`), colore impianto e compensazione `body.zoom` invariati.
+
+`node --check` 8/8. `docs/MAPPA_FUNZIONALE.md`: riga "Label 2D" aggiornata + versione mappata → 8.59.8 (modifica di funzione legata a UI, sincronizzazione obbligatoria). Deploy canary **LEGACY → BACKEND** commit `927adef` (LEGACY deploy `92e00bb0`, BACKEND `309b2e12`); verifica live 8.59.8 + `<title>`/`ANALIZZA_BUILD` 8.59.8 + gating `/api/leaderboard` no-token → 403 su entrambi i domini + alias `app.syntesis-icp.com`. **PENDING collaudo utente.**
+
+---
+
 ## 2026-06-13 — 8.59.7: Replace-iT "Taglia scansione" usa il CAD madre INTERO, non il trim dell'anteprima
 
 Follow-up immediato dell'8.59.6. Feedback utente: *"solo un accorgimento: non tagliare con il file ridotto come da anteprima ma taglia con il file intero che hai in memoria."*
