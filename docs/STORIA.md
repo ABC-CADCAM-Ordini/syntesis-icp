@@ -4,6 +4,21 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-13 — 8.59.6: Replace-iT "Taglia scansione" segue la FORMA del Madre (bound assiale)
+
+Feedback utente: *"la funzione taglia scansione taglia la scansione del marker madre correttamente e toglie pure le isole, bene. Ma taglia anche la parte di scansione che non è il marker, verso i tessuti e i denti adiacenti. Quella parte non dovrebbe essere interessata: il taglio da parte di Madre deve essere solo esclusivamente la forma del marker più offset impostato dall'albero scena."*
+
+**Causa**: il "Taglia scansione" non tagliava la *forma* del marker ma un **tubo passante ±30mm lungo l'asse** (`REPLACE_CUT_HALFH = 30.0`). Radialmente era già corretto (la sezione segue la silhouette per-angolo del Madre via `_replaceMadreProfile` + offset). Ma assialmente il taglio era un carotaggio di **60mm** centrato sul marker: lo scanbody è alto pochi mm, quindi i restanti ~28mm/lato attraversavano la scansione lungo l'asse e — soprattutto con scanbody/impianti **inclinati** — il tubo "spazzava" lateralmente, mangiando gengiva e denti adiacenti che capitavano in quella colonna.
+
+**Fix** (solo blocco `replace*` del monolite `v3b`, richiesta utente esplicita "esclusivamente la forma del marker + offset"):
+- `_replaceMadreProfile` (già itera tutti i vertici del Madre in mondo) traccia ora `axMin/axMax` = estensione assiale reale del Madre rispetto al centroide marker, ed espone i due valori nel return.
+- `replaceRebuildScanGeometry` calcola per ogni cilindro di taglio la banda assiale `[axLo, axHi] = [axMin - off, axMax + off]`, **clampata** a `±REPLACE_CUT_HALFH` (così non è MAI più larga di prima). Il loop di taglio usa la banda invece di `Math.abs(axial) > halfH`; `_replaceRemoveCutIslands` (8.59.4) usa lo stesso bound (+ margine isole) per restare coerente.
+- Radiale, fallback (profilo `null` → vecchio comportamento ±30mm) e UI invariati. Il buco diventa un "tappo" della forma dello scanbody + offset; gengiva e denti adiacenti restano. Trade-off: con un taglio così aderente, se la posa 3-punti è leggermente fuori in altezza può restare un sottile anello → si compensa alzando lo slider offset (default 0.5mm).
+
+`node --check` 8/8; harness Node sintetico 7/7 (scanbody corpo+cap tagliati; dente adiacente a +18mm e tessuto profondo a −15mm, prima rimossi dal tubo, ora preservati; confine offset 3.4 sì / 3.6 no). Deploy canary **LEGACY → BACKEND** commit `1a4157a` (LEGACY deploy `bf0b344d`, BACKEND `e23b859a`); verifica live 8.59.6 + `<title>`/`ANALIZZA_BUILD` 8.59.6 + gating `/api/leaderboard` no-token → 403 su entrambi i domini + alias `app.syntesis-icp.com`. **PENDING collaudo utente.**
+
+---
+
 ## 2026-06-13 — 8.59.5: Replace-iT fix picking 3-punti — causa reale (raycast .point fuori dal raggio)
 
 Chiusura del problema "pallino spostato dal cursore" sulla scansione, dopo due ipotesi sbagliate (8.59.2 = mio falso fix sull'NDC/zoom, revocato in 8.59.3; inerzia camera = non era quello). Stavolta **diagnosi con misure reali nel browser dell'utente** (Chrome), via snippet console A/B non distruttivi, escludendo una per una tutte le cause:
