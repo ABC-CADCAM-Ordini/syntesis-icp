@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.59.3</title>
+<title>Syntesis-ICP - Analizzare v8.59.4</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.59.3';
+window.ANALIZZA_BUILD = '8.59.4';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16919,14 +16919,80 @@ function _replaceMadreProfile(p){
     return { u: u, w: w, NB: NB, prof: prof };
   } catch(e){ return null; }
 }
+// 8.59.4 (feedback utente: "Taglia scansione lascia frammenti di STL vaganti, piccole isole di
+// triangoli staccate da tutto -> andrebbero incluse nel taglio e nascoste"). Dopo il taglio,
+// connected-components per saldatura vertici (griglia 1µm) + union-find: rimuove le componenti
+// PICCOLE, NON la più grande (= corpo scansione), che cadono in MAGGIORANZA dentro l'intorno del
+// cilindro di taglio. Conservativo: il corpo principale, le "metà" grandi e l'anatomia LONTANA dal
+// taglio restano (richiedono size<5% del totale E >60% triangoli near-cut E non-largest).
+var REPLACE_ISLAND_MARGIN = 2.0;   // mm: intorno radiale/assiale del taglio entro cui un frammento staccato è un'isola
+function _replaceRemoveCutIslands(kept, cyls){
+  var T = kept.length / 9;
+  if(T < 4 || !cyls || !cyls.length) return kept;
+  // 1) saldatura vertici su griglia (1µm) -> id univoco per posizione
+  var Q = 1000, vmap = new Map(), vid = new Int32Array(T * 3), nextId = 0;
+  for(var t = 0; t < T; t++){
+    var b = t * 9;
+    for(var k = 0; k < 3; k++){
+      var o = b + k * 3;
+      var key = Math.round(kept[o] * Q) + ',' + Math.round(kept[o+1] * Q) + ',' + Math.round(kept[o+2] * Q);
+      var id = vmap.get(key);
+      if(id === undefined){ id = nextId++; vmap.set(key, id); }
+      vid[t * 3 + k] = id;
+    }
+  }
+  // 2) union-find sui vertici saldati (triangolo = unione dei suoi 3 vertici)
+  var parent = new Int32Array(nextId);
+  for(var p = 0; p < nextId; p++) parent[p] = p;
+  function find(x){ while(parent[x] !== x){ parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+  function uni(a, c){ a = find(a); c = find(c); if(a !== c) parent[a] = c; }
+  for(var t2 = 0; t2 < T; t2++){ uni(vid[t2*3], vid[t2*3+1]); uni(vid[t2*3+1], vid[t2*3+2]); }
+  // 3) per triangolo: componente (root) + dimensione + frazione near-cut
+  var compOf = new Int32Array(T), sizeMap = new Map(), nearMap = new Map();
+  for(var t3 = 0; t3 < T; t3++){
+    var root = find(vid[t3*3]); compOf[t3] = root;
+    sizeMap.set(root, (sizeMap.get(root) || 0) + 1);
+    var bb = t3 * 9;
+    var ccx = (kept[bb]+kept[bb+3]+kept[bb+6])/3, ccy = (kept[bb+1]+kept[bb+4]+kept[bb+7])/3, ccz = (kept[bb+2]+kept[bb+5]+kept[bb+8])/3;
+    var near = false;
+    for(var c2 = 0; c2 < cyls.length && !near; c2++){
+      var kk = cyls[c2];
+      var dx = ccx-kk.cp.x, dy = ccy-kk.cp.y, dz = ccz-kk.cp.z;
+      var axial = dx*kk.ax.x + dy*kk.ax.y + dz*kk.ax.z;
+      if(Math.abs(axial) > kk.halfH + REPLACE_ISLAND_MARGIN) continue;
+      var rx = dx-axial*kk.ax.x, ry = dy-axial*kk.ax.y, rz = dz-axial*kk.ax.z;
+      var rad = (kk.profMax > 0 ? kk.profMax : kk.R) + kk.off + REPLACE_ISLAND_MARGIN;
+      if(rx*rx+ry*ry+rz*rz <= rad*rad) near = true;
+    }
+    if(near) nearMap.set(root, (nearMap.get(root) || 0) + 1);
+  }
+  // 4) corpo principale = componente più grande (da preservare sempre)
+  var biggest = -1, biggestSize = -1;
+  sizeMap.forEach(function(sz, root){ if(sz > biggestSize){ biggestSize = sz; biggest = root; } });
+  // 5) isole da rimuovere: non la più grande + piccola (<5% del totale) + in maggioranza near-cut
+  var remove = new Set();
+  sizeMap.forEach(function(sz, root){
+    if(root === biggest) return;
+    if(sz < T * 0.05 && (nearMap.get(root) || 0) / sz > 0.6) remove.add(root);
+  });
+  if(!remove.size) return kept;
+  // 6) ricostruisci senza le isole
+  var out = [];
+  for(var t4 = 0; t4 < T; t4++){
+    if(remove.has(compOf[t4])) continue;
+    var bo = t4 * 9; for(var v = 0; v < 9; v++) out.push(kept[bo + v]);
+  }
+  return out;
+}
 function replaceRebuildScanGeometry(){
   if(!replaceOriginalGeo || !replaceMesh) return;
   var cyls = replacePlaced.filter(function(p){ return p.cutScan === true && p.position && p.axisDir; })
     .map(function(p){
       var prof = _replaceMadreProfile(p);            // 8.55.0: silhouette PER-ANGOLO del madre
       var _R = replaceEstimateMarkerRadius(p);       // fallback circolare (single-mesh / profilo assente; _R include l'offset)
+      var _profMax = 0; if(prof && prof.prof){ for(var _pi = 0; _pi < prof.prof.length; _pi++){ if(prof.prof[_pi] > _profMax) _profMax = prof.prof[_pi]; } }
       return { cp: p.position, ax: p.axisDir.clone().normalize(), prof: prof, off: (p.cutOffset || 0),
-               R2: _R * _R, halfH: REPLACE_CUT_HALFH };
+               R2: _R * _R, halfH: REPLACE_CUT_HALFH, profMax: _profMax, R: Math.sqrt(_R * _R) };
     });
   if(!cyls.length){
     replaceMesh.geometry.dispose();
@@ -16956,6 +17022,7 @@ function replaceRebuildScanGeometry(){
     }
     if(!inside){ for(var v = 0; v < 9; v++) kept.push(pos[ni + v]); }
   }
+  if(kept.length >= 36) kept = _replaceRemoveCutIslands(kept, cyls);   // 8.59.4: rimuovi le ISOLE sospese (frammenti staccati nella zona del taglio)
   replaceMesh.geometry.dispose();
   var ng = new THREE.BufferGeometry();
   ng.setAttribute('position', new THREE.Float32BufferAttribute(kept, 3));

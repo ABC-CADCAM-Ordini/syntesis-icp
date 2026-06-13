@@ -4,6 +4,17 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-13 — 8.59.4: Replace-iT "Taglia scansione" rimuove le isole sospese
+
+Feedback utente (con screenshot): il "Taglia scansione" lasciava nella zona del marker dei frammenti di STL vaganti — piccole isole di triangoli staccate dal corpo principale — che vanno incluse nel taglio. Causa: `replaceRebuildScanGeometry` rimuoveva solo i triangoli **dentro** il profilo della madre; i triangoli appena fuori ma ormai disconnessi restavano fluttuanti.
+
+**Fix** (solo blocco `replace*`): nuova `_replaceRemoveCutIslands(kept, cyls)` dopo la costruzione di `kept`. Connected-components sui triangoli sopravvissuti: saldatura vertici su griglia 1µm (`Map` posizione→id) + union-find sui vertici saldati → ogni triangolo ha una componente. Rimuove le componenti che soddisfano TUTTE e tre le condizioni:
+1. non sono la più grande (il corpo della scansione è sempre preservato);
+2. sono piccole (< 5% del totale dei triangoli);
+3. cadono in maggioranza (> 60% dei triangoli) nell'intorno del cilindro di taglio (raggio `profMax`+offset+2mm; assiale ±`halfH`+2mm).
+
+Le tre condizioni insieme rendono il taglio conservativo: corpo principale, "metà" grandi da taglio passante e anatomia lontana dal marker non vengono toccati. **Verifica offline** (harness Node sulla funzione reale estratta dal file): 3/3 — isola vicina rimossa, isola lontana + corpo principale preservati, componente grande near-cut non rimossa. La passata gira nel rebuild già **debounced 120ms** → nessun lag sul drag dello slider offset. `node --check` 7/7.
+
 ## 2026-06-13 — 8.59.3: REVERT del fix picking 8.59.2 (era una regressione)
 
 Lo screenshot dell'utente (su Chrome) ha mostrato che l'8.59.2 non aveva risolto il pallino spostato. Ho **riprodotto in Chromium** (Blink, stesso motore del Chrome dell'utente) il comportamento di `body.style.zoom = 1.30` con una misura diretta: un `div` `left:100px;width:600px` riporta `getBoundingClientRect()` = `{left:130, width:780}` (**visual**, cioè zoomato ×1.3), ma `clientWidth/offsetWidth` = `600` (**unzoomed**); un click a `clientX:200` produce `offsetX:70` = `clientX − rect.left` (**offsetX è in spazio visual**).
