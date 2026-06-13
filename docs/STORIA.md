@@ -4,6 +4,21 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-13 — 8.59.9: Replace-iT "Taglia scansione" — tetto al profilo radiale (via le strisce nella mucosa)
+
+Follow-up dell'8.59.7. Feedback utente (screenshot prima/dopo): *"il taglia scansione è un po' impreciso sulla parte di mucosa, ha creato due strisce di taglio parallele che non dovrebbero esserci in questo caso."*
+
+**Causa**: il profilo radiale per-angolo del Madre (`_replaceMadreProfile`, 48 settori, 85° percentile) è **una sola silhouette 2D** che viene estrusa lungo **tutta l'altezza assiale** del taglio. Dal 8.59.7 il profilo si calcola sul **CAD Madre intero**, che include la **feature anti-rotazione sub-gengivale** (lo *square engaging*, il blocchetto quadrato visibile alla base del figlio). Quella feature è più larga del corpo cilindrico nelle direzioni dei suoi lati: estrusa giù fino al livello della mucosa, il taglio si allarga lì → **due prolungamenti paralleli** che incidono la gengiva. Ma a quel livello lo scanbody reale è **round** e nella scansione del paziente c'è **solo mucosa** (la feature è sepolta nell'impianto, lo scanner non la vede).
+
+**Fix** (solo blocco `replace*` del monolite `v3b`):
+- nuova costante `REPLACE_PROFILE_CAP_K = 1.2`. Dopo aver calcolato il profilo e la mediana dei settori `fb` (≈ raggio del corpo cilindrico), si applica un **tetto robusto** `rcap = fb · K`: per ogni settore `prof[bin] = min(prof[bin], rcap)`.
+- i settori del corpo round (≈ `fb`) restano **invariati**; solo i settori gonfiati dalle feature non-round (square engaging, scan-flag) vengono **clampati** → le strisce spariscono.
+- l'**altezza assiale piena** (8.59.7) e il taglio del **corpo round** restano pieni; l'offset utente è invariato (sommato dopo, nel loop di taglio). Trade-off: gli angoli della feature **sopra gengiva** (in aria) non sono tagliati al 100% — innocuo, non c'è mucosa da preservare lì.
+
+`node --check` 8/8. `docs/MAPPA_FUNZIONALE.md`: riga "Taglia scansione" aggiornata (con recupero delle note 8.59.6 bound assiale e 8.59.7 CAD intero, prima mancanti) + versione mappata → 8.59.9. Deploy canary **LEGACY → BACKEND** commit `bf3c4f0` (LEGACY deploy `fd47ffd1`, BACKEND `cde5ad86`); verifica live 8.59.9 + `<title>`/`ANALIZZA_BUILD` 8.59.9 + gating `/api/leaderboard` no-token → 403 su entrambi i domini + alias `app.syntesis-icp.com`. **PENDING collaudo utente** (`K=1.2` tunable se le strisce non spariscono del tutto / se il corpo viene tagliato troppo stretto).
+
+---
+
 ## 2026-06-13 — 8.59.8: Replace-iT label impianto ancorata al cap del figlio + lift in alto
 
 Feedback utente: *"loro su altri workflow sono differenti, hanno una linea che si sposta e porta il label più alto; lui qui dovrebbe partire dal file figlio e spostarsi in alto per essere visto senza dare noia."* Confermato in chat: **cap del figlio** + **verso l'alto del figlio**.
