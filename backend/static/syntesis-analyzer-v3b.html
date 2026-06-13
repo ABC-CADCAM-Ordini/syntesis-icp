@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.59.5</title>
+<title>Syntesis-ICP - Analizzare v8.59.6</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.59.5';
+window.ANALIZZA_BUILD = '8.59.6';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16891,6 +16891,7 @@ function _replaceMadreProfile(p){
     var u = new THREE.Vector3().crossVectors(ax, ref).normalize();
     var w = new THREE.Vector3().crossVectors(ax, u).normalize();   // base ⊥ asse: (u, w)
     var NB = 48, bins = [];
+    var axMin = Infinity, axMax = -Infinity;   // 8.59.6: bound assiale del taglio = estensione reale del madre (no piu' tubo passante)
     for(var b = 0; b < NB; b++) bins.push([]);
     var posA = mesh.geometry.attributes.position.array, n = posA.length / 3;
     if(n < 16) return null;
@@ -16901,6 +16902,7 @@ function _replaceMadreProfile(p){
       var wz = m[2]*lx + m[6]*ly + m[10]*lz + m[14];
       var dx = wx - p.position.x, dy = wy - p.position.y, dz = wz - p.position.z;
       var axial = dx*ax.x + dy*ax.y + dz*ax.z;
+      if(axial < axMin) axMin = axial; if(axial > axMax) axMax = axial;   // 8.59.6: estensione assiale reale del madre
       var rx = dx - axial*ax.x, ry = dy - axial*ax.y, rz = dz - axial*ax.z;
       var r = Math.sqrt(rx*rx + ry*ry + rz*rz);
       var cu = rx*u.x + ry*u.y + rz*u.z, cw = rx*w.x + ry*w.y + rz*w.z;
@@ -16921,7 +16923,7 @@ function _replaceMadreProfile(p){
     glob.sort(function(a, c){ return a - c; });
     var fb = glob[Math.floor(glob.length * 0.5)];   // mediana -> settori vuoti
     for(var b3 = 0; b3 < NB; b3++) if(prof[b3] < 0) prof[b3] = fb;
-    return { u: u, w: w, NB: NB, prof: prof };
+    return { u: u, w: w, NB: NB, prof: prof, axMin: axMin, axMax: axMax };
   } catch(e){ return null; }
 }
 // 8.59.4 (feedback utente: "Taglia scansione lascia frammenti di STL vaganti, piccole isole di
@@ -16964,7 +16966,8 @@ function _replaceRemoveCutIslands(kept, cyls){
       var kk = cyls[c2];
       var dx = ccx-kk.cp.x, dy = ccy-kk.cp.y, dz = ccz-kk.cp.z;
       var axial = dx*kk.ax.x + dy*kk.ax.y + dz*kk.ax.z;
-      if(Math.abs(axial) > kk.halfH + REPLACE_ISLAND_MARGIN) continue;
+      if(kk.axLo != null){ if(axial < kk.axLo - REPLACE_ISLAND_MARGIN || axial > kk.axHi + REPLACE_ISLAND_MARGIN) continue; }   // 8.59.6: stesso bound assiale del taglio
+      else if(Math.abs(axial) > kk.halfH + REPLACE_ISLAND_MARGIN) continue;
       var rx = dx-axial*kk.ax.x, ry = dy-axial*kk.ax.y, rz = dz-axial*kk.ax.z;
       var rad = (kk.profMax > 0 ? kk.profMax : kk.R) + kk.off + REPLACE_ISLAND_MARGIN;
       if(rx*rx+ry*ry+rz*rz <= rad*rad) near = true;
@@ -16996,8 +16999,13 @@ function replaceRebuildScanGeometry(){
       var prof = _replaceMadreProfile(p);            // 8.55.0: silhouette PER-ANGOLO del madre
       var _R = replaceEstimateMarkerRadius(p);       // fallback circolare (single-mesh / profilo assente; _R include l'offset)
       var _profMax = 0; if(prof && prof.prof){ for(var _pi = 0; _pi < prof.prof.length; _pi++){ if(prof.prof[_pi] > _profMax) _profMax = prof.prof[_pi]; } }
-      return { cp: p.position, ax: p.axisDir.clone().normalize(), prof: prof, off: (p.cutOffset || 0),
-               R2: _R * _R, halfH: REPLACE_CUT_HALFH, profMax: _profMax, R: Math.sqrt(_R * _R) };
+      var _off = (p.cutOffset || 0), _axLo = null, _axHi = null;   // 8.59.6: taglio = forma del madre + offset, non piu' ±30mm passante
+      if(prof && isFinite(prof.axMin) && isFinite(prof.axMax)){
+        _axLo = Math.max(prof.axMin - _off, -REPLACE_CUT_HALFH);   // clamp a ±30mm = mai PIU' largo di prima
+        _axHi = Math.min(prof.axMax + _off,  REPLACE_CUT_HALFH);
+      }
+      return { cp: p.position, ax: p.axisDir.clone().normalize(), prof: prof, off: _off,
+               R2: _R * _R, halfH: REPLACE_CUT_HALFH, profMax: _profMax, R: Math.sqrt(_R * _R), axLo: _axLo, axHi: _axHi };
     });
   if(!cyls.length){
     replaceMesh.geometry.dispose();
@@ -17014,7 +17022,8 @@ function replaceRebuildScanGeometry(){
       var k = cyls[c];
       var dx = cx - k.cp.x, dy = cy - k.cp.y, dz = cz - k.cp.z;
       var axial = dx*k.ax.x + dy*k.ax.y + dz*k.ax.z;
-      if(Math.abs(axial) > k.halfH) continue;
+      if(k.axLo != null){ if(axial < k.axLo || axial > k.axHi) continue; }   // 8.59.6: solo la forma del madre (+offset), non ±30mm passante
+      else if(Math.abs(axial) > k.halfH) continue;
       var rx = dx - axial*k.ax.x, ry = dy - axial*k.ax.y, rz = dz - axial*k.ax.z;
       var r2v = rx*rx + ry*ry + rz*rz;
       if(k.prof){   // 8.55.0: soglia PER-ANGOLO = raggio del madre nel settore + offset utente
