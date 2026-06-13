@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.59.7</title>
+<title>Syntesis-ICP - Analizzare v8.59.8</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.59.7';
+window.ANALIZZA_BUILD = '8.59.8';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -17779,11 +17779,11 @@ function replaceUpdateLabels(){
   if(analysisMode !== 'replace') return;
   var vp = document.getElementById('viewport');
   if(!vp) return;
-  // 8.53.1: come le label MUA di Analizza ma ROBUSTO ALLO SCORCIO. L'offset 3D asse×10mm
-  // collassava sul marker quando l'asse punta verso la camera (i 10mm si proiettano a ~2px).
-  // Qui la pillola sta a OFF_PX px FISSI dal marker, lungo la direzione dell'asse PROIETTATA,
-  // sempre orientata verso l'ALTO dello schermo -> distacco e linea guida sempre visibili.
-  // #labelLines è svuotato ogni frame da updateDivergenceLabels() (subito prima in animate()).
+  // 8.59.8: la pillola è ancorata al CAP del FIGLIO (meshSub, estremo più lontano dalla connessione)
+  // e sale VERSO L'ALTO DEL FIGLIO (lungo l'asse, verso il cap) a OFF_PX px fissi -> parte dal
+  // sostituto, non dalla connessione (p.position = origine, bassa/coperta dalla gengiva). Fallback
+  // all'alto-schermo se il cap punta verso la camera (asse proiettato collassato, robusto allo scorcio
+  // come il 8.53.1). #labelLines è svuotato ogni frame da updateDivergenceLabels() (prima in animate()).
   var OFF_PX = 54;
   var zoomF = (typeof syntesisGetUiZoom === 'function') ? syntesisGetUiZoom() : 1.0;
   var rect = renderer.domElement.getBoundingClientRect();
@@ -17795,15 +17795,32 @@ function replaceUpdateLabels(){
   replacePlaced.forEach(function(p){
     if(!p.labelEl) return;
     if(!p.position || !p.axisDir){ p.labelEl.style.display = 'none'; return; }
-    var va = p.position.clone().project(camera);
+    // 8.59.8: ancora al CAP del FIGLIO (meshSub) e lift VERSO L'ALTO DEL FIGLIO (lungo l'asse, verso
+    // il cap), non dalla connessione (p.position = origine, bassa e coperta dalla gengiva).
+    var ax = p.axisDir.clone().normalize();
+    var anchor3 = p.position.clone(), axUp3 = ax.clone();   // anchor = cap del figlio; axUp3 = verso il cap (su del figlio)
+    if(p.meshSub){
+      try {
+        var _b = new THREE.Box3().setFromObject(p.meshSub);
+        if(!_b.isEmpty()){
+          var _c = _b.getCenter(new THREE.Vector3()), _s = _b.getSize(new THREE.Vector3());
+          var _half = 0.5 * (Math.abs(_s.x*ax.x) + Math.abs(_s.y*ax.y) + Math.abs(_s.z*ax.z));
+          var _cA = _c.clone().add(ax.clone().multiplyScalar(_half));
+          var _cB = _c.clone().add(ax.clone().multiplyScalar(-_half));
+          var _far = (_cA.distanceToSquared(p.position) >= _cB.distanceToSquared(p.position));   // cap = estremo più LONTANO dalla connessione
+          anchor3 = _far ? _cA : _cB;
+          axUp3   = _far ? ax.clone() : ax.clone().negate();
+        }
+      } catch(e){}
+    }
+    var va = anchor3.clone().project(camera);
     if(va.z > 1 || va.z < -1){ p.labelEl.style.display = 'none'; return; }
     var aPx = _toPx(va);
-    // direzione dell'asse impianto proiettata in schermo, orientata verso l'alto (screen -Y)
-    var tPx = _toPx(p.position.clone().add(p.axisDir.clone()).project(camera));
+    // direzione "verso l'alto del figlio" (asse verso il cap) proiettata in schermo
+    var tPx = _toPx(anchor3.clone().add(axUp3).project(camera));
     var sdx = tPx.x - aPx.x, sdy = tPx.y - aPx.y;
     var len = Math.sqrt(sdx * sdx + sdy * sdy);
-    if(len < 0.5){ sdx = 0; sdy = -1; } else { sdx /= len; sdy /= len; }
-    if(sdy > 0){ sdx = -sdx; sdy = -sdy; }   // garantisce label sopra il marker
+    if(len < 0.5){ sdx = 0; sdy = -1; } else { sdx /= len; sdy /= len; }   // scorcio (cap verso camera) -> fallback alto-schermo
     var labelX = aPx.x + sdx * OFF_PX, labelY = aPx.y + sdy * OFF_PX;
     var hex = '#' + ('000000' + (p.color >>> 0).toString(16)).slice(-6);
     var _lib = _replaceLibId(p);
