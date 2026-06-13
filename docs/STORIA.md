@@ -4,6 +4,20 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-13 — 8.59.2: Replace-iT fix picking 3-punti sulla scansione (pallino spostato dal cursore)
+
+Feedback utente: il clic sulla scansione (i 3 punti del seme di Replace-iT) posiziona il pallino **spostato** dal cursore — "sempre, senza una direzione precisa" — nonostante il fix dell'inerzia camera (8.56.1). Indagine multi-agente (pipeline del pick / zoom-DPR confronto col pick MUA / inerzia-timing).
+
+**Intuizione che sblocca la diagnosi**: il picking MUA di Analizza "funziona" non perché il calcolo NDC sia corretto, ma perché **aggancia al centro scanbody** (`findScanbodyCenter`), che assorbe l'errore del pick grezzo. La conclusione dell'8.56.1 ("non è lo zoom, è l'inerzia") si basava sulla prova "il MUA con la stessa formula funziona al 130%" — prova **invalida**, perché il MUA maschera l'errore con lo snap. Il pick a 3 punti usa il **punto grezzo** del raycast → è il primo (e unico) posto dove un errore latente di NDC diventa visibile.
+
+**Causa**: l'NDC è calcolato come `(clientX - rect.left)/rect.width` con `rect = getBoundingClientRect()`, mentre `document.body.style.zoom = 1.30` (default di `applyUiZoom`). `clientX` è in spazio viewport e `getBoundingClientRect()` può essere in spazio zoomato: su **Safari** (default su Mac) e **Chrome < 128** i due divergono → il ray parte spostato. (Chromium ≥ 128 li ha resi coerenti; Firefox usa `transform: scale` ed è già coerente.)
+
+**Fix** in `replaceOnViewportClick` (fase `pickScan`):
+- NDC calcolato con `event.offsetX/offsetY` relativi al canvas, divisi per `clientWidth/clientHeight`. offset e clientWidth sono entrambi nello spazio **locale** dell'elemento → il rapporto è la frazione vera, **invariante allo zoom** su qualsiasi browser. Fallback al calcolo `clientX`-`rect` se `event.target` non è il canvas (zero regressione).
+- `camera.updateMatrixWorld()` prima di `raycaster.setFromCamera()` → il ray parte da una camera con matrice mondo aggiornata (difesa contro una proiezione da camera stantia tra due frame).
+
+**Localizzato al solo pick scansione**: `onViewportClick` (MUA) e `sostOnViewportClick` restano **invariati** — lo snap-al-centro li maschera comunque, quindi nessun motivo di toccarli e blast radius ridotto. `node --check` 7/7. **Non riproducibile in locale** (dipende da browser/zoom dell'utente) → collaudo A/B utente.
+
 ## 2026-06-13 — 8.59.1: Replace-iT "Raffina+" hardening (da revisione avversariale)
 
 Revisione avversariale multi-agente del 8.59.0 (18 agenti, 6 dimensioni, ogni finding verificato in modo indipendente sul codice). **Esito**: nessun blocker; la correttezza matematica del motore, la **direzione di R,t end-to-end** (il rischio principale), l'apply 4×4, il gating di sicurezza e la validazione input sono stati **confermati corretti** (anche con test numerici). Chiusi 4 finding reali emersi:
