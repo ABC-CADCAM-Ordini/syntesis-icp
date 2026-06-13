@@ -4,6 +4,16 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-13 — 8.59.3: REVERT del fix picking 8.59.2 (era una regressione)
+
+Lo screenshot dell'utente (su Chrome) ha mostrato che l'8.59.2 non aveva risolto il pallino spostato. Ho **riprodotto in Chromium** (Blink, stesso motore del Chrome dell'utente) il comportamento di `body.style.zoom = 1.30` con una misura diretta: un `div` `left:100px;width:600px` riporta `getBoundingClientRect()` = `{left:130, width:780}` (**visual**, cioè zoomato ×1.3), ma `clientWidth/offsetWidth` = `600` (**unzoomed**); un click a `clientX:200` produce `offsetX:70` = `clientX − rect.left` (**offsetX è in spazio visual**).
+
+Quindi `clientX`, `getBoundingClientRect` e `offsetX` stanno tutti nello spazio **visual/zoomato**, mentre `clientWidth/clientHeight` stanno nello spazio **layout/unzoomed**. La "correzione" 8.59.2 `offsetX / clientWidth` mischiava i due → sbagliava di **1.30×**. Era una **regressione** introdotta da me: ha **peggiorato** il picking (lo screenshot mostrava in gran parte questo bug). La formula **storica** `((clientX − rect.left) / rect.width)` è **corretta** (numeratore e denominatore entrambi visual → il rapporto è la frazione giusta del canvas, invariante allo zoom).
+
+**Fix**: ripristinata la formula storica in `replaceOnViewportClick`; mantenuto solo `camera.updateMatrixWorld()` prima di `raycaster.setFromCamera()` (difensivo, innocuo). `onViewportClick` (MUA) e `sostOnViewportClick` invariati. `node --check` 7/7.
+
+**Lezione**: la diagnosi precedente assumeva (senza misurare) che `offsetX/clientWidth` fosse zoom-invariante; non lo è in Blink. Va misurato, non assunto. **L'offset originale** segnalato dall'utente prima dell'8.59.2 NON è la formula NDC (ora provata corretta) → da diagnosticare con dati reali dal browser dell'utente (camera/timing).
+
 ## 2026-06-13 — 8.59.2: Replace-iT fix picking 3-punti sulla scansione (pallino spostato dal cursore)
 
 Feedback utente: il clic sulla scansione (i 3 punti del seme di Replace-iT) posiziona il pallino **spostato** dal cursore — "sempre, senza una direzione precisa" — nonostante il fix dell'inerzia camera (8.56.1). Indagine multi-agente (pipeline del pick / zoom-DPR confronto col pick MUA / inerzia-timing).
