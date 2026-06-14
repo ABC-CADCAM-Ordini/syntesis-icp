@@ -233,7 +233,8 @@ Prima i prerequisiti trasversali, poi i domini dal meno al più intrecciato, cor
 
 | # | Passo | Tipo | Rischio | Pre-condizione |
 |---|---|---|---|---|
-| **0** | **Fixture STL + harness headless WebGL** (gate runtime) | infra | — | **bloccante per tutto il resto** (§7) |
+| **0a** | **Gate Tier 1 — invarianti statiche** (no browser) | infra test | basso | scelto come primo passo (§7; piano in GATE_TIER1) |
+| **0c** | Fixture STL reale anonimizzata + harness WebGL (Tier 3) | infra test | — | **differito al passo 7**; fixture dall'utente (§7) |
 | **0b** | Rifare mappa 7 blocchi `<script>` + dep_census su file intero | analisi | — | fatto in parte (`scripts/dep_census.py` v2) |
 | **1** | Spina di piattaforma → `window.SYN.scene/state` + alias accessor (`scanMesh` first) | refactor stato | medio | strict-mode invariata; defineProperty caveat |
 | **2** | `tree*` — estrazione pilota | modulo A | basso | passo 1 (scanMesh con casa) |
@@ -256,10 +257,19 @@ non-strict, THREE non pronto, id DOM mancante, libreria assente, chiave localSto
 **runtime-only**, e si manifestano sul percorso *carica scansione → detect → ICP → overlay → report*,
 che oggi è attivabile **solo con una scansione reale**. `jsdom` non basta (serve WebGL).
 
-**Precondizione bloccante (Fase 0 stabilizzazione)**: costruire (a) una **fixture STL minima** — 2 file,
-scan + reference, anche sintetici via `parseSTL` ASCII, **niente dati paziente**; (b) un **harness
-headless** (Playwright/Puppeteer con WebGL software/SwiftShader) che esegua il percorso completo. Stimare
-il costo: è ciò che trasforma il gate da "verifica di presenza simboli" a "verifica di contratto runtime".
+**Precondizione bloccante (Fase 0 stabilizzazione)**: costruire (a) una **fixture STL minima** —
+scan + reference; (b) un **harness headless** (Playwright/Puppeteer con WebGL software/SwiftShader) che
+esegua il percorso completo. È ciò che trasforma il gate da "verifica di presenza simboli" a "verifica
+di contratto runtime".
+
+**DECISIONE 2026-06-14 — gate a livelli (non scommettere tutto sul Tier 3):**
+- **Tier 1 — invarianti statiche** (no browser/WebGL): linter che asserisce §2–§3 (must_preserve,
+  no `"use strict"` aggiunto, contratto DOM, ownership localStorage, guardia `three-ready`, sintassi).
+  **Scelto come primo passo**, rischio nullo. Progettazione completa: `MODULARIZZAZIONE_GATE_TIER1_v1.md`.
+- **Tier 2 — DOM/no-scena** via harness browser-via-preview già provato (panel): differito.
+- **Tier 3 — golden-master WebGL completo**: **differito** al passo 7 (core `mis*`). Fixture =
+  **STL reale anonimizzata fornita dall'utente** (decisione 2026-06-14; geometria pura = anonima;
+  una sintetica non attiva la detection click-seedata). Confronto **numerico** su `misICP_result`, mai pixel.
 
 ---
 
