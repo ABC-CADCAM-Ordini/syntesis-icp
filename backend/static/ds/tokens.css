@@ -25,6 +25,14 @@
   --syn-red:         #DC2626;
   --syn-gold:        #F59E0B;
 
+  /* 8.61.0 — token FILL pastello per sfondi/pulsanti (testo scuro sopra). I --syn-blue/green/red/gold
+     restano SATURI per testo, accenti e letture cliniche; il pastello sta nei riempimenti. */
+  --fill-primary:    #4FA3E3;
+  --fill-confirm:    #8ADFB2;
+  --fill-warn:       #FFE08A;
+  --fill-error:      #FF8D85;
+  --fill-sel:        #7DBDF2;
+
   /* === Radius scale === */
   --syn-radius-sm:   6px;
   --syn-radius-md:   10px;

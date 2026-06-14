@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.60.0</title>
+<title>Syntesis-ICP - Analizzare v8.61.0</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -37,7 +37,7 @@ body{
 @keyframes syntSpin{to{--synt-sa:360deg}}
 
 
-:root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--ghost:#8090A8;--red:#DC2626;--gold:#F59E0B;--primary-strong:#0065B3;--confirm-strong:#0D9E6E;--clin-good:#639922;--clin-warn:#D97706;--clin-risk:#F97316;--clin-bad:#EF4444;--radius:14px;--font:'Helvetica Neue',Helvetica,Arial,sans-serif;--mono:'Helvetica Neue',Helvetica,Arial,sans-serif}
+:root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--ghost:#8090A8;--red:#DC2626;--gold:#F59E0B;--primary-strong:#0065B3;--confirm-strong:#0D9E6E;--clin-good:#639922;--clin-warn:#D97706;--clin-risk:#F97316;--clin-bad:#EF4444;--fill-primary:#4FA3E3;--fill-confirm:#8ADFB2;--fill-warn:#FFE08A;--fill-error:#FF8D85;--fill-sel:#7DBDF2;--radius:14px;--font:'Helvetica Neue',Helvetica,Arial,sans-serif;--mono:'Helvetica Neue',Helvetica,Arial,sans-serif}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100vh;display:flex;flex-direction:column;font-feature-settings:"tnum";font-variant-numeric:tabular-nums}
 .header{display:flex;align-items:center;gap:6px;padding:10px 16px;background:var(--white);border-bottom:1px solid var(--border);z-index:10;flex-shrink:0;flex-wrap:wrap;border-top-left-radius:10px;border-top-right-radius:10px}
@@ -50,15 +50,15 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .btn:hover{border-color:var(--blue);color:var(--blue)}
 .btn:hover svg [stroke="#0065B3"]{stroke:var(--blue)}
 .btn:hover svg [fill="#0065B3"]{fill:var(--blue)}
-.btn.active{background:var(--blue);color:var(--white);border-color:var(--blue)}
-.btn.active svg [stroke="#0065B3"]{stroke:var(--white)}
-.btn.active svg [fill="#0065B3"]{fill:var(--white)}
+.btn.active{background:var(--fill-primary);color:var(--dark);border-color:var(--fill-primary)}
+.btn.active svg [stroke="#0065B3"]{stroke:var(--dark)}
+.btn.active svg [fill="#0065B3"]{fill:var(--dark)}
 .btn.green{border-color:var(--green);color:var(--green)}
-.btn.green:hover,.btn.green.active{background:var(--green);color:var(--white);border-color:var(--green)}
-.btn.green.primary{background:var(--green);color:var(--white);border-color:var(--green)}
-.btn.green.primary svg [stroke="#0065B3"]{stroke:var(--white)}
-.btn.blue.primary{background:var(--blue);color:var(--white);border-color:var(--blue)}
-.btn.blue.primary svg [stroke="#0065B3"]{stroke:var(--white)}
+.btn.green:hover,.btn.green.active{background:var(--fill-confirm);color:var(--dark);border-color:var(--fill-confirm)}
+.btn.green.primary{background:var(--fill-confirm);color:var(--dark);border-color:var(--fill-confirm)}
+.btn.green.primary svg [stroke="#0065B3"]{stroke:var(--dark)}
+.btn.blue.primary{background:var(--fill-primary);color:var(--dark);border-color:var(--fill-primary)}
+.btn.blue.primary svg [stroke="#0065B3"]{stroke:var(--dark)}
 .btn.icon-only{padding:5px 7px;gap:0}
 .btn.danger{border-color:#E24B4A;color:#A32D2D}
 .btn.danger svg [stroke="#0065B3"]{stroke:#A32D2D}
@@ -263,7 +263,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .tree-node.mua-header .lbl{cursor:pointer}
 
 .tree-node .del-btn{margin-left:auto;padding:0 5px;border:1px solid var(--border);background:var(--white);color:var(--red);font-size:12px;border-radius:3px;cursor:pointer;font-family:var(--mono);font-weight:800;line-height:14px}
-.tree-node .del-btn:hover{background:var(--red);color:var(--white);border-color:var(--red)}
+.tree-node .del-btn:hover{background:var(--fill-error);color:var(--dark);border-color:var(--fill-error)}
 
 /* === Blocco 7a: pannello unificato Albero Scena + Scene Registry === */
 /* Header di gruppo (FILE, MUA, ANALISI, TOGGLE MASSIVI) */
@@ -343,14 +343,14 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 /* Mode toggle (Misura / Accoppia) */
 .mode-toggle{display:inline-flex;border:1.5px solid var(--border);border-radius:7px;overflow:hidden;background:var(--white);line-height:1}
 .mode-toggle .mode-btn{padding:7px 12px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:none;background:transparent;color:var(--gray);cursor:pointer;transition:color .15s, background .15s}
-.mode-toggle .mode-btn.active{background:var(--blue);color:var(--white)}
+.mode-toggle .mode-btn.active{background:var(--fill-primary);color:var(--dark)}
 .mode-toggle .mode-btn:not(.active):hover{color:var(--blue)}
 /* Export panel (modalita' Accoppia) */
 .export-checkbox{display:flex;align-items:center;gap:8px;padding:7px 8px;font-family:var(--mono);font-size:12px;color:var(--dark);cursor:pointer;border-radius:5px;transition:background .15s;user-select:none}
 .export-checkbox:hover{background:var(--light)}
 .export-checkbox input{margin:0;cursor:pointer;accent-color:var(--blue)}
 .export-checkbox .exp-swatch{display:inline-block;width:10px;height:10px;border-radius:50%;flex-shrink:0;border:1px solid rgba(0,0,0,.1)}
-.export-btn{margin-top:10px;width:100%;padding:9px 12px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.08em;border:none;border-radius:7px;background:var(--blue);color:#fff;cursor:pointer;transition:opacity .15s}
+.export-btn{margin-top:10px;width:100%;padding:9px 12px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.08em;border:none;border-radius:7px;background:var(--fill-primary);color:var(--dark);cursor:pointer;transition:opacity .15s}
 .export-btn:hover{opacity:.9}
 .export-btn:disabled{opacity:.4;cursor:not-allowed}
 .export-note{font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:10px;line-height:1.55}
@@ -367,8 +367,8 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .acc-item.sel-source{border-color:var(--blue);background:rgba(0,101,179,.06)}
 .acc-item.sel-target{border-color:var(--green);background:rgba(13,158,110,.06)}
 .acc-check{width:15px;height:15px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:800;color:var(--gray);background:var(--light)}
-.acc-item.sel-source .acc-check{border-color:var(--blue);background:var(--blue);color:#fff}
-.acc-item.sel-target .acc-check{border-color:var(--green);background:var(--green);color:#fff}
+.acc-item.sel-source .acc-check{border-color:var(--fill-primary);background:var(--fill-primary);color:var(--dark)}
+.acc-item.sel-target .acc-check{border-color:var(--fill-confirm);background:var(--fill-confirm);color:var(--dark)}
 .acc-body{flex:1;min-width:0}
 .acc-name{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
 .acc-meta{font-family:var(--mono);font-size:10px;color:var(--gray);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -385,7 +385,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .comp-radio label.active{border-color:var(--blue);background:rgba(0,101,179,.05);color:var(--blue);font-weight:800}
 .comp-radio input{display:none}
 .comp-radio .sw{display:inline-block;width:7px;height:7px;border-radius:50%}
-.misurare-btn{margin-top:10px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:none;border-radius:7px;background:var(--green);color:#fff;cursor:pointer;transition:opacity .15s}
+.misurare-btn{margin-top:10px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:none;border-radius:7px;background:var(--fill-confirm);color:var(--dark);cursor:pointer;transition:opacity .15s}
 .misurare-btn:hover{opacity:.9}
 .misurare-btn:disabled{opacity:.35;cursor:not-allowed}
 .misurare-selected{display:flex;gap:6px;margin-top:8px}
@@ -405,7 +405,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .workflow-menu-item:hover{background:var(--light)}
 .workflow-menu-item.active{background:rgba(0,101,179,.08);color:var(--blue)}
 .workflow-menu-item .wf-icon{flex-shrink:0;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;background:var(--light);color:var(--blue)}
-.workflow-menu-item.active .wf-icon{background:var(--blue);color:#fff}
+.workflow-menu-item.active .wf-icon{background:var(--fill-primary);color:var(--dark)}
 .workflow-menu-item .wf-icon svg [stroke="#0065B3"]{stroke:currentColor}
 .workflow-menu-item .wf-label{display:flex;flex-direction:column;gap:2px}
 .workflow-menu-item .wf-label .wf-name{font-size:12px;font-weight:800;letter-spacing:.06em}
@@ -428,7 +428,7 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .misurare-stage-title{font-size:18px;font-weight:800;color:var(--dark);margin-bottom:8px}
 .misurare-stage-sub{font-family:var(--mono);font-size:13px;color:var(--gray);line-height:1.65}
 .misurare-stage-sub b{color:var(--dark)}
-.misurare-stage-badge{display:inline-block;margin-bottom:14px;padding:4px 10px;border-radius:12px;background:var(--gold);color:#fff;font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.misurare-stage-badge{display:inline-block;margin-bottom:14px;padding:4px 10px;border-radius:12px;background:var(--fill-warn);color:var(--dark);font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
 /* Misurare ICP panel: dropzone A/B, run button, summary */
 .mis-dz{display:flex;flex-direction:column;gap:4px;border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--light);text-align:center;transition:all .15s;margin-bottom:8px;min-height:58px;justify-content:center}
 .mis-dz:hover,.mis-dz.ov{border-color:var(--blue);background:rgba(0,101,179,.05)}
@@ -539,8 +539,8 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 .calmodal-f{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;background:#F7F9FC;border-radius:0 0 14px 14px}
 .calmodal-btn{font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;padding:9px 14px;border-radius:7px;border:1.5px solid var(--border);background:#fff;color:var(--dark);cursor:pointer;transition:all .15s}
 .calmodal-btn:hover{border-color:var(--blue);color:var(--blue)}
-.calmodal-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
-.calmodal-btn.primary:hover{background:#004F8A}
+.calmodal-btn.primary{background:var(--fill-primary);color:var(--dark);border-color:var(--fill-primary)}
+.calmodal-btn.primary:hover{background:#004F8A;color:var(--white)}
 
 /* v7.3.9.082 draggable+resizable panels */
 .syn-drag-handle {
@@ -1490,7 +1490,7 @@ if (document.readyState === 'loading') {
     <span id="replaceSeedCounter" style="font-size:10px;color:var(--gray);font-weight:700"></span>
     <button id="replaceSeedUndo" onclick="replaceSeedUndo()" style="display:none;margin-left:auto;padding:5px 9px;background:#fff;border:1px solid var(--border);border-radius:5px;color:var(--dark);font-family:var(--mono);font-size:11px;cursor:pointer">Annulla punto</button>
     <button id="replaceSeedReset" class="replace-only" onclick="replaceSeedClear()" style="padding:5px 9px;background:#fff;border:1px solid var(--border);border-radius:5px;color:var(--dark);font-family:var(--mono);font-size:11px;cursor:pointer">Ricomincia</button>
-    <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:var(--green);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
+    <button id="replaceBtnConfirm" onclick="replaceConfirmSeed()" style="display:none;padding:5px 12px;background:var(--fill-confirm);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">✓ Conferma</button>
   </div>
   <div id="replaceViewRow" style="display:none;align-items:center;gap:10px;margin-top:6px;font-size:10px;color:var(--gray);flex-wrap:wrap">
     <span style="font-weight:700">Vista:</span>
@@ -1729,7 +1729,7 @@ if (document.readyState === 'loading') {
       <div class="panel-collapsible-body">
         <div id="clinicalInfo"><div style="font-family:var(--mono);font-size:12px;color:var(--gray)">Disponibile dopo accoppiamento ICP</div></div>
         <!-- Blocco 6a: Report MUA PDF dentro Stato clinico (richiesta Francesco 2026-04-30) -->
-        <button id="btnAnalReport" onclick="analReport_generate()" disabled style="margin-top:10px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:1.5px solid var(--blue);border-radius:7px;background:var(--blue);color:#fff;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px">
+        <button id="btnAnalReport" onclick="analReport_generate()" disabled style="margin-top:10px;width:100%;padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.06em;border:1.5px solid var(--fill-primary);border-radius:7px;background:var(--fill-primary);color:var(--dark);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
           <span>Scarica Report MUA (PDF)</span>
         </button>
@@ -1974,8 +1974,8 @@ if (document.readyState === 'loading') {
       <div id="sostCustomName" style="display:none;font-family:var(--mono);font-size:11px;color:var(--dark);margin-top:4px;padding:4px 6px;background:var(--light);border-radius:4px;border:1px solid var(--border)"></div>
 
       <div style="display:flex;gap:6px;margin-top:12px">
-        <button id="sostBtnPlace" onclick="sostStartPlacement()" style="flex:1;padding:8px 10px;background:var(--confirm-strong);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona</button>
-        <button id="sostBtnRefine" onclick="sostAlignAll()" style="flex:1;padding:8px 10px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase;opacity:0.5" disabled>Raffina</button>
+        <button id="sostBtnPlace" onclick="sostStartPlacement()" style="flex:1;padding:8px 10px;background:var(--fill-confirm);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona</button>
+        <button id="sostBtnRefine" onclick="sostAlignAll()" style="flex:1;padding:8px 10px;background:var(--fill-primary);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase;opacity:0.5" disabled>Raffina</button>
       </div>
 
       <div id="sostPlacedList" style="display:none;margin-top:10px">
@@ -2029,7 +2029,7 @@ if (document.readyState === 'loading') {
 
 
       <div style="display:flex;gap:6px;margin-top:12px">
-        <button id="replaceBtnPlace" class="replace-only" onclick="replaceStartNewImplant()" style="flex:1;padding:8px 10px;background:var(--green);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Nuovo impianto</button>
+        <button id="replaceBtnPlace" class="replace-only" onclick="replaceStartNewImplant()" style="flex:1;padding:8px 10px;background:var(--fill-confirm);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Nuovo impianto</button>
       </div>
 
       <!-- 2b-3b: counter / Annulla / Ricomincia / Conferma vivono nella finestra
@@ -2042,10 +2042,10 @@ if (document.readyState === 'loading') {
 
       <!-- 2b-1.3: flusso per-scanbody. Raffina (2b-2) e Concludi (2b-3) sono scaffolding disabilitato. -->
       <div id="replaceFlow" style="display:none;gap:6px;margin-top:10px;flex-wrap:wrap">
-        <button id="replaceBtnRefine" class="replace-only" disabled onclick="replaceRefineCurrent()" title="Raffina (ICP) SOLO l'impianto attivo: l'ultimo piazzato, o quello selezionato nell'albero scena" style="flex:1;min-width:78px;padding:7px 8px;background:#0065B3;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina</button>
-        <button id="replaceBtnRefineSrv" class="replace-only" disabled onclick="replaceRefineServer()" title="Raffina SERVER (point-to-plane, piena risoluzione · beta): stesso impianto attivo, calcolata sul server con TUTTA la mesh (il client sottocampiona) -> fit piu' fine. Mostra il residuo del fit per il confronto A/B con Raffina." style="flex:1;min-width:78px;padding:7px 8px;background:var(--confirm-strong);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina+</button>
+        <button id="replaceBtnRefine" class="replace-only" disabled onclick="replaceRefineCurrent()" title="Raffina (ICP) SOLO l'impianto attivo: l'ultimo piazzato, o quello selezionato nell'albero scena" style="flex:1;min-width:78px;padding:7px 8px;background:var(--fill-primary);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina</button>
+        <button id="replaceBtnRefineSrv" class="replace-only" disabled onclick="replaceRefineServer()" title="Raffina SERVER (point-to-plane, piena risoluzione · beta): stesso impianto attivo, calcolata sul server con TUTTA la mesh (il client sottocampiona) -> fit piu' fine. Mostra il residuo del fit per il confronto A/B con Raffina." style="flex:1;min-width:78px;padding:7px 8px;background:var(--fill-confirm);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina+</button>
         <button id="replaceBtnNext" class="replace-only" onclick="replaceNextScanbody()" style="flex:1;min-width:78px;padding:7px 8px;background:#fff;color:var(--dark);border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Avanti / nuovo</button>
-        <button id="replaceBtnFinish" class="replace-only" onclick="replaceExportSTL()" title="Esporta i sostituti (figli) piazzati come file STL nelle loro posizioni in scena" style="flex:1;min-width:78px;padding:7px 8px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Concludi · Esporta</button>
+        <button id="replaceBtnFinish" class="replace-only" onclick="replaceExportSTL()" title="Esporta i sostituti (figli) piazzati come file STL nelle loro posizioni in scena" style="flex:1;min-width:78px;padding:7px 8px;background:var(--fill-primary);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Concludi · Esporta</button>
       </div>
 
       <div id="replaceStatus" style="display:none;font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:6px;padding:4px 6px;background:var(--light);border-radius:4px;line-height:1.45"></div>
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.60.0';
+window.ANALIZZA_BUILD = '8.61.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -16106,7 +16106,7 @@ function replaceGuideRender(){
     for(var i = 0; i < defs.length; i++){
       var on = (i + 1) === cur;
       html += '<span style="flex:1;text-align:center;padding:3px 2px;border-radius:4px;font-weight:700;' +
-              (on ? 'background:var(--green);color:#fff;' : 'background:var(--pearl);color:var(--gray);') + '">' +
+              (on ? 'background:var(--fill-confirm);color:var(--dark);' : 'background:var(--pearl);color:var(--gray);') + '">' +
               defs[i][0] + ' ' + defs[i][1] + '</span>';
     }
     stepsEl.innerHTML = html;
@@ -19554,7 +19554,7 @@ window.addEventListener('DOMContentLoaded',init);
     <div id="groupDialogList" style="max-height:300px;overflow-y:auto;margin-bottom:16px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="closeGroupDialog()" style="padding:6px 14px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:13px;cursor:pointer">Annulla</button>
-      <button onclick="confirmGroup()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Crea</button>
+      <button onclick="confirmGroup()" style="padding:6px 14px;background:var(--fill-primary);color:var(--dark);border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Crea</button>
     </div>
   </div>
 </div>
@@ -19571,7 +19571,7 @@ window.addEventListener('DOMContentLoaded',init);
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="closeSostExportNameDialog()" style="padding:6px 14px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:13px;cursor:pointer">Annulla</button>
-      <button onclick="confirmSostExport()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Scarica</button>
+      <button onclick="confirmSostExport()" style="padding:6px 14px;background:var(--fill-primary);color:var(--dark);border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Scarica</button>
     </div>
   </div>
 </div>
@@ -19587,7 +19587,7 @@ window.addEventListener('DOMContentLoaded',init);
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="closeReplaceExportDialog()" style="padding:6px 14px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:13px;cursor:pointer">Annulla</button>
-      <button onclick="confirmReplaceExport()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Scarica</button>
+      <button onclick="confirmReplaceExport()" style="padding:6px 14px;background:var(--fill-primary);color:var(--dark);border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Scarica</button>
     </div>
   </div>
 </div>
@@ -19894,7 +19894,7 @@ window.addEventListener('DOMContentLoaded',init);
     <!-- Footer -->
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="cancelSettings()" style="padding:6px 14px;background:#f0f0f0;border:1px solid #ccc;border-radius:6px;font-family:var(--mono);font-size:13px;cursor:pointer">Annulla</button>
-      <button onclick="saveSettings()" style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Salva</button>
+      <button onclick="saveSettings()" style="padding:6px 14px;background:var(--fill-primary);color:var(--dark);border:none;border-radius:6px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer">Salva</button>
     </div>
   </div>
 </div>
