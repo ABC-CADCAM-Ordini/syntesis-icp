@@ -4,6 +4,22 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-14 — 8.60.0: Design system, Fase pastello — commit 1/2 (fondamenta + unificazione clinica)
+
+Avvio dell'iniziativa di coerenza UI richiesta dall'utente: *"se usiamo qualche colore più allegro non è male; se decidiamo un colore per una funzione o un tasto usiamolo sempre in tutti i workflow; verifichiamo che tutti i workflow siano coerenti tra loro come grafica, testi (pochi ed essenziali), alberi scena (completi e coerenti)."* L'utente ha fornito una palette pastello (separata per "funzioni" e "viewport 3D") e ha scelto: **UI tutta verso il pastello**, **partendo da token + fix incoerenze**.
+
+**Metodo** (le decisioni in [[ui-consistency-cheerful-palette]]): audit read-only multi-agente su TUTTO il prodotto (token DS esistenti, colori per funzione, alberi scena, testi, superfici non-v3b) → un workflow ha prodotto un **piano edit verificato avversarialmente**. La verifica (3 agenti) ha **BOCCIATO il ripunto pastello in-un-colpo**, scoprendo due rischi reali: (1) i token `--green/--red/--gold` sono usati **sia** dai pulsanti UI **sia** dalle etichette di deviazione cliniche → pastellizzarli avrebbe cambiato in silenzio la scala di severità clinica; (2) ~13 pulsanti inline sarebbero rimasti con testo bianco illeggibile su pastello. Da qui lo **staging in 2 commit atomici**.
+
+**Commit 1** (questo; solo blocco `replace*`/CSS del monolite `v3b`, sicuro e additivo):
+- nel `:root` statico: nuovi token `--primary-strong:#0065B3` e `--confirm-strong:#0D9E6E` (sfondi contrast-safe per i CTA bianco-su-colore del commit 2) + token **clinici** `--clin-good:#639922 / --clin-warn:#D97706 / --clin-risk:#F97316 / --clin-bad:#EF4444` = palette **d3 canonica**.
+- **etichette di deviazione** (`.divergence-label.good/.warn/.risk/.bad`, classi da `classifyDivergence` con soglie 15/25/45) ri-puntate dai token UI `--green/--gold/--red` (+`#F97316` hardcoded) ai nuovi `--clin-*`: così sono **disaccoppiate** dalla UI (il ripunto pastello del commit 2 non le tocca) e **unificate** alla palette clinica d3 (scelta utente esplicita — era un mix legacy non coincidente con la d3).
+- **fix incoerenze**: `sostBtnPlace` (#0D9E6E hardcoded) e `replaceBtnRefineSrv`/"Raffina+" (one-off #0E8C6A) → `var(--confirm-strong)`; `REPLACE_SEED_COLORS` (i 3 punti-seme rosso/verde/blu "da sistema operativo" `[0xFF3B30,0x00C853,0x2979FF]`, fuori-brand) → trio pastello `[0xFF8D85,0x8ADFB2,0x4FA3E3]`.
+- **NON toccati**: `--blue/--green/--red/--gold` (restano saturi fino al commit 2), i colori clinici di `registry.py`/`SCANBODY`/`d3_hex`, la mesh neutra (→ #DCE6EC nel commit 2).
+
+`node --check` 8/8. `docs/MAPPA_FUNZIONALE.md`: riga Label 2D (nota 8.60.0 sull'unificazione clinica) + versione mappata 8.60.0. Deploy commit `e22c4e5` (LEGACY `93b157a9`, BACKEND `4a9ef743`, build BACKEND lento ~11 min ma a buon fine); live 8.60.0 + token `--clin-good` serviti + gating 403 su entrambi i domini + alias. **Commit 2 in corso**: ripunto pastello del chrome (pulsanti pastello + testo scuro su ~24 CTA, token in 3 punti di definizione) + mesh a freddo #DCE6EC.
+
+---
+
 ## 2026-06-13 — 8.59.9: Replace-iT "Taglia scansione" — tetto al profilo radiale (via le strisce nella mucosa)
 
 Follow-up dell'8.59.7. Feedback utente (screenshot prima/dopo): *"il taglia scansione è un po' impreciso sulla parte di mucosa, ha creato due strisce di taglio parallele che non dovrebbero esserci in questo caso."*
