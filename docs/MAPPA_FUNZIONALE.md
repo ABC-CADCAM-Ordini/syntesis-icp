@@ -1,9 +1,10 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.61.1 — **Data:** 2026-06-14
+> **Versione software mappata:** 8.61.2 — **Data:** 2026-06-14
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3).
+> **Coerenza cross-superficie (8.61.2):** il menù **WorkFlow di Vedere** (`syntesis-icp-vedere.html`, file separato) elencava 4 workflow → aggiunta la voce **Replace-iT** (`data-wf="replace"`, markup+icona clonati dal monolite); `selectWorkflow` di Vedere ora naviga a `/analizzare?wf=<wf>` (deep-link passato, prima andava a `/analizzare` default = Analizza) e gestisce `replace`. Nel monolite la whitelist deep-link `?wf=` ([~5183](../backend/static/syntesis-analyzer-v3b.html#L5183)) ora include `'replace'`. Decisione architetturale (utente): **Opzione A** = 2 file separati ma deriva azzerata (menù+stile+comportamenti uniformi); unificazione fisica/modularizzazione = direzione a lungo termine.
 
 Sorgenti primarie:
 - `backend/main.py` — route che servono le pagine.

@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.61.1</title>
+<title>Syntesis-ICP - Analizzare v8.61.2</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.61.1';
+window.ANALIZZA_BUILD = '8.61.2';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -5180,7 +5180,7 @@ function setMode(mode){
 document.addEventListener('DOMContentLoaded', function(){
   try {
     var wf = new URLSearchParams(location.search).get('wf');
-    var valid = ['analizza','accoppia','misurare','sostituire'];
+    var valid = ['analizza','accoppia','misurare','sostituire','replace'];   // 8.61.2: include Replace-iT nel deep-link ?wf= (per il menù di Vedere)
     if(wf && valid.indexOf(wf) !== -1 && wf !== 'analizza' && typeof selectWorkflow === 'function'){
       setTimeout(function(){ try { selectWorkflow(wf); } catch(e){ console.warn('[?wf] selectWorkflow', e); } }, 0);
     }

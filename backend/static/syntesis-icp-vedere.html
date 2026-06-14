@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Syntesis-ICP - Vedere v8.0.0-refactor (Synthesis Core)
+<!-- Syntesis-ICP - Vedere v8.0.1-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Vedere v8.0.0-refactor</title>
+<title>Syntesis-ICP - Vedere v8.0.1-refactor</title>
 <!-- Syntesis Design System (8.3.0+). Pilota: header + bottone primario.
      Inclusione PRIMA dello <style> embedded: la cascade fa vincere l'embedded
      sui suoi selettori, mentre le classi .syn-* portano regole nuove. -->
@@ -941,7 +941,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.0-refactor</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.1-refactor</span>
     </div>
   </div>
   <button class="btn-home" onclick="goHomeNewSession()" data-tooltip="Home (nuova sessione)">
@@ -1018,6 +1018,13 @@ input[type="file"]{display:none}
           <svg width="12" height="12" viewBox="0 0 28 28" fill="none"><path d="M5 10 L14 5 L23 10 L14 15 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M5 15 L14 20 L23 15" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><path d="M18 19 L22 23 M22 19 L18 23" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/></svg>
         </span>
         <span class="wf-label"><span class="wf-name">Sostituire</span><span class="wf-desc">Sostituzione scan body con ICP</span></span>
+      </div>
+      <div class="workflow-menu-sep"></div>
+      <div class="workflow-menu-item" data-wf="replace" onclick="selectWorkflow('replace')">
+        <span class="wf-icon">
+          <svg width="12" height="12" viewBox="0 0 28 28" fill="none"><path d="M5 10 L14 5 L23 10 L14 15 Z" stroke="#0065B3" stroke-width="1.6" fill="none" stroke-linejoin="round"/><circle cx="14" cy="19" r="3.4" stroke="#0065B3" stroke-width="1.6" fill="none"/><path d="M11.5 22.5 L16.5 16" stroke="#0065B3" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </span>
+        <span class="wf-label"><span class="wf-name">Replace-iT</span><span class="wf-desc">Sostituzione da libreria Exocad</span></span>
       </div>
     </div>
   </div>
@@ -1509,7 +1516,7 @@ input[type="file"]{display:none}
 //   axis-to-axis           distanza tra 2 assi (skew lines)
 //   centroid-deviation     deviazione centroide (vettore + magnitudo)
 //
-// In v8.0.0-refactor sono creabili da viewport solo linear-3d e
+// In v8.0.1-refactor sono creabili da viewport solo linear-3d e
 // linear-2d-section. Gli altri tipi sono pre-definiti come schema
 // e accettano misure create programmaticamente da bridge altri moduli.
 // ----------------------------------------------------------------
@@ -1778,7 +1785,7 @@ input[type="file"]{display:none}
 // Stato attuale: gestisce UNA sola sezione attiva (limite del codice
 // esistente). API predisposta per multi-sezione futura.
 //
-// In v8.0.0-refactor il manager incapsula la cutview di Vedere; quando
+// In v8.0.1-refactor il manager incapsula la cutview di Vedere; quando
 // porteremo Analizza/Misurare/Sostituire alla v8 (Blocco 6), ognuno
 // potra' usare lo stesso manager - oppure passare un adapter custom.
 // ----------------------------------------------------------------
@@ -1965,7 +1972,7 @@ input[type="file"]{display:none}
   };
 })();
 
-console.log('[Syntesis Core] v8.0.0-refactor caricato. SynRegistry, SynIcons, theme, SynLayerPanel, SynMeasureManager, SynCutViewManager attivi.');
+console.log('[Syntesis Core] v8.0.1-refactor caricato. SynRegistry, SynIcons, theme, SynLayerPanel, SynMeasureManager, SynCutViewManager attivi.');
 </script>
 
 <script>
@@ -8238,7 +8245,7 @@ function openVedereSettings() {
       <div style="background:#fff;border-radius:14px;padding:28px 32px;min-width:380px;max-width:520px;box-shadow:0 16px 48px rgba(15,25,35,0.25);position:relative">
         <button id="vsmClose" style="position:absolute;top:14px;right:14px;width:28px;height:28px;border:none;background:transparent;font-size:22px;cursor:pointer;color:var(--gray);line-height:1">×</button>
         <h2 style="font-family:var(--font);font-size:18px;font-weight:800;letter-spacing:.04em;color:var(--dark);margin:0 0 6px">Impostazioni</h2>
-        <p style="font-family:var(--font);font-size:12px;color:var(--gray);margin:0 0 22px">Vedere v8.0.0-refactor</p>
+        <p style="font-family:var(--font);font-size:12px;color:var(--gray);margin:0 0 22px">Vedere v8.0.1-refactor</p>
         <div style="font-family:var(--font);font-size:13px;color:var(--dark);line-height:1.6;background:var(--light);padding:14px 16px;border-radius:8px;border-left:3px solid var(--mario-cyan)">
           Le preferenze utente arrivano in una versione successiva. Quando saranno disponibili, qui potrai configurare la palette delle misure, la dimensione default della gomma e altre opzioni di visualizzazione.
         </div>
@@ -8281,7 +8288,8 @@ document.addEventListener('click', (e) => {
 function selectWorkflow(wf) {
   closeWorkflowMenu();
   if (wf === 'vedere') return; // gia' attivo
-  if (wf === 'analizza' || wf === 'accoppia' || wf === 'misurare' || wf === 'sostituire') {
+  if (wf === 'analizza' || wf === 'accoppia' || wf === 'misurare' || wf === 'sostituire' || wf === 'replace') {
+    // 8.61.2: passa il deep-link ?wf= così ogni voce atterra sul SUO workflow nel monolite (prima andavano tutte su Analizza default). + Replace-iT aggiunto.
     const isLocalFile = (window.location.protocol === 'file:');
     if (isLocalFile) {
       // In locale: avviso l'utente e apro il sito live in nuova scheda
@@ -8289,10 +8297,10 @@ function selectWorkflow(wf) {
         'Il modulo "' + wf.toUpperCase() + '" non è disponibile in modalità locale.\n\n' +
         'Vuoi aprire il sito live (app.syntesis-icp.com) in una nuova scheda?'
       );
-      if (ok) window.open('https://syntesis-icp-production.up.railway.app/analizzare', '_blank');
+      if (ok) window.open('https://syntesis-icp-production.up.railway.app/analizzare?wf=' + wf, '_blank');
       return;
     }
-    window.location.href = '/analizzare';
+    window.location.href = '/analizzare?wf=' + wf;
     return;
   }
 }
