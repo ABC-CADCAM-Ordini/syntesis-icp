@@ -4,6 +4,23 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-14 — 8.61.2: menù WorkFlow di Vedere allineato (+ Replace-iT, deep-link) — coerenza cross-superficie
+
+Feedback utente: *"perché quando sono su vedere i workflow in elenco sono di meno?? sembra che vedere sia un software a parte… vedere dovrebbe essere una parte dello stesso software, un workflow; separarlo così rischia di creare differenze di stile e comportamento."*
+
+**Diagnosi:** Vedere è **letteralmente un file separato** (`syntesis-icp-vedere.html`, `v8.0.0-refactor` — ricostruito sul design system `ds/*`, più moderno del monolite legacy). Il suo menù WorkFlow fu scritto **prima** che Replace-iT esistesse (~8.18.0) e mai aggiornato → elencava 4 workflow invece di 5. Inoltre la whitelist deep-link `?wf=` del monolite (`DOMContentLoaded`, ~L5183) accettava solo `['analizza','accoppia','misurare','sostituire']`, e `selectWorkflow` di Vedere navigava a `/analizzare` **senza** parametro → da Vedere ogni voce atterrava su Analizza (default), non sul workflow scelto.
+
+**Discussione architetturale + decisione utente (Opzione A):** l'utente ha ragione che concettualmente Vedere è un workflow come gli altri, e la separazione fisica crea deriva. Ma la direzione giusta NON è fondere Vedere (il file pulito) nel monolite legacy (3.87 MB) — sarebbe il verso sbagliato e un refactor enorme — bensì portare i workflow del monolite **verso** l'architettura pulita di Vedere (campagna di modularizzazione, lungo termine). Per ora: **Opzione A pragmatica** = 2 file separati ma **deriva azzerata** (menù identico + stesso design system + comportamenti uniformi). La direttiva strategica (*"rendere meno monolitico il software, lavorare a compartimenti per gestire la crescita"*) è registrata in memoria [[v3b-modularization]].
+
+**Fix (3 punti, passo 1 di Opzione A):**
+- monolite v3b: `'replace'` aggiunto alla whitelist deep-link `?wf=` (~L5183);
+- Vedere: aggiunta la voce **Replace-iT** al menù WorkFlow (markup + icona SVG clonati dal monolite);
+- Vedere `selectWorkflow`: naviga a `/analizzare?wf=<wf>` (parametro passato) e gestisce `replace` → ogni voce atterra sul **suo** workflow (sistemato anche il bug "tutto su Analizza").
+
+`node --check` v3b 8/8 + Vedere 3/3. Label Vedere `v8.0.0-refactor → v8.0.1-refactor`. Deploy commit `db157a0` (LEGACY `b495551c`, BACKEND `5e85b8d5`); live 8.61.2 su entrambi + alias, Vedere a 5 workflow, gating 403. **Prossime tappe coerenza (Opzione A):** Vedere allineato al pastello (`--fill-*`) + fix drag-camera replicato nel controller di Vedere.
+
+---
+
 ## 2026-06-14 — 8.61.1: il drag della camera continua oltre il canvas del viewport
 
 Feedback utente: ruotando/spostando i file 3D, il movimento si **interrompe** appena il puntatore esce dal viewport o passa sopra l'albero scena.
