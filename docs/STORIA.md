@@ -4,6 +4,16 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-14 — 8.61.1: il drag della camera continua oltre il canvas del viewport
+
+Feedback utente: ruotando/spostando i file 3D, il movimento si **interrompe** appena il puntatore esce dal viewport o passa sopra l'albero scena.
+
+**Causa**: l'`OrbitControls` custom inline del monolite (`~L2449`) in `onMD` (mousedown sul canvas) agganciava `mousemove`/`mouseup` a `el` (= `renderer.domElement`, il canvas). Uscendo dal canvas quegli eventi non arrivano più → la rotazione/pan si ferma; rilasciando fuori dal canvas il `mouseup` non scatta (drag potenzialmente "appiccicato").
+
+**Fix**: durante il drag attivo i listener `mousemove`/`mouseup` vanno su **`window`** invece che su `el` (`onMD` addEventListener + `onMU` removeEventListener) → il drag continua **ovunque** (sopra `#layersPanel`, fuori dal viewport) finché il tasto è premuto. Il drag continua a **partire** solo dal canvas (`onMD` resta agganciato a `el`). In più, guardia self-heal in `onMM`: se `e.buttons === 0` (tasto rilasciato fuori dalla finestra, `mouseup` perso) → `onMU()` chiude il drag. Touch (`onTM` su `el`) invariato (il touch ha capture implicito sul target). `node --check` 8/8. Deploy commit `05fd453` (LEGACY `97bb4180`, BACKEND `11cb7391`); live 8.61.1 su entrambi + alias.
+
+---
+
 ## 2026-06-14 — 8.61.0: Design system, Fase pastello — commit 2/2 (chrome pastello)
 
 Seconda metà dell'iniziativa pastello: gli **sfondi dei pulsanti/CTA** diventano pastello con **testo scuro**, come nella preview approvata dall'utente.
