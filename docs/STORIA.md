@@ -4,6 +4,22 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-14 — 8.61.0: Design system, Fase pastello — commit 2/2 (chrome pastello)
+
+Seconda metà dell'iniziativa pastello: gli **sfondi dei pulsanti/CTA** diventano pastello con **testo scuro**, come nella preview approvata dall'utente.
+
+**Architettura (decisa dopo aver scoperto il rischio):** ripuntare i token condivisi `--blue/--green/--red/--gold` a pastello avrebbe rotto **molte letture cliniche** (non solo le etichette: anche `.angle-val.good/.warn/.bad` = valori d'angolo colorati per severità, gli avvisi sottosquadro/fresabilità, i bordi `.clinical-section`). Quindi **NON si ripuntano i token condivisi** (restano saturi per testo, accenti e clinica); si aggiungono **token FILL pastello dedicati** e si migrano **solo gli sfondi dei pulsanti**:
+- nuovi `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` (in `:root` v3b + `ds/tokens.css`);
+- i ~26 sfondi-pulsante: `background:var(--blue|green|red|gold)` → `var(--fill-*)` e `color:#fff/var(--white)` → `var(--dark)` (testo scuro). Contrasto AA verificato 6.5–13.8:1.
+
+**Metodo "non sbagliare":** applicato con **script Python deterministico** (assert di unicità su ogni sostituzione: 27 totali) + **verifica avversariale del diff** (agente general-purpose) che ha colto **2 problemi reali**, poi corretti: (A) le icone SVG dei pulsanti `.btn.active/.green.primary/.blue.primary` restavano **bianche** (regole `svg [stroke]{stroke:var(--white)}`) → quasi invisibili sul fill pastello accanto al testo scuro → portate a `var(--dark)`; (B) `.calmodal-btn.primary:hover` cambiava lo sfondo a `#004F8A` scuro lasciando il testo scuro ereditato (2.10:1) → aggiunto `color:var(--white)`.
+
+**NON toccati:** i valori dei token condivisi, i colori clinici/brand/d3, `.divergence-label`/`.angle-val`. `node --check` 8/8; grep di completezza contrasto = 0 residui (nessuno sfondo saturo con testo bianco, nessun fill con testo chiaro). MAPPA: nota design system in testa + versione mappata 8.61.0. Deploy commit `b8c2dd3` (LEGACY `1671dc1f`, BACKEND `e27183a7`); live 8.61.0 su entrambi + alias, con fill pastello serviti + clinici d3 intatti + token condivisi ancora saturi + gating 403.
+
+**Resta il commit 3:** mesh scansione → freddo `#DCE6EC` (16 hit eterogenei: materiale Three.js, default `envSettings.scanColor`, default dei color-picker, swatch "Marroncino", slider accent, token — da classificare uno a uno).
+
+---
+
 ## 2026-06-14 — 8.60.0: Design system, Fase pastello — commit 1/2 (fondamenta + unificazione clinica)
 
 Avvio dell'iniziativa di coerenza UI richiesta dall'utente: *"se usiamo qualche colore più allegro non è male; se decidiamo un colore per una funzione o un tasto usiamolo sempre in tutti i workflow; verifichiamo che tutti i workflow siano coerenti tra loro come grafica, testi (pochi ed essenziali), alberi scena (completi e coerenti)."* L'utente ha fornito una palette pastello (separata per "funzioni" e "viewport 3D") e ha scelto: **UI tutta verso il pastello**, **partendo da token + fix incoerenze**.
