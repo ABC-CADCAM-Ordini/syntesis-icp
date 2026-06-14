@@ -37,3 +37,6 @@ scripts/gate/**/*.err
 
 # Preview/launch config — locale, mai committato (vincolo utente "no launch.json")
 .claude/launch.json
+
+# Censimento dipendenze — artefatto generato da scripts/dep_census.py (rigenerabile)
+scripts/dep_census_out.json
