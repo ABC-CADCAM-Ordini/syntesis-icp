@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.59.9</title>
+<title>Syntesis-ICP - Analizzare v8.60.0</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -37,7 +37,7 @@ body{
 @keyframes syntSpin{to{--synt-sa:360deg}}
 
 
-:root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--ghost:#8090A8;--red:#DC2626;--gold:#F59E0B;--radius:14px;--font:'Helvetica Neue',Helvetica,Arial,sans-serif;--mono:'Helvetica Neue',Helvetica,Arial,sans-serif}
+:root{--blue:#0065B3;--dark:#0F1923;--gray:#7A90A4;--pearl:#F0F5FA;--light:#F7F9FC;--border:#D6E4F0;--white:#FFFFFF;--green:#0D9E6E;--ghost:#8090A8;--red:#DC2626;--gold:#F59E0B;--primary-strong:#0065B3;--confirm-strong:#0D9E6E;--clin-good:#639922;--clin-warn:#D97706;--clin-risk:#F97316;--clin-bad:#EF4444;--radius:14px;--font:'Helvetica Neue',Helvetica,Arial,sans-serif;--mono:'Helvetica Neue',Helvetica,Arial,sans-serif}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100vh;display:flex;flex-direction:column;font-feature-settings:"tnum";font-variant-numeric:tabular-nums}
 .header{display:flex;align-items:center;gap:6px;padding:10px 16px;background:var(--white);border-bottom:1px solid var(--border);z-index:10;flex-shrink:0;flex-wrap:wrap;border-top-left-radius:10px;border-top-right-radius:10px}
@@ -333,10 +333,10 @@ body{font-family:var(--font);background:var(--pearl);overflow:hidden;height:100v
 
 /* Divergence labels */
 .divergence-label{position:absolute;transform:translate(-50%,-50%);padding:3px 9px;border-radius:11px;font-family:var(--mono);font-size:12px;font-weight:800;color:#fff;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35);z-index:3;opacity:1;border:1.5px solid rgba(255,255,255,0.25)}
-.divergence-label.good{background:var(--green)}
-.divergence-label.warn{background:var(--gold)}
-.divergence-label.risk{background:#F97316}
-.divergence-label.bad{background:var(--red)}
+.divergence-label.good{background:var(--clin-good)}
+.divergence-label.warn{background:var(--clin-warn)}
+.divergence-label.risk{background:var(--clin-risk)}
+.divergence-label.bad{background:var(--clin-bad)}
 .divergence-label{transform:translate(-50%,-50%)}
 #labelLayer{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:3}
 #labelLines line{stroke-width:1.5;opacity:0.85}
@@ -1974,7 +1974,7 @@ if (document.readyState === 'loading') {
       <div id="sostCustomName" style="display:none;font-family:var(--mono);font-size:11px;color:var(--dark);margin-top:4px;padding:4px 6px;background:var(--light);border-radius:4px;border:1px solid var(--border)"></div>
 
       <div style="display:flex;gap:6px;margin-top:12px">
-        <button id="sostBtnPlace" onclick="sostStartPlacement()" style="flex:1;padding:8px 10px;background:#0D9E6E;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona</button>
+        <button id="sostBtnPlace" onclick="sostStartPlacement()" style="flex:1;padding:8px 10px;background:var(--confirm-strong);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase">+ Posiziona</button>
         <button id="sostBtnRefine" onclick="sostAlignAll()" style="flex:1;padding:8px 10px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:0.03em;cursor:pointer;text-transform:uppercase;opacity:0.5" disabled>Raffina</button>
       </div>
 
@@ -2043,7 +2043,7 @@ if (document.readyState === 'loading') {
       <!-- 2b-1.3: flusso per-scanbody. Raffina (2b-2) e Concludi (2b-3) sono scaffolding disabilitato. -->
       <div id="replaceFlow" style="display:none;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button id="replaceBtnRefine" class="replace-only" disabled onclick="replaceRefineCurrent()" title="Raffina (ICP) SOLO l'impianto attivo: l'ultimo piazzato, o quello selezionato nell'albero scena" style="flex:1;min-width:78px;padding:7px 8px;background:#0065B3;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina</button>
-        <button id="replaceBtnRefineSrv" class="replace-only" disabled onclick="replaceRefineServer()" title="Raffina SERVER (point-to-plane, piena risoluzione · beta): stesso impianto attivo, calcolata sul server con TUTTA la mesh (il client sottocampiona) -> fit piu' fine. Mostra il residuo del fit per il confronto A/B con Raffina." style="flex:1;min-width:78px;padding:7px 8px;background:#0E8C6A;color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina+</button>
+        <button id="replaceBtnRefineSrv" class="replace-only" disabled onclick="replaceRefineServer()" title="Raffina SERVER (point-to-plane, piena risoluzione · beta): stesso impianto attivo, calcolata sul server con TUTTA la mesh (il client sottocampiona) -> fit piu' fine. Mostra il residuo del fit per il confronto A/B con Raffina." style="flex:1;min-width:78px;padding:7px 8px;background:var(--confirm-strong);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina+</button>
         <button id="replaceBtnNext" class="replace-only" onclick="replaceNextScanbody()" style="flex:1;min-width:78px;padding:7px 8px;background:#fff;color:var(--dark);border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Avanti / nuovo</button>
         <button id="replaceBtnFinish" class="replace-only" onclick="replaceExportSTL()" title="Esporta i sostituti (figli) piazzati come file STL nelle loro posizioni in scena" style="flex:1;min-width:78px;padding:7px 8px;background:var(--blue);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Concludi · Esporta</button>
       </div>
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.59.9';
+window.ANALIZZA_BUILD = '8.60.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -15603,7 +15603,7 @@ var REPLACE_DOT_R = 0.45;           // mm, piu' piccolo dei marker
 // 2b-1.2: seeding a 3 punti (sostituisce il click_center). I 3 punti hanno
 // colori distinti, uguali tra anteprima-marker e scansione, per accoppiarli a vista.
 var REPLACE_SEED_N = 3;
-var REPLACE_SEED_COLORS = [0xFF3B30, 0x00C853, 0x2979FF]; // 1 rosso, 2 verde, 3 blu
+var REPLACE_SEED_COLORS = [0xFF8D85, 0x8ADFB2, 0x4FA3E3]; // 8.60.0: trio pastello (1 corallo, 2 verde, 3 blu) coerente coi token UI, era rosso/verde/blu fuori-brand
 // Seme in corso: markerPts/scanPts coppie corrispondenti (per Kabsch); markerDots
 // sono figli della mesh anteprima, scanDots vivono nella scena principale.
 // 8.40.0: flusso UNICO a 3 punti. Fasi: idle -> pickMarker (3 punti sul marker, anteprima)
