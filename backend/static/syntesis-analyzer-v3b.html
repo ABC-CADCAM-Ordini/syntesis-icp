@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.61.0</title>
+<title>Syntesis-ICP - Analizzare v8.61.1</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2428,7 +2428,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.61.0';
+window.ANALIZZA_BUILD = '8.61.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-13';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -2473,10 +2473,11 @@ var MUA_COLORS=[0x0065B3,0xF59E0B,0x0D9E6E,0xDC2626,0x8B5CF6,0xEC4899,0x06B6D4,0
     e.preventDefault();
     if(e.button===0){state=STATE.ROTATE;rS.set(e.clientX,e.clientY)}
     else if(e.button===2){state=STATE.PAN;pS.set(e.clientX,e.clientY)}
-    el.addEventListener('mousemove',onMM);
-    el.addEventListener('mouseup',onMU);
+    window.addEventListener('mousemove',onMM);   // 8.61.1: il drag continua oltre il canvas (sopra l'albero scena / fuori dal viewport), non si interrompe; era su el (canvas)
+    window.addEventListener('mouseup',onMU);
   }
   function onMM(e){
+    if(e.buttons === 0){ onMU(); return; }   // 8.61.1: self-heal se il tasto è stato rilasciato fuori dalla finestra (mouseup mancato)
     if(state===STATE.ROTATE){
       rE.set(e.clientX,e.clientY);
       var d=new THREE.Vector2().subVectors(rE,rS);
@@ -2492,8 +2493,8 @@ var MUA_COLORS=[0x0065B3,0xF59E0B,0x0D9E6E,0xDC2626,0x8B5CF6,0xEC4899,0x06B6D4,0
   }
   function onMU(){
     state=STATE.NONE;
-    el.removeEventListener('mousemove',onMM);
-    el.removeEventListener('mouseup',onMU);
+    window.removeEventListener('mousemove',onMM);
+    window.removeEventListener('mouseup',onMU);
   }
   function onWh(e){e.preventDefault();if(e.deltaY<0)scale/=gzs();else scale*=gzs()}
   function onCM(e){e.preventDefault()}
