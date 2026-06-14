@@ -31,14 +31,24 @@ checklist §11 di CLAUDE.md (passo 5 "validare sintassi" diventa "validare sinta
 ## 1. I 7 gruppi di check
 
 ### Check 1 — Lista di sicurezza `must_preserve` (il più importante)
-**Invariante**: ogni nome che un modulo `ds/*.js` consuma dal monolite resta **definito top-level**
-(quindi globale, in blocco non-strict) in `v3b.html`.
+**Invariante**: ogni nome che un modulo `ds/*.js` consuma dal monolite resta **risolvibile come
+global nudo** (`X` / `root.X` / `window.X`) in `v3b.html`. È soddisfatta da (a) una **dichiarazione
+top-level** `function X` / `var|let|const X` nel blocco principale, **oppure** (b) un **accessor
+configurato sul global object** — `Object.defineProperty(window/root, 'X', {get/set})` o il pattern
+accessor `SYN`. Non si pretende quindi la dichiarazione: il fix del passo 1 **rimuove** il `var` di
+`scanMesh` per installare l'accessor, perciò una regex `^var X` darebbe rosso **sul fix corretto** —
+il gate boccerebbe il suo primo cliente reale.
 - **Sorgente A (automatica)**: parsa `ds/*.js` ed estrai ogni riferimento esterno —
-  `root.X`, `window.X`, `globalThis.X`, `typeof X` bare. Per ciascun `X` asserisci che esista
-  `^function X(` **oppure** `^var|let|const X` top-level nel blocco principale di `v3b.html`.
+  `root.X`, `window.X`, `globalThis.X`, `typeof X` bare. Per ciascun `X`:
+  - **nome NON marcato accessor** (default): asserisci che esista `^function X(` **oppure**
+    `^var|let|const X` top-level nel blocco principale di `v3b.html`.
+  - **nome marcato `accessor_backed` nel manifest** (`scanMesh`, `analysisMode`, `currentWorkflow`):
+    asserisci invece la presenza dell'**installazione dell'accessor** — `Object.defineProperty` su
+    `window`/`root` per quel nome, oppure il pattern accessor `SYN` — **non** `^var X`.
 - **Sorgente B (manifest)**: la lista consolidata di STRATEGIA §3 come elenco atteso → asserisci
   che la Sorgente A non introduca nomi **non** previsti né perda nomi previsti (drift bidirezionale).
-- **Fallisce se**: un'estrazione sposta `X` dentro un IIFE/modulo senza ri-esporlo bare su window.
+- **Fallisce se**: un'estrazione sposta `X` dentro un IIFE/modulo senza ri-esporlo bare su window
+  (né come dichiarazione top-level né come accessor installato).
 - **Esempio reale che prenderebbe**: estrarre `fres*` rendendo `fresState`/`closeFresability`
   module-scoped → `syn-clip.js:121` (`root.fresState`/`root.closeFresability`) si romperebbe.
 
@@ -94,8 +104,10 @@ superficie window, e — durante un'estrazione funzionale — **non** vengono ri
 - **Un solo script** `scripts/gate/static/invariants.py` (Python 3, stdlib only — coerente con
   `dep_census.py`/`check_inline_scripts.py`; nessuna dipendenza nuova).
 - **Un manifest** `scripts/gate/static/invariants_manifest.json` con: lista `must_preserve`,
-  contratto DOM (id+classi), chiavi localStorage+owner, allow-list righe IIFE strict, dead-code names.
-  Derivato a mano da STRATEGIA §2–§3, versionato, aggiornato quando un'estrazione cambia il contratto.
+  **set dei nomi `accessor_backed`** (oggi `scanMesh`, `analysisMode`, `currentWorkflow` — per cui il
+  Check 1 verifica l'accessor installato, non la dichiarazione `var`), contratto DOM (id+classi),
+  chiavi localStorage+owner, allow-list righe IIFE strict, dead-code names. Derivato a mano da
+  STRATEGIA §2–§3, versionato, aggiornato quando un'estrazione cambia il contratto.
 - **CLI**: `invariants.py baseline` (snapshot in `scripts/gate/static/baseline.json`, gitignored)
   e `invariants.py check` (asserisce assolute + diff col baseline; exit≠0 su violazione, report `+/-`).
 - **Aggancio**: passo aggiuntivo nella checklist patch §11 (dopo `node --check`, prima del commit).
@@ -108,6 +120,8 @@ superficie window, e — durante un'estrazione funzionale — **non** vengono ri
 | Rischio (STRATEGIA §9) | Tier 1 statico | Serve |
 |---|---|---|
 | Nome `must_preserve` sparito | ✅ Check 1 | — |
+| Accessor-backed **installato** (`scanMesh`/`analysisMode`/`currentWorkflow`) | ✅ Check 1 | — |
+| Accessor-backed **vivo** (riassegnazione propaga ai lettori bare) | ⚠️ no — verifica solo che sia *installato* | **Tier 1.5** (gate del passo 1, §4) |
 | `"use strict"` aggiunto | ✅ Check 2 | — |
 | id/classe DOM rimossa | ✅ Check 3 | — |
 | chiave localStorage sdoppiata | ✅ Check 4 | — |
@@ -122,7 +136,29 @@ superficie window, e — durante un'estrazione funzionale — **non** vengono ri
 
 ---
 
-## 4. Tier 3 (differito) — promemoria fixture
+## 4. Tier 1.5 — propagazione accessor (jsdom, no browser/WebGL, nessuna fixture)
+
+Gate **del passo 1** (spina `window.SYN` + alias accessor), distinto dal **Tier 1** (presenza simboli,
+statico) e dal **Tier 3** (golden-master WebGL). Verifica ciò che il linter statico non può: che
+l'accessor sia **vivo**, cioè che la riassegnazione via setter sia **vista dai lettori bare** non-strict.
+
+Per ogni nome `accessor_backed` (`scanMesh` come oggetto; `analysisMode`/`currentWorkflow` come
+primitive), in **jsdom** (zero browser, zero WebGL, zero STL — solo `global`/`window`):
+1. installa l'accessor come da STRATEGIA §2.3 (`Object.defineProperty(window, NAME, {get/set})`
+   appoggiato a `SYN.scene`/`SYN.state`);
+2. definisci una funzione **non-strict** che legge il nome **nudo** (es. `function r(){ return NAME }`);
+3. riassegna via setter (`window.NAME = nuovoValore`; per gli oggetti, muta una proprietà tramite il getter);
+4. **asserisci** che la funzione veda il nuovo valore (propagazione effettiva ai lettori bare).
+
+- **Costo**: basso — `jsdom` è una dipendenza di **test** (non del frontend, vincolo §3 salvo);
+  nessun WebGL, nessuna fixture, nessun server stub.
+- **Copre**: il fallimento tipico del passo 1 sulle primitive riassegnate — accessor *installato ma
+  morto* (riferimento copiato invece di get/set, così la riassegnazione non propaga ai lettori bare).
+- **NON copre**: il percorso clinico (detection→ICP→report) — resta Tier 3.
+
+---
+
+## 5. Tier 3 (differito) — promemoria fixture
 
 Quando si arriverà al core `mis*` (roadmap passo 7) servirà il golden-master runtime. Precondizioni
 già note (STRATEGIA §7), da affrontare allora:
@@ -137,6 +173,6 @@ già note (STRATEGIA §7), da affrontare allora:
 
 ---
 
-## 5. Riferimenti
+## 6. Riferimenti
 `MODULARIZZAZIONE_STRATEGIA_v1.md` (§2–§3 invarianti, §7 gate, §9 problemi), `scripts/gate/`
 (`check_inline_scripts.py`, template clip/panel), memoria `v3b-modularization`.

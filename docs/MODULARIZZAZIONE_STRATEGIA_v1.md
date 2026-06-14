@@ -242,11 +242,14 @@ Prima i prerequisiti trasversali, poi i domini dal meno al più intrecciato, cor
 | **4** | Consolidare naming `replace*`/`sost*`, poi estrarre Replace-iT | modulo A | medio | DOM per-stringa preservato |
 | **5** | `analReport_*` — modulo report con contratto jspdf/xlsx | modulo B | medio | — |
 | **6** | Sotto-classificare i 171 'other' per call-graph+write-set (non per nome) | analisi+refactor | medio | iterativo |
-| **7** | `mis*` core — prima il **nucleo numerico puro**, poi il viewport | modulo mixed | alto | passo 0 (gate golden-master) |
-| **8** | `findScanbodyCenter` — cuore clinico condiviso | modulo | alto | passo 0 |
+| **7** | `mis*` core — prima il **nucleo numerico puro**, poi il viewport | modulo mixed | alto | passo 0c (Tier 3 golden-master) |
+| **8** | `findScanbodyCenter` — cuore clinico condiviso | modulo | alto | passo 0c (Tier 3) |
 
-**Differenza chiave rispetto a v1**: il passo 0 (fixture+harness) sale a **prerequisito assoluto**,
-non "da fare prima del core". Senza, i passi 1/3/4 hanno gate solo statico = cieco sui loro veri rischi.
+**Differenza chiave rispetto a v1**: i passi **1/3/4** sono gated da **Tier 1 (invarianti statiche) +
+check runtime economici (Tier 1.5, jsdom, SENZA WebGL né STL)** — sufficienti per stato/accessor, moduli
+e contratto DOM. **Solo il core `mis*` (passi 7/8)** richiede il **Tier 3 completo** (WebGL + STL reale).
+La fixture+harness (**0c**) resta perciò **differita al passo 7** e **non è mai stata prerequisito dei
+passi 1/3/4** (correzione rispetto alla prima stesura, che lo implicava erroneamente).
 
 ---
 
@@ -257,15 +260,19 @@ non-strict, THREE non pronto, id DOM mancante, libreria assente, chiave localSto
 **runtime-only**, e si manifestano sul percorso *carica scansione → detect → ICP → overlay → report*,
 che oggi è attivabile **solo con una scansione reale**. `jsdom` non basta (serve WebGL).
 
-**Precondizione bloccante (Fase 0 stabilizzazione)**: costruire (a) una **fixture STL minima** —
-scan + reference; (b) un **harness headless** (Playwright/Puppeteer con WebGL software/SwiftShader) che
-esegua il percorso completo. È ciò che trasforma il gate da "verifica di presenza simboli" a "verifica
-di contratto runtime".
+**Precondizione del Tier 3 (gate runtime completo, passo 7 — NON dei passi 1/3/4)**: costruire (a) una
+**fixture STL reale anonimizzata** — scan + reference; (b) un **harness headless** (Playwright/Puppeteer
+con WebGL software/SwiftShader) che esegua il percorso completo. È ciò che trasforma il gate da "verifica
+di presenza simboli" a "verifica di contratto runtime" **per il core clinico**. I passi precedenti
+(1/3/4) sono coperti dai gate economici Tier 1 + Tier 1.5 (vedi sotto), che non richiedono né WebGL né STL.
 
 **DECISIONE 2026-06-14 — gate a livelli (non scommettere tutto sul Tier 3):**
 - **Tier 1 — invarianti statiche** (no browser/WebGL): linter che asserisce §2–§3 (must_preserve,
   no `"use strict"` aggiunto, contratto DOM, ownership localStorage, guardia `three-ready`, sintassi).
   **Scelto come primo passo**, rischio nullo. Progettazione completa: `MODULARIZZAZIONE_GATE_TIER1_v1.md`.
+- **Tier 1.5 — propagazione accessor** (jsdom, no browser/WebGL, nessuna fixture): **GATE dei passi
+  1/3/4** — verifica che gli accessor (`scanMesh`/`analysisMode`/`currentWorkflow`) siano *vivi* (la
+  riassegnazione propaga ai lettori bare), non solo installati. Dettaglio: `MODULARIZZAZIONE_GATE_TIER1_v1.md` §4.
 - **Tier 2 — DOM/no-scena** via harness browser-via-preview già provato (panel): differito.
 - **Tier 3 — golden-master WebGL completo**: **differito** al passo 7 (core `mis*`). Fixture =
   **STL reale anonimizzata fornita dall'utente** (decisione 2026-06-14; geometria pura = anonima;
