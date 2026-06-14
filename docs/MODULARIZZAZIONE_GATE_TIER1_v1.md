@@ -35,7 +35,7 @@ checklist §11 di CLAUDE.md (passo 5 "validare sintassi" diventa "validare sinta
 global nudo** (`X` / `root.X` / `window.X`) in `v3b.html`. È soddisfatta da (a) una **dichiarazione
 top-level** `function X` / `var|let|const X` nel blocco principale, **oppure** (b) un **accessor
 configurato sul global object** — `Object.defineProperty(window/root, 'X', {get/set})` o il pattern
-accessor `SYN`. Non si pretende quindi la dichiarazione: il fix del passo 1 **rimuove** il `var` di
+accessor `SYN`. Non si pretende quindi la dichiarazione: il fix del passo 2 **rimuove** il `var` di
 `scanMesh` per installare l'accessor, perciò una regex `^var X` darebbe rosso **sul fix corretto** —
 il gate boccerebbe il suo primo cliente reale.
 - **Sorgente A (automatica)**: parsa `ds/*.js` ed estrai ogni riferimento esterno —
@@ -121,7 +121,7 @@ superficie window, e — durante un'estrazione funzionale — **non** vengono ri
 |---|---|---|
 | Nome `must_preserve` sparito | ✅ Check 1 | — |
 | Accessor-backed **installato** (`scanMesh`/`analysisMode`/`currentWorkflow`) | ✅ Check 1 | — |
-| Accessor-backed **vivo** (riassegnazione propaga ai lettori bare) | ⚠️ no — verifica solo che sia *installato* | **Tier 1.5** (gate del passo 1, §4) |
+| Accessor-backed **vivo** (riassegnazione propaga ai lettori bare) | ⚠️ no — verifica solo che sia *installato* | **Tier 1.5** (gate del passo 2, §4) |
 | `"use strict"` aggiunto | ✅ Check 2 | — |
 | id/classe DOM rimossa | ✅ Check 3 | — |
 | chiave localStorage sdoppiata | ✅ Check 4 | — |
@@ -138,7 +138,7 @@ superficie window, e — durante un'estrazione funzionale — **non** vengono ri
 
 ## 4. Tier 1.5 — propagazione accessor (jsdom, no browser/WebGL, nessuna fixture)
 
-Gate **del passo 1** (spina `window.SYN` + alias accessor), distinto dal **Tier 1** (presenza simboli,
+Gate **del passo 2** (spina `window.SYN` + alias accessor), distinto dal **Tier 1** (presenza simboli,
 statico) e dal **Tier 3** (golden-master WebGL). Verifica ciò che il linter statico non può: che
 l'accessor sia **vivo**, cioè che la riassegnazione via setter sia **vista dai lettori bare** non-strict.
 
@@ -152,7 +152,7 @@ primitive), in **jsdom** (zero browser, zero WebGL, zero STL — solo `global`/`
 
 - **Costo**: basso — `jsdom` è una dipendenza di **test** (non del frontend, vincolo §3 salvo);
   nessun WebGL, nessuna fixture, nessun server stub.
-- **Copre**: il fallimento tipico del passo 1 sulle primitive riassegnate — accessor *installato ma
+- **Copre**: il fallimento tipico del passo 2 sulle primitive riassegnate — accessor *installato ma
   morto* (riferimento copiato invece di get/set, così la riassegnazione non propaga ai lettori bare).
 - **NON copre**: il percorso clinico (detection→ICP→report) — resta Tier 3.
 
