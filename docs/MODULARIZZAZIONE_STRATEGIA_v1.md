@@ -236,20 +236,28 @@ Prima i prerequisiti trasversali, poi i domini dal meno al più intrecciato, cor
 | **0a** | **Gate Tier 1 — invarianti statiche** (no browser) | infra test | basso | scelto come primo passo (§7; piano in GATE_TIER1) |
 | **0c** | Fixture STL reale anonimizzata + harness WebGL (Tier 3) | infra test | — | **differito al passo 7**; fixture dall'utente (§7) |
 | **0b** | Rifare mappa 7 blocchi `<script>` + dep_census su file intero | analisi | — | fatto in parte (`scripts/dep_census.py` v2) |
-| **1** | Spina di piattaforma → `window.SYN.scene/state` + alias accessor (`scanMesh` first) | refactor stato | medio | strict-mode invariata; defineProperty caveat |
-| **2** | `tree*` — estrazione pilota | modulo A | basso | passo 1 (scanMesh con casa) |
-| **3** | `fres*` — preservando i 9 nomi + non toccando il monkey-patch | modulo mixed | alto | passi 1–2; lettori bare risolti a window |
+| **1** | `tree*` — estrazione pilota | modulo A | basso | passo 0a (Tier 1 costruito) |
+| **2** | Spina di piattaforma → `window.SYN.scene/state` + alias accessor (`scanMesh` first) | refactor stato | medio | Tier 1.5 costruito (invariante Check 1 risolvibile-bare già in repo); strict-mode invariata; defineProperty caveat |
+| **3** | `fres*` — preservando i 9 nomi + non toccando il monkey-patch | modulo mixed | alto | passo 2 (spina/scanMesh con casa); lettori bare risolti a window |
 | **4** | Consolidare naming `replace*`/`sost*`, poi estrarre Replace-iT | modulo A | medio | DOM per-stringa preservato |
 | **5** | `analReport_*` — modulo report con contratto jspdf/xlsx | modulo B | medio | — |
 | **6** | Sotto-classificare i 171 'other' per call-graph+write-set (non per nome) | analisi+refactor | medio | iterativo |
 | **7** | `mis*` core — prima il **nucleo numerico puro**, poi il viewport | modulo mixed | alto | passo 0c (Tier 3 golden-master) |
 | **8** | `findScanbodyCenter` — cuore clinico condiviso | modulo | alto | passo 0c (Tier 3) |
 
-**Differenza chiave rispetto a v1**: i passi **1/3/4** sono gated da **Tier 1 (invarianti statiche) +
+**Perché `tree*` (1) prima della spina (2) — sequenziamento del rischio:** prima la **prova generale a
+rischio zero** (`tree*`, 3 funzioni, rilocazione verbatim) per **rodare il gate Tier 1 e il meccanismo di
+estrazione su un'estrazione vera**; poi il **refactor delicato della spina** (conversione `var`→accessor di
+`scanMesh`). Non si valida la conversione accessor — la più rischiosa — con un gate **appena costruito e
+mai esercitato**. Il conflitto Check 1 ↔ conversione-dichiarazione è **già stato risolto** (GATE_TIER1 §1,
+invariante "risolvibile-bare"), quindi l'inversione è ora **puramente sequenziamento del rischio**, non
+aggiramento di un conflitto.
+
+**Differenza chiave rispetto a v1**: i passi **1–4** sono gated da **Tier 1 (invarianti statiche) +
 check runtime economici (Tier 1.5, jsdom, SENZA WebGL né STL)** — sufficienti per stato/accessor, moduli
 e contratto DOM. **Solo il core `mis*` (passi 7/8)** richiede il **Tier 3 completo** (WebGL + STL reale).
 La fixture+harness (**0c**) resta perciò **differita al passo 7** e **non è mai stata prerequisito dei
-passi 1/3/4** (correzione rispetto alla prima stesura, che lo implicava erroneamente).
+passi 1–4** (correzione rispetto alla prima stesura, che lo implicava erroneamente).
 
 ---
 
