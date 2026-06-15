@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.62.2</title>
+<title>Syntesis-ICP - Analizzare v8.63.0</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2429,7 +2429,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.62.2';
+window.ANALIZZA_BUILD = '8.63.0';
 window.ANALIZZA_BUILD_DATE = '2026-06-15';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -18151,6 +18151,51 @@ function sostRobustCenter(scanGeo, roughCenter, axis, R){
   return { applied:true, center:new THREE.Vector3(cx,cy,cz), coverageDeg:coverageDeg, nWall:nWall };
 }
 
+// 8.63.0: asse lateral-wall LOCALE per il centraggio robusto su 1T3/OS. Il motore asse globale
+// (synAxisUseLateral 'auto') usa cap-media per 1T3/OS; ma sostRobustCenter ancora il centro al piano
+// ⊥ asse -> un asse cap-media inclinato gli farebbe ereditare il tilt (fix illusorio). Qui ricavo
+// l'asse dalla PARETE (min-eigenvector di Σ area·n·nᵀ sui triangoli laterali nell'anello), SOLO in
+// questo branch -> NON tocca synAxisUseLateral / Analizza / report PDF. Fail-soft: parete povera
+// (< 12 triangoli) -> ritorna null -> resta l'asse cap-media. Stessa banda/anello di sostRobustCenter.
+function _sostLocalWallAxis(scanGeo, roughCenter, roughAxis, R){
+  if(!scanGeo || !scanGeo.attributes || !scanGeo.attributes.normal) return null;
+  var pos = scanGeo.attributes.position.array, nrm = scanGeo.attributes.normal.array;
+  var nTri = pos.length / 9;
+  var ax0 = roughAxis.x, ax1 = roughAxis.y, ax2 = roughAxis.z;
+  var cx = roughCenter.x, cy = roughCenter.y, cz = roughCenter.z;
+  var Rlo = R - 0.8, Rhi = R + 0.6;
+  var S = [[0,0,0],[0,0,0],[0,0,0]], nWall = 0;
+  for(var i = 0; i < nTri; i++){
+    var ni = i*9;
+    var tx=(pos[ni]+pos[ni+3]+pos[ni+6])/3, ty=(pos[ni+1]+pos[ni+4]+pos[ni+7])/3, tz=(pos[ni+2]+pos[ni+5]+pos[ni+8])/3;
+    var nx=(nrm[ni]+nrm[ni+3]+nrm[ni+6])/3, ny=(nrm[ni+1]+nrm[ni+4]+nrm[ni+7])/3, nz=(nrm[ni+2]+nrm[ni+5]+nrm[ni+8])/3;
+    var nl=Math.sqrt(nx*nx+ny*ny+nz*nz); if(nl<0.01) continue; nx/=nl; ny/=nl; nz/=nl;
+    if(Math.abs(nx*ax0+ny*ax1+nz*ax2) >= 0.35) continue;           // solo parete laterale
+    var dx=tx-cx, dy=ty-cy, dz=tz-cz;
+    var axial = dx*ax0+dy*ax1+dz*ax2; if(Math.abs(axial) > 3.5) continue;
+    var px=dx-axial*ax0, py=dy-axial*ax1, pz=dz-axial*ax2;
+    var rad=Math.sqrt(px*px+py*py+pz*pz); if(rad < Rlo || rad > Rhi) continue;
+    var e1x=pos[ni+3]-pos[ni], e1y=pos[ni+4]-pos[ni+1], e1z=pos[ni+5]-pos[ni+2];
+    var e2x=pos[ni+6]-pos[ni], e2y=pos[ni+7]-pos[ni+1], e2z=pos[ni+8]-pos[ni+2];
+    var crx=e1y*e2z-e1z*e2y, cry=e1z*e2x-e1x*e2z, crz=e1x*e2y-e1y*e2x;
+    var ar=0.5*Math.sqrt(crx*crx+cry*cry+crz*crz);
+    S[0][0]+=ar*nx*nx; S[0][1]+=ar*nx*ny; S[0][2]+=ar*nx*nz;
+    S[1][0]+=ar*ny*nx; S[1][1]+=ar*ny*ny; S[1][2]+=ar*ny*nz;
+    S[2][0]+=ar*nz*nx; S[2][1]+=ar*nz*ny; S[2][2]+=ar*nz*nz;
+    nWall++;
+  }
+  if(nWall < 12) return null;
+  var ej = misICP_jacobi3(S);
+  var mi = 0;
+  if(ej.vals[1] < ej.vals[mi]) mi = 1;
+  if(ej.vals[2] < ej.vals[mi]) mi = 2;
+  var wx = ej.vecs[0][mi], wy = ej.vecs[1][mi], wz = ej.vecs[2][mi];
+  var wl = Math.sqrt(wx*wx+wy*wy+wz*wz); if(wl < 1e-9) return null;
+  wx/=wl; wy/=wl; wz/=wl;
+  if(wx*ax0+wy*ax1+wz*ax2 < 0){ wx=-wx; wy=-wy; wz=-wz; }            // verso concorde col cap-media
+  return new THREE.Vector3(wx, wy, wz);
+}
+
 function sostPlaceTemplate(rawPoint, rawNormal){
   // Auto-centratura deterministica (stessa funzione di Analizza).
   // Passa il raggio del marker presente nella scansione di partenza
@@ -18160,14 +18205,23 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     sourceRadius ? { radius: sourceRadius } : undefined);
   var discWorld = autoResult.center;       // faccia del disco scansionato nel mondo
   var axis = autoResult.axis.clone().normalize();
-  // Replace-iT: centraggio click-invariante (flag 'syntesis_sost_center'='robust', SR-only).
-  // Ri-fitta solo il centro (XY) ancorandolo all'asse; livello disco e asse invariati.
-  // Fail-soft: se la copertura della parete e' insufficiente, resta il centro legacy.
-  if(synSostCenterRead() === 'robust' && sostSourceTemplate === 'SR' && sourceRadius){
+  // Replace-iT: centraggio click-invariante (flag 'syntesis_sost_center'='robust').
+  // 8.63.0: esteso da SR a TUTTI i tipi (1T3/OS/SR), beta opt-in (default 'legacy' INVARIATO).
+  // Per 1T3/OS l'asse del motore globale e' cap-media -> ricavo un asse lateral-wall LOCALE
+  // (_sostLocalWallAxis, non tocca Analizza/report) cosi' il centro non eredita il tilt; l'asse
+  // raffinato si applica SOLO se il robust ha agito. Doppio fail-soft: parete povera -> asse
+  // cap-media; copertura < 140° -> centro legacy. Feasibility provata offline (asse osservabile +
+  // robust applied 100% su 1T3/OS); gain reale da validare A/B su scansioni vere.
+  if(synSostCenterRead() === 'robust' && sourceRadius){
     try {
-      var _rc = sostRobustCenter(sostMesh.geometry, autoResult.center, axis, sourceRadius);
-      if(_rc.applied) discWorld = _rc.center;
-      console.log('[sostRobustCenter] applied='+_rc.applied+' cov='+(_rc.coverageDeg||0).toFixed(0)+'° nWall='+_rc.nWall);
+      var _ax = axis;
+      if(sostSourceTemplate !== 'SR'){
+        var _wa = _sostLocalWallAxis(sostMesh.geometry, autoResult.center, axis, sourceRadius);
+        if(_wa) _ax = _wa;
+      }
+      var _rc = sostRobustCenter(sostMesh.geometry, autoResult.center, _ax, sourceRadius);
+      if(_rc.applied){ discWorld = _rc.center; axis = _ax.clone().normalize(); }
+      console.log('[sostRobustCenter] type='+sostSourceTemplate+' applied='+_rc.applied+' cov='+(_rc.coverageDeg||0).toFixed(0)+'° nWall='+_rc.nWall);
     } catch(e){ console.warn('[sostRobustCenter] errore, fallback legacy:', e); }
   }
 
@@ -20040,9 +20094,9 @@ window.addEventListener('DOMContentLoaded',init);
           <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="sostCenterOptRobust">
             <input type="radio" name="sostCenterOpt" value="robust" onchange="onSostCenterChange(this.value)" style="margin-top:2px">
             <div style="flex:1">
-              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Robust click-invariante (beta, SR)</div>
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Robust click-invariante (beta, 1T3/OS/SR)</div>
               <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
-                Centro da fit full-surface ancorato all&apos;asse (ri-crop iterato della parete), indipendente dal punto di click. Solo SR; fail-soft se la copertura della parete e&apos; insufficiente. Sperimentale (A/B vs Legacy).
+                Centro da fit full-surface ancorato all&apos;asse (ri-crop iterato della parete), indipendente dal punto di click. Esteso a 1T3/OS/SR (8.63.0; per 1T3/OS usa un asse lateral-wall locale). Doppio fail-soft: parete povera o copertura insufficiente &rarr; resta il centro legacy. Sperimentale (A/B vs Legacy, da validare su scansioni reali).
               </div>
             </div>
           </label>
