@@ -4,6 +4,12 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-15 — 8.63.1: fix finestra "Sezione" enorme
+
+Segnalazione utente con screenshot: la finestra **Sezione** (`#cutViewOverlay`, usata da Analizza e Sostituire) era enorme — il canvas nero riempiva metà del viewport. Causa: `#cutCanvas` ha il buffer a `width=260 height=260` ma **nessuna dimensione CSS**; dentro l'overlay `display:flex; flex-direction:column` veniva **stirato dal flex** (`align-items:stretch` di default) e, essendo un *replaced element* con aspect-ratio 1:1, cresceva ~quadrato fino a ~1000px. Nessun resize JS, nessuna CSS specifica per il canvas. Fix deterministico: dimensioni CSS esplicite sul canvas — `width:240px;height:240px;flex:none;align-self:center` — che vincono sullo stretch → box fisso 240×240 (il buffer 260 resta, il render è scalato a 240, nitido). Solo markup `#cutCanvas` v3b. `node --check` 8/8. Deploy 2026-06-15 (commit `7039daa`, deploy LEGACY `4804b881`/BACKEND `52f919a7`): verifica visiva live (lo stato richiede STL + marker + sezione aperta, non riproducibile in preview locale).
+
+---
+
 ## 2026-06-15 — 8.63.0: centraggio robust Sostituire esteso a 1T3/OS (beta opt-in)
 
 Su richiesta dell'utente di attaccare *"il vero soffitto di precisione di Sostituire (~37µm, click-seedato, robusto solo per SR)"*. Il soffitto è il centraggio legacy `findScanbodyCenter`: il **search-crop segue il punto di click** (`searchR` attorno a `clickPos`) → su copertura asimmetrica (tessuto, click decentrato) il centro è biased. `sostRobustCenter` (8.15.0) lo annulla (ri-crop iterato della parete **attorno all'asse** + circle-fit Kasa a raggio libero → click-invariant, ~µm), ma era ristretto a SR (validazione 8.15.0 SR-only).
