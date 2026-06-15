@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.63.0</title>
+<title>Syntesis-ICP - Analizzare v8.63.1</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -1458,7 +1458,7 @@ if (document.readyState === 'loading') {
     <span id="cutAngleDisplay" style="font-family:var(--mono);font-size:11px;color:#888;margin-left:auto">0°</span>
     <button onclick="closeCutView()" title="Chiudi" style="background:#1a1a22;color:#fff;border:1px solid #333;border-radius:3px;padding:2px 8px;cursor:pointer;font-family:var(--mono);font-size:13px;line-height:14px">✕</button>
   </div>
-  <canvas id="cutCanvas" width="260" height="260" style="background:#000;border:1px solid #222;border-radius:4px;cursor:grab;display:block"></canvas>
+  <canvas id="cutCanvas" width="260" height="260" style="width:240px;height:240px;flex:none;align-self:center;background:#000;border:1px solid #222;border-radius:4px;cursor:grab;display:block"></canvas>
   <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:#888">
     <span>Zoom</span>
     <input id="cutZoom" type="range" min="2" max="20" step="0.5" value="6" style="flex:1;accent-color:#0065B3" oninput="renderCutView()">
@@ -2429,7 +2429,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.63.0';
+window.ANALIZZA_BUILD = '8.63.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-15';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
