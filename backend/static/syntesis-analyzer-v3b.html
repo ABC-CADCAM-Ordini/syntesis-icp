@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.63.3</title>
+<title>Syntesis-ICP - Analizzare v8.63.4</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2429,7 +2429,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.63.3';
+window.ANALIZZA_BUILD = '8.63.4';
 window.ANALIZZA_BUILD_DATE = '2026-06-15';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -18196,6 +18196,76 @@ function _sostLocalWallAxis(scanGeo, roughCenter, roughAxis, R){
   return new THREE.Vector3(wx, wy, wz);
 }
 
+// 8.63.4 (richiesta utente "stesso file deve dare 0"): detection cilindro CLICK-INVARIANTE per 1T3/OS.
+// Fit cap+parete iterato a PUNTO FISSO: due click qualsiasi sullo stesso scanbody convergono allo STESSO
+// (centro, asse) -> posa identica -> 0. Il CENTRO+livello = baricentro del CAP (faccia piatta occlusale,
+// SEMPRE catturata -> robusto anche dove la parete e' poca, dove il robust-Kasa faceva fail-soft); l'ASSE
+// = min-eigenvector della parete (se sufficiente) altrimenti normale media del cap. Itera finche' (centro,
+// asse) non si muovono piu' -> indipendente dal seme click. Filtro radiale esclude il tessuto. null se
+// non c'e' cap (qui non c'e' uno scanbody). Per la RIPETIBILITA' (=0) conta il punto fisso, non l'accuratezza.
+function _sostCylFitInvariant(scanGeo, roughCenter, roughAxis, R){
+  if(!scanGeo || !scanGeo.attributes || !scanGeo.attributes.normal) return null;
+  var pos = scanGeo.attributes.position.array, nrm = scanGeo.attributes.normal.array;
+  var nTri = pos.length / 9;
+  var cx = roughCenter.x, cy = roughCenter.y, cz = roughCenter.z;
+  var ax = roughAxis.x, ay = roughAxis.y, az = roughAxis.z;
+  var _al = Math.sqrt(ax*ax+ay*ay+az*az); if(_al < 1e-9) return null; ax/=_al; ay/=_al; az/=_al;   // asse UNITARIO (le soglie dot lo assumono)
+  var ax0 = ax, ay0 = ay, az0 = az;            // verso iniziale = verso il CAP/occlusale (findScanbodyCenter -> normale outward): pinna l'orientamento cosi' axMax e' SEMPRE il cap, mai il fondo
+  var Rhi = R + 0.9, Rlo = R - 0.9;            // anello generoso: tutta la parete dello scanbody, no tessuto (oltre Rhi)
+  for(var it = 0; it < 25; it++){
+    var fa = [];                                // facce piatte: [axial, tx,ty,tz, area, nx,ny,nz]
+    var S = [[0,0,0],[0,0,0],[0,0,0]], nWall = 0;
+    for(var i = 0; i < nTri; i++){
+      var ni = i*9;
+      var tx=(pos[ni]+pos[ni+3]+pos[ni+6])/3, ty=(pos[ni+1]+pos[ni+4]+pos[ni+7])/3, tz=(pos[ni+2]+pos[ni+5]+pos[ni+8])/3;
+      var dx=tx-cx, dy=ty-cy, dz=tz-cz;
+      var axial = dx*ax+dy*ay+dz*az; if(Math.abs(axial) > 3.5) continue;
+      var prx=dx-axial*ax, pry=dy-axial*ay, prz=dz-axial*az; var rad=Math.sqrt(prx*prx+pry*pry+prz*prz);
+      if(rad > Rhi) continue;                   // tessuto fuori dal raggio
+      var nx=(nrm[ni]+nrm[ni+3]+nrm[ni+6])/3, ny=(nrm[ni+1]+nrm[ni+4]+nrm[ni+7])/3, nz=(nrm[ni+2]+nrm[ni+5]+nrm[ni+8])/3;
+      var nl=Math.sqrt(nx*nx+ny*ny+nz*nz); if(nl<0.01) continue; nx/=nl;ny/=nl;nz/=nl;
+      var e1x=pos[ni+3]-pos[ni], e1y=pos[ni+4]-pos[ni+1], e1z=pos[ni+5]-pos[ni+2];
+      var e2x=pos[ni+6]-pos[ni], e2y=pos[ni+7]-pos[ni+1], e2z=pos[ni+8]-pos[ni+2];
+      var crx=e1y*e2z-e1z*e2y, cry=e1z*e2x-e1x*e2z, crz=e1x*e2y-e1y*e2x;
+      var ar=0.5*Math.sqrt(crx*crx+cry*cry+crz*crz);
+      var dotA = nx*ax+ny*ay+nz*az;
+      if(Math.abs(dotA) > 0.75){ fa.push([axial, tx,ty,tz, ar, nx,ny,nz]); }   // faccia piatta (cap o fondo)
+      else if(Math.abs(dotA) < 0.35 && rad >= Rlo){                            // parete nell'anello
+        S[0][0]+=ar*nx*nx; S[0][1]+=ar*nx*ny; S[0][2]+=ar*nx*nz;
+        S[1][0]+=ar*ny*nx; S[1][1]+=ar*ny*ny; S[1][2]+=ar*ny*nz;
+        S[2][0]+=ar*nz*nx; S[2][1]+=ar*nz*ny; S[2][2]+=ar*nz*nz; nWall++;
+      }
+    }
+    if(fa.length < 3) return null;               // niente cap -> non e' uno scanbody qui
+    // CAP = facce piatte all'estremo +asse (disco occlusale); scarta il fondo (connessione)
+    var axMax = -Infinity; for(var k=0;k<fa.length;k++){ if(fa[k][0] > axMax) axMax = fa[k][0]; }
+    var sx=0,sy=0,sz=0,sw=0, cnx=0,cny=0,cnz=0;
+    for(var k2=0;k2<fa.length;k2++){
+      if(fa[k2][0] < axMax - 0.6) continue;      // tieni solo il cap (top)
+      var w=fa[k2][4]; sx+=w*fa[k2][1]; sy+=w*fa[k2][2]; sz+=w*fa[k2][3]; sw+=w;
+      var sgn=(fa[k2][5]*ax+fa[k2][6]*ay+fa[k2][7]*az)>0?1:-1;
+      cnx+=w*sgn*fa[k2][5]; cny+=w*sgn*fa[k2][6]; cnz+=w*sgn*fa[k2][7];
+    }
+    if(sw <= 0) return null;
+    var ncx=sx/sw, ncy=sy/sw, ncz=sz/sw;         // centro = baricentro del CAP (click-invariante)
+    var nax=ax, nay=ay, naz=az;
+    if(nWall >= 12){                              // asse dalla parete (preferito)
+      var ej=misICP_jacobi3(S); var mi=0; if(ej.vals[1]<ej.vals[mi])mi=1; if(ej.vals[2]<ej.vals[mi])mi=2;
+      var wx=ej.vecs[0][mi], wy=ej.vecs[1][mi], wz=ej.vecs[2][mi]; var wl=Math.sqrt(wx*wx+wy*wy+wz*wz);
+      if(wl>1e-9){ wx/=wl;wy/=wl;wz/=wl; if(wx*ax+wy*ay+wz*az<0){wx=-wx;wy=-wy;wz=-wz;} nax=wx;nay=wy;naz=wz; }
+    } else {                                      // parete insufficiente -> normale media del cap
+      var cl=Math.sqrt(cnx*cnx+cny*cny+cnz*cnz);
+      if(cl>1e-9){ nax=cnx/cl; nay=cny/cl; naz=cnz/cl; }
+    }
+    if(nax*ax0+nay*ay0+naz*az0 < 0){ nax=-nax; nay=-nay; naz=-naz; }   // tieni l'asse verso il CAP (no inversione -> centro sempre sul disco occlusale)
+    var dC=Math.sqrt((ncx-cx)*(ncx-cx)+(ncy-cy)*(ncy-cy)+(ncz-cz)*(ncz-cz));
+    var dA=1-Math.abs(nax*ax+nay*ay+naz*az);
+    cx=ncx;cy=ncy;cz=ncz; ax=nax;ay=nay;az=naz;
+    if(dC < 1e-5 && dA < 1e-10) break;            // punto fisso (sub-µm, sub-millideg) -> click-invariante
+  }
+  return { center: new THREE.Vector3(cx,cy,cz), axis: new THREE.Vector3(ax,ay,az), applied: true };
+}
+
 function sostPlaceTemplate(rawPoint, rawNormal){
   // Auto-centratura deterministica (stessa funzione di Analizza).
   // Passa il raggio del marker presente nella scansione di partenza
@@ -18217,22 +18287,17 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     try {
       var _cen = autoResult.center, _ax = axis, _ok = false, _cov = 0;
       if(sostSourceTemplate !== 'SR'){
-        var _c = autoResult.center, _a = axis;
-        for(var _it = 0; _it < 5; _it++){
-          var _wa = _sostLocalWallAxis(sostMesh.geometry, _c, _a, sourceRadius);   // asse dalla parete attorno al centro corrente
-          if(_wa) _a = _wa;
-          var _r = sostRobustCenter(sostMesh.geometry, _c, _a, sourceRadius);       // centro (kasa) attorno all'asse corrente
-          if(!_r.applied){ _ok = false; break; }
-          _cov = _r.coverageDeg; var _d = _r.center.distanceTo(_c); _c = _r.center; _ok = true;
-          if(_d < 1e-4) break;                                                       // convergenza sub-µm
-        }
-        if(_ok){ _cen = _c; _ax = _a; }
+        // 8.63.4: detection CLICK-INVARIANTE (fit cap+parete a punto fisso) -> due click qualsiasi
+        // sullo stesso scanbody -> stesso (centro,asse) -> posa identica -> ripetibilita' ~0. Il cap
+        // sempre presente sostituisce il fail-soft del robust-Kasa su parete povera.
+        var _fit = _sostCylFitInvariant(sostMesh.geometry, autoResult.center, axis, sourceRadius);
+        if(_fit){ _cen = _fit.center; _ax = _fit.axis; _ok = true; }
       } else {
-        var _rS = sostRobustCenter(sostMesh.geometry, autoResult.center, axis, sourceRadius);  // SR: solo centro
+        var _rS = sostRobustCenter(sostMesh.geometry, autoResult.center, axis, sourceRadius);  // SR: solo centro (validato 8.15.0)
         if(_rS.applied){ _cen = _rS.center; _ok = true; _cov = _rS.coverageDeg; }
       }
       if(_ok){ discWorld = _cen; axis = _ax.clone().normalize(); }
-      console.log('[sostRobustCenter] type='+sostSourceTemplate+' applied='+_ok+' cov='+(_cov||0).toFixed(0)+'° (8.63.2 fit congiunto centro+asse per 1T3/OS)');
+      console.log('[sostRobustCenter] type='+sostSourceTemplate+' applied='+_ok+' (8.63.4 fit click-invariante cap+parete per 1T3/OS)');
     } catch(e){ console.warn('[sostRobustCenter] errore, fallback legacy:', e); }
   }
 
