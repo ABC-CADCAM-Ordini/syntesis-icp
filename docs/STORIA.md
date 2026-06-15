@@ -4,6 +4,18 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-15 — 8.63.4: detection click-invariante 1T3/OS (fit cap+parete a punto fisso)
+
+L'utente ha corretto un mio errore concettuale: i file confrontati sono **sintetici, senza rumore** (sostituti CAD identici sullo stesso scan), quindi due pose dello stesso scanbody **devono dare 0** — gli 8.6µm misurati (OS-10 vs OS-13, due pose nuove) sono **puro non-determinismo software**, non un pavimento da rumore scanner.
+
+Indagine (workflow determinismo, alta confidenza, verificata avversarialmente): la **Raffina è deterministica** (zero RNG nel percorso geometrico — `kabsch`, NN brute-force, stride costanti). Gli 8.6µm sono **click-dependence del SEME**: l'asse cap-media di `findScanbodyCenter` balla ~0.5° tra due click (cap OS piccolo, crop centrato sul click), e — siccome il riferimento di misura è il **centroide di volume** del sostituto, ~1mm sotto il disco lungo l'asse — la **leva** lo amplifica: `0.5°·1mm ≈ 8.7µm`. La serie [3,4,5,8,10,15] è **bimodale**: marker dove il robust ingaggia (~3-5µm) vs dove fa **fail-soft** a legacy (~10-15µm, copertura parete <140°). Conferma empirica: per-scanbody la differenza OS-10/OS-13 è traslazione 8-30µm + un **clocking enormemente non-deterministico** (fino a 177°, il DOF debole su cilindro quasi-simmetrico, che però non sposta il centroide).
+
+Fix (solo blocco `sost*` v3b, branch robust; beta opt-in, default legacy; SR invariato): nuovo motore `_sostCylFitInvariant` — **fit cilindro a PUNTO FISSO** (max 25 iter). Ogni iter croppa attorno a (centro,asse) corrente con filtro radiale che esclude il tessuto, separa il **CAP occlusale** (faccia piatta all'estremo +asse) dalla parete; nuovo centro = baricentro del CAP, nuovo asse = min-eigenvector della parete (se sufficiente) altrimenti normale media del cap; itera finché (centro,asse) non si muovono più. Due click qualsiasi → stesso punto fisso → **indipendente dal click**. Il CAP è **sempre catturato** (anche dove la parete è poca) → elimina il fail-soft del robust-Kasa (la coda 10-15µm). Per la ripetibilità (=0) conta il punto fisso, non l'accuratezza assoluta (un eventuale notch off-axis è identico nei due run → 0).
+
+Hardening da verifica avversariale (Explore, 2 critici chiusi): (1) asse **normalizzato** all'ingresso (le soglie dot lo assumono unitario); (2) verso dell'asse **pinnato** al verso iniziale (verso il cap, da `findScanbodyCenter` outward) → `axMax` è sempre il cap occlusale, mai il fondo/connessione, anche se l'asse oscilla durante l'iterazione. `node --check` 8/8. Deploy 2026-06-15 (commit `7b5fb5c`, deploy LEGACY `adc5a6c1`/BACKEND `38e46a70`). **PENDING**: collaudo A/B utente — OS-su-OS **due pose nuove** (Robust + autoloop), atteso il crollo degli 8.6µm verso ~0; se confermato → promozione di robust a default.
+
+---
+
 ## 2026-06-15 — 8.63.3: Raffina Sostituire auto-loop fino a convergenza
 
 Richiesta utente: *"per stabilizzare l'accoppiamento devo cliccare Raffina tante volte, puoi farlo in automatico?"*. `sostAlignAll` faceva **un solo round ICP per click**; siccome ogni round ri-croppa il template attorno alla posa corrente (coordinate descent), per stabilizzarsi servivano molti click manuali.
