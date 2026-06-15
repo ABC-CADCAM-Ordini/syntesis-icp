@@ -4,6 +4,16 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-15 — 8.63.3: Raffina Sostituire auto-loop fino a convergenza
+
+Richiesta utente: *"per stabilizzare l'accoppiamento devo cliccare Raffina tante volte, puoi farlo in automatico?"*. `sostAlignAll` faceva **un solo round ICP per click**; siccome ogni round ri-croppa il template attorno alla posa corrente (coordinate descent), per stabilizzarsi servivano molti click manuali.
+
+Ora **un click → auto-loop fino a convergenza**, come Replace-iT `replaceRefineAll` (8.25.0). La pipeline decode-template resta una volta sola nel `then`; poi due funzioni interne: `_sostRefineRound(round)` esegue il forEach per-marker (corpo sample/crop/ICP/apply **invariato**), traccia il max spostamento (`_posB = p.position` pre-round, `_mv = distanza` post-round) e — se `maxMove < SOST_REFINE_EPS_MM` (1µm) o `round >= SOST_REFINE_MAX_ROUNDS` (12) — chiama `_sostFinishRefine` (render + status + rebuildTree + cut + rilascio lock); altrimenti `setTimeout(0)` → round successivo (UI reattiva + progresso live "round N… spostamento X µm").
+
+Robustezza (verifica avversariale Explore, 1 difetto reale chiuso): il loop ricorre via `setTimeout` **fuori dalla catena Promise**, quindi un'eccezione in un round non sarebbe catturata dal `.catch` → aggiunto **try/catch per-round** (status + rilascio lock). E la scena può cambiare nel gap tra round (scansione scaricata/ricreata → `sostMesh` nullo o `scanPos` stantio; marker eliminati) mentre la re-guard 8.62.2 è solo a inizio `then` → aggiunta **re-guard PER-ROUND**: `scanPos` riletto fresco ad ogni round + guardia `p` valido nel forEach + check `sostMesh`/`sostPlaced`. Lock `sostAlignInProgress` rilasciato su **tutte** le vie (convergenza/cap/eccezione/re-guard). Terminazione garantita (coordinate descent + cap 12). `node --check` 8/8. Deploy 2026-06-15 (commit `a461b7e`, deploy LEGACY `cd9f4240`/BACKEND `1d06c587`).
+
+---
+
 ## 2026-06-15 — 8.63.2: centraggio robust 1T3/OS = fit cilindro congiunto centro+asse
 
 L'utente, testando **OS sostituito-con-se-stesso** (file uguale → dovrebbe dare 0 errore), ha insistito che i ~12µm vanno azzerati. A/B sui dati reali: robust+point-to-plane = RMSD **12.5µm** (assi 0.04-0.52°) vs legacy+point-to-point = **12.8µm** (assi 0.12-0.76°) → **equivalenti**. Ma il log (`[sostRobustCenter] type=OS applied=true cov=358°`) mostra che il **centro robust era già click-invariante**. Quindi il residuo **non è il centro**.
