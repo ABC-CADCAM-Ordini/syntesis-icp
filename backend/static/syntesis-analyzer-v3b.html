@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.62.0</title>
+<title>Syntesis-ICP - Analizzare v8.62.1</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2429,7 +2429,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.62.0';
+window.ANALIZZA_BUILD = '8.62.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-15';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -6301,14 +6301,30 @@ function misICP_clusterComps(cents, thresh){
 // Calcola centroide di un cluster (insieme di componenti unite)
 // scanIdxs = indici in part.scan, compList = comps completa, T = triangoli
 function misICP_clusterCentroid(T, comps, partScan, scanIdxsInCluster){
-  var x=0, y=0, z=0, n=0;
+  // 8.62.1: centroide AREA-PESATO (centroide di superficie) invece della media non pesata dei
+  // vertici. La media non pesata pesa per DENSITA' di triangolazione: confrontando due mesh a
+  // densita' diversa (es. exocad denso 31k tri vs export Synthesis decimato 12k tri) il centroide
+  // si sposta -> deviazione SPURIA (riprodotta 74.5um, scende a 17.3um reale su id 2770). L'area-peso
+  // rende la metrica indipendente dalla densita'. UNICO punto: alimenta sia l'allineamento
+  // (scanCentsA/B -> misICP_runICP) sia la deviazione (matchPairs) -> li corregge entrambi. Allinea
+  // il client al backend, che usa gia' un riferimento robusto (icp_engine.cap_centroid).
+  var sx=0, sy=0, sz=0, W=0;
   scanIdxsInCluster.forEach(function(ri){
     var compIdx = partScan[ri];
     comps[compIdx].forEach(function(ti){
-      T[ti].forEach(function(v){ x+=v[0]; y+=v[1]; z+=v[2]; n++; });
+      var tr=T[ti], a=tr[0], b=tr[1], c=tr[2];
+      var ux=b[0]-a[0], uy=b[1]-a[1], uz=b[2]-a[2];
+      var vx=c[0]-a[0], vy=c[1]-a[1], vz=c[2]-a[2];
+      var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+      var ar=0.5*Math.sqrt(nx*nx + ny*ny + nz*nz);     // area del triangolo
+      sx += ar*(a[0]+b[0]+c[0])/3; sy += ar*(a[1]+b[1]+c[1])/3; sz += ar*(a[2]+b[2]+c[2])/3; W += ar;
     });
   });
-  return [x/n, y/n, z/n];
+  if(W>0) return [sx/W, sy/W, sz/W];
+  // fallback difensivo (cluster di soli triangoli degeneri, area~0): media non pesata storica
+  var x=0, y=0, z=0, n=0;
+  scanIdxsInCluster.forEach(function(ri){ comps[partScan[ri]].forEach(function(ti){ T[ti].forEach(function(v){ x+=v[0]; y+=v[1]; z+=v[2]; n++; }); }); });
+  return n ? [x/n, y/n, z/n] : [0,0,0];
 }
 
 // Estrae tutti i triangoli di un cluster come array unico
