@@ -4,6 +4,25 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-15 — 8.63.0: centraggio robust Sostituire esteso a 1T3/OS (beta opt-in)
+
+Su richiesta dell'utente di attaccare *"il vero soffitto di precisione di Sostituire (~37µm, click-seedato, robusto solo per SR)"*. Il soffitto è il centraggio legacy `findScanbodyCenter`: il **search-crop segue il punto di click** (`searchR` attorno a `clickPos`) → su copertura asimmetrica (tessuto, click decentrato) il centro è biased. `sostRobustCenter` (8.15.0) lo annulla (ri-crop iterato della parete **attorno all'asse** + circle-fit Kasa a raggio libero → click-invariant, ~µm), ma era ristretto a SR (validazione 8.15.0 SR-only).
+
+Approccio disciplinato (come per Misurare): **capire e misurare prima di scrivere**.
+- **Workflow understand (4 lenti)**: fonte del 37µm = solo il centro legacy (il raggio fisso non c'entra, aiuta); ma `sostRobustCenter` ancora il centro al piano ⊥ asse → per 1T3/OS l'asse globale è **cap-media** (lateral-wall è SR-only nel motore `synAxisUseLateral 'auto'`) → estendere SOLO il centro sarebbe un **fix illusorio** (eredita il tilt). Inoltre cambiare il motore asse globale propagherebbe ad Analizza e al report PDF (regressione cross-workflow). Raccomandazione: **misura-prima**.
+- **Harness offline Fase 0+1** (`/tmp/centering_harness.py`, marker HD 1T3/OS/SR + rumore 15µm + occlusione + gengiva sintetica): **feasibility GREEN** per 1T3/OS — asse lateral-wall **osservabile** (err ≤0.4°, anche OS a 1.10mm parete), robust **applied 100%** (zero fail-soft, nemmeno OS), centro click-invariant. I timori "OS vicolo cieco / asse non osservabile" del workflow **non si materializzano** sulla geometria reale. CAVEAT onesto: il sintetico **non riproduce** il 37µm in-vivo (driver = topologia di una scansione reale, gengiva irregolare) → il **gain reale su 1T3/OS resta da validare A/B su scansioni vere** (per questo è opt-in, non default).
+
+Implementazione (solo blocco `sost*` v3b):
+- Nuovo helper `_sostLocalWallAxis(scanGeo, roughCenter, roughAxis, R)`: asse lateral-wall **LOCALE** = min-eigenvector di Σ area·n·nᵀ sui triangoli di parete (|n·axis|<0.35, banda ±3.5, anello [R−0.8, R+0.6]) via `misICP_jacobi3`; verso concorde al cap-media; fail-soft `nWall<12 → null`. Calcolato SOLO nel branch robust → **non** tocca `synAxisUseLateral`/Analizza/report PDF (evita la regressione cross-workflow).
+- Branch in `sostPlaceTemplate`: guard da `sostSourceTemplate === 'SR'` a tutti i tipi quando `flag === 'robust' && sourceRadius`; per non-SR ricava l'asse locale (`_ax = _wa || axis`); centro robusto + asse raffinato applicati SOLO se `_rc.applied` (copertura ≥140°). **Triplo fail-soft**: parete<12 tri → cap-media; copertura<140° → centro legacy; flag default `legacy` → tutto invariato. **SR INVARIATO** (`_ax = axis`, riassegnazione no-op).
+- UI radio tab Algoritmo: "beta, SR" → "beta, 1T3/OS/SR" + descrizione doppio fail-soft.
+
+Verifica avversariale del diff (Explore): **PULITO** (matematica asse corretta e coerente con `sostAlignAll`, SR invariato no-op, fail-soft completo, nessun NaN/crash — S-zero gateato da `nWall<12`). `node --check` 8/8. Le costanti banda/anello (tarate su SR) lasciate as-is: la rete fail-soft protegge; ri-taratura per-tipo = follow-up con dati reali. Deploy 2026-06-15 (commit `cbe52ed`): cache calda, nessun hang — LEGACY deploy `fcf7ad0a`, BACKEND `15b855a5`, SUCCESS in 30-60s; live 8.63.0 su entrambi + custom domain.
+
+**PENDING**: collaudo A/B utente del robust su scansioni reali 1T3/OS (abilitare flag dal tab Algoritmo, confrontare vs legacy) prima di valutare la promozione a default — decisione di prodotto.
+
+---
+
 ## 2026-06-15 — 8.62.2: fix robustezza accoppiamento Sostituire (crash async + leak GPU)
 
 Su richiesta dell'utente (*"in Sostituire ci sono bug durante l'accoppiamento? siamo sicuri che funzioni al meglio?"*) è stato condotto un **audit avversariale** del codice di accoppiamento (30 agenti, 5 lenti di review → verifica per refutazione di ogni finding → sintesi). Esito: il **cuore è sano** — motore ICP, posa (`sostPlaceTemplate`), flip SR, delta della triade **confermati corretti** (14 falsi allarmi sul core, gli scettici non sono riusciti a romperlo). Coerente con i ~17µm misurati su id 2770. **2 bug reali di robustezza** (non di accuratezza dell'accoppiamento), fixati qui; i limiti di precisione noti lasciati come track separato.
