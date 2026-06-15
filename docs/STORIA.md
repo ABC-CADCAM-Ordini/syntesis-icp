@@ -4,6 +4,24 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-15 — 8.62.0: righello A/B per il collaudo di Raffina+ (Replace-iT)
+
+Strumentazione per rendere **conclusivo** il collaudo A/B di **Raffina+** (raffinamento posa madre via ICP point-to-plane SERVER full-res, 8.59.x) contro la **Raffina** client. Il collaudo era *pending da 8.59.1*: la feature era live ma i due path mostravano metriche **non comparabili** — la Raffina client riporta `RMSD medio mm` (point-to-point, su ~400/1500 campioni sottocampionati), Raffina+ riporta `residuo fit µm` (point-to-plane, full-res). Il residuo point-to-plane è sempre più piccolo del point-to-point a parità di posa → un A/B live sarebbe stato **falsato a favore del server per costruzione**.
+
+Solo frontend `v3b` (blocco `replace*`); l'endpoint `POST /api/rit/refine-icp` e il motore `icp_engine.refine_point_to_plane` (hardenizzato dalla revisione 18-agenti del 8.59.1) restano **invariati** — la modifica è puramente additiva.
+
+Implementazione:
+- `_replaceExtractRefineSets(p, maxSrc, maxTgt)`: estrae madre full-res (mondo) + crop cilindrico scansione. Clona la logica crop inline di `replaceRefineServer` (quella resta intatta; de-dup annotata come passo dedicato, CLAUDE.md §3.4).
+- `_replaceEvalFit(p)`: **righello comune** = RMSD point-to-point in µm, calcolato con la **stessa funzione** per entrambe le pose finali, cap `REPLACE_EVAL_MAX_SRC=1500`/`REPLACE_EVAL_MAX_TGT=4000` (one-shot, no freeze), trim mediana×2.5.
+- `_replaceTwistAngleDeg(qCur, qSeed, axis)`: **delta-clocking** firmato (°) della posa corrente vs il seed 3-punti grezzo, via swing-twist attorno all'asse impianto (il DOF debole = vero oggetto del dubbio sul clocking). Seed catturato in `replacePlaceFromSeed` (`p.seedPos`/`seedQuat`/`seedAxis`).
+- `_replaceRecordAB`/`_replaceShowAB`: memorizza `p.abClient`/`p.abServer` e stampa la riga-verdetto (`A/B #N (righello comune) — Raffina: Xµm, clock +A° · Raffina+: Yµm, clock +B° → Δfit, Δclock`). Aggancio: `finish()` di `replaceRefineAll` single-target → record `'client'` (al Conferma la `onDone` sovrascrive → no spam; sul Raffina manuale resta); fine `replaceRefineServer` → record `'server'`.
+- NUOVO pulsante **"↺ Seed"** (`#replaceBtnResetSeed`, `replaceResetToSeed`) accanto a Raffina+: riporta l'impianto attivo alla posa seed → A/B **indipendente** (reset→Raffina→reset→Raffina+ dallo stesso seed). Abilitato/disabilitato come Raffina+ in `replaceRebuildPlacedList`.
+- `node --check` 8/8; `py_compile` registry OK. Bump `<title>`/`ANALIZZA_BUILD` 8.62.0; `MAPPA_FUNZIONALE` riga `.replace-only` (8 bottoni) + versione mappata 8.62.0.
+
+Deploy 2026-06-15 (commit `d833bf0`): entrambi i servizi hanno avuto un **hang Railway post-build** — lo status è rimasto in `BUILDING` ~15 min nonostante i build log mostrassero lo step `[7/7]` e l'export immagine **completati senza errori**. Risolti con **ri-trigger** (`serviceInstanceDeploy latestCommit:true`): con la cache calda il nuovo build è andato a `SUCCESS` in ~90-120s (LEGACY deploy `27ae6f1c`, BACKEND deploy `cfed79a4`). Verifica live: 8.62.0 su entrambi i domini + custom domain, `/analizzare` 200, gating `403`. **PENDING: collaudo A/B in live dall'utente** (protocollo: posiziona impianto → ↺ Seed → Raffina → ↺ Seed → Raffina+ → leggi Δfit/Δclock; ripeti sui 3 scanbody di forma diversa).
+
+---
+
 ## 2026-06-14 — 8.61.2: menù WorkFlow di Vedere allineato (+ Replace-iT, deep-link) — coerenza cross-superficie
 
 Feedback utente: *"perché quando sono su vedere i workflow in elenco sono di meno?? sembra che vedere sia un software a parte… vedere dovrebbe essere una parte dello stesso software, un workflow; separarlo così rischia di creare differenze di stile e comportamento."*
