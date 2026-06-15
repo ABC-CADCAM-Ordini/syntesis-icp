@@ -4,6 +4,25 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-15 — 8.62.1: fix clinico Misurare — centroide scanbody area-pesato (artefatto di densità)
+
+Segnalazione utente sul workflow **Misurare** (Confronto ICP): sovrapponendo due STL "che dovrebbero essere quasi identici", *"tutti gli scanbody tirano dalla stessa parte"*; ipotesi dell'utente *"ICP che scivola di lato"*. Diagnosi condotta sui file reali (id 2770: File A = export **exocad** 31.344 tri; File B = `_SR-2` = export **Synthesis Sostituire** decimato 11.994 tri) e **riprodotta offline al micron**.
+
+**Cosa NON era.** (1) Non è slittamento ICP: Misurare allinea i **6 centroidi** dei cluster scanbody con Kabsch+ICP (`misICP_run`), e Kabsch forza la **media-residuo = 0** per costruzione → una traslazione netta laterale è impossibile (bias coerente misurato `[0,0,0]` esatto). (2) Non è un errore di piazzamento di Sostituire: la deviazione reale è ~17µm, ottima (il gap ~37µm temuto non c'è su questo caso). (3) Non è la decimazione dell'export: i template che Sostituire piazza sono decimati **a monte** da IPD a 1999 tri (`SOSTITUIRE_TEMPLATES_B64`), l'export li scrive 1:1.
+
+**Causa vera.** Il riferimento scanbody di Misurare — `misICP_clusterCentroid` (~6303), come `misICP_cen` (~6210) — era la **media NON pesata dei vertici** (`x/n`), quindi pesata per **densità di triangolazione**. Confrontando una mesh densa (exocad 31k) con una decimata (Synthesis 12k), la diversa densità sposta il centroide → **deviazione spuria**. La replica offline con media non pesata dà RMSD **74.5µm** e deviazioni **64/43/31/135/51/75µm** — IDENTICHE allo screenshot utente, fino alle componenti (#1 X−12 Y−62 Z+5). Area-pesando (centroide di superficie, density-independent) scende a RMSD **17.3µm** (14/2/8/17/26/24µm).
+
+Implementazione:
+- `misICP_clusterCentroid` ora calcola il **centroide AREA-PESATO**: per ogni triangolo, baricentro × area, sommati e normalizzati per l'area totale. È il punto unico: alimenta sia l'allineamento (`scanCentsA/B` 6793-6794) sia la deviazione (`matchPairs`) → corregge entrambi. `misICP_cen` (solo euristiche di clustering/autoThresh) lasciato intatto. Guard `W>0` con fallback alla media non pesata storica su cluster di soli triangoli degeneri.
+- **Blast-radius = 1 funzione, 2 chiamanti.** Verificato avversarialmente (3 lenti): allineamento safe (simmetrico su A/B, clustering invariante, scala-safe — anzi *riduce* il residuo Kabsch), nessun chiamante rotto, swap template HD non necessario.
+- **FE/BE:** il backend `/api/analyze` (leaderboard) usa già `icp_engine.cap_centroid` (riferimento robusto, cap-based) → il fix **avvicina** client e server; nessuna modifica al backend.
+
+**Impatto clinico (voluto, non silenzioso):** le deviazioni refertate, la classe clinica per-scanbody e il Syntesis Score cambiano verso i **valori reali** (più piccoli/migliori); un export PDF/Excel fatto prima del fix non è bit-identico a uno fatto dopo. `node --check` 8/8. Deploy 2026-06-15 (commit `8b4d970`): cache calda, nessun hang — LEGACY deploy `ef1845d8`, BACKEND `8a2d0d98`, SUCCESS in 30-60s; live 8.62.1 su entrambi + custom domain.
+
+Nota aperta (separata): il template **1T3** embedded è troncato in altezza (Z=1.07mm vs 1.90mm di datasheet/HD) — da chiarire se voluto (solo parte esposta) o difetto; innocuo allo stato attuale (`BBOX_LOCAL['1T3']` intatto).
+
+---
+
 ## 2026-06-15 — 8.62.0: righello A/B per il collaudo di Raffina+ (Replace-iT)
 
 Strumentazione per rendere **conclusivo** il collaudo A/B di **Raffina+** (raffinamento posa madre via ICP point-to-plane SERVER full-res, 8.59.x) contro la **Raffina** client. Il collaudo era *pending da 8.59.1*: la feature era live ma i due path mostravano metriche **non comparabili** — la Raffina client riporta `RMSD medio mm` (point-to-point, su ~400/1500 campioni sottocampionati), Raffina+ riporta `residuo fit µm` (point-to-plane, full-res). Il residuo point-to-plane è sempre più piccolo del point-to-point a parità di posa → un A/B live sarebbe stato **falsato a favore del server per costruzione**.
