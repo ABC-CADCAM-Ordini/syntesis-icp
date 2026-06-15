@@ -4,6 +4,20 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-15 — 8.62.2: fix robustezza accoppiamento Sostituire (crash async + leak GPU)
+
+Su richiesta dell'utente (*"in Sostituire ci sono bug durante l'accoppiamento? siamo sicuri che funzioni al meglio?"*) è stato condotto un **audit avversariale** del codice di accoppiamento (30 agenti, 5 lenti di review → verifica per refutazione di ogni finding → sintesi). Esito: il **cuore è sano** — motore ICP, posa (`sostPlaceTemplate`), flip SR, delta della triade **confermati corretti** (14 falsi allarmi sul core, gli scettici non sono riusciti a romperlo). Coerente con i ~17µm misurati su id 2770. **2 bug reali di robustezza** (non di accuratezza dell'accoppiamento), fixati qui; i limiti di precisione noti lasciati come track separato.
+
+Implementazione (solo blocco `sost*` v3b; motore di accoppiamento INVARIATO):
+- **Crash async nella Raffina.** `sostAlignAll` esegue in `setTimeout` → `Promise.all(decode).then()`. La `then` dereferenziava `sostMesh.geometry` (~18541) **senza re-guard né `catch`**: se l'utente scaricava la scansione o cambiava workflow nei ~30ms del decode async, crash + unhandled rejection. Fix: re-guard a inizio `then` (`sostMesh`/`geometry`/`attributes`/`sostPlaced.length`), `.catch` sulla catena (stato chiaro, niente eccezione silenziosa) e **lock anti-rientranza** `sostAlignInProgress` (da review avversariale del diff: il bottone Raffina restava cliccabile durante l'ICP async → doppio-click = doppia esecuzione concorrente; ora il 2° click è ignorato finché il 1° non chiude, rilascio in successo/errore/re-guard).
+- **Leak GPU su reset/reload.** `_hardResetSostituire` faceva solo `scene.remove(p.group)` e `sostClearScene` disponeva solo `p.group` → i **2 variant inattivi** (`p.groups` 1T3/SR/OS) + `axisLine` restavano allocati in VRAM a ogni cambio-workflow/reload. Fix: nuovo helper `_sostDisposePlaced(p)` (dispose completo dei variant via `p.groups` + `axisLine`, stesso pattern di `sostRemovePlaced`) usato da entrambi; l'orphan-sweep di `sostClearScene` ora fa `dispose` prima di `scene.remove`.
+
+Verificato avversarialmente (review del diff con Explore: 3 fix robusti, doppio-dispose impossibile perché `scene.remove` stacca prima del traverse, geometrie non condivise; il 4° punto — re-entrancy — chiuso col lock). `node --check` 8/8. Deploy 2026-06-15 (commit `78d47ae`): cache calda, nessun hang — LEGACY deploy `58c473f0`, BACKEND `f8370ec9`, SUCCESS in 30-90s; live 8.62.2 su entrambi + custom domain.
+
+Limiti noti lasciati come track separato (non bug): centraggio click-seedato ~37µm (`sostRobustCenter` SR-only opt-in, 8.15.0); template 1T3 troncato Z=1.07 vs 1.90 (innocuo per la posa, `BBOX_LOCAL` coerente con `T_root` −8.5); dead code `SOSTITUIRE_Z_OFFSET_UNIVERSAL`.
+
+---
+
 ## 2026-06-15 — 8.62.1: fix clinico Misurare — centroide scanbody area-pesato (artefatto di densità)
 
 Segnalazione utente sul workflow **Misurare** (Confronto ICP): sovrapponendo due STL "che dovrebbero essere quasi identici", *"tutti gli scanbody tirano dalla stessa parte"*; ipotesi dell'utente *"ICP che scivola di lato"*. Diagnosi condotta sui file reali (id 2770: File A = export **exocad** 31.344 tri; File B = `_SR-2` = export **Synthesis Sostituire** decimato 11.994 tri) e **riprodotta offline al micron**.
