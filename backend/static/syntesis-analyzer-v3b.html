@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.61.2</title>
+<title>Syntesis-ICP - Analizzare v8.62.0</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2043,7 +2043,8 @@ if (document.readyState === 'loading') {
       <!-- 2b-1.3: flusso per-scanbody. Raffina (2b-2) e Concludi (2b-3) sono scaffolding disabilitato. -->
       <div id="replaceFlow" style="display:none;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button id="replaceBtnRefine" class="replace-only" disabled onclick="replaceRefineCurrent()" title="Raffina (ICP) SOLO l'impianto attivo: l'ultimo piazzato, o quello selezionato nell'albero scena" style="flex:1;min-width:78px;padding:7px 8px;background:var(--fill-primary);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina</button>
-        <button id="replaceBtnRefineSrv" class="replace-only" disabled onclick="replaceRefineServer()" title="Raffina SERVER (point-to-plane, piena risoluzione · beta): stesso impianto attivo, calcolata sul server con TUTTA la mesh (il client sottocampiona) -> fit piu' fine. Mostra il residuo del fit per il confronto A/B con Raffina." style="flex:1;min-width:78px;padding:7px 8px;background:var(--fill-confirm);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina+</button>
+        <button id="replaceBtnRefineSrv" class="replace-only" disabled onclick="replaceRefineServer()" title="Raffina SERVER (point-to-plane, piena risoluzione · beta): stesso impianto attivo, calcolata sul server con TUTTA la mesh (il client sottocampiona) -> fit piu' fine. Mostra il righello A/B comune per il confronto con Raffina." style="flex:1;min-width:78px;padding:7px 8px;background:var(--fill-confirm);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">Raffina+</button>
+        <button id="replaceBtnResetSeed" class="replace-only" disabled onclick="replaceResetToSeed()" title="Riporta l'impianto attivo alla posa SEED (3 punti grezzi, prima di ogni raffina) -> per un A/B indipendente: reset, Raffina, reset, Raffina+ (entrambe dallo stesso seed)." style="flex:1;min-width:78px;padding:7px 8px;background:#fff;color:var(--dark);border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;opacity:0.5;cursor:not-allowed">↺ Seed</button>
         <button id="replaceBtnNext" class="replace-only" onclick="replaceNextScanbody()" style="flex:1;min-width:78px;padding:7px 8px;background:#fff;color:var(--dark);border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Avanti / nuovo</button>
         <button id="replaceBtnFinish" class="replace-only" onclick="replaceExportSTL()" title="Esporta i sostituti (figli) piazzati come file STL nelle loro posizioni in scena" style="flex:1;min-width:78px;padding:7px 8px;background:var(--fill-primary);color:var(--dark);border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer">Concludi · Esporta</button>
       </div>
@@ -2428,8 +2429,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.61.2';
-window.ANALIZZA_BUILD_DATE = '2026-06-13';
+window.ANALIZZA_BUILD = '8.62.0';
+window.ANALIZZA_BUILD_DATE = '2026-06-15';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -16618,6 +16619,7 @@ function replacePlaceFromSeed(){
       group: group, meshSub: meshSub, meshSrc: meshSrc, originAxes: originAxes,
       showSrc: true, showSub: true, showOrigin: true,
       seedMarkerPts: seedMarker, seedScanPts: seedScan,
+      seedPos: posV.clone(), seedQuat: qFinal.clone(), seedAxis: N.clone(),   // 8.62.0: posa SEED 3-punti grezza (delta-clocking A/B + reset-to-seed)
       position: posV.clone(), axisDir: N.clone(),
       srcGeo: geoSrc,                               // 8.31.1: la Raffina resta sul SORGENTE (cap trimmato per il fit)
       srcGeoFull: geos[0],                          // 8.59.7: CAD MADRE INTERO (cache, mai accorciato) -> il "Taglia scansione" usa QUESTO, non il trim dell'anteprima
@@ -16747,17 +16749,20 @@ function replaceRebuildPlacedList(){
   if(!wrap || !items) return;
   var rfn = document.getElementById('replaceBtnRefine');
   var rfnS = document.getElementById('replaceBtnRefineSrv');   // 8.59.0: Raffina+ server
+  var rfnR = document.getElementById('replaceBtnResetSeed');   // 8.62.0: reset alla posa seed (A/B)
   if(!replacePlaced.length){
     wrap.style.display = 'none'; items.innerHTML = '';
     if(flow) flow.style.display = 'none';
     if(rfn){ rfn.disabled = true; rfn.style.opacity = '0.5'; rfn.style.cursor = 'not-allowed'; }
     if(rfnS){ rfnS.disabled = true; rfnS.style.opacity = '0.5'; rfnS.style.cursor = 'not-allowed'; }
+    if(rfnR){ rfnR.disabled = true; rfnR.style.opacity = '0.5'; rfnR.style.cursor = 'not-allowed'; }
     return;
   }
   wrap.style.display = '';
   if(flow) flow.style.display = 'flex';
   if(rfn){ rfn.disabled = false; rfn.style.opacity = '1'; rfn.style.cursor = 'pointer'; }  // 2b-2: Raffina attiva con >=1 marker
   if(rfnS){ rfnS.disabled = false; rfnS.style.opacity = '1'; rfnS.style.cursor = 'pointer'; }  // 8.59.0: idem Raffina+ server
+  if(rfnR){ rfnR.disabled = false; rfnR.style.opacity = '1'; rfnR.style.cursor = 'pointer'; }  // 8.62.0: reset-to-seed attivo con >=1 impianto
   items.innerHTML = '';
   replacePlaced.forEach(function(p){
     var row = document.createElement('div');
@@ -17597,6 +17602,144 @@ function replaceRefineCurrent(){
 // del client -> ~1µm vs ~5-9µm (validato offline). Self-contained: NON tocca il path
 // client. Applica lo stesso delta rigido (matrice 4x4) e mostra RMSD/coppie/tempi per A/B.
 var REPLACE_SRV_MAX_SRC = 8000, REPLACE_SRV_MAX_TGT = 20000;   // allineati ai cap backend
+var REPLACE_EVAL_MAX_SRC = 1500, REPLACE_EVAL_MAX_TGT = 4000;   // 8.62.0: cap del RIGHELLO A/B (one-shot, no freeze); BASSI e IDENTICI per i due path -> "medesimi punti"
+
+// 8.62.0 (collaudo A/B Raffina+): estrazione madre full-res (mondo) + crop cilindrico scansione
+// attorno al marker -> set di punti per il RIGHELLO COMUNE (point-to-point). NB: clona la logica
+// crop INLINE di replaceRefineServer (~17613-17667), che resta INTATTA (path server hardenizzato
+// 8.59.1). De-dup annotata come passo dedicato (CLAUDE.md §3.4).
+function _replaceExtractRefineSets(p, maxSrc, maxTgt){
+  if(!p || !p.group || !replaceMesh) return { ok: false };
+  p.group.updateMatrixWorld(true);
+  var m = p.group.matrixWorld.elements;
+  var geo = p.srcGeo || (p.group.children && p.group.children[0] && p.group.children[0].geometry);
+  if(!geo || !geo.attributes || !geo.attributes.position) return { ok: false };
+  var cadPos = geo.attributes.position.array;
+  var nCadV = cadPos.length / 3;
+  var srcStep = Math.max(1, Math.ceil(nCadV / maxSrc));
+  var axis = p.axisDir.clone().normalize(), axx = axis.x, axy = axis.y, axz = axis.z;
+  var src = [], cen = [0, 0, 0];
+  for(var vi = 0; vi < nCadV; vi += srcStep){
+    var o = vi * 3, lx = cadPos[o], ly = cadPos[o+1], lz = cadPos[o+2];
+    var wx = m[0]*lx + m[4]*ly + m[8]*lz  + m[12];
+    var wy = m[1]*lx + m[5]*ly + m[9]*lz  + m[13];
+    var wz = m[2]*lx + m[6]*ly + m[10]*lz + m[14];
+    src.push([wx, wy, wz]); cen[0]+=wx; cen[1]+=wy; cen[2]+=wz;
+  }
+  if(src.length < 20) return { ok: false };
+  cen[0]/=src.length; cen[1]/=src.length; cen[2]/=src.length;
+  var zMin = Infinity, zMax = -Infinity, rMax = 0;
+  for(var i2 = 0; i2 < src.length; i2++){
+    var dx = src[i2][0]-cen[0], dy = src[i2][1]-cen[1], dz = src[i2][2]-cen[2];
+    var zp = dx*axx + dy*axy + dz*axz; if(zp < zMin) zMin = zp; if(zp > zMax) zMax = zp;
+    var rx = dx - zp*axx, ry = dy - zp*axy, rz = dz - zp*axz; var r = Math.sqrt(rx*rx + ry*ry + rz*rz); if(r > rMax) rMax = r;
+  }
+  var MARG = 1.5, zLo = zMin - MARG, zHi = zMax + MARG, radLim2 = (rMax + MARG) * (rMax + MARG);
+  var scanPos = (replaceOriginalGeo || replaceMesh.geometry).attributes.position.array;
+  var nScanTri = scanPos.length / 9, tgt = [];
+  for(var si = 0; si < nScanTri; si++){
+    var oi = si * 9;
+    var px = (scanPos[oi]   + scanPos[oi+3] + scanPos[oi+6]) / 3;
+    var py = (scanPos[oi+1] + scanPos[oi+4] + scanPos[oi+7]) / 3;
+    var pz = (scanPos[oi+2] + scanPos[oi+5] + scanPos[oi+8]) / 3;
+    var ddx = px-cen[0], ddy = py-cen[1], ddz = pz-cen[2];
+    var zp2 = ddx*axx + ddy*axy + ddz*axz; if(zp2 < zLo || zp2 > zHi) continue;
+    var rrx = ddx - zp2*axx, rry = ddy - zp2*axy, rrz = ddz - zp2*axz; if(rrx*rrx + rry*rry + rrz*rrz > radLim2) continue;
+    tgt.push([px, py, pz]);
+  }
+  if(tgt.length < 20) return { ok: false };
+  if(tgt.length > maxTgt){ var stp = Math.ceil(tgt.length / maxTgt), ta = []; for(var k = 0; k < tgt.length; k += stp){ ta.push(tgt[k]); } tgt = ta; }
+  return { ok: true, src: src, tgt: tgt };
+}
+
+// 8.62.0: RIGHELLO COMUNE — RMSD point-to-point (µm) della posa CORRENTE di p, calcolato con la
+// STESSA funzione per Raffina (client) e Raffina+ (server). Le metriche native (mm point-to-point
+// vs µm point-to-plane, su campioni diversi) NON sono comparabili: questo le mette sullo stesso
+// righello. Trim robusto a mediana×2.5 (allineato allo spirito del motore server).
+function _replaceEvalFit(p){
+  var ex = _replaceExtractRefineSets(p, REPLACE_EVAL_MAX_SRC, REPLACE_EVAL_MAX_TGT);
+  if(!ex || !ex.ok) return null;
+  var src = ex.src, tgt = ex.tgt, nT = tgt.length;
+  if(src.length < 10 || nT < 10) return null;
+  var d2 = new Array(src.length);
+  for(var i = 0; i < src.length; i++){
+    var sx = src[i][0], sy = src[i][1], sz = src[i][2], best = Infinity;
+    for(var j = 0; j < nT; j++){
+      var dx = sx - tgt[j][0], dy = sy - tgt[j][1], dz = sz - tgt[j][2];
+      var dd = dx*dx + dy*dy + dz*dz; if(dd < best) best = dd;
+    }
+    d2[i] = best;
+  }
+  var sorted = d2.slice().sort(function(a, b){ return a - b; });
+  var med = sorted[Math.floor(sorted.length / 2)] || 0;
+  var lim = med > 0 ? med * 6.25 : Infinity;   // (2.5)^2 sulla distanza al quadrato
+  var sum = 0, n = 0;
+  for(var k = 0; k < d2.length; k++){ if(d2[k] <= lim){ sum += d2[k]; n++; } }
+  if(!n) return null;
+  return { rmsdUm: Math.round(Math.sqrt(sum / n) * 1000), nPairs: n };
+}
+
+// 8.62.0: clocking firmato (°) della posa corrente rispetto al seed 3-punti, via swing-twist
+// attorno all'asse impianto (il DOF debole = vero oggetto del collaudo). null se manca il seed.
+function _replaceTwistAngleDeg(qCur, qSeed, axisV){
+  if(!qCur || !qSeed || !axisV) return null;
+  var qRel = qCur.clone().multiply(qSeed.clone().invert());
+  if(qRel.w < 0){ qRel.x = -qRel.x; qRel.y = -qRel.y; qRel.z = -qRel.z; qRel.w = -qRel.w; }
+  var ax = axisV.clone().normalize();
+  var d = qRel.x*ax.x + qRel.y*ax.y + qRel.z*ax.z;   // proiezione firmata della parte vettoriale sull'asse
+  var deg = 2 * Math.atan2(d, qRel.w) * 180 / Math.PI;
+  while(deg > 180) deg -= 360; while(deg < -180) deg += 360;
+  return deg;
+}
+
+// 8.62.0: registra il risultato A/B (righello + clocking) del path indicato ('client'|'server')
+// e mostra la riga-verdetto col confronto se entrambi i path sono stati eseguiti.
+function _replaceRecordAB(p, which){
+  if(!p) return;
+  var fit = null; try { fit = _replaceEvalFit(p); } catch(e){}
+  var clk = (p.seedQuat && p.group) ? _replaceTwistAngleDeg(p.group.quaternion, p.seedQuat, (p.seedAxis || p.axisDir)) : null;
+  var rec = { rmsdUm: (fit ? fit.rmsdUm : null), clockDeg: clk };
+  if(which === 'server') p.abServer = rec; else p.abClient = rec;
+  _replaceShowAB(p);
+}
+function _replaceShowAB(p){
+  function fmt(r){
+    if(!r) return '—';
+    var u = (r.rmsdUm != null) ? (r.rmsdUm + 'µm') : 'n/d';
+    var c = (r.clockDeg != null) ? ('clock ' + (r.clockDeg >= 0 ? '+' : '') + r.clockDeg.toFixed(1) + '°') : 'clock n/d';
+    return u + ', ' + c;
+  }
+  var c = p.abClient, s = p.abServer;
+  var line = 'A/B #' + p.num + ' (righello comune) — Raffina: ' + fmt(c) + '  ·  Raffina+: ' + fmt(s);
+  if(c && s && c.rmsdUm != null && s.rmsdUm != null){
+    var dF = s.rmsdUm - c.rmsdUm;
+    line += '  →  Δfit ' + (dF > 0 ? '+' : '') + dF + 'µm';
+    if(c.clockDeg != null && s.clockDeg != null) line += ', Δclock ' + Math.abs(s.clockDeg - c.clockDeg).toFixed(1) + '°';
+  } else {
+    line += '  (esegui anche l\'altra per il confronto)';
+  }
+  replaceShowStatus(line);
+}
+
+// 8.62.0: riporta l'impianto attivo alla POSA SEED (3-punti grezza, prima di ogni raffina) ->
+// abilita l'A/B INDIPENDENTE (reset -> Raffina -> reset -> Raffina+, entrambe dallo stesso seed).
+function replaceResetToSeed(){
+  var tn = _replaceRefineTargetNum();
+  if(tn == null){ replaceShowStatus('Nessun impianto attivo da riportare al seed.', true); return; }
+  var p = null;
+  for(var i = 0; i < replacePlaced.length; i++){ if(replacePlaced[i].num === tn){ p = replacePlaced[i]; break; } }
+  if(!p || !p.group){ replaceShowStatus('Impianto non valido.', true); return; }
+  if(!p.seedQuat || !p.seedPos){ replaceShowStatus('Posa seed non disponibile per questo impianto.', true); return; }
+  p.group.position.copy(p.seedPos);
+  p.group.quaternion.copy(p.seedQuat);
+  p.group.updateMatrix(); p.group.updateMatrixWorld(true);
+  p.position.copy(p.seedPos);
+  if(p.seedAxis) p.axisDir.copy(p.seedAxis);
+  p.rmsd = null;
+  try { replaceRebuildScanGeometry(); } catch(e){}   // il taglio scansione segue la posa
+  replaceRebuildPlacedList();
+  replaceShowStatus('Impianto #' + tn + ' riportato alla posa seed (3-punti). Ora Raffina o Raffina+ per l\'A/B indipendente.');
+}
 function replaceRefineServer(){
   var tn = _replaceRefineTargetNum();
   if(tn == null){ replaceShowStatus('Nessun marker da raffinare.', true); return; }
@@ -17713,6 +17856,7 @@ function replaceRefineServer(){
     replaceRebuildPlacedList();
     var rmsUm = (typeof res.rmsd === 'number') ? Math.round(res.rmsd * 1000) : null;
     replaceShowStatus('Impianto #' + tn + ': Raffina+ SERVER — residuo fit ' + (rmsUm != null ? (rmsUm + ' µm') : 'n/d') + ' · ' + (res.n_pairs || '?') + ' coppie · ' + (res.iters || '?') + ' it · ' + (res.elapsed_ms || '?') + ' ms (piena ris.).');
+    try { _replaceRecordAB(p, 'server'); } catch(e){}   // 8.62.0: righello A/B del path SERVER (sovrascrive con la riga-verdetto)
   }).catch(function(err){
     _restore();
     replaceShowStatus('Raffina+ server fallita: ' + (err && err.message ? err.message : err), true);
@@ -17735,6 +17879,9 @@ function replaceRefineAll(onDone, targetNum){
     var head = converged ? (_w + 'a convergenza in ' + round + ' round')
                          : (_w + 'fermata al limite di ' + round + ' round (non ancora ferma)');
     replaceShowStatus(head + (avg != null ? (' — RMSD medio ' + avg + ' mm') : '') + '.');
+    // 8.62.0: righello A/B del path CLIENT. Solo single-target: al Conferma (auto-refine) la
+    // onDone sovrascrive subito la riga -> nessuno spam; sul Raffina manuale resta la riga A/B.
+    if(targetNum != null && targets.length){ try { _replaceRecordAB(targets[0], 'client'); } catch(e){} }
     if(typeof onDone === 'function') onDone();
   }
   function doRound(round){
