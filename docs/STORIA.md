@@ -4,6 +4,18 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-15 — 8.63.2: centraggio robust 1T3/OS = fit cilindro congiunto centro+asse
+
+L'utente, testando **OS sostituito-con-se-stesso** (file uguale → dovrebbe dare 0 errore), ha insistito che i ~12µm vanno azzerati. A/B sui dati reali: robust+point-to-plane = RMSD **12.5µm** (assi 0.04-0.52°) vs legacy+point-to-point = **12.8µm** (assi 0.12-0.76°) → **equivalenti**. Ma il log (`[sostRobustCenter] type=OS applied=true cov=358°`) mostra che il **centro robust era già click-invariante**. Quindi il residuo **non è il centro**.
+
+Diagnosi (lever-arm): il residuo è l'**ASSE**, ancora click-dipendente (motore cap-media per OS, ~0.5° run-to-run). Il centroide del sostituto — riferimento di Misurare — è sfalsato ~1mm lungo l'asse rispetto al centro di posa; un tilt di 0.5° lo pivota di `1mm·sin(0.5°) ≈ ~10µm`, esattamente i 12µm misurati. Robustificare solo il centro (8.63.0) non bastava perché l'asse restava l'ultimo input legato al click.
+
+Fix (solo blocco `sost*` v3b, branch robust di `sostPlaceTemplate`; beta opt-in, default `legacy` invariato; SR invariato): per 1T3/OS, **fit cilindro congiunto iterato** — un loop (max 5, break a convergenza sub-µm) che alterna `_sostLocalWallAxis` (asse = min-eigenvector della parete attorno al centro corrente) e `sostRobustCenter` (centro kasa attorno all'asse corrente). Dopo poche iterazioni **centro e asse** diventano entrambi **click-invarianti** → la posa è **deterministica** → lo stesso file su sé stesso, con la Raffina deterministica a parità di seme, converge identico → atteso **~0**. Triplo fail-soft preservato (parete<12 tri → asse precedente; `applied=false` in un'iterazione → esce e resta il centro legacy; flag default legacy).
+
+Verifica avversariale del diff (Explore): codice robusto, fail-soft corretto, convergenza coordinate-descent sound, nessun crash/NaN (2 note minori non-bug). `node --check` 8/8. Deploy 2026-06-15 (commit `93992fe`, deploy LEGACY `0b9bff71`/BACKEND `643349a7`). **PENDING**: collaudo A/B utente — rifare OS-su-OS col fit congiunto (Robust ON), atteso il crollo dei 12µm verso ~0; se confermato → promozione di robust a default.
+
+---
+
 ## 2026-06-15 — 8.63.1: fix finestra "Sezione" enorme
 
 Segnalazione utente con screenshot: la finestra **Sezione** (`#cutViewOverlay`, usata da Analizza e Sostituire) era enorme — il canvas nero riempiva metà del viewport. Causa: `#cutCanvas` ha il buffer a `width=260 height=260` ma **nessuna dimensione CSS**; dentro l'overlay `display:flex; flex-direction:column` veniva **stirato dal flex** (`align-items:stretch` di default) e, essendo un *replaced element* con aspect-ratio 1:1, cresceva ~quadrato fino a ~1000px. Nessun resize JS, nessuna CSS specifica per il canvas. Fix deterministico: dimensioni CSS esplicite sul canvas — `width:240px;height:240px;flex:none;align-self:center` — che vincono sullo stretch → box fisso 240×240 (il buffer 260 resta, il render è scalato a 240, nitido). Solo markup `#cutCanvas` v3b. `node --check` 8/8. Deploy 2026-06-15 (commit `7039daa`, deploy LEGACY `4804b881`/BACKEND `52f919a7`): verifica visiva live (lo stato richiede STL + marker + sezione aperta, non riproducibile in preview locale).
