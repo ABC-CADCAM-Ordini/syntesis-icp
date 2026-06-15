@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.63.1</title>
+<title>Syntesis-ICP - Analizzare v8.63.2</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2429,7 +2429,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.63.1';
+window.ANALIZZA_BUILD = '8.63.2';
 window.ANALIZZA_BUILD_DATE = '2026-06-15';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -18206,22 +18206,33 @@ function sostPlaceTemplate(rawPoint, rawNormal){
   var discWorld = autoResult.center;       // faccia del disco scansionato nel mondo
   var axis = autoResult.axis.clone().normalize();
   // Replace-iT: centraggio click-invariante (flag 'syntesis_sost_center'='robust').
-  // 8.63.0: esteso da SR a TUTTI i tipi (1T3/OS/SR), beta opt-in (default 'legacy' INVARIATO).
-  // Per 1T3/OS l'asse del motore globale e' cap-media -> ricavo un asse lateral-wall LOCALE
-  // (_sostLocalWallAxis, non tocca Analizza/report) cosi' il centro non eredita il tilt; l'asse
-  // raffinato si applica SOLO se il robust ha agito. Doppio fail-soft: parete povera -> asse
-  // cap-media; copertura < 140° -> centro legacy. Feasibility provata offline (asse osservabile +
-  // robust applied 100% su 1T3/OS); gain reale da validare A/B su scansioni vere.
+  // 8.63.0: esteso da SR a tutti i tipi. 8.63.2: per 1T3/OS FIT CILINDRO CONGIUNTO click-invariante
+  // (CENTRO + ASSE, iterato). Robustificare solo il centro NON bastava: l'asse cap-media residuo era
+  // ancora click-dipendente (~0.5° run-to-run) e, col centroide del sostituto sfalsato lungo l'asse
+  // (~1mm di leva), dava ~10µm di deriva = il residuo misurato "OS su OS" (file uguale dovrebbe -> 0).
+  // Iterando asse(parete) <-> centro(kasa) attorno al centro robusto, ENTRAMBI diventano click-
+  // invarianti -> posa deterministica -> stesso file su se' stesso -> verso 0. SR resta com'era
+  // (robust solo-centro, validato 8.15.0). beta opt-in (default 'legacy' INVARIATO); fail-soft a legacy.
   if(synSostCenterRead() === 'robust' && sourceRadius){
     try {
-      var _ax = axis;
+      var _cen = autoResult.center, _ax = axis, _ok = false, _cov = 0;
       if(sostSourceTemplate !== 'SR'){
-        var _wa = _sostLocalWallAxis(sostMesh.geometry, autoResult.center, axis, sourceRadius);
-        if(_wa) _ax = _wa;
+        var _c = autoResult.center, _a = axis;
+        for(var _it = 0; _it < 5; _it++){
+          var _wa = _sostLocalWallAxis(sostMesh.geometry, _c, _a, sourceRadius);   // asse dalla parete attorno al centro corrente
+          if(_wa) _a = _wa;
+          var _r = sostRobustCenter(sostMesh.geometry, _c, _a, sourceRadius);       // centro (kasa) attorno all'asse corrente
+          if(!_r.applied){ _ok = false; break; }
+          _cov = _r.coverageDeg; var _d = _r.center.distanceTo(_c); _c = _r.center; _ok = true;
+          if(_d < 1e-4) break;                                                       // convergenza sub-µm
+        }
+        if(_ok){ _cen = _c; _ax = _a; }
+      } else {
+        var _rS = sostRobustCenter(sostMesh.geometry, autoResult.center, axis, sourceRadius);  // SR: solo centro
+        if(_rS.applied){ _cen = _rS.center; _ok = true; _cov = _rS.coverageDeg; }
       }
-      var _rc = sostRobustCenter(sostMesh.geometry, autoResult.center, _ax, sourceRadius);
-      if(_rc.applied){ discWorld = _rc.center; axis = _ax.clone().normalize(); }
-      console.log('[sostRobustCenter] type='+sostSourceTemplate+' applied='+_rc.applied+' cov='+(_rc.coverageDeg||0).toFixed(0)+'° nWall='+_rc.nWall);
+      if(_ok){ discWorld = _cen; axis = _ax.clone().normalize(); }
+      console.log('[sostRobustCenter] type='+sostSourceTemplate+' applied='+_ok+' cov='+(_cov||0).toFixed(0)+'° (8.63.2 fit congiunto centro+asse per 1T3/OS)');
     } catch(e){ console.warn('[sostRobustCenter] errore, fallback legacy:', e); }
   }
 
