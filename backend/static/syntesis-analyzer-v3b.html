@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.64.1</title>
+<title>Syntesis-ICP - Analizzare v8.64.2</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -1658,8 +1658,12 @@ if (document.readyState === 'loading') {
           <div class="mis-tree-leaf">
             <div class="mis-tree-leaf-row">
               <input type="checkbox" id="layChkConn" checked onchange="misICP_applyLayerVis('conn', this.checked)">
-              <span class="mis-tree-dot" style="background:#A855F7"></span>
-              <label class="mis-tree-leaf-name" for="layChkConn">Connessione (origine + matematica)</label>
+              <input type="color" class="tree-color" value="#A855F7" title="Colore connessione (matematica)" onchange="misICP_setConnColor(this.value)">
+              <label class="mis-tree-leaf-name" for="layChkConn">Connessione</label>
+            </div>
+            <div class="mis-tree-slider-row">
+              <input type="range" id="laySldConn" min="0" max="100" value="50" oninput="misICP_applyLayerOp('conn', this.value/100)">
+              <span class="mis-tree-val" id="layValConn">50%</span>
             </div>
           </div>
         </div>
@@ -2436,7 +2440,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.64.1';
+window.ANALIZZA_BUILD = '8.64.2';
 window.ANALIZZA_BUILD_DATE = '2026-06-16';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -7121,6 +7125,7 @@ var MIS_OP_SCB_B  = 0.55;
 // (stessa logica di placeMUA: group al cap, quaternion up->asse, geom -capZ).
 // Tutto in misICP_connMeshes -> gruppo albero 'conn', toggle dall'albero.
 var misICP_connMeshes = [];
+var misICP_connColor = '#A855F7';   // 8.64.2: colore geometria matematica connessione (gestibile da albero)
 function misICP_renderConnections(pairs){
   if(typeof scene==='undefined' || !scene) return;
   misICP_connMeshes.forEach(function(o){ if(o){ scene.remove(o);
@@ -7149,8 +7154,9 @@ function misICP_renderConnections(pairs){
           var grp=new THREE.Group(); grp.position.copy(capPt);
           grp.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(
             new THREE.Vector3(0,0,1), new THREE.Vector3(p.connAxA[0],p.connAxA[1],p.connAxA[2]).normalize()));
-          var mesh=new THREE.Mesh(mr.geometry, new THREE.MeshPhongMaterial({color:0xA855F7, specular:0x222222, shininess:50, transparent:true, opacity:0.5, side:THREE.DoubleSide}));
-          mesh.userData.misConn=true; grp.add(mesh); grp.userData.misConn=true;
+          var _mcol=parseInt(misICP_connColor.replace('#',''),16);
+          var mesh=new THREE.Mesh(mr.geometry, new THREE.MeshPhongMaterial({color:_mcol, specular:0x222222, shininess:50, transparent:true, opacity:0.5, side:THREE.DoubleSide}));
+          mesh.userData.misConn=true; mesh.userData.misConnMat=true; grp.add(mesh); grp.userData.misConn=true;
           scene.add(grp); misICP_connMeshes.push(grp);
         }
       }catch(e){ if(window.console) console.warn('[misConn] matematica skip:', e && e.message); }
@@ -10155,6 +10161,7 @@ function misICP_generatePDF(){
 // la left/top della <div> corrispondente.
 
 var misICP_labels = []; // array di HTMLElement allineati a misICP_result.pairs
+var misICP_labelsVisible = true; // 8.64.2: stato toggle "Etichette 3D" (gate anche la leader-line SVG)
 
 function misICP_createLabels(){
   misICP_destroyLabels();
@@ -10215,9 +10222,10 @@ function misICP_updateLabels(){
 
   var svg = document.getElementById('labelLines');
   if(svg){
-    svg.style.display = '';
     while(svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.style.display = misICP_labelsVisible ? '' : 'none';
   }
+  if(!misICP_labelsVisible) return;  // label+leader spente: niente linee/pallini
   var pairs = misICP_result.pairs;
   var LABEL_OFFSET_PX = 56;
   for(var i=0;i<pairs.length;i++){
@@ -10392,10 +10400,14 @@ var misICP_layerColors = { bgA:'#b8a090', scbA:'#F59E0B', bgB:'#b8a090', scbB:'#
 
 function misICP_applyLayerVis(group, visible){
   if(group === 'labels'){
-    // Toggle delle label 3D overlay HTML
+    misICP_labelsVisible = !!visible;
+    // Label HTML
     misICP_labels.forEach(function(el){
       if(el) el.style.visibility = visible ? '' : 'hidden';
     });
+    // Leader-line SVG (linea + pallino): fanno parte del label -> spegni insieme
+    var svgL = document.getElementById('labelLines');
+    if(svgL){ if(!visible){ while(svgL.firstChild) svgL.removeChild(svgL.firstChild); } svgL.style.display = visible ? '' : 'none'; }
     return;
   }
   var meshes = misICP_groupMeshes(group);
@@ -10409,7 +10421,7 @@ function misICP_applyLayerOp(group, opacity){
     m.material.transparent = (opacity < 1);
   });
   // Aggiorno anche il label %
-  var map = { bgA:'layValBgA', bgB:'layValBgB', scbA:'layValScbA', scbB:'layValScbB' };
+  var map = { bgA:'layValBgA', bgB:'layValBgB', scbA:'layValScbA', scbB:'layValScbB', conn:'layValConn' };
   var lbl = document.getElementById(map[group]);
   if(lbl) lbl.textContent = Math.round(opacity*100) + '%';
   // Aggiorno i default globali, cosi' highlight/deselect non sovrascrivono le scelte dell'utente
@@ -10417,6 +10429,19 @@ function misICP_applyLayerOp(group, opacity){
   if(group === 'bgB')  MIS_OP_BG_B  = opacity;
   if(group === 'scbA') MIS_OP_SCB_A = opacity;
   if(group === 'scbB') MIS_OP_SCB_B = opacity;
+}
+
+// 8.64.2: colore della geometria matematica della connessione (i marker A/B restano
+// arancio/blu; il picker agisce solo sulla geometria "connessione" = matematica).
+function misICP_setConnColor(hex){
+  misICP_connColor = hex;
+  var col = parseInt(hex.replace('#',''),16);
+  if(typeof misICP_connMeshes !== 'undefined'){
+    misICP_connMeshes.forEach(function(o){
+      if(o && o.traverse) o.traverse(function(c){ if(c.userData && c.userData.misConnMat && c.material) c.material.color.setHex(col); });
+      else if(o && o.userData && o.userData.misConnMat && o.material) o.material.color.setHex(col);
+    });
+  }
 }
 
 // Aggiorna le badge numeriche degli header di gruppo (es. "5 dischi")
