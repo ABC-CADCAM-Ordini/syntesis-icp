@@ -4,6 +4,22 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-16 — 8.65.0: Sostituire/robust accuratezza centratura laterale 1T3/OS (Kasa, caso Tara 2770)
+
+Handoff Tara id 2770: la sostituzione sintetico-su-sintetico (ScanLogiQ → Synthesis, stessa geometria CAD) deve dare ~0 ma dà RMSD 7.9µm per-cilindro [9.8, 3.6, 8.1, 13.4, 3.2, 3.3]. La diagnostica 8.64.x ha confermato che il centraggio robust ENTRA (`applied=true`, nWall=1859) ma dà posa identica al legacy perché l'**asse è già ok** (uniforme ~0.15°). Il residuo è la **centratura laterale per-marker**.
+
+Root cause: `_sostCylFitInvariant` (8.63.4) usa il **baricentro del CAP** per il centro → RIPETIBILE (export bit-identici, stesso file → 0) ma su un marker inclinato il cap viene catturato asimmetrico e il baricentro slitta 3-12µm dall'asse vero (#4 il peggiore, ~11.6µm). Il ground-truth è il **centro del cilindro** (fit Kasa parete), non il baricentro del cap: la campagna 8.63.x aveva scambiato accuratezza per ripetibilità.
+
+Fix (additivo, NON un revert di 8.63.4), branch robust 1T3/OS di `sostPlaceTemplate`: dopo `_sostCylFitInvariant` (cap-baricentro + asse-parete), si rifinisce il **solo centro laterale** (piano ⊥ asse) con `sostRobustCenter` (Kasa parete, già validato 8.15.0 per SR) — che sposta il centro **unicamente** nel piano ⊥ asse, quindi il livello del disco (axial, dal cap) e l'asse restano intatti. Gate copertura ≥140° con **fail-soft al cap-baricentro** (parete povera → resta 8.63.4 ripetibile: nessuna regressione). SR invariato; default `legacy` invariato (beta opt-in).
+
+Implementazione:
+- `backend/static/syntesis-analyzer-v3b.html`: `sostPlaceTemplate` branch robust 1T3/OS (~18498); diag in `_sostInvLastReason` (`+kasaXY(cov=…)` / `(kasaXY skip cov=…)`); bump `<title>` + `ANALIZZA_BUILD` 8.65.0.
+- `backend/registry.py`: `BACKEND_VERSION` 8.65.0 + voce History.
+- `docs/MAPPA_FUNZIONALE.md`: riga 436 (passo 8.65.0) + header versione.
+- node --check 8/8 OK. Live verificato 8.65.0 su entrambi i servizi (DNS pinnato via --resolve, resolver host flaky). PENDING collaudo A/B utente (ri-export Tara OS-su-OS).
+
+---
+
 ## 2026-06-16 — 8.64.2: UI connessione Misurare (leader-line toggle + gestione colore/opacità)
 
 Due richieste utente dopo la verifica visiva di 8.64.1 (orientamento ora corretto, connessione verso l'impianto).
