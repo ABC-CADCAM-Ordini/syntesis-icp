@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.64.3</title>
+<title>Syntesis-ICP - Analizzare v8.64.4</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2440,7 +2440,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.64.3';
+window.ANALIZZA_BUILD = '8.64.4';
 window.ANALIZZA_BUILD_DATE = '2026-06-16';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -18504,11 +18504,14 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       if(_ok){ discWorld = _cen; axis = _ax.clone().normalize(); }
       var _diag = '[ROBUST-DIAG] type='+sostSourceTemplate+' applied='+_ok+' reason='+(_sostInvLastReason||'(SR/altro)');
       console.log(_diag);
-      if(typeof sostShowStatus==='function') sostShowStatus('Robust '+sostSourceTemplate+': '+(_ok?'APPLICATO ✓':'fail-soft→legacy ('+(_sostInvLastReason||'?')+')'), !_ok);
-    } catch(e){ console.warn('[ROBUST-DIAG] errore, fallback legacy:', e); if(typeof sostShowStatus==='function') sostShowStatus('Robust: errore → legacy ('+(e&&e.message)+')', true); }
+      alert('DIAGNOSTICA ROBUST (8.64.4)\n\nGate: setting='+_scSet+'  tipoSorgente='+sostSourceTemplate+'  raggio='+sourceRadius
+        +'\n\nRobust ENTRATO: '+(_ok?'SI — APPLICATO ✓':'SI ma FAIL-SOFT → legacy')
+        +'\nMotivo fit: '+(_sostInvLastReason||'(n/d)'));
+    } catch(e){ console.warn('[ROBUST-DIAG] errore:', e); alert('DIAGNOSTICA ROBUST (8.64.4)\n\nERRORE → fallback legacy:\n'+(e&&e.message)); }
   } else {
-    console.log('[ROBUST-DIAG] branch SALTATO: setting='+_scSet+' sourceRadius='+sourceRadius+' (serve setting=robust E sourceRadius definito)');
-    if(typeof sostShowStatus==='function' && _scSet==='robust' && !sourceRadius) sostShowStatus('Robust attivo ma sourceRadius mancante (tipo sorgente non riconosciuto) → legacy', true);
+    console.log('[ROBUST-DIAG] branch SALTATO: setting='+_scSet+' sourceRadius='+sourceRadius);
+    alert('DIAGNOSTICA ROBUST (8.64.4)\n\nIl robust NON e\' entrato (branch saltato).\n\nGate: setting='+_scSet+'  tipoSorgente='+sostSourceTemplate+'  raggio='+sourceRadius
+      +'\n\nServe: setting=robust E raggio definito. Se setting!=robust -> non e\' salvato; se raggio=undefined -> tipo sorgente non riconosciuto.');
   }
 
   // Template da costruire per ogni marker: tutti e tre insieme cosi' l'utente
