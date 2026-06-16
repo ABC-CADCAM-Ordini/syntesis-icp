@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.64.0</title>
+<title>Syntesis-ICP - Analizzare v8.64.1</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2436,7 +2436,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.64.0';
+window.ANALIZZA_BUILD = '8.64.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-16';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -6717,7 +6717,12 @@ function misICP_detectSbType(tris){
   });
   return best;                                         // {type, capZ, radius, err}
 }
-// Orienta l'asse verso il CAP occlusale = estremo con MENO area di facce piatte.
+// Orienta l'asse verso il CAP occlusale = estremo con PIU' area di facce piatte
+// (il cap occlusale e' la faccia piatta che lo scanner legge / il disco del template;
+//  la base/connessione e' l'estremo OPPOSTO). La connessione = capZ sotto il cap,
+//  quindi opposta al top. [8.64.1: corretto da "MENO" a "PIU'" — la regola precedente
+//  orientava la connessione dalla parte sbagliata, verso il top invece che verso
+//  l'impianto; segnalato dall'utente con screenshot del workflow Misurare.]
 function misICP_orientCapward(tris, centroid, axis){
   var aPos=0, aNeg=0, cen=centroid;
   tris.forEach(function(t){
@@ -6731,7 +6736,7 @@ function misICP_orientCapward(tris, centroid, axis){
     var mz=(t[0][2]+t[1][2]+t[2][2])/3-cen[2];
     if((mx*axis[0]+my*axis[1]+mz*axis[2])>=0) aPos+=0.5*L; else aNeg+=0.5*L;
   });
-  return (aPos<=aNeg) ? [axis[0],axis[1],axis[2]] : [-axis[0],-axis[1],-axis[2]];
+  return (aPos>=aNeg) ? [axis[0],axis[1],axis[2]] : [-axis[0],-axis[1],-axis[2]];
 }
 // Punto di connessione lungo l'asse, capZ sotto il piano del cap occlusale.
 function misICP_connectionPoint(tris, centroid, axisCapward, capZ){
