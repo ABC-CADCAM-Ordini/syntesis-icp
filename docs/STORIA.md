@@ -4,6 +4,14 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-16 — 8.64.1: fix orientamento connessione (Misurare)
+
+Subito dopo il deploy di 8.64.0, l'utente ha visto nel workflow Misurare che la **geometria di connessione (matematica viola) + i marker erano disegnati verso il top occlusale**, sopra gli scanbody, invece che verso l'impianto. Correzione: *"su OS RS e 1T3 la connessione va opposta al top, guarda come è orientata nel workflow Analizza."*
+
+Causa: in `misICP_orientCapward` la regola di orientamento era invertita — assumevo che il disco-base 122-tri fosse la base/connessione e usavo "cap = estremo con **meno** area di facce piatte". In realtà il **cap occlusale è la faccia piatta** che lo scanner legge (il disco del template), quindi cap = estremo con **più** area piatta; la connessione, a `capZ` sotto il cap lungo l'asse, cade all'estremo **opposto = verso l'impianto** (opposta al top, come `placeMUA` in Analizza che pone la connessione a `click − capZ·normale_occlusale`).
+
+Fix: una sola riga in `misICP_orientCapward` (`aPos<=aNeg` → `aPos>=aNeg`) + commento. La **magnitudine** della deviazione alla connessione (~44µm su 2770) resta **invariata** — la leva è simmetrica, cambia solo il **lato** su cui cadono connessione, marker e matematica. Vale per OS/1T3/SR. `node --check` OK; flip confermato offline col vero JS (la connessione passa al lato opposto). Verifica visiva live a carico utente. Deploy 8.64.1 su entrambi i servizi, verificato.
+
 ## 2026-06-16 — 8.64.0: Misurare — misura clinica alla connessione (beta, accanto al centroide)
 
 Il report di accoppiamento misura le deviazioni al **centroide di volume** dello scanbody. L'utente ha proposto di misurarle alla **connessione** (l'interfaccia con l'impianto, dove la protesi si siede): geometricamente è a `capZ` sotto il cap occlusale lungo l'asse del cilindro — lo stesso schema canonico che Replace-iT usa per piazzare i MUA (`placeMUA`: cap al click, connessione a `click − capZ`).
