@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.63.4</title>
+<title>Syntesis-ICP - Analizzare v8.64.0</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -1655,6 +1655,13 @@ if (document.readyState === 'loading') {
               <label class="mis-tree-leaf-name" for="layChkLabels">Etichette 3D</label>
             </div>
           </div>
+          <div class="mis-tree-leaf">
+            <div class="mis-tree-leaf-row">
+              <input type="checkbox" id="layChkConn" checked onchange="misICP_applyLayerVis('conn', this.checked)">
+              <span class="mis-tree-dot" style="background:#A855F7"></span>
+              <label class="mis-tree-leaf-name" for="layChkConn">Connessione (origine + matematica)</label>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2429,8 +2436,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.63.4';
-window.ANALIZZA_BUILD_DATE = '2026-06-15';
+window.ANALIZZA_BUILD = '8.64.0';
+window.ANALIZZA_BUILD_DATE = '2026-06-16';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -4845,6 +4852,14 @@ function _hardResetMisurare(){
       }});
       misICP_meshesB.length = 0;
     }
+    if(typeof misICP_connMeshes !== 'undefined' && Array.isArray(misICP_connMeshes)){
+      misICP_connMeshes.forEach(function(o){ if(o){
+        scene.remove(o);
+        if(o.geometry) o.geometry.dispose();
+        if(o.material) o.material.dispose();
+      }});
+      misICP_connMeshes.length = 0;
+    }
     if(typeof misICP_geomA !== 'undefined') misICP_geomA = null;
     if(typeof misICP_geomB !== 'undefined') misICP_geomB = null;
     if(typeof misICP_result !== 'undefined') misICP_result = null;
@@ -6670,6 +6685,66 @@ function misICP_axisAngleDeg(a,b){
   return Math.acos(d)*180/Math.PI;
 }
 
+// === Connessione clinica (Misurare, beta 8.64.x) ============================
+// La connessione clinica e' a capZ sotto il cap occlusale, lungo l'asse del
+// cilindro (schema canonico Replace-iT: cap al click, connessione a click-capZ;
+// vedi placeMUA ~3013). Misurare non posa MUA: qui auto-rileviamo il tipo dal
+// raggio e calcoliamo il punto = centroide - (capZ - delta)*asse_capward.
+// ORIENTAMENTO (beta): "capward = estremo con MENO area di facce piatte", cioe'
+// lontano dal disco/base (faccia piatta dominante negli export Sostituire).
+// Validato su OS (id 2770, tutti e 6). 1T3/SR: da verificare live (il cap
+// occlusale ampio puo' competere col disco -> eventuale flip).
+function misICP_detectSbType(tris){
+  if(!tris || tris.length<3) return null;
+  var ax = misICP_cylAxis(tris);
+  var cx=0,cy=0,cz=0,n=0;
+  tris.forEach(function(t){ t.forEach(function(v){ cx+=v[0];cy+=v[1];cz+=v[2];n++; }); });
+  cx/=n; cy/=n; cz/=n;
+  var rs=[];
+  tris.forEach(function(t){ t.forEach(function(v){
+    var dx=v[0]-cx,dy=v[1]-cy,dz=v[2]-cz, pr=dx*ax[0]+dy*ax[1]+dz*ax[2];
+    var ex=dx-pr*ax[0], ey=dy-pr*ax[1], ez=dz-pr*ax[2];
+    rs.push(Math.sqrt(ex*ex+ey*ey+ez*ez));
+  }); });
+  rs.sort(function(a,b){return a-b;});
+  var radius = rs[Math.floor(rs.length/2)];          // raggio = mediana dist. dall'asse
+  var SB = (window.SYN && window.SYN.scanbody) || null;
+  var best=null;
+  ['1T3','OS','SR'].forEach(function(k){
+    var t = SB && SB[k]; if(!t) return;
+    var err = Math.abs(radius - t.radius_mm)/t.radius_mm;
+    if(best===null || err<best.err) best={type:k, err:err, capZ:t.cap_z_mm, radius:t.radius_mm};
+  });
+  return best;                                         // {type, capZ, radius, err}
+}
+// Orienta l'asse verso il CAP occlusale = estremo con MENO area di facce piatte.
+function misICP_orientCapward(tris, centroid, axis){
+  var aPos=0, aNeg=0, cen=centroid;
+  tris.forEach(function(t){
+    var ux=t[1][0]-t[0][0],uy=t[1][1]-t[0][1],uz=t[1][2]-t[0][2];
+    var vx=t[2][0]-t[0][0],vy=t[2][1]-t[0][1],vz=t[2][2]-t[0][2];
+    var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    var L=Math.sqrt(nx*nx+ny*ny+nz*nz); if(L<1e-12) return;
+    if(Math.abs((nx*axis[0]+ny*axis[1]+nz*axis[2])/L) < 0.85) return;  // solo facce piatte
+    var mx=(t[0][0]+t[1][0]+t[2][0])/3-cen[0];
+    var my=(t[0][1]+t[1][1]+t[2][1])/3-cen[1];
+    var mz=(t[0][2]+t[1][2]+t[2][2])/3-cen[2];
+    if((mx*axis[0]+my*axis[1]+mz*axis[2])>=0) aPos+=0.5*L; else aNeg+=0.5*L;
+  });
+  return (aPos<=aNeg) ? [axis[0],axis[1],axis[2]] : [-axis[0],-axis[1],-axis[2]];
+}
+// Punto di connessione lungo l'asse, capZ sotto il piano del cap occlusale.
+function misICP_connectionPoint(tris, centroid, axisCapward, capZ){
+  var proj=[];
+  tris.forEach(function(t){ t.forEach(function(v){
+    proj.push((v[0]-centroid[0])*axisCapward[0]+(v[1]-centroid[1])*axisCapward[1]+(v[2]-centroid[2])*axisCapward[2]);
+  }); });
+  proj.sort(function(a,b){return a-b;});
+  var delta = proj[Math.floor(proj.length*0.98)];      // centroide -> piano cap
+  var L = capZ - delta;                                // centroide -> connessione
+  return [centroid[0]-L*axisCapward[0], centroid[1]-L*axisCapward[1], centroid[2]-L*axisCapward[2]];
+}
+
 // --- UI: CARICAMENTO FILE STL ---
 function misICP_onDrop(e,side){
   e.preventDefault();
@@ -6876,10 +6951,32 @@ function misICP_run(){
           p.dzum  = p.dz  * 1000;
           p.level = misICP_clinLevel(Math.round(p.d3um));
           p.axLevel = misICP_clinAx(p.axAngleDeg);
+          // --- Connessione clinica (beta): capZ sotto il cap, lungo l'asse ---
+          var _sb = misICP_detectSbType(trisOfA);
+          if(_sb){
+            var _cenA = scanCentsA[p.iA], _cenB = scanCentsBt[p.iB];
+            var _axAc = misICP_orientCapward(trisOfA,  _cenA, p.axA);
+            var _axBc = misICP_orientCapward(trisOfBt, _cenB, p.axBt);
+            if(_axBc[0]*_axAc[0]+_axBc[1]*_axAc[1]+_axBc[2]*_axAc[2] < 0) _axBc=[-_axBc[0],-_axBc[1],-_axBc[2]];
+            p.sbType = _sb.type;
+            p.connCapZ = _sb.capZ; p.connAxA = _axAc; p.connAxB = _axBc;  // per il render (Inc-2)
+            p.connA = misICP_connectionPoint(trisOfA,  _cenA, _axAc, _sb.capZ);
+            p.connB = misICP_connectionPoint(trisOfBt, _cenB, _axBc, _sb.capZ);
+            var _cdx=(p.connB[0]-p.connA[0])*1000, _cdy=(p.connB[1]-p.connA[1])*1000, _cdz=(p.connB[2]-p.connA[2])*1000;
+            p.connDxum=_cdx; p.connDyum=_cdy; p.connDzum=_cdz;
+            p.connDxyum=Math.sqrt(_cdx*_cdx+_cdy*_cdy);
+            p.connD3um =Math.sqrt(_cdx*_cdx+_cdy*_cdy+_cdz*_cdz);
+            p.connLevel=misICP_clinLevel(Math.round(p.connD3um));
+          } else {
+            p.sbType=null; p.connA=null; p.connB=null;
+            p.connD3um=null; p.connDxum=null; p.connDyum=null; p.connDzum=null; p.connDxyum=null; p.connLevel=null;
+          }
         } else {
           p.axBt=null; p.trisBt=null; p.axAngleDeg=0;
           p.d3um=null; p.dxyum=null; p.dxum=null; p.dyum=null; p.dzum=null;
           p.level=null; p.axLevel=null;
+          p.sbType=null; p.connA=null; p.connB=null;
+          p.connD3um=null; p.connDxum=null; p.connDyum=null; p.connDzum=null; p.connDxyum=null; p.connLevel=null;
         }
       });
 
@@ -7012,8 +7109,53 @@ var MIS_OP_BG_B   = 0.45;
 var MIS_OP_SCB_A  = 1.00;
 var MIS_OP_SCB_B  = 0.55;
 
+// === Inc-2 (beta 8.64.x): disegno connessione + origine in scena =============
+// Per ogni scanbody disegna: marker-origine (sfera) alla connessione A (arancio)
+// e B (blu), una linea-leva cap->connessione (lato A), e la geometria "matematica"
+// (= connessione IPD presa da Analizza) sul lato A, orientata sull'asse capward
+// (stessa logica di placeMUA: group al cap, quaternion up->asse, geom -capZ).
+// Tutto in misICP_connMeshes -> gruppo albero 'conn', toggle dall'albero.
+var misICP_connMeshes = [];
+function misICP_renderConnections(pairs){
+  if(typeof scene==='undefined' || !scene) return;
+  misICP_connMeshes.forEach(function(o){ if(o){ scene.remove(o);
+    if(o.geometry) o.geometry.dispose(); if(o.material) o.material.dispose(); } });
+  misICP_connMeshes = [];
+  if(!pairs) return;
+  var rMk = 0.25;  // mm
+  pairs.forEach(function(p){
+    if(!p.connA || !p.connB) return;
+    [{c:p.connA, col:MIS_COL_SCB_A},{c:p.connB, col:MIS_COL_SCB_B}].forEach(function(o){
+      var s=new THREE.Mesh(new THREE.SphereGeometry(rMk,16,12),
+        new THREE.MeshPhongMaterial({color:o.col, emissive:o.col, emissiveIntensity:0.35, specular:0x222222, shininess:40}));
+      s.position.set(o.c[0],o.c[1],o.c[2]); s.renderOrder=10; s.userData.misConn=true;
+      scene.add(s); misICP_connMeshes.push(s);
+    });
+    if(p.connAxA && p.connCapZ!=null){
+      var capPt=new THREE.Vector3(p.connA[0]+p.connCapZ*p.connAxA[0], p.connA[1]+p.connCapZ*p.connAxA[1], p.connA[2]+p.connCapZ*p.connAxA[2]);
+      var ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([capPt, new THREE.Vector3(p.connA[0],p.connA[1],p.connA[2])]),
+        new THREE.LineBasicMaterial({color:MIS_COL_SCB_A}));
+      ln.userData.misConn=true; scene.add(ln); misICP_connMeshes.push(ln);
+      // geometria matematica (connessione IPD) sul lato A
+      try{
+        if(typeof MATEMATICA_B64!=='undefined'){
+          var mr=parseSTL(b64toArrayBuffer(MATEMATICA_B64));
+          mr.geometry.translate(0,0,-p.connCapZ);
+          var grp=new THREE.Group(); grp.position.copy(capPt);
+          grp.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0,0,1), new THREE.Vector3(p.connAxA[0],p.connAxA[1],p.connAxA[2]).normalize()));
+          var mesh=new THREE.Mesh(mr.geometry, new THREE.MeshPhongMaterial({color:0xA855F7, specular:0x222222, shininess:50, transparent:true, opacity:0.5, side:THREE.DoubleSide}));
+          mesh.userData.misConn=true; grp.add(mesh); grp.userData.misConn=true;
+          scene.add(grp); misICP_connMeshes.push(grp);
+        }
+      }catch(e){ if(window.console) console.warn('[misConn] matematica skip:', e && e.message); }
+    }
+  });
+}
+
 function misICP_renderPerCylinder(pairs, bgTrisA, bgTrisB){
   if(!scene) return;
+  if(typeof misICP_connMeshes!=='undefined'){ misICP_connMeshes.forEach(function(o){ if(o){ scene.remove(o); if(o.geometry) o.geometry.dispose(); if(o.material) o.material.dispose(); } }); misICP_connMeshes=[]; }
   // Cleanup mesh precedenti
   if(misICP_meshA){ scene.remove(misICP_meshA); if(misICP_meshA.geometry) misICP_meshA.geometry.dispose(); if(misICP_meshA.material) misICP_meshA.material.dispose(); misICP_meshA=null; }
   if(misICP_meshB){ scene.remove(misICP_meshB); if(misICP_meshB.geometry) misICP_meshB.geometry.dispose(); if(misICP_meshB.material) misICP_meshB.material.dispose(); misICP_meshB=null; }
@@ -7067,6 +7209,10 @@ function misICP_renderPerCylinder(pairs, bgTrisA, bgTrisB){
       if(mB.geometry.boundingSphere) boundingCentroids.push(mB.geometry.boundingSphere);
     } else { misICP_meshesB.push(null); }
   });
+
+  // Inc-2: disegno connessione + origine (gruppo albero 'conn'). Additivo: un
+  // fallimento qui NON deve rompere il display dell'analisi (centroidi/dischi).
+  try { misICP_renderConnections(pairs); } catch(e){ if(window.console) console.warn('[misConn] render skip:', e && e.message); }
 
   // Framing: centro medio di tutti i bounding sphere; raggio = distanza massima dal centro
   if(boundingCentroids.length){
@@ -7305,6 +7451,8 @@ function misICP_reset(){
   misICP_meshesA.forEach(function(m){ if(m){ scene.remove(m); if(m.geometry) m.geometry.dispose(); if(m.material) m.material.dispose(); } });
   misICP_meshesB.forEach(function(m){ if(m){ scene.remove(m); if(m.geometry) m.geometry.dispose(); if(m.material) m.material.dispose(); } });
   misICP_meshesA=[]; misICP_meshesB=[];
+  // Dispose marker/geometrie connessione (Inc-2)
+  if(typeof misICP_connMeshes!=='undefined'){ misICP_connMeshes.forEach(function(o){ if(o){ scene.remove(o); if(o.geometry) o.geometry.dispose(); if(o.material) o.material.dispose(); } }); misICP_connMeshes=[]; }
   // Dispose arcate A e B
   if(misICP_bgMeshA){ scene.remove(misICP_bgMeshA); if(misICP_bgMeshA.geometry) misICP_bgMeshA.geometry.dispose(); if(misICP_bgMeshA.material) misICP_bgMeshA.material.dispose(); misICP_bgMeshA=null; }
   if(misICP_bgMeshB){ scene.remove(misICP_bgMeshB); if(misICP_bgMeshB.geometry) misICP_bgMeshB.geometry.dispose(); if(misICP_bgMeshB.material) misICP_bgMeshB.material.dispose(); misICP_bgMeshB=null; }
@@ -7870,7 +8018,11 @@ function misICP_buildReportData(){
       trisA: pp.trisA, trisB: pp.trisBt,
       iA: pp.iA, iB: pp.iB,
       axAngleDeg: pp.axAngleDeg,
-      axA: pp.axA, axBt: pp.axBt
+      axA: pp.axA, axBt: pp.axBt,
+      // Connessione clinica (beta 8.64.x)
+      sbType: pp.sbType, connA: pp.connA, connB: pp.connB,
+      connD3um: pp.connD3um, connDxum: pp.connDxum, connDyum: pp.connDyum,
+      connDzum: pp.connDzum, connDxyum: pp.connDxyum, connLevel: pp.connLevel
     };
   }).filter(function(pp){return pp.b !== null;});
   if(!pdfPairs.length) throw new Error('Nessuna coppia valida per il report.');
@@ -8794,6 +8946,22 @@ function misICP_pdfDrawCylinderPage(doc, data, ci){
     ['Centroide A (X,Y,Z)',    p.a[0].toFixed(3)+', '+p.a[1].toFixed(3)+', '+p.a[2].toFixed(3)+' mm', ''],
     ['Centroide B allineato',  p.b[0].toFixed(3)+', '+p.b[1].toFixed(3)+', '+p.b[2].toFixed(3)+' mm', '']
   ];
+  // Connessione clinica (beta 8.64.x): metriche al punto di connessione, accanto al centroide
+  if(p.connD3um != null && p.connA && p.connB){
+    var _cd3=Math.round(p.connD3um), _cxy=Math.round(p.connDxyum);
+    var _cx=Math.round(p.connDxum), _cy=Math.round(p.connDyum), _cz=Math.round(p.connDzum);
+    var _clv=p.connLevel||misICP_clinLevel(_cd3);
+    tbRows.push(
+      ['CONNESSIONE'+(p.sbType?' ('+p.sbType+')':''), '— capZ sotto il cap —', ''],
+      ['|D| 3D connessione',      _cd3+' μm',                          _clv.label],
+      ['Dev. XY connessione',     _cxy+' μm',                          misICP_clinLevel(_cxy).label],
+      ['Dev. X connessione',      (_cx>=0?'+':'')+_cx+' μm',           ''],
+      ['Dev. Y connessione',      (_cy>=0?'+':'')+_cy+' μm',           ''],
+      ['Dev. Z connessione',      (_cz>=0?'+':'')+_cz+' μm',           ''],
+      ['Connessione A (X,Y,Z)',   p.connA[0].toFixed(3)+', '+p.connA[1].toFixed(3)+', '+p.connA[2].toFixed(3)+' mm', ''],
+      ['Connessione B allineata', p.connB[0].toFixed(3)+', '+p.connB[1].toFixed(3)+', '+p.connB[2].toFixed(3)+' mm', '']
+    );
+  }
   doc.autoTable({
     startY: y,
     margin: {left:ml, right:mr},
@@ -10210,6 +10378,7 @@ function misICP_groupMeshes(group){
   if(group === 'bgB')  return misICP_bgMeshB ? [misICP_bgMeshB] : [];
   if(group === 'scbA') return misICP_meshesA.filter(function(m){return m;});
   if(group === 'scbB') return misICP_meshesB.filter(function(m){return m;});
+  if(group === 'conn') return (typeof misICP_connMeshes!=='undefined') ? misICP_connMeshes.filter(function(m){return m;}) : [];
   return [];
 }
 

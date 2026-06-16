@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.63.4 — **Data:** 2026-06-15
+> **Versione software mappata:** 8.64.0 — **Data:** 2026-06-16
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3).
@@ -251,6 +251,9 @@ Confronto ICP fra 2 STL, viewport dedicato (`misICP_mountViewport` [4701]). Pann
 | → Clinico / Taratura / Analisi / Excel | | onclick | `misICP_generateReport('clinico'/'taratura'/'analisi'/'excel')` | genera report | [1863-1866] |
 | Cutview ICP: select / chiudi / reset albero | `#misCutSelect` / `.mis-cut-close` / `.mis-tree-reset` | onchange/onclick | `misICP_openCutview` / `misICP_closeCutview` / `misICP_resetTreeDefaults` | gestione cutview | [1515-1530] |
 | Albero ICP: visibilità / opacità layer | `#layChk*` / `#laySld*` | onchange/oninput | `misICP_applyLayerVis` / `misICP_applyLayerOp` | toggle/opacità bgA,scbA,bgB,scbB,labels | [1543-1608] |
+| **Connessione (origine + matematica)** `[beta 8.64.0]` | `#layChkConn` (gruppo Overlay) | onchange | `misICP_applyLayerVis('conn',…)` → `misICP_groupMeshes('conn')` = `misICP_connMeshes` | toggle marker-origine A/B + linea-leva + geometria matematica alle connessioni | riga albero [~1657]; render `misICP_renderConnections` |
+
+> **Connessione clinica in Misurare (beta 8.64.0).** Oltre alla deviazione al **centroide** di volume, il workflow misurare calcola e mostra (accanto, non al posto) la deviazione al **punto di connessione** = `centroide − (capZ − δ)·asse_capward` (capZ da `window.SYN.scanbody`, tipo auto-rilevato dal raggio). Helper dopo `misICP_axisAngleDeg`: `misICP_detectSbType` / `misICP_orientCapward` / `misICP_connectionPoint`. Calcolo nel loop pairs (`p.connA/connB`, `p.connD3um`…); riga **CONNESSIONE** nella tabella per-cilindro del PDF (`misICP_pdfDrawCylinderPage`). Disegno in scena + nodo albero `conn` via `misICP_renderConnections` (additivo, in try/catch; cleanup in `misICP_renderPerCylinder`/`misICP_reset`/dispose-workflow). Razionale e validazione su id 2770: la connessione è il datum clinico vero ma oggi **lever-dominata** dall'asse (44µm vs 8µm al centroide; 8µm con asse perfetto). Orientamento "cap = meno area piatta" validato su **OS**; 1T3/SR/raw-scan da verificare.
 
 ### Sotto-sezione — workflow **sostituire** (`analysisMode='sostituire'`, ramo [4704])
 
