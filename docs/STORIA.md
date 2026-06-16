@@ -4,6 +4,18 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-16 — 8.64.0: Misurare — misura clinica alla connessione (beta, accanto al centroide)
+
+Il report di accoppiamento misura le deviazioni al **centroide di volume** dello scanbody. L'utente ha proposto di misurarle alla **connessione** (l'interfaccia con l'impianto, dove la protesi si siede): geometricamente è a `capZ` sotto il cap occlusale lungo l'asse del cilindro — lo stesso schema canonico che Replace-iT usa per piazzare i MUA (`placeMUA`: cap al click, connessione a `click − capZ`).
+
+Validazione su file reali (id 2770, OS×6 — export Sostituire) eseguendo il **vero codice JS** sui cluster: tipo OS auto-rilevato dal raggio (1.78), `Lconn` = 5.33mm coerente su tutti e 6, deviazione alla connessione **RMS 44µm vs 8µm al centroide**. Prova decisiva: forzando l'asse perfetto (`axis_B = axis_A`) la connessione torna **8µm identica al centroide** → tutto il divario è errore d'asse × leva 5.33mm. Conclusione: la connessione è il datum clinicamente vero (rivela l'errore di seating che il centroide nasconde) ma è **lever-dominata** finché l'asse OS resta mal osservabile. Decisione di prodotto: mostrare **entrambe** (centroide + connessione), decidere più avanti cosa spegnere.
+
+Implementazione:
+- **INC-1 (calcolo)**: 3 helper dopo `misICP_axisAngleDeg` — `misICP_detectSbType` (raggio→tipo→capZ da `window.SYN.scanbody`), `misICP_orientCapward` (cap = estremo con meno area di facce piatte, lontano dal disco/base; validato su OS), `misICP_connectionPoint` (`centroide − (capZ−δ)·asse`). Wiring nel loop pairs (`p.connA/connB`, `p.connD3um`…, `p.connAxA/connAxB/connCapZ`). Blocco **CONNESSIONE** sotto il centroide nella tabella per-cilindro del PDF (`misICP_pdfDrawCylinderPage`).
+- **INC-2 (scena + albero)**: `misICP_renderConnections` — marker-origine sfera A (arancio)/B (blu) + linea-leva cap→connessione + geometria **matematica** (connessione IPD da Analizza) sul lato A orientata sull'asse (logica `placeMUA`). Raccolta in `misICP_connMeshes`, gruppo albero `conn` (riga Overlay `#layChkConn`, toggle via `misICP_applyLayerVis`/`groupMeshes`), cleanup in `misICP_renderPerCylinder`/`misICP_reset`/dispose-workflow. Render **additivo in try/catch**: un fallimento non rompe il display dell'analisi.
+- Auto-rilevamento tipo da geometria (scelta utente). `node --check` 8/8. Calcolo verificato col vero JS sui dati reali; render 3D da verificare visivamente live (pagina gated da auth, non ispezionabile in preview locale). Deploy 8.64.0 su entrambi i servizi, verificato (`backend_version` + title su entrambi i domini).
+- **LIMITI**: orientamento "meno area piatta" validato su **OS** (export Sostituire con disco-base); **1T3/SR** (cap occlusale ampio può competere col disco) e **raw-scan** (senza disco-base) da verificare live.
+
 ## 2026-06-15 — 8.63.4: detection click-invariante 1T3/OS (fit cap+parete a punto fisso)
 
 L'utente ha corretto un mio errore concettuale: i file confrontati sono **sintetici, senza rumore** (sostituti CAD identici sullo stesso scan), quindi due pose dello stesso scanbody **devono dare 0** — gli 8.6µm misurati (OS-10 vs OS-13, due pose nuove) sono **puro non-determinismo software**, non un pavimento da rumore scanner.
