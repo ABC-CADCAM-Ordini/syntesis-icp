@@ -4,6 +4,16 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-16 — 8.64.2: UI connessione Misurare (leader-line toggle + gestione colore/opacità)
+
+Due richieste utente dopo la verifica visiva di 8.64.1 (orientamento ora corretto, connessione verso l'impianto).
+
+(1) **Leader-line del label**: la linea + il pallino colorati (SVG `#labelLines`) che collegano l'etichetta "#N · Xµm" allo scanbody non si spegnevano col toggle "Etichette 3D" — `misICP_applyLayerVis('labels')` agiva solo sulle label HTML (via `visibility`), mentre `misICP_updateLabels` ridisegnava le linee ogni frame forzando `svg.style.display=''`. Fix: flag `misICP_labelsVisible` (default true); `applyLayerVis('labels')` lo setta + svuota/nasconde l'SVG; `updateLabels` nasconde l'SVG e fa early-return quando spento → linea+pallino spariscono insieme al label.
+
+(2) **Connessione gestibile dall'albero**: la riga "Connessione" ora ha color-picker (`misICP_setConnColor` → ricolora SOLO la geometria matematica via `userData.misConnMat`; i marker-origine A=arancio/B=blu restano invariati) + slider opacità (`misICP_applyLayerOp('conn')`, label `#layValConn`). Globale `misICP_connColor` (default `#A855F7`) usato in `misICP_renderConnections`.
+
+`node --check` 8/8. Deploy 8.64.2 su entrambi i servizi, verificato.
+
 ## 2026-06-16 — 8.64.1: fix orientamento connessione (Misurare)
 
 Subito dopo il deploy di 8.64.0, l'utente ha visto nel workflow Misurare che la **geometria di connessione (matematica viola) + i marker erano disegnati verso il top occlusale**, sopra gli scanbody, invece che verso l'impianto. Correzione: *"su OS RS e 1T3 la connessione va opposta al top, guarda come è orientata nel workflow Analizza."*
