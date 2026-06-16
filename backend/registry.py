@@ -34,6 +34,7 @@ import numpy as np
 # Quando si promuove la Fase A in produzione, il suffisso sparisce -> 8.2.0.
 #
 # History:
+#   8.64.5         (2026-06-16): CLEANUP rimosso il pop-up alert() diagnostico di 8.64.4 (era invasivo, serviva solo a confermare che il robust ingaggia: confermato applied=true). Diagnostica ora solo console.log [sostRobustCenter]. ESITO indagine: su id 2770 il centraggio robust ENTRA ma da' risultato identico al legacy, perche' l'asse e' gia' ben determinato (cap-media/wall-min-eig/wall-LS concordano ~0.09 gradi). I ~13µm di #4 NON sono errore di posa/asse: sono il residuo del confronto sostituto-CAD vs scansione (mesh diverse). node --check OK.
 #   8.64.4         (2026-06-16): DIAG v2 Sostituire/robust — il messaggio diagnostico ora e' un alert() pop-up (le scritte di stato transitorie venivano coperte da "Marker posizionato"). Mostra al click: gate (setting/tipoSorgente/raggio) + se il robust e' entrato/fail-soft + motivo. Solo per diagnosi (rimuovere dopo). node --check OK.
 #   8.64.3         (2026-06-16): DIAG Sostituire/robust — strumentazione per capire perche' il centraggio robust click-invariante (8.63.4) NON cambia la posa OS (export OS-16 bit-identico al legacy OS-14 = robust non ingaggia). Aggiunti log [ROBUST-DIAG] + status a schermo in sostPlaceTemplate: (a) gate (setting/sourceTemplate/sourceRadius) per vedere se il branch e' saltato; (b) motivo del fail-soft di _sostCylFitInvariant via _sostInvLastReason ('no-vertex-normals' / 'cap<3' / 'area-cap=0' / 'ok nWall/cap'). Solo logging+status, zero cambi di comportamento. node --check OK. Bump <title>/ANALIZZA_BUILD 8.64.3. Deploy su ENTRAMBI per diagnosi live (ri-piazzare un OS → leggere il motivo).
 #   8.64.2         (2026-06-16): UI Misurare/connessione (2 richieste utente). (1) FIX label: la leader-line SVG (#labelLines, linea+pallino colorati) e il pallino NON si spegnevano col toggle "Etichette 3D" (misICP_applyLayerVis('labels') agiva solo sulle label HTML via visibility; il loop misICP_updateLabels ridisegnava le linee ogni frame forzando svg.style.display=''). Aggiunto flag misICP_labelsVisible (default true): applyLayerVis('labels') lo setta + svuota/nasconde #labelLines; updateLabels nasconde l'SVG e fa early-return se spento -> linea+pallino spariscono col label. (2) FEAT connessione gestibile dall'albero: riga "Connessione" ora ha color-picker (misICP_setConnColor -> ricolora SOLO la geometria matematica via userData.misConnMat; i marker origine A=arancio/B=blu restano invariati) + slider opacita' (misICP_applyLayerOp('conn'), label #layValConn). Nuovo globale misICP_connColor (default #A855F7) usato in misICP_renderConnections. node --check 8/8. MAPPA aggiornata. Bump <title>/ANALIZZA_BUILD 8.64.2. Deploy su ENTRAMBI.
@@ -172,7 +173,7 @@ import numpy as np
 #   8.1.2-A.2   (2026-05-02): aggiunto backend/registry.py + endpoint
 #   8.1.1-A.0   (2026-05-02): rimosso icp_engine_lab.py (copia 1:1)
 #   8.1.0       (2026-05-02): stato pre-Fase A (Analizzare promosso ieri)
-BACKEND_VERSION = "8.64.4"
+BACKEND_VERSION = "8.64.5"
 
 REGISTRY_VERSION = "1.1.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
 REGISTRY_SOURCE = "backend/registry.py"
