@@ -4,6 +4,16 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-17 — 8.66.2: CLEANUP rimozione dead code `_sostDiscPlaneAxis`
+
+Cleanup cosmetico puro, nessun cambio di logica. Rimossa fisicamente la funzione `_sostDiscPlaneAxis` (v3b ~18481) + il blocco commento `[DEAD CODE dal 8.66.1]` sopra di essa (net **−59 righe**). L'helper era già stato disattivato in 8.66.1 (revoca del disc-axis 8.66.0, collaudo live peggiore): la sua unica referenza rimasta era la propria definizione, quindi codice morto a tutti gli effetti. `_sostCylFitInvariant` (sopra) e `sostPlaceTemplate` (sotto) restano intatti.
+
+Implementazione:
+- v3b.html: eliminato il range commento+funzione; `grep _sostDiscPlaneAxis` = 0 risultati dopo l'edit.
+- Validazione: `scripts/gate/check_inline_scripts.py backend/static/syntesis-analyzer-v3b.html` = TUTTI OK (7 blocchi).
+- Bump PATCH coordinato: `registry.py` BACKEND_VERSION 8.66.1→8.66.2 + LAST_UPDATED 2026-06-17 + voce History; v3b `<title>` v8.66.2 + `ANALIZZA_BUILD` 8.66.2 / DATE 2026-06-17; `docs/MAPPA_FUNZIONALE.md` versione mappata 8.66.2 + nota dead-code aggiornata (helper rimosso fisicamente).
+- Deploy su ENTRAMBI i servizi (BACKEND `b7671e12` + LEGACY `7ac922ce`) via `serviceInstanceDeploy latestCommit:true`; verifica live OK su entrambi i domini (backend_version + `<title>` + ANALIZZA_BUILD = 8.66.2). Commit codice `7ca58a3`.
+
 ## 2026-06-17 — 8.66.1: REVERT disc-axis OS + indagine Tara 2770 CHIUSA
 
 Il disc-axis 8.66.0 (asse OS dal piano del disco) ha **peggiorato** il collaudo live (export OS-23: RMSD 8.4→10.3µm, #3 da 10 a 17µm, asse #3 0.21→0.34°). La normale del piano-disco non è più accurata della parete per l'asse OS: il **fitting d'asse da singola feature** (wall / cap-media / disco) è **esaurito a ~0.5°**. Disabilitata la chiamata `_sostDiscPlaneAxis` → robust-OS torna al comportamento 8.65.0 (cap-fit + Kasa, baseline [8,7,10,14,3,3] RMSD 8.4 score 97.15). Helper marcato dead code (conservato per razionale).
