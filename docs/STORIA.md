@@ -4,6 +4,26 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-17 — 8.66.0: Sostituire/robust asse OS roll-free dal piano del disco (Tara 2770)
+
+Chiusura della diagnosi Tara id 2770, gate-validata avendo in mano entrambi gli STL. Il sostituto (Synthesis OS) e il sorgente (ScanLogiQ OS) sono **geometrie BIT-IDENTICHE** (match firma-triangoli = 0.00µm): quindi il residuo Tara (~8µm, RMSD 8.4) è un **puro errore di POSA**, non di geometria né di misura. Decomponendo la rotazione esatta R fra le due pose: **tilt ⊥ asse 0.1-1.2°** (= il residuo, muove il centroide via leva) + **roll attorno all'asse 45-174° ma IRRILEVANTE** (l'OS è assialsimmetrico, il centroide è on-axis).
+
+Questo ribalta l'handoff (che diceva "è la centratura"): **è l'ASSE**. Confermato che il fix centratura 8.65.0 (Kasa) è un **no-op** (export OS-20 cap-baricentro e OS-21 Kasa-applied sono MD5-identici), e che la Raffina point-to-point esistente non aiuta (cliccata su 6 marker → numeri identici). Il 6-DOF ICP è lo strumento sbagliato: insegue il roll ambiguo → minimi locali (prototipi: 2/6 converge).
+
+Root cause: l'asse di `_sostCylFitInvariant` viene dal min-eigenvector della **parete**; per l'OS (cilindro corto h=1.1mm, R=1.78) la parete è poco osservabile → tilt residuo. Il cap occlusale è largo e piatto: la normale del suo **piano** (PCA least-squares) è molto meglio condizionata.
+
+Fix (beta opt-in, default legacy invariato, SR/1T3 invariati): nuovo helper `_sostDiscPlaneAxis` = fit PCA del piano del cap → normale = asse, usato **solo per OS** nel branch robust dopo il Kasa. Imposta **solo la direzione** dell'asse (roll-free per costruzione; centro/livello dal cap-fit+Kasa invariati). Guardia: correzione >5° → fail-soft asse cap-fit; null se cap<8 facce; diag `+discAxis`/`(discAxis skip)`.
+
+Nota onesta: la validazione **offline** a <2µm non è risultata affidabile (la leva cap-centroide OS = 0.43mm è troppo corta per definire l'asse vero a <1° offline, e i prototipi rapidi erano instabili). Clinicamente il Tara è già **97/100 ECCELLENTE** (tutti i centroidi Ottimo <50µm): il push sotto 8µm è precisione, non clinica. Validazione = collaudo live (ri-piazzare OS robust, confronto col baseline OS-21).
+
+Implementazione:
+- `backend/static/syntesis-analyzer-v3b.html`: helper `_sostDiscPlaneAxis` (~18470) + chiamata branch robust OS (~18516); bump `<title>`/`ANALIZZA_BUILD` 8.66.0.
+- `backend/registry.py`: `BACKEND_VERSION` 8.66.0 + History.
+- `docs/MAPPA_FUNZIONALE.md`: riga 436 (passo 8.66.0) + header.
+- node --check 8/8 OK. Live 8.66.0 su entrambi i servizi. PENDING collaudo A/B utente.
+
+---
+
 ## 2026-06-16 — 8.65.0: Sostituire/robust accuratezza centratura laterale 1T3/OS (Kasa, caso Tara 2770)
 
 Handoff Tara id 2770: la sostituzione sintetico-su-sintetico (ScanLogiQ → Synthesis, stessa geometria CAD) deve dare ~0 ma dà RMSD 7.9µm per-cilindro [9.8, 3.6, 8.1, 13.4, 3.2, 3.3]. La diagnostica 8.64.x ha confermato che il centraggio robust ENTRA (`applied=true`, nWall=1859) ma dà posa identica al legacy perché l'**asse è già ok** (uniforme ~0.15°). Il residuo è la **centratura laterale per-marker**.
