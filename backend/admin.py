@@ -26,7 +26,7 @@ import asyncpg
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
-from auth import verify_token
+from auth import verify_token, require_contributor
 
 router = APIRouter()
 
@@ -38,14 +38,18 @@ RIT_MAX_ZIP_BYTES = int(os.getenv("RIT_MAX_ZIP_BYTES", str(200 * 1024 * 1024)))
 
 
 async def require_admin(current_user: dict = Depends(verify_token)) -> dict:
-    """Consente l'accesso solo agli amministratori."""
-    if current_user.get("role") != "admin":
-        raise HTTPException(403, detail="Accesso riservato agli amministratori.")
+    """RBAC 8.67.0: SUPER-ADMIN soltanto (role=='admin'), ruolo riletto dal DB (il
+    JWT puo' essere stantio). Riservato alle operazioni piu' sensibili: assegnazione
+    ruoli e impostazione del codice-lucchetto. La gestione librerie/clienti usa
+    require_contributor (admin O contribuente)."""
+    from auth import _fresh_role
+    if (await _fresh_role(current_user)) != "admin":
+        raise HTTPException(403, detail="Accesso riservato al super-amministratore.")
     return current_user
 
 
 @router.get("/users")
-async def admin_list_users(admin: dict = Depends(require_admin)):
+async def admin_list_users(admin: dict = Depends(require_contributor)):
     """Elenco di tutti gli utenti registrati con stato, contatti e metriche d'uso."""
     from database import list_all_users
     users = await list_all_users()
@@ -60,10 +64,21 @@ async def admin_list_users(admin: dict = Depends(require_admin)):
     return {"users": users}
 
 
+async def _guard_not_superadmin(actor: dict, user_id: str):
+    """Guardia RBAC 8.67.0: un CONTRIBUENTE non puo' agire (authorize/revoke) su un
+    SUPER-ADMIN. Il super-admin puo' agire su chiunque. (Scelta utente: il contribuente
+    puo' gestire chiunque TRANNE il super-admin.)"""
+    if actor.get("fresh_role") != "admin":
+        from database import get_user_role
+        if (await get_user_role(user_id)) == "admin":
+            raise HTTPException(403, detail="Solo il super-admin puo' gestire un super-admin.")
+
+
 @router.post("/users/{user_id}/authorize")
-async def admin_authorize(user_id: str, admin: dict = Depends(require_admin)):
-    """Autorizza un utente: genera la chiave SICP, la associa e attiva l'account.
-    Ritorna la chiave generata (verrà mostrata all'utente nel suo pannello)."""
+async def admin_authorize(user_id: str, admin: dict = Depends(require_contributor)):
+    """Autorizza un utente (accetta): genera la chiave SICP, la associa e attiva
+    l'account. Contribuente o super-admin (guardia: no super-admin altrui)."""
+    await _guard_not_superadmin(admin, user_id)
     from database import authorize_user
     key = await authorize_user(user_id)
     if key is None:
@@ -72,13 +87,35 @@ async def admin_authorize(user_id: str, admin: dict = Depends(require_admin)):
 
 
 @router.post("/users/{user_id}/revoke")
-async def admin_revoke(user_id: str, admin: dict = Depends(require_admin)):
-    """Revoca l'autorizzazione: disattiva la licenza e riporta l'utente in attesa."""
+async def admin_revoke(user_id: str, admin: dict = Depends(require_contributor)):
+    """Revoca/disattiva un cliente: disattiva la licenza, l'utente perde l'accesso
+    (record e storico restano -> reversibile riautorizzando). = "cancella cliente"
+    della UI (scelta utente: disattiva, no hard-delete). Contribuente o super-admin."""
+    await _guard_not_superadmin(admin, user_id)
     from database import revoke_user
     ok = await revoke_user(user_id)
     if not ok:
         raise HTTPException(404, detail="Utente non trovato.")
     return {"user_id": user_id, "revoked": True}
+
+
+class RoleBody(BaseModel):
+    role: str
+
+
+@router.patch("/users/{user_id}/role")
+async def admin_set_role(user_id: str, body: RoleBody, admin: dict = Depends(require_admin)):
+    """Assegna un ruolo a un utente — SOLO super-admin (8.67.0). Ruoli ammessi:
+    'user' (cliente), 'contribuente', 'admin' (super-admin). Guardia anti-lockout
+    sull'ultimo super-admin (in update_user_role)."""
+    from database import update_user_role
+    try:
+        new_role = await update_user_role(user_id, (body.role or "").strip())
+    except ValueError as e:
+        raise HTTPException(400, detail=str(e))
+    if new_role is None:
+        raise HTTPException(404, detail="Utente non trovato.")
+    return {"user_id": user_id, "role": new_role}
 
 
 # =====================================================================
@@ -662,7 +699,7 @@ async def rit_ingest_library(
     stl_overwrite: Optional[str] = Form(None),        # JSON [nomi] da sovrascrivere (presenza = deciso)
     lib_overwrite: Optional[str] = Form(None),        # "1" = sovrascrivi librerie esistenti
     code: Optional[str] = Form(None),                 # codice lucchetto (overwrite di asset bloccati)
-    admin: dict = Depends(require_admin),
+    admin: dict = Depends(require_contributor),
 ):
     """Ingest librerie Replace-iT — TRE porte, stesso modello dati:
     1) ZIP Exocad (config.xml): path storico, INVARIATO.
@@ -848,14 +885,14 @@ async def rit_ingest_library(
 
 
 @router.get("/rit/libraries")
-async def rit_list_libraries_endpoint(admin: dict = Depends(require_admin)):
+async def rit_list_libraries_endpoint(admin: dict = Depends(require_contributor)):
     """Elenco librerie con conteggio type (tabella in /gestione)."""
     from database import rit_list_libraries
     return {"libraries": await rit_list_libraries()}
 
 
 @router.get("/rit/libraries/{library_id}")
-async def rit_library_detail_endpoint(library_id: int, admin: dict = Depends(require_admin)):
+async def rit_library_detail_endpoint(library_id: int, admin: dict = Depends(require_contributor)):
     """Dettaglio read-only: root-params + type con tutti i parametri."""
     from database import rit_get_library_detail
     detail = await rit_get_library_detail(library_id)
@@ -865,7 +902,7 @@ async def rit_library_detail_endpoint(library_id: int, admin: dict = Depends(req
 
 
 @router.get("/rit/libraries/{library_id}/preview")
-async def rit_library_preview_endpoint(library_id: int, admin: dict = Depends(require_admin)):
+async def rit_library_preview_endpoint(library_id: int, admin: dict = Depends(require_contributor)):
     """Serve preview_png (PNG) della libreria. 404 se assente."""
     from database import rit_get_library_image
     png = await rit_get_library_image(library_id, "preview")
@@ -875,7 +912,7 @@ async def rit_library_preview_endpoint(library_id: int, admin: dict = Depends(re
 
 
 @router.get("/rit/libraries/{library_id}/logo")
-async def rit_library_logo_endpoint(library_id: int, admin: dict = Depends(require_admin)):
+async def rit_library_logo_endpoint(library_id: int, admin: dict = Depends(require_contributor)):
     """Serve logo_png (PNG) del fornitore. 404 se assente."""
     from database import rit_get_library_image
     png = await rit_get_library_image(library_id, "logo")
@@ -890,7 +927,7 @@ class RitActiveBody(BaseModel):
 
 @router.patch("/rit/libraries/{library_id}/active")
 async def rit_set_active_endpoint(library_id: int, body: RitActiveBody,
-                                  admin: dict = Depends(require_admin)):
+                                  admin: dict = Depends(require_contributor)):
     """Attiva/disattiva una libreria (l'utente la attiva dopo la verifica)."""
     from database import rit_set_library_active
     ok = await rit_set_library_active(library_id, body.active)
@@ -914,7 +951,7 @@ _RIT_TYPE_BREAK = ("Operazione rifiutata: lascerebbe la libreria ATTIVA senza un
 @router.patch("/rit/libraries/{library_id}/types/{type_id}")
 async def rit_update_type_endpoint(library_id: int, type_id: int,
                                    body: RitTypeUpdate,
-                                   admin: dict = Depends(require_admin)):
+                                   admin: dict = Depends(require_contributor)):
     """Modifica i campi editabili di un componente (type): SOLO quelli inviati nel
     body (semantica PATCH) tra display/ruolo/eng/attivo. Vale per librerie importate
     E create (es. assegnare il ruolo ai componenti di una LITE che li ha NULL). La
@@ -946,7 +983,7 @@ async def rit_update_type_endpoint(library_id: int, type_id: int,
 
 @router.delete("/rit/libraries/{library_id}/types/{type_id}")
 async def rit_delete_type_endpoint(library_id: int, type_id: int,
-                                   admin: dict = Depends(require_admin)):
+                                   admin: dict = Depends(require_contributor)):
     """Cancella un componente (type) da una libreria."""
     from database import rit_delete_scanbody_type
     status = await rit_delete_scanbody_type(type_id, library_id)
@@ -962,7 +999,7 @@ async def rit_delete_type_endpoint(library_id: int, type_id: int,
 # =====================================================================
 
 @router.get("/rit/stl")
-async def rit_stl_list_endpoint(admin: dict = Depends(require_admin)):
+async def rit_stl_list_endpoint(admin: dict = Depends(require_contributor)):
     """Archivio STL per nome (con used_by = n. librerie CSV/editor collegate)."""
     from database import rit_list_stl_assets
     return {"assets": await rit_list_stl_assets()}
@@ -973,7 +1010,7 @@ async def rit_stl_upload_endpoint(
     files: list[UploadFile] = File(...),
     stl_overwrite: Optional[str] = Form(None),   # JSON [nomi] (presenza = deciso)
     code: Optional[str] = Form(None),
-    admin: dict = Depends(require_admin),
+    admin: dict = Depends(require_contributor),
 ):
     """Upload diretto in archivio. Collisione per NOME con contenuto diverso:
     senza decisione -> 409 stl_conflict; con stl_overwrite, i nomi elencati
@@ -1049,7 +1086,7 @@ async def rit_stl_upload_endpoint(
 
 
 @router.get("/rit/stl/{name}/content")
-async def rit_stl_content_endpoint(name: str, admin: dict = Depends(require_admin)):
+async def rit_stl_content_endpoint(name: str, admin: dict = Depends(require_contributor)):
     """Bytes STL di un asset per NOME (per l'anteprima 3D nel pannello)."""
     from database import rit_get_stl_asset, rit_get_marker_bytes
     asset = await rit_get_stl_asset(name)
@@ -1063,7 +1100,7 @@ async def rit_stl_content_endpoint(name: str, admin: dict = Depends(require_admi
 
 
 @router.post("/rit/stl/{name}/lock")
-async def rit_stl_lock_endpoint(name: str, admin: dict = Depends(require_admin)):
+async def rit_stl_lock_endpoint(name: str, admin: dict = Depends(require_contributor)):
     """Blocca un file (lucchetto). Il blocco e' libero; lo SBLOCCO chiede il codice."""
     from database import rit_set_stl_asset_locked
     if not await rit_set_stl_asset_locked(name, True):
@@ -1077,7 +1114,7 @@ class RitUnlockBody(BaseModel):
 
 @router.post("/rit/stl/{name}/unlock")
 async def rit_stl_unlock_endpoint(name: str, body: RitUnlockBody,
-                                  admin: dict = Depends(require_admin)):
+                                  admin: dict = Depends(require_contributor)):
     """Sblocca un file: richiede il codice di sicurezza (verifica server-side)."""
     from database import rit_set_stl_asset_locked
     await _rit_check_lock_code(body.code)
@@ -1087,7 +1124,7 @@ async def rit_stl_unlock_endpoint(name: str, body: RitUnlockBody,
 
 
 @router.delete("/rit/stl/{name}")
-async def rit_stl_delete_endpoint(name: str, admin: dict = Depends(require_admin)):
+async def rit_stl_delete_endpoint(name: str, admin: dict = Depends(require_contributor)):
     """Cancella un file dall'archivio. Rifiuta se bloccato (sbloccare prima)
     o se ancora usato da librerie CSV/editor."""
     from database import rit_delete_stl_asset
@@ -1102,7 +1139,7 @@ async def rit_stl_delete_endpoint(name: str, admin: dict = Depends(require_admin
 
 
 @router.get("/rit/lock-code")
-async def rit_lock_code_status_endpoint(admin: dict = Depends(require_admin)):
+async def rit_lock_code_status_endpoint(admin: dict = Depends(require_contributor)):
     """Stato del codice di sicurezza (solo SE e' impostato, mai il valore)."""
     from database import rit_get_lock_secret
     return {"is_set": (await rit_get_lock_secret()) is not None}
@@ -1116,8 +1153,8 @@ class RitLockCodeBody(BaseModel):
 @router.post("/rit/lock-code")
 async def rit_lock_code_set_endpoint(body: RitLockCodeBody,
                                      admin: dict = Depends(require_admin)):
-    """Imposta/cambia il codice del lucchetto. Se gia' impostato richiede
-    quello attuale. Salvato SOLO hashed (pbkdf2 via auth.hash_password)."""
+    """Imposta/cambia il codice del lucchetto — SOLO super-admin (8.67.0, scelta
+    utente). Se gia' impostato richiede quello attuale. Salvato SOLO hashed."""
     from database import rit_get_lock_secret, rit_set_lock_secret
     from auth import hash_password
     new = (body.code_new or "").strip()

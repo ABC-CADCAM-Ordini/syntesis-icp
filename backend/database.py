@@ -670,6 +670,42 @@ async def revoke_user(user_id: str) -> bool:
             return True
 
 
+# ── RBAC (8.67.0): ruoli applicativi. Whitelist a livello codice (la colonna
+# users.role e' free-TEXT senza CHECK -> niente migrazione). 'admin' = super-admin,
+# 'contribuente' = sub-admin (librerie + gestione clienti), 'user' = cliente. ──
+ROLE_WHITELIST = ("user", "contribuente", "admin")
+
+
+async def get_user_role(user_id: str) -> Optional[str]:
+    """Ruolo corrente di un utente (per le guardie RBAC). None se non esiste."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchval("SELECT role FROM users WHERE id = $1", user_id)
+
+
+async def update_user_role(user_id: str, role: str) -> Optional[str]:
+    """Assegna un ruolo a un utente (whitelist). Ritorna il nuovo ruolo; None se
+    l'utente non esiste; solleva ValueError se il ruolo non e' valido o se la
+    modifica lascerebbe ZERO super-admin (guardia anti-lockout)."""
+    if role not in ROLE_WHITELIST:
+        raise ValueError(f"Ruolo non valido: {role}")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            cur = await conn.fetchrow(
+                "SELECT role FROM users WHERE id = $1 FOR UPDATE", user_id)
+            if not cur:
+                return None
+            # Anti-lockout: non declassare l'ULTIMO super-admin.
+            if cur["role"] == "admin" and role != "admin":
+                n_admin = await conn.fetchval(
+                    "SELECT COUNT(*) FROM users WHERE role = 'admin'")
+                if (n_admin or 0) <= 1:
+                    raise ValueError("Impossibile declassare l'ultimo super-admin.")
+            await conn.execute("UPDATE users SET role = $1 WHERE id = $2", role, user_id)
+            return role
+
+
 async def log_analysis(analysis_id: str, user_id: str, filename_a: str,
                         filename_b: str, score: int, rmsd: float,
                         result_json: Optional[dict] = None):

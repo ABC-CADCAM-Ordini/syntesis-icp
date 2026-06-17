@@ -309,7 +309,8 @@
   //      authorized = active===true && license_key presente.
   function classify(user){
     if(!user) return "pending";
-    if(user.role === "admin") return "authorized"; // gli admin entrano sempre
+    // 8.67.0 RBAC: staff (super-admin + contribuente) entrano sempre, senza licenza.
+    if(user.role === "admin" || user.role === "contribuente") return "authorized";
     var hasKey = !!(user.license_key && String(user.license_key).trim());
     var active = user.active === true || user.active === undefined ? user.active : false;
     // se il backend non manda 'active', ci basiamo sulla chiave

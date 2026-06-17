@@ -223,7 +223,7 @@
     <div class="tablecard">
       <table>
         <thead>
-          <tr><th>Utente</th><th>Città · Cellulare</th><th>Accessi</th><th>Ultimo accesso</th><th>Utilizzo</th><th>Registrato</th><th>Stato</th><th>Licenza</th><th></th></tr>
+          <tr><th>Utente</th><th>Città · Cellulare</th><th>Accessi</th><th>Ultimo accesso</th><th>Utilizzo</th><th>Registrato</th><th>Stato</th><th>Licenza</th><th>Ruolo</th><th></th></tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
@@ -396,6 +396,8 @@
   var searchTerm = "";
   var sortMode = "created_desc";
   var users = []; // popolato da loadUsers()
+  var MY_ROLE = null; // 8.67.0: ruolo del visitatore (super-admin vede il dropdown "modifica ruolo")
+  var ROLE_LABELS = { "admin":"Super-admin", "contribuente":"Contribuente", "user":"Cliente" };
 
   // ---------- API ----------
   function adminHeaders(){ return {"Authorization":"Bearer "+ADMIN_TOKEN}; }
@@ -411,7 +413,7 @@
       .catch(function(status){
         if(status===401 || status===403){
           document.querySelector(".wrap").innerHTML =
-            '<div class="empty">Accesso riservato agli amministratori.<br>' +
+            '<div class="empty">Accesso riservato ad amministratori e contribuenti.<br>' +
             '<a href="/accedi" style="color:var(--accent)">Torna all\'accesso</a></div>';
         } else {
           toast("Errore nel caricamento degli utenti.");
@@ -431,6 +433,22 @@
     return fetch(API+"/admin/users/"+encodeURIComponent(id)+"/revoke",
       {method:"POST",headers:adminHeaders()})
       .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); });
+  }
+
+  // 8.67.0 RBAC: ruolo del visitatore (per mostrare il dropdown modifica-ruolo solo al super-admin)
+  function loadMyRole(){
+    return fetch(API+"/auth/me",{headers:adminHeaders()})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ MY_ROLE = (d && d.user && d.user.role) || null; })
+      .catch(function(){ MY_ROLE = null; });
+  }
+
+  // 8.67.0 RBAC: assegna ruolo (solo super-admin lato server, PATCH /admin/users/{id}/role)
+  function setUserRole(id, role){
+    return fetch(API+"/admin/users/"+encodeURIComponent(id)+"/role",
+      {method:"PATCH",headers:{"Authorization":"Bearer "+ADMIN_TOKEN,"Content-Type":"application/json"},
+       body:JSON.stringify({role:role})})
+      .then(function(r){ return r.ok ? r.json() : r.json().then(function(j){ return Promise.reject(j.detail||r.status); }); });
   }
 
   // ---------- render ----------
@@ -514,7 +532,23 @@
             ? '<span class="pill ok"><span class="dot"></span>Autorizzato</span>'
             : '<span class="pill wait"><span class="dot"></span>In attesa</span>')+'</td>'+
         '<td class="keycell '+(authd?'':'none')+'">'+(authd?escapeHtml(u.license_key):'—')+'</td>'+
+        '<td class="rolecell"></td>'+
         '<td class="actcell"></td>';
+      // 8.67.0 RBAC: colonna Ruolo. Super-admin -> dropdown "modifica ruolo"; altri -> sola etichetta.
+      var rolecell=tr.querySelector(".rolecell");
+      var roleVal=(u.role||"user");
+      if(MY_ROLE==="admin"){
+        var sel=document.createElement("select");
+        sel.className="roleSel";
+        ["user","contribuente","admin"].forEach(function(rv){
+          var o=document.createElement("option"); o.value=rv; o.textContent=ROLE_LABELS[rv]||rv;
+          if(rv===roleVal) o.selected=true; sel.appendChild(o);
+        });
+        sel.addEventListener("change", function(){ onRoleChange(u, sel, roleVal); });
+        rolecell.appendChild(sel);
+      } else {
+        rolecell.className="umeta"; rolecell.textContent = ROLE_LABELS[roleVal] || roleVal;
+      }
       var actcell=tr.querySelector(".actcell");
       if(authd){
         var rb=document.createElement("button");
@@ -548,6 +582,17 @@
     revokeUser(u.id).then(function(){
       u.active=false; u.license_key=null; render(); toast("Accesso revocato.");
     }).catch(function(){ btn.disabled=false; toast("Errore durante la revoca."); });
+  }
+  // 8.67.0 RBAC: cambio ruolo (solo super-admin; server PATCH /admin/users/{id}/role)
+  function onRoleChange(u, sel, prevVal){
+    var nr=sel.value; if(nr===prevVal) return;
+    if(!confirm("Cambiare il ruolo di "+u.name+" in \""+(ROLE_LABELS[nr]||nr)+"\"?")){ sel.value=prevVal; return; }
+    sel.disabled=true;
+    setUserRole(u.id, nr).then(function(res){
+      u.role=res.role; sel.disabled=false; toast("Ruolo aggiornato: "+(ROLE_LABELS[res.role]||res.role)+".");
+    }).catch(function(err){
+      sel.value=prevVal; sel.disabled=false; toast("Ruolo non cambiato: "+err);
+    });
   }
 
   // ---------- modal ----------
@@ -1438,7 +1483,8 @@
   });
 
   // ---------- init ----------
-  loadUsers();
+  // 8.67.0: prima leggo il MIO ruolo (per il dropdown modifica-ruolo), poi gli utenti.
+  loadMyRole().then(loadUsers);
   ritLoad();
   stlLoad();
   stlCodeStatus();

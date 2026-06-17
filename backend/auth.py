@@ -67,16 +67,39 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
     return decode_token(credentials.credentials)
 
 
-async def require_authorized(current_user: dict = Depends(verify_token)) -> dict:
-    """v8.x: consente l'accesso ai servizi solo a utenti autorizzati
-    (licenza attiva) oppure agli admin. Gli utenti pending ricevono 403."""
-    if current_user.get("role") == "admin":
-        return current_user
+async def _fresh_role(current_user: dict) -> str:
+    """RBAC 8.67.0: ruolo aggiornato letto dal DB. Il JWT embedda role e puo'
+    restare stantio fino a 24h (TTL token): un cambio ruolo deve avere effetto al
+    prossimo request, quindi i gate rileggono dal DB invece di fidarsi del token."""
     from database import get_user_by_email
     u = await get_user_by_email(current_user.get("email"))
+    if u and u.get("role"):
+        return u["role"]
+    return current_user.get("role") or "user"
+
+
+async def require_authorized(current_user: dict = Depends(verify_token)) -> dict:
+    """Servizi di prodotto (analisi/ICP/report): ammessi super-admin e contribuenti
+    (staff) e i clienti AUTORIZZATI (licenza attiva). Pending -> 403.
+    8.67.0: ruolo riletto dal DB (non dal token) per coerenza coi cambi ruolo."""
+    from database import get_user_by_email
+    u = await get_user_by_email(current_user.get("email"))
+    role = (u.get("role") if u else None) or current_user.get("role")
+    if role in ("admin", "contribuente"):
+        return current_user
     if not u or not u.get("active") or not u.get("license_key"):
         raise HTTPException(403, detail="Account non ancora autorizzato.")
     return current_user
+
+
+async def require_contributor(current_user: dict = Depends(verify_token)) -> dict:
+    """RBAC 8.67.0: super-admin O contribuente (ruolo riletto dal DB). Gate per la
+    gestione librerie e la gestione clienti. Allega 'fresh_role' al dict cosi' gli
+    endpoint applicano la guardia (un contribuente non puo' agire sul super-admin)."""
+    role = await _fresh_role(current_user)
+    if role not in ("admin", "contribuente"):
+        raise HTTPException(403, detail="Accesso riservato a contribuenti e super-admin.")
+    return {**current_user, "fresh_role": role}
 
 
 # ── Password hashing ──────────────────────────────────────────────────────────
