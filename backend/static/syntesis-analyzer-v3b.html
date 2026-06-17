@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.66.1</title>
+<title>Syntesis-ICP - Analizzare v8.66.2</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2440,8 +2440,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.66.1';
-window.ANALIZZA_BUILD_DATE = '2026-06-16';
+window.ANALIZZA_BUILD = '8.66.2';
+window.ANALIZZA_BUILD_DATE = '2026-06-17';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -18465,65 +18465,6 @@ function _sostCylFitInvariant(scanGeo, roughCenter, roughAxis, R){
   }
   _sostInvLastReason='ok (parete nWall='+nWall+', facce cap='+fa.length+')';
   return { center: new THREE.Vector3(cx,cy,cz), axis: new THREE.Vector3(ax,ay,az), applied: true };
-}
-
-// [DEAD CODE dal 8.66.1: NON piu' chiamata — il disc-axis 8.66.0 e' stato revocato, collaudo
-//  live peggiore. Conservata per il razionale; rimuovere in un passo di cleanup dedicato.]
-// 8.66.0 (Tara/OS — asse ROLL-FREE dal piano del disco). Diagnosi gate-validata su id 2770:
-// geometrie sostituto/sorgente BIT-IDENTICHE -> il residuo Tara (~8µm) e' puro TILT d'asse OS
-// (0.1-1.2°), il roll e' irrilevante (OS assialsimmetrico, centroide on-axis). L'asse di
-// _sostCylFitInvariant viene dal min-eigenvector della PARETE: per l'OS (cilindro CORTO h=1.1mm,
-// R=1.78) la parete e' poco osservabile -> tilt residuo. Il CAP occlusale invece e' largo e
-// piatto: la normale del suo PIANO (autovettore minimo della covarianza dei punti cap, fit
-// least-squares) e' molto meglio condizionata. Qui imposto SOLO la direzione dell'asse (roll-free
-// per costruzione; il centro/livello restano quelli del cap-fit + Kasa). Guardia: rifiuta
-// correzioni >5° (cap mal rilevato) -> fail-soft all'asse precedente. Ritorna null se cap insuff.
-function _sostDiscPlaneAxis(scanGeo, center, axis, R){
-  if(!scanGeo || !scanGeo.attributes || !scanGeo.attributes.position) return null;
-  var pos = scanGeo.attributes.position.array, nTri = pos.length/9;
-  var cx=center.x, cy=center.y, cz=center.z;
-  var ax=axis.x, ay=axis.y, az=axis.z;
-  var _l=Math.sqrt(ax*ax+ay*ay+az*az); if(_l<1e-9) return null; ax/=_l;ay/=_l;az/=_l;
-  var Rhi=R+0.9, cap=[], axMax=-Infinity;
-  for(var i=0;i<nTri;i++){
-    var o=i*9;
-    var tx=(pos[o]+pos[o+3]+pos[o+6])/3, ty=(pos[o+1]+pos[o+4]+pos[o+7])/3, tz=(pos[o+2]+pos[o+5]+pos[o+8])/3;
-    var dx=tx-cx, dy=ty-cy, dz=tz-cz;
-    var axial=dx*ax+dy*ay+dz*az; if(Math.abs(axial)>3.5) continue;
-    var prx=dx-axial*ax, pry=dy-axial*ay, prz=dz-axial*az;
-    if(prx*prx+pry*pry+prz*prz > Rhi*Rhi) continue;
-    var e1x=pos[o+3]-pos[o], e1y=pos[o+4]-pos[o+1], e1z=pos[o+5]-pos[o+2];
-    var e2x=pos[o+6]-pos[o], e2y=pos[o+7]-pos[o+1], e2z=pos[o+8]-pos[o+2];
-    var nx=e1y*e2z-e1z*e2y, ny=e1z*e2x-e1x*e2z, nz=e1x*e2y-e1y*e2x;
-    var nl=Math.sqrt(nx*nx+ny*ny+nz*nz); if(nl<1e-9) continue;
-    var area=0.5*nl; nx/=nl;ny/=nl;nz/=nl;
-    if(Math.abs(nx*ax+ny*ay+nz*az) < 0.85) continue;   // solo facce piatte (cap/disco)
-    if(axial>axMax) axMax=axial;
-    cap.push([tx,ty,tz,area,axial]);
-  }
-  if(cap.length<8) return null;
-  var wsum=0,mx=0,my=0,mz=0,pts=[];
-  for(var k=0;k<cap.length;k++){
-    if(cap[k][4] < axMax-0.5) continue;                 // solo il cap occlusale (estremo +asse)
-    var w=cap[k][3]; pts.push(cap[k]); wsum+=w; mx+=w*cap[k][0]; my+=w*cap[k][1]; mz+=w*cap[k][2];
-  }
-  if(pts.length<8 || wsum<=0) return null;
-  mx/=wsum;my/=wsum;mz/=wsum;
-  var C=[[0,0,0],[0,0,0],[0,0,0]];
-  for(var k2=0;k2<pts.length;k2++){
-    var w2=pts[k2][3], px=pts[k2][0]-mx, py=pts[k2][1]-my, pz=pts[k2][2]-mz;
-    C[0][0]+=w2*px*px; C[0][1]+=w2*px*py; C[0][2]+=w2*px*pz;
-    C[1][0]+=w2*py*px; C[1][1]+=w2*py*py; C[1][2]+=w2*py*pz;
-    C[2][0]+=w2*pz*px; C[2][1]+=w2*pz*py; C[2][2]+=w2*pz*pz;
-  }
-  var ej=misICP_jacobi3(C), mi=0;
-  if(ej.vals[1]<ej.vals[mi])mi=1; if(ej.vals[2]<ej.vals[mi])mi=2;   // autovettore minimo = normale del piano
-  var nx2=ej.vecs[0][mi], ny2=ej.vecs[1][mi], nz2=ej.vecs[2][mi];
-  var nl2=Math.sqrt(nx2*nx2+ny2*ny2+nz2*nz2); if(nl2<1e-9) return null;
-  nx2/=nl2;ny2/=nl2;nz2/=nl2;
-  if(nx2*ax+ny2*ay+nz2*az < 0){ nx2=-nx2;ny2=-ny2;nz2=-nz2; }       // verso il cap
-  if(nx2*ax+ny2*ay+nz2*az < Math.cos(5*Math.PI/180)) return null;   // guardia: correzione >5° = cap mal rilevato
-  return new THREE.Vector3(nx2,ny2,nz2);
 }
 
 function sostPlaceTemplate(rawPoint, rawNormal){
