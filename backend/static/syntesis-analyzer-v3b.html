@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.66.8</title>
+<title>Syntesis-ICP - Analizzare v8.66.9</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2440,7 +2440,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.66.8';
+window.ANALIZZA_BUILD = '8.66.9';
 window.ANALIZZA_BUILD_DATE = '2026-06-17';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -18627,6 +18627,7 @@ function sostPlaceTemplate(rawPoint, rawNormal){
   // [ROBUST-DIAG 8.64.3] gate: perché il robust (non) si applica
   var _scSet = synSostCenterRead();
   console.log('[ROBUST-DIAG] gate setting='+_scSet+' sourceTemplate='+sostSourceTemplate+' sourceRadius='+sourceRadius);
+  var _placeDiagCap = null;   // 8.66.9: catena centraggio catturata per il log CSV diagnostico
   if(_scSet === 'robust' && sourceRadius){
     try {
       var _cen = autoResult.center, _ax = axis, _ok = false, _cov = 0;
@@ -18674,6 +18675,20 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       }
       if(_ok){ discWorld = _cen; axis = _ax.clone().normalize(); }
       console.log('[sostRobustCenter] type='+sostSourceTemplate+' applied='+_ok+' reason='+(_sostInvLastReason||'(SR/altro)')+' (gate setting='+_scSet+' radius='+sourceRadius+')');
+      // 8.66.9: cattura l'INTERA catena di centraggio per il log CSV (seed -> cap-fit -> geomAxis -> Kasa -> finale)
+      try {
+        var _arr = function(o){ return o ? [(o.x!==undefined?o.x:o[0]), (o.y!==undefined?o.y:o[1]), (o.z!==undefined?o.z:o[2])] : null; };
+        _placeDiagCap = {
+          type: sostSourceTemplate, radius: sourceRadius, engine: _scSet, applied: _ok, reason: _sostInvLastReason,
+          seedCen: _arr(autoResult.center), seedAx: _arr(autoResult.axis),
+          fitCen: (typeof _fit!=='undefined' && _fit) ? _arr(_fit.center) : null,
+          fitAx:  (typeof _fit!=='undefined' && _fit) ? _arr(_fit.axis)   : null,
+          geomAx: (typeof _gw!=='undefined'  && _gw)  ? _arr(_gw)         : null,
+          kasaCen:(typeof _kc!=='undefined'  && _kc && _kc.applied) ? _arr(_kc.center) : null,
+          kasaCov:(typeof _kc!=='undefined'  && _kc)  ? _kc.coverageDeg   : null,
+          finalCen: _arr(_cen), finalAx: _arr(_ax)
+        };
+      } catch(_edc){ console.warn('[sostPlaceDiag]', _edc); }
     } catch(e){ console.warn('[sostRobustCenter] errore, fallback legacy:', e); }
   } else {
     console.log('[sostRobustCenter] branch saltato: setting='+_scSet+' sourceRadius='+sourceRadius);
@@ -18949,6 +18964,7 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       rmsd: null,
       // 8.66.8: diagnostica posa (motivo robust: +geomAxis/skip, +kasaXY/skip, applied/reason)
       diagReason: (typeof _sostInvLastReason === 'string' ? _sostInvLastReason : ''),
+      diag: _placeDiagCap,   // 8.66.9: catena centraggio completa per il log CSV
       axisLine: axisLine
     });
 
@@ -19400,7 +19416,47 @@ function sostRenderPlacedList(){
            + '<br>centro ' + c + ' · asse ' + a
            + '</div>';
   });
+  // 8.66.9: pulsante download log CSV diagnostico (tutta la catena di centraggio per marker)
+  _html += '<button onclick="sostDownloadDiagLog()" style="margin-top:8px;width:100%;padding:7px 10px;border:1px solid var(--border);background:#fff;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer;color:var(--dark)">⤓ Scarica log diagnostica (CSV)</button>';
   items.innerHTML = _html;
+}
+
+// 8.66.9: scarica un CSV con TUTTA la catena di centraggio per ogni marker piazzato
+// (seed findScanbodyCenter -> cap-fit _sostCylFitInvariant -> geomAxis -> Kasa -> finale) +
+// click + connessione + info di sistema. Cosi' la diagnosi non dipende dalla console: l'utente
+// scarica il file e lo invia. Solo lettura di sostPlaced[].diag, zero effetto su posa/numeri.
+function sostDownloadDiagLog(){
+  if(!sostPlaced || !sostPlaced.length){ sostShowStatus('Nessun marker posizionato.', true); return; }
+  var ver = window.ANALIZZA_BUILD || '?';
+  var eng = '?', axeng = '?';
+  try { if(typeof synSostCenterRead==='function') eng = synSostCenterRead(); } catch(e){}
+  try { if(typeof synAxisEngineRead==='function') axeng = synAxisEngineRead('auto'); } catch(e){}
+  function f(x){ return (x==null || isNaN(x)) ? '' : (+x).toFixed(4); }
+  function v3(a){ return a ? (f(a[0])+','+f(a[1])+','+f(a[2])) : ',,'; }
+  function vv(o){ return o ? (f(o.x)+','+f(o.y)+','+f(o.z)) : ',,'; }
+  var lines = [];
+  lines.push('# Syntesis-ICP - diagnostica posa Sostituire | versione=' + ver + ' | motore_centraggio=' + eng + ' | motore_asse=' + axeng + ' | n_marker=' + sostPlaced.length);
+  lines.push('marker,tipo,raggio,engine,applied,reason,seedCenX,seedCenY,seedCenZ,seedAxX,seedAxY,seedAxZ,fitCenX,fitCenY,fitCenZ,fitAxX,fitAxY,fitAxZ,geomAxX,geomAxY,geomAxZ,kasaCenX,kasaCenY,kasaCenZ,kasaCov,finalCenX,finalCenY,finalCenZ,finalAxX,finalAxY,finalAxZ,clickX,clickY,clickZ,clickNX,clickNY,clickNZ,connX,connY,connZ');
+  sostPlaced.forEach(function(p){
+    var d = p.diag || {};
+    var row = [
+      p.num, (p.templateKey||''), f(d.radius), (d.engine||''), (d.applied===true?'true':(d.applied===false?'false':'')),
+      '"' + String(d.reason||'').replace(/"/g,'') + '"',
+      v3(d.seedCen), v3(d.seedAx), v3(d.fitCen), v3(d.fitAx), v3(d.geomAx), v3(d.kasaCen),
+      (d.kasaCov!=null && !isNaN(d.kasaCov) ? (+d.kasaCov).toFixed(1) : ''),
+      v3(d.finalCen), v3(d.finalAx), vv(p.clickPoint), vv(p.clickNormal), vv(p.position)
+    ];
+    lines.push(row.join(','));
+  });
+  try {
+    var blob = new Blob(['﻿' + lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url;
+    a.download = 'SyntesisICP_PosaDiag_v' + ver + '_' + sostPlaced.length + 'marker.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+    sostShowStatus('Log diagnostica posa scaricato (' + sostPlaced.length + ' marker).');
+  } catch(e){ sostShowStatus('Errore download log: ' + (e && e.message ? e.message : e), true); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
