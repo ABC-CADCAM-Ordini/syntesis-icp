@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.66.2</title>
+<title>Syntesis-ICP - Analizzare v8.66.3</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2440,7 +2440,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.66.2';
+window.ANALIZZA_BUILD = '8.66.3';
 window.ANALIZZA_BUILD_DATE = '2026-06-17';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -18467,6 +18467,62 @@ function _sostCylFitInvariant(scanGeo, roughCenter, roughAxis, R){
   return { center: new THREE.Vector3(cx,cy,cz), axis: new THREE.Vector3(ax,ay,az), applied: true };
 }
 
+// 8.66.3 (Tara/OS — asse pulito SEED-INDIPENDENTE). Diagnosi gate-validata su id 2770: tutti
+// e 6 i marker di File B sono la mesh BIT-IDENTICA (firma triangoli=0.00µm) e gli estimatori
+// d'asse sono PERFETTAMENTE equivarianti -> il wall-eigenvector GEOMETRIA-seeded ha errore
+// 0.0801° UNIFORME su tutti e 6 (offline). Ma il piazzamento reale da' 0.3-1.0° NON-uniforme,
+// correlato alla VERTICALITA' del marker (#4 dritto -> peggio, #6 inclinato -> meglio): il fit
+// click-seeded di _sostCylFitInvariant trattiene il bias di findScanbodyCenter (asse iniziale
+// = media normali del CLICK + ref mondo [0,0,1]) che per l'OS corto (asse mal condizionato)
+// non viene del tutto rimosso. Qui ricalcolo l'asse OS in modo EQUIVARIANTE, indipendente dal
+// click: (1) normale dominante del cluster (= disco, rough robusto); (2) min-eigenvector dello
+// scatter area-pesato delle sole normali di PARETE (|n.rough|<0.35) = asse cilindro. Imposta
+// SOLO la direzione (roll-free); centro/livello invariati. Guardia 5° -> fail-soft asse cap-fit.
+function _sostGeomWallAxis(scanGeo, center, R, refAxis){
+  if(!scanGeo || !scanGeo.attributes || !scanGeo.attributes.position) return null;
+  var pos = scanGeo.attributes.position.array, nTri = pos.length/9;
+  var cx=center.x, cy=center.y, cz=center.z, Rsph=R+0.8, Rsph2=Rsph*Rsph;
+  var S=[[0,0,0],[0,0,0],[0,0,0]], tris=[];
+  for(var i=0;i<nTri;i++){
+    var o=i*9;
+    var tx=(pos[o]+pos[o+3]+pos[o+6])/3, ty=(pos[o+1]+pos[o+4]+pos[o+7])/3, tz=(pos[o+2]+pos[o+5]+pos[o+8])/3;
+    var dx=tx-cx, dy=ty-cy, dz=tz-cz; if(dx*dx+dy*dy+dz*dz > Rsph2) continue;
+    var e1x=pos[o+3]-pos[o], e1y=pos[o+4]-pos[o+1], e1z=pos[o+5]-pos[o+2];
+    var e2x=pos[o+6]-pos[o], e2y=pos[o+7]-pos[o+1], e2z=pos[o+8]-pos[o+2];
+    var nx=e1y*e2z-e1z*e2y, ny=e1z*e2x-e1x*e2z, nz=e1x*e2y-e1y*e2x;
+    var nl=Math.sqrt(nx*nx+ny*ny+nz*nz); if(nl<1e-9) continue;
+    var area=0.5*nl; nx/=nl;ny/=nl;nz/=nl;
+    S[0][0]+=area*nx*nx; S[0][1]+=area*nx*ny; S[0][2]+=area*nx*nz;
+    S[1][0]+=area*ny*nx; S[1][1]+=area*ny*ny; S[1][2]+=area*ny*nz;
+    S[2][0]+=area*nz*nx; S[2][1]+=area*nz*ny; S[2][2]+=area*nz*nz;
+    tris.push([nx,ny,nz,area]);
+  }
+  if(tris.length<20) return null;
+  var ej=misICP_jacobi3(S), mx=0;
+  if(ej.vals[1]>ej.vals[mx])mx=1; if(ej.vals[2]>ej.vals[mx])mx=2;   // MAX autovalore -> normale dominante (disco) = rough
+  var rx=ej.vecs[0][mx], ry=ej.vecs[1][mx], rz=ej.vecs[2][mx];
+  var rl=Math.sqrt(rx*rx+ry*ry+rz*rz); if(rl<1e-9) return null; rx/=rl;ry/=rl;rz/=rl;
+  var W=[[0,0,0],[0,0,0],[0,0,0]], nWall=0;
+  for(var k=0;k<tris.length;k++){
+    var t=tris[k]; if(Math.abs(t[0]*rx+t[1]*ry+t[2]*rz) >= 0.35) continue;   // solo PARETE
+    var a=t[3];
+    W[0][0]+=a*t[0]*t[0]; W[0][1]+=a*t[0]*t[1]; W[0][2]+=a*t[0]*t[2];
+    W[1][0]+=a*t[1]*t[0]; W[1][1]+=a*t[1]*t[1]; W[1][2]+=a*t[1]*t[2];
+    W[2][0]+=a*t[2]*t[0]; W[2][1]+=a*t[2]*t[1]; W[2][2]+=a*t[2]*t[2];
+    nWall++;
+  }
+  if(nWall<12) return null;
+  var ew=misICP_jacobi3(W), mi=0;
+  if(ew.vals[1]<ew.vals[mi])mi=1; if(ew.vals[2]<ew.vals[mi])mi=2;   // MIN autovalore -> asse cilindro
+  var ax=ew.vecs[0][mi], ay=ew.vecs[1][mi], az=ew.vecs[2][mi];
+  var al=Math.sqrt(ax*ax+ay*ay+az*az); if(al<1e-9) return null; ax/=al;ay/=al;az/=al;
+  if(refAxis){
+    if(ax*refAxis.x+ay*refAxis.y+az*refAxis.z < 0){ ax=-ax;ay=-ay;az=-az; }   // verso il cap
+    if(ax*refAxis.x+ay*refAxis.y+az*refAxis.z < Math.cos(5*Math.PI/180)) return null;   // guardia 5°
+  }
+  return new THREE.Vector3(ax,ay,az);
+}
+
 function sostPlaceTemplate(rawPoint, rawNormal){
   // Auto-centratura deterministica (stessa funzione di Analizza).
   // Passa il raggio del marker presente nella scansione di partenza
@@ -18514,13 +18570,19 @@ function sostPlaceTemplate(rawPoint, rawNormal){
               _sostInvLastReason += ' (kasaXY skip cov='+(_kc.coverageDeg||0).toFixed(0)+'°)';
             }
           } catch(_ek){ console.warn('[sostKasaXY] errore, resta cap-baricentro:', _ek); }
-          // 8.66.1: REVOCATO il disc-axis 8.66.0 (collaudo live peggiore: RMSD 8.4->10.3, #3 10->17).
-          // La normale del piano-disco NON e' piu' accurata della parete per l'asse OS; il fitting
-          // d'asse da singola feature e' esaurito (~0.5°). Workflow multi-agente: una registrazione
-          // roll-free porta il Tara a ~0 ma SOLO perche' sorgente/sostituto sono la mesh IDENTICA
-          // (sintetico); su tassellatura diversa = 67-467µm, e il centroide area-pesato stesso slitta
-          // ~67µm sotto tassellature diverse. Il vero limite reale e' la METRICA (Misurare), non la
-          // posa. Restaurato il branch robust OS al comportamento 8.65.0 (cap-fit + Kasa).
+          // 8.66.3 (Tara/OS): asse pulito SEED-INDIPENDENTE. _sostCylFitInvariant e' click-seeded e
+          // trattiene un bias verticalita'-dipendente di findScanbodyCenter (asse mal condizionato su
+          // OS corto). _sostGeomWallAxis ricalcola l'asse in modo EQUIVARIANTE (rough=normale-disco
+          // dominante, NON il click; poi min-eigenvector parete) -> offline 0.08° UNIFORME su tutti
+          // e 6 vs 0.3-1.0° non-uniforme del fit click-seeded. Solo direzione asse (roll-free);
+          // centro/livello invariati. Guardia 5° -> fail-soft. (disc-axis 8.66.0 revocato in 8.66.1.)
+          if(sostSourceTemplate === 'OS'){
+            try {
+              var _gw = _sostGeomWallAxis(sostMesh.geometry, _cen, sourceRadius, _ax);
+              if(_gw){ _ax = _gw; _sostInvLastReason += ' +geomAxis'; }
+              else { _sostInvLastReason += ' (geomAxis skip)'; }
+            } catch(_eg){ console.warn('[sostGeomAxis] errore, resta asse cap-fit:', _eg); }
+          }
         }
       } else {
         var _rS = sostRobustCenter(sostMesh.geometry, autoResult.center, axis, sourceRadius);  // SR: solo centro (validato 8.15.0)
