@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.66.9</title>
+<title>Syntesis-ICP - Analizzare v8.67.1</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2440,7 +2440,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.66.9';
+window.ANALIZZA_BUILD = '8.67.1';
 window.ANALIZZA_BUILD_DATE = '2026-06-17';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -6742,6 +6742,36 @@ function misICP_orientCapward(tris, centroid, axis){
   });
   return (aPos>=aNeg) ? [axis[0],axis[1],axis[2]] : [-axis[0],-axis[1],-axis[2]];
 }
+// [SR] Orienta capward verso il cap occlusale = disco PIENO (rmin~0). I due dischi dell'SR
+// sostituito hanno AREA uguale (gemelli) -> orientCapward per-area tira a indovinare (ribaltava
+// 3 marker su 6). Discriminante affidabile: cap occlusale pieno (template SR rmin 0.09; export
+// 0.025) vs base/connessione con sede-vite (rmin 0.146) -> 5.8x, netto su tutti e 6. Gate
+// validato: SR+OS+1T3 sullo stesso impianto -> connessioni coincidenti <1µm. Fallback: se un
+// solo estremo ha facce piatte (scan reale, base aperta) -> quello e' il cap.
+function misICP_orientCapwardSolid(tris, centroid, axis){
+  var aL=Math.sqrt(axis[0]*axis[0]+axis[1]*axis[1]+axis[2]*axis[2])||1;
+  var ax=[axis[0]/aL,axis[1]/aL,axis[2]/aL];
+  var pR=1e9,nR=1e9,pN=0,nN=0;
+  for(var i=0;i<tris.length;i++){
+    var t=tris[i];
+    var ux=t[1][0]-t[0][0],uy=t[1][1]-t[0][1],uz=t[1][2]-t[0][2];
+    var vx=t[2][0]-t[0][0],vy=t[2][1]-t[0][1],vz=t[2][2]-t[0][2];
+    var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    var Ln=Math.sqrt(nx*nx+ny*ny+nz*nz); if(Ln<1e-12) continue;
+    if(Math.abs((nx*ax[0]+ny*ax[1]+nz*ax[2])/Ln) < 0.85) continue;   // solo facce piatte
+    var mx=(t[0][0]+t[1][0]+t[2][0])/3-centroid[0];
+    var my=(t[0][1]+t[1][1]+t[2][1])/3-centroid[1];
+    var mz=(t[0][2]+t[1][2]+t[2][2])/3-centroid[2];
+    var axial=mx*ax[0]+my*ax[1]+mz*ax[2]; if(Math.abs(axial)<0.5) continue;
+    var rx=mx-axial*ax[0], ry=my-axial*ax[1], rz=mz-axial*ax[2];
+    var rad=Math.sqrt(rx*rx+ry*ry+rz*rz);
+    if(axial>=0){ if(rad<pR)pR=rad; pN++; } else { if(rad<nR)nR=rad; nN++; }
+  }
+  if(pN<8 && nN>=8) return [ax[0],ax[1],ax[2]];           // un solo disco (+): e' il cap
+  if(nN<8 && pN>=8) return [-ax[0],-ax[1],-ax[2]];        // un solo disco (-): e' il cap
+  if(pN<8 && nN<8)  return [ax[0],ax[1],ax[2]];           // nessun disco: invariato
+  return (pR<=nR) ? [ax[0],ax[1],ax[2]] : [-ax[0],-ax[1],-ax[2]];  // cap = disco PIENO (rmin minore)
+}
 // Punto di connessione lungo l'asse, capZ sotto il piano del cap occlusale.
 function misICP_connectionPoint(tris, centroid, axisCapward, capZ){
   var proj=[];
@@ -6964,8 +6994,9 @@ function misICP_run(){
           var _sb = misICP_detectSbType(trisOfA);
           if(_sb){
             var _cenA = scanCentsA[p.iA], _cenB = scanCentsBt[p.iB];
-            var _axAc = misICP_orientCapward(trisOfA,  _cenA, p.axA);
-            var _axBc = misICP_orientCapward(trisOfBt, _cenB, p.axBt);
+            var _solid = (_sb.type === 'SR');   // [SR] dischi gemelli per area -> orienta sul disco PIENO
+            var _axAc = _solid ? misICP_orientCapwardSolid(trisOfA,  _cenA, p.axA) : misICP_orientCapward(trisOfA,  _cenA, p.axA);
+            var _axBc = _solid ? misICP_orientCapwardSolid(trisOfBt, _cenB, p.axBt) : misICP_orientCapward(trisOfBt, _cenB, p.axBt);
             if(_axBc[0]*_axAc[0]+_axBc[1]*_axAc[1]+_axBc[2]*_axAc[2] < 0) _axBc=[-_axBc[0],-_axBc[1],-_axBc[2]];
             p.sbType = _sb.type;
             p.connCapZ = _sb.capZ; p.connAxA = _axAc; p.connAxB = _axBc;  // per il render (Inc-2)

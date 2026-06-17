@@ -4,6 +4,19 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-17 — 8.67.1: FIX Misurare — connessione SR orientata sul disco pieno (no ribaltamento)
+
+L'SR ha geometria CAD nativa Z-invertita (`flip X 180`): cap occlusale a −Z, connessione/origine a +Z. Verificato sui template reali (MarkerOS/MarkerSR/1T3): tutti con origine a (0,0,0) e cap a +6/−5/+10; gate **SR+OS+1T3 sullo stesso impianto → connessioni coincidenti a 0.6µm**. `misICP_orientCapward` sceglie il cap come "estremo con più area piatta": per OS/1T3 va bene (un cap dominante), ma per l'**SR sostituito** i due dischi sono GEMELLI per area (6.20≈6.23, rmax identico) → sceglieva a caso, ribaltando la connessione su 3 marker su 6 (#4/#5/#6).
+
+Implementazione:
+- v3b: nuovo helper `misICP_orientCapwardSolid` (dopo `misICP_orientCapward`) — per l'SR orienta capward verso il **disco PIENO** (rmin minore: cap occlusale rmin~0.025 vs base/sede-vite 0.146, separazione 5.8× netta su tutti e 6); fallback al disco singolo (scan reale, base aperta).
+- v3b call-site `misICP` (~6967): branch `_sb.type==='SR'` → nuovo helper; **OS/1T3 INVARIATI** (restano su `orientCapward` per-area, validato).
+- Validazione: `node --check` sugli 8 blocchi `<script>` OK; `registry.py` AST OK. Gate offline: discriminatore 5.8× su 6/6 marker; connessioni dei 3 template coincidenti <1µm.
+- Bump PATCH coordinato: `registry.py` 8.67.0→8.67.1 + History; v3b `<title>`/`ANALIZZA_BUILD` 8.67.1; `docs/MAPPA_FUNZIONALE.md` versione mappata + riga connessione (risolto "DA verificare live su SR"). CACHEBUST non toccato (superfluo con `latestCommit:true`).
+- Deploy su ENTRAMBI i servizi.
+
+---
+
 ## 2026-06-17 — 8.66.2: CLEANUP rimozione dead code `_sostDiscPlaneAxis`
 
 Cleanup cosmetico puro, nessun cambio di logica. Rimossa fisicamente la funzione `_sostDiscPlaneAxis` (v3b ~18481) + il blocco commento `[DEAD CODE dal 8.66.1]` sopra di essa (net **−59 righe**). L'helper era già stato disattivato in 8.66.1 (revoca del disc-axis 8.66.0, collaudo live peggiore): la sua unica referenza rimasta era la propria definizione, quindi codice morto a tutti gli effetti. `_sostCylFitInvariant` (sopra) e `sostPlaceTemplate` (sotto) restano intatti.
