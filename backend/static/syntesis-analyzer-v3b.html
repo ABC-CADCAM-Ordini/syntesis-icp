@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.66.4</title>
+<title>Syntesis-ICP - Analizzare v8.66.5</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -1952,7 +1952,7 @@ if (document.readyState === 'loading') {
             <button onclick="misICP_generateReport('clinico')" style="display:block;width:100%;padding:10px 12px;border:none;background:transparent;text-align:left;cursor:pointer;font-family:var(--mono);font-size:13px;border-bottom:1px solid #f0f4f8" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'"><b>Clinico (PDF)</b><br><span style="font-size:11px;color:var(--gray)">Report completo per il caso</span></button>
             <button onclick="misICP_generateReport('taratura')" style="display:block;width:100%;padding:10px 12px;border:none;background:transparent;text-align:left;cursor:pointer;font-family:var(--mono);font-size:13px;border-bottom:1px solid #f0f4f8" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'"><b>Taratura (PDF)</b><br><span style="font-size:11px;color:var(--gray)">Metrologia scanner</span></button>
             <button onclick="misICP_generateReport('analisi')" style="display:block;width:100%;padding:10px 12px;border:none;background:transparent;text-align:left;cursor:pointer;font-family:var(--mono);font-size:13px;border-bottom:1px solid #f0f4f8" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'"><b>Analisi (PDF)</b><br><span style="font-size:11px;color:var(--gray)">Esteso con coppie e raw data</span></button>
-            <button onclick="misICP_generateReport('excel')" style="display:block;width:100%;padding:10px 12px;border:none;background:transparent;text-align:left;cursor:pointer;font-family:var(--mono);font-size:13px" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'"><b>Tabella dati (Excel)</b><br><span style="font-size:11px;color:var(--gray)">Quattro fogli .xlsx</span></button>
+            <button onclick="misICP_generateReport('excel')" style="display:block;width:100%;padding:10px 12px;border:none;background:transparent;text-align:left;cursor:pointer;font-family:var(--mono);font-size:13px" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'"><b>Tabella dati (Excel)</b><br><span style="font-size:11px;color:var(--gray)">.xlsx multi-foglio (incl. Diagnostica)</span></button>
           </div>
         </div>
       </div>
@@ -2440,7 +2440,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.66.4';
+window.ANALIZZA_BUILD = '8.66.5';
 window.ANALIZZA_BUILD_DATE = '2026-06-17';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -9890,6 +9890,73 @@ function misICP_renderExcel(data){
     return {wch:14};
   });
   XLSX.utils.book_append_sheet(wb, ws1, 'Cilindri');
+
+  // ─────────────────────────────────────────────────────
+  // FOGLIO: DIAGNOSTICA (8.66.5) — decomposizione CENTRO-vs-ASSE + sistema/processo.
+  // Tutte le info utili per la diagnosi, sempre nel report (niente copia-incolla da console).
+  // Cap-baricentro = connessione + capZ·asse (= centro di posa, leva ~0). Se Cap-baric ≈
+  // Centroide -> domina il CENTRO (centraggio); se Cap-baric ≈ 0 -> domina l'ASSE (tilt×leva).
+  // ─────────────────────────────────────────────────────
+  var _sostEng = 'n/d', _axEng = 'n/d';
+  try { if(typeof synSostCenterRead==='function') _sostEng = synSostCenterRead(); } catch(e){}
+  try { if(typeof synAxisEngineRead==='function') _axEng = synAxisEngineRead('auto'); } catch(e){}
+  var diagSys = [
+    ['SISTEMA / PROCESSO'],
+    ['Versione (ANALIZZA_BUILD)',     window.ANALIZZA_BUILD],
+    ['Motore centraggio Sostituire',  _sostEng],
+    ['Motore asse cilindro',          _axEng],
+    ['Algoritmo allineamento',        'Kabsch + SVD + ICP iterativo'],
+    ['Riferimento asse',              'cap-based PCA'],
+    ['RMSD ICP globale (μm)',         Number((data.rmsdUm||0).toFixed(2))],
+    ['Angolo asse medio (deg)',       Number(avgAngle.toFixed(3))],
+    ['Voto globale',                  Number((data.score||0).toFixed(2)) + ' / 100 (' + lvLabel + ')'],
+    [],
+    ['DECOMPOSIZIONE CENTRO-vs-ASSE (per cilindro)'],
+    ['Cap-baricentro = connessione + capZ·asse (= centro di posa, leva ~0). Se Cap-baric ≈ Centroide -> domina il CENTRO; se Cap-baric ≈ 0 ma Centroide grande -> domina l\'ASSE (tilt x leva).'],
+    []
+  ];
+  var diagHeader = [
+    '#', 'Tipo', 'capZ (mm)',
+    'Centroide |D| (μm)', 'Cen dX', 'Cen dY', 'Cen dZ',
+    'Cap-baric A X (mm)', 'Cap-baric A Y', 'Cap-baric A Z',
+    'Cap-baric B X (mm)', 'Cap-baric B Y', 'Cap-baric B Z',
+    'Cap-baric |D| (μm)', 'Cap dX', 'Cap dY', 'Cap dZ',
+    'Connessione |D| (μm)', 'Angolo asse (deg)', 'Verdetto centro/asse'
+  ];
+  var diagData = data.pairs.map(function(p, i){
+    var d3um = Math.round(p.d3*1000);
+    if(p.iB < 0 || !p.connA || !p.connB || p.connCapZ==null || !p.connAxA || !p.connAxB){
+      return [i+1, (p.sbType||'?'), '', d3um, Math.round(p.dx*1000), Math.round(p.dy*1000), Math.round(p.dz*1000),
+        '','','', '','','', '','','','',
+        (p.connD3um!=null?Number(p.connD3um.toFixed(1)):''),
+        (p.axAngleDeg!=null?Number(p.axAngleDeg.toFixed(3)):''), 'n/d (no connessione)'];
+    }
+    var cZ=p.connCapZ, aA=p.connAxA, aB=p.connAxB;
+    var capA=[p.connA[0]+cZ*aA[0], p.connA[1]+cZ*aA[1], p.connA[2]+cZ*aA[2]];
+    var capB=[p.connB[0]+cZ*aB[0], p.connB[1]+cZ*aB[1], p.connB[2]+cZ*aB[2]];
+    var kdx=(capB[0]-capA[0])*1000, kdy=(capB[1]-capA[1])*1000, kdz=(capB[2]-capA[2])*1000;
+    var kD=Math.sqrt(kdx*kdx+kdy*kdy+kdz*kdz);
+    var verdict = (d3um>0.5) ? (kD>=0.7*d3um ? 'CENTRO domina' : (kD<=0.3*d3um ? 'ASSE domina' : 'misto')) : 'trascurabile';
+    return [
+      i+1, (p.sbType||'?'), Number(cZ.toFixed(2)),
+      d3um, Math.round(p.dx*1000), Math.round(p.dy*1000), Math.round(p.dz*1000),
+      Number(capA[0].toFixed(4)), Number(capA[1].toFixed(4)), Number(capA[2].toFixed(4)),
+      Number(capB[0].toFixed(4)), Number(capB[1].toFixed(4)), Number(capB[2].toFixed(4)),
+      Number(kD.toFixed(1)), Math.round(kdx), Math.round(kdy), Math.round(kdz),
+      (p.connD3um!=null?Number(p.connD3um.toFixed(1)):''),
+      (p.axAngleDeg!=null?Number(p.axAngleDeg.toFixed(3)):''),
+      verdict
+    ];
+  });
+  var diagSheet = buildHeader('Diagnostica centro-vs-asse + sistema').concat(diagSys).concat([diagHeader]).concat(diagData);
+  var wsD = XLSX.utils.aoa_to_sheet(diagSheet);
+  wsD['!cols'] = diagHeader.map(function(h){
+    if(h==='#') return {wch:5};
+    if(h==='Tipo') return {wch:7};
+    if(/Verdetto/.test(h)) return {wch:18};
+    return {wch:14};
+  });
+  XLSX.utils.book_append_sheet(wb, wsD, 'Diagnostica');
 
   // ─────────────────────────────────────────────────────
   // FOGLIO 3: COPPIE INTER-CENTROIDE (con vettori completi)

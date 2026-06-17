@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.66.3 — **Data:** 2026-06-17
+> **Versione software mappata:** 8.66.5 — **Data:** 2026-06-17
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3).
@@ -248,7 +248,7 @@ Confronto ICP fra 2 STL, viewport dedicato (`misICP_mountViewport` [4701]). Pann
 | Esegui allineamento ICP | `#misBtnRun` | onclick | `misICP_run` | lancia ICP | [1849] | disabled finché 2 mesh |
 | Ricomincia | `.mis-reset-btn` | onclick | `misICP_reset` | reset misurare | [1859] |
 | Scarica report ▾ | `#misBtnReport` | onclick | `misICP_toggleReportMenu` | dropdown report | [1860] |
-| → Clinico / Taratura / Analisi / Excel | | onclick | `misICP_generateReport('clinico'/'taratura'/'analisi'/'excel')` | genera report | [1863-1866] |
+| → Clinico / Taratura / Analisi / Excel | | onclick | `misICP_generateReport('clinico'/'taratura'/'analisi'/'excel')` | genera report. **8.66.5**: Excel (`misICP_renderExcel`) ora multi-foglio con nuovo foglio **"Diagnostica"** (sistema/processo: versione, motore centraggio/asse, RMSD; + decomposizione **centro-vs-asse** per cilindro: capZ, centroide dev, cap-baricentro A/B + dev, connessione, angolo asse, verdetto CENTRO/ASSE) — label pulsante aggiornata ".xlsx multi-foglio (incl. Diagnostica)" | [1863-1866] |
 | Cutview ICP: select / chiudi / reset albero | `#misCutSelect` / `.mis-cut-close` / `.mis-tree-reset` | onchange/onclick | `misICP_openCutview` / `misICP_closeCutview` / `misICP_resetTreeDefaults` | gestione cutview | [1515-1530] |
 | Albero ICP: visibilità / opacità layer | `#layChk*` / `#laySld*` | onchange/oninput | `misICP_applyLayerVis` / `misICP_applyLayerOp` | toggle/opacità bgA,scbA,bgB,scbB,labels | [1543-1608] |
 | **Connessione** `[beta 8.64.0; gestione 8.64.2]` | `#layChkConn` / color `misICP_setConnColor` / `#laySldConn` (gruppo Overlay) | onchange/oninput | `misICP_applyLayerVis('conn',…)` (vis) · `misICP_setConnColor` (colore SOLO matematica, `userData.misConnMat`; marker A/B invariati) · `misICP_applyLayerOp('conn',…)` (opacità, label `#layValConn`) | toggle/colore/opacità: marker-origine A/B + linea-leva + geometria matematica alle connessioni; `misICP_groupMeshes('conn')`=`misICP_connMeshes` | riga albero [~1659]; render `misICP_renderConnections` |
