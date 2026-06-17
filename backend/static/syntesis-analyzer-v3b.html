@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.66.7</title>
+<title>Syntesis-ICP - Analizzare v8.66.8</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2440,7 +2440,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.66.7';
+window.ANALIZZA_BUILD = '8.66.8';
 window.ANALIZZA_BUILD_DATE = '2026-06-17';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -18947,6 +18947,8 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       templateKey: activeKey,
       color: (SOSTITUIRE_TEMPLATE_INFO[activeKey] || {color:0x888888}).color,
       rmsd: null,
+      // 8.66.8: diagnostica posa (motivo robust: +geomAxis/skip, +kasaXY/skip, applied/reason)
+      diagReason: (typeof _sostInvLastReason === 'string' ? _sostInvLastReason : ''),
       axisLine: axisLine
     });
 
@@ -19385,10 +19387,20 @@ function sostRenderPlacedList(){
   list.style.display = '';
   if(btnExport) btnExport.style.display = '';
   if(exportAs) exportAs.style.display = '';
-  items.innerHTML = '<div style="font-family:var(--mono);font-size:12px;color:var(--dark);padding:4px 0">' +
-                    '<b>' + sostPlaced.length + '</b> ' +
-                    (sostPlaced.length === 1 ? 'marker' : 'marker') + ' posizionat' +
-                    (sostPlaced.length === 1 ? 'o' : 'i') + '.</div>';
+  // 8.66.8: diagnostica posa per-marker a schermo (no console) — motivo robust + centro/asse reali.
+  var _html = '<div style="font-family:var(--mono);font-size:12px;color:var(--dark);padding:4px 0">' +
+              '<b>' + sostPlaced.length + '</b> marker posizionat' +
+              (sostPlaced.length === 1 ? 'o' : 'i') + '.</div>';
+  sostPlaced.forEach(function(p){
+    var dw = p.discWorld, ax = p.axisDir;
+    var c = (dw ? '('+dw.x.toFixed(3)+', '+dw.y.toFixed(3)+', '+dw.z.toFixed(3)+')' : '?');
+    var a = (ax ? '('+ax.x.toFixed(3)+', '+ax.y.toFixed(3)+', '+ax.z.toFixed(3)+')' : '?');
+    _html += '<div style="font-family:var(--mono);font-size:10px;color:var(--gray);padding:3px 0;border-top:1px solid #eee;line-height:1.4">'
+           + '<b style="color:var(--dark)">#' + p.num + ' ' + (p.templateKey||'') + '</b> · ' + (p.diagReason || '(n/d)')
+           + '<br>centro ' + c + ' · asse ' + a
+           + '</div>';
+  });
+  items.innerHTML = _html;
 }
 
 // ═══════════════════════════════════════════════════════════════════
