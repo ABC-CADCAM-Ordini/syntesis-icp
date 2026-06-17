@@ -4,6 +4,24 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-17 — 8.66.1: REVERT disc-axis OS + indagine Tara 2770 CHIUSA
+
+Il disc-axis 8.66.0 (asse OS dal piano del disco) ha **peggiorato** il collaudo live (export OS-23: RMSD 8.4→10.3µm, #3 da 10 a 17µm, asse #3 0.21→0.34°). La normale del piano-disco non è più accurata della parete per l'asse OS: il **fitting d'asse da singola feature** (wall / cap-media / disco) è **esaurito a ~0.5°**. Disabilitata la chiamata `_sostDiscPlaneAxis` → robust-OS torna al comportamento 8.65.0 (cap-fit + Kasa, baseline [8,7,10,14,3,3] RMSD 8.4 score 97.15). Helper marcato dead code (conservato per razionale).
+
+**Indagine chiusa con un workflow multi-agente** (12 agenti, 8 strategie di registrazione roll-free in parallelo + verifica avversariale). Risultato profondo:
+- Una registrazione roll-free (symmetric-ICP, confermata non-cheat) porta il Tara a **~0**. Ma è un **artefatto di mesh-identità**: il risultato sub-micron regge solo perché sorgente e sostituto sono la **mesh bit-identica** (sintetico). Su tassellatura diversa (scan reali) il residuo sale a **67-467µm**, e — punto decisivo — il **centroide area-pesato stesso slitta ~67µm** sotto tassellature diverse anche con un fit geometrico perfetto a 0.001µm.
+- La verifica avversariale ha smascherato **3 strategie su 4** come cheat/artefatti (una dichiarava 0 ma reale 314µm usando la corrispondenza mesh-identica vietata; un'altra aveva una metrica che restituisce 0 per qualsiasi rotazione = misurava il nulla). Senza la verifica avrei portato in produzione codice fasullo.
+
+**Conclusione:** il Tara=0 letterale è un artefatto sintetico da **non inseguire** (non migliora l'accuratezza reale, rischia falsa fiducia). Il vero limite sugli scan reali è la **metrica di Misurare** (centroide sotto tassellature diverse → servirebbe un landmark robusto alla tassellatura), non il piazzamento. Il sistema piazza a ~8µm = **ECCELLENTE clinico**; il residuo è il limite sub-grado del fit asse OS corto. L'idea utente "ancorare alla libreria + registrazione full-surface" era teoricamente corretta (azzera il Tara) ma il workflow ha provato che non generalizza.
+
+Implementazione:
+- `backend/static/syntesis-analyzer-v3b.html`: disabilitata chiamata disc-axis (~18516); helper `_sostDiscPlaneAxis` marcato dead code (~18470); bump `<title>`/`ANALIZZA_BUILD` 8.66.1.
+- `backend/registry.py`: `BACKEND_VERSION` 8.66.1 + History.
+- `docs/MAPPA_FUNZIONALE.md`: riga 436 (revert) + header.
+- node --check 8/8 OK. Live 8.66.1 su entrambi i servizi.
+
+---
+
 ## 2026-06-17 — 8.66.0: Sostituire/robust asse OS roll-free dal piano del disco (Tara 2770)
 
 Chiusura della diagnosi Tara id 2770, gate-validata avendo in mano entrambi gli STL. Il sostituto (Synthesis OS) e il sorgente (ScanLogiQ OS) sono **geometrie BIT-IDENTICHE** (match firma-triangoli = 0.00µm): quindi il residuo Tara (~8µm, RMSD 8.4) è un **puro errore di POSA**, non di geometria né di misura. Decomponendo la rotazione esatta R fra le due pose: **tilt ⊥ asse 0.1-1.2°** (= il residuo, muove il centroide via leva) + **roll attorno all'asse 45-174° ma IRRILEVANTE** (l'OS è assialsimmetrico, il centroide è on-axis).
