@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.66.3</title>
+<title>Syntesis-ICP - Analizzare v8.66.4</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2440,7 +2440,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.66.3';
+window.ANALIZZA_BUILD = '8.66.4';
 window.ANALIZZA_BUILD_DATE = '2026-06-17';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -6976,6 +6976,21 @@ function misICP_run(){
             p.connDxyum=Math.sqrt(_cdx*_cdx+_cdy*_cdy);
             p.connD3um =Math.sqrt(_cdx*_cdx+_cdy*_cdy+_cdz*_cdz);
             p.connLevel=misICP_clinLevel(Math.round(p.connD3um));
+            // [8.66.4 DIAG centro-vs-asse] decompone il residuo: il cap-baricentro (= centro di
+            // posa, leva ~0) e' l'errore di CENTRO; il centroide (leva ~0.43mm) e la connessione
+            // (leva ~capZ) aggiungono il tilt d'asse. Se cap-dev ~ centroide-dev -> e' il CENTRO;
+            // se cap-dev ~0 ma centroide grande -> e' l'ASSE. Solo console.log, zero comportamento.
+            try {
+              var _cZ=_sb.capZ;
+              var _capA=[p.connA[0]+_cZ*_axAc[0], p.connA[1]+_cZ*_axAc[1], p.connA[2]+_cZ*_axAc[2]];
+              var _capB=[p.connB[0]+_cZ*_axBc[0], p.connB[1]+_cZ*_axBc[1], p.connB[2]+_cZ*_axBc[2]];
+              var _kdx=(_capB[0]-_capA[0])*1000, _kdy=(_capB[1]-_capA[1])*1000, _kdz=(_capB[2]-_capA[2])*1000;
+              var _kD=Math.sqrt(_kdx*_kdx+_kdy*_kdy+_kdz*_kdz);
+              console.log('[DIAG centro-vs-asse] cyl#'+(localIdx+1)+' '+(_sb.type||'?')
+                +' | CENTROIDE='+p.d3um.toFixed(1)+'µm ('+p.dxum.toFixed(0)+','+p.dyum.toFixed(0)+','+p.dzum.toFixed(0)+')'
+                +' | CAP-baric='+_kD.toFixed(1)+'µm ('+_kdx.toFixed(0)+','+_kdy.toFixed(0)+','+_kdz.toFixed(0)+')'
+                +' | CONNESS='+p.connD3um.toFixed(1)+'µm | asse='+p.axAngleDeg.toFixed(3)+'° | capZ='+_cZ.toFixed(2)+'mm');
+            } catch(_edx){ try{ console.warn('[DIAG centro-vs-asse]', _edx); }catch(e){} }
           } else {
             p.sbType=null; p.connA=null; p.connB=null;
             p.connD3um=null; p.connDxum=null; p.connDyum=null; p.connDzum=null; p.connDxyum=null; p.connLevel=null;
