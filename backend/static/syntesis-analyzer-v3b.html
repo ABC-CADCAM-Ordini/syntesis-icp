@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.66.6</title>
+<title>Syntesis-ICP - Analizzare v8.66.7</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2440,7 +2440,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.66.6';
+window.ANALIZZA_BUILD = '8.66.7';
 window.ANALIZZA_BUILD_DATE = '2026-06-17';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -18638,13 +18638,26 @@ function sostPlaceTemplate(rawPoint, rawNormal){
         var _fit = _sostCylFitInvariant(sostMesh.geometry, autoResult.center, axis, sourceRadius);
         if(_fit){
           _cen = _fit.center; _ax = _fit.axis; _ok = true;
-          // 8.65.0 (Tara accuracy): il baricentro del CAP e' RIPETIBILE (8.63.4) ma slitta
-          // LATERALMENTE per-marker — su un marker inclinato il cap viene catturato asimmetrico
-          // e il suo baricentro deriva di 3-12µm dall'asse vero. Rifinisci il SOLO centro LATERALE
-          // (piano ⊥ asse) col fit cilindro Kasa della parete: sostRobustCenter sposta il centro
-          // UNICAMENTE nel piano ⊥ asse, quindi il LIVELLO del disco (axial, dal cap) resta intatto
-          // e l'ASSE resta quello del cap-fit. Gate copertura ≥140° con fail-soft al cap-baricentro
-          // (parete povera -> niente Kasa -> resta 8.63.4 ripetibile: nessuna regressione).
+          // 8.66.7 (Tara/OS): ORDINE corretto — PRIMA l'asse pulito, POI la Kasa che lo usa. Diagnosi
+          // gate-validata (foglio Diagnostica): il residuo Tara e' il CENTRO (cap-baricentro ~= centroide
+          // su tutti e 6, ~18.7µm su #4), NON l'asse. Offline TUTTE le candidate di centro (cap-disco,
+          // Kasa) sono equivarianti/UNIFORMI -> la non-uniformita' live veniva dall'ORDINE: la Kasa
+          // fitta il centro nel piano ⊥ asse usando l'asse cap-fit CONTAMINATO (tilt verticalita'-
+          // dipendente) -> piano inclinato -> centro Kasa off ~18µm sul marker piu' DRITTO (#4). geomAxis
+          // (8.66.3) sistemava l'asse DOPO la Kasa -> la Kasa aveva gia' girato col piano sbagliato (ecco
+          // perche' non muoveva nulla). Fix: asse pulito PRIMA -> Kasa nel piano giusto -> centro pulito.
+          // [1] asse pulito SEED-INDIPENDENTE per OS (rough=normale-disco dominante, NON il click; poi
+          //     min-eigenvector parete -> 0.08° UNIFORME offline). Roll-free; guardia 5° -> fail-soft.
+          if(sostSourceTemplate === 'OS'){
+            try {
+              var _gw = _sostGeomWallAxis(sostMesh.geometry, _fit.center, sourceRadius, _ax);
+              if(_gw){ _ax = _gw; _sostInvLastReason += ' +geomAxis'; }
+              else { _sostInvLastReason += ' (geomAxis skip)'; }
+            } catch(_eg){ console.warn('[sostGeomAxis] errore, resta asse cap-fit:', _eg); }
+          }
+          // [2] Kasa: rifinisce il centro LATERALE (piano ⊥ asse) col fit cilindro della parete, usando
+          //     l'asse ORA pulito (per OS); sposta solo nel piano ⊥ asse -> livello disco e asse
+          //     invariati. Gate copertura ≥140° con fail-soft al cap-baricentro (no regressione).
           try {
             var _kc = sostRobustCenter(sostMesh.geometry, _fit.center, _ax, sourceRadius);
             if(_kc.applied){
@@ -18654,19 +18667,6 @@ function sostPlaceTemplate(rawPoint, rawNormal){
               _sostInvLastReason += ' (kasaXY skip cov='+(_kc.coverageDeg||0).toFixed(0)+'°)';
             }
           } catch(_ek){ console.warn('[sostKasaXY] errore, resta cap-baricentro:', _ek); }
-          // 8.66.3 (Tara/OS): asse pulito SEED-INDIPENDENTE. _sostCylFitInvariant e' click-seeded e
-          // trattiene un bias verticalita'-dipendente di findScanbodyCenter (asse mal condizionato su
-          // OS corto). _sostGeomWallAxis ricalcola l'asse in modo EQUIVARIANTE (rough=normale-disco
-          // dominante, NON il click; poi min-eigenvector parete) -> offline 0.08° UNIFORME su tutti
-          // e 6 vs 0.3-1.0° non-uniforme del fit click-seeded. Solo direzione asse (roll-free);
-          // centro/livello invariati. Guardia 5° -> fail-soft. (disc-axis 8.66.0 revocato in 8.66.1.)
-          if(sostSourceTemplate === 'OS'){
-            try {
-              var _gw = _sostGeomWallAxis(sostMesh.geometry, _cen, sourceRadius, _ax);
-              if(_gw){ _ax = _gw; _sostInvLastReason += ' +geomAxis'; }
-              else { _sostInvLastReason += ' (geomAxis skip)'; }
-            } catch(_eg){ console.warn('[sostGeomAxis] errore, resta asse cap-fit:', _eg); }
-          }
         }
       } else {
         var _rS = sostRobustCenter(sostMesh.geometry, autoResult.center, axis, sourceRadius);  // SR: solo centro (validato 8.15.0)
