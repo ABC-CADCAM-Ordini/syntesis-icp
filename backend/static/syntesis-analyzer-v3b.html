@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.67.1</title>
+<title>Syntesis-ICP - Analizzare v8.67.2</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2440,7 +2440,7 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.67.1';
+window.ANALIZZA_BUILD = '8.67.2';
 window.ANALIZZA_BUILD_DATE = '2026-06-17';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
@@ -6930,29 +6930,42 @@ function misICP_run(){
       //    Kabsch su 8 punti). Se nessuna permutazione migliora rispetto
       //    all'identita', applied=false e l'ICP riceve i centroidi originali.
       var preAlign = misICP_bruteForcePreAlign(scanCentsA, scanCentsB);
+      // 8.67.2 FIX: applica SEMPRE il miglior fit rigido del brute-force come stato
+      // iniziale dell'ICP, non solo quando una permutazione batte l'identita'
+      // (vecchio preAlign.applied). Se l'identita' E' gia' la perm corretta ma i due
+      // frame (scanner diversi) sono ruotati, bestRes e' comunque il fit globale giusto
+      // (~30um): scartarlo faceva ripartire l'ICP nearest-neighbor dai centroidi GREZZI
+      // -> minimo locale (RMSD scala-mm, rotazione XY). preUsable = il brute-force ha
+      // prodotto un fit valido (n in [3..8]); fail-soft ai grezzi solo se non utilizzabile.
+      var preUsable = (preAlign.n >= 3 && preAlign.n <= 8 && isFinite(preAlign.rmsd));
       var scanCentsBpre;
-      if(preAlign.applied){
+      if(preUsable){
         scanCentsBpre = scanCentsB.map(function(p){
           var rp = misICP_mv3(preAlign.R, p);
           return [rp[0]+preAlign.t[0], rp[1]+preAlign.t[1], rp[2]+preAlign.t[2]];
         });
         try {
-          console.log('[Misurare PATCH G] brute-force attivata: n=' + preAlign.n +
-                      ', RMSD baseline=' + (preAlign.rmsdBaseline*1000).toFixed(1) +
-                      'um -> migliore=' + (preAlign.rmsd*1000).toFixed(1) + 'um, perm=' +
-                      JSON.stringify(preAlign.perm));
+          console.log('[Misurare pre-align] n=' + preAlign.n + ' baseline=' +
+                      (preAlign.rmsdBaseline*1000).toFixed(1) + 'um -> best=' +
+                      (preAlign.rmsd*1000).toFixed(1) + 'um perm=' + JSON.stringify(preAlign.perm) +
+                      ' (applicato sempre; migliora-identita=' + preAlign.applied + ')');
         } catch(_){}
       } else {
         scanCentsBpre = scanCentsB;
       }
 
-      // 5b. ICP tra i centroidi dei CLUSTER (gia' pre-allineati se PATCH G ha agito)
+      // 5b. ICP tra i centroidi dei CLUSTER (gia' pre-allineati dal brute-force)
       var icpRes = misICP_runICP(scanCentsA, scanCentsBpre, 60);
+      // 8.67.2 guard: se l'ICP nearest-neighbor PEGGIORA il pre-align (puo' divergere su
+      // cluster quasi-simmetrici), scarta l'ICP e tieni il pre-align gia' ottimo.
+      if(preUsable && icpRes.rmsd > preAlign.rmsd){
+        icpRes = { R: misICP_eye3(), t: [0,0,0], aligned: scanCentsBpre, rmsd: preAlign.rmsd, angle: 0 };
+      }
 
       // 5c. Compongo la trasformazione TOTALE: T_total = T_icp * T_pre.
       //     R_total = R_icp * R_pre,    t_total = R_icp * t_pre + t_icp
       //     L'angolo va ricalcolato dalla R combinata.
-      if(preAlign.applied){
+      if(preUsable){
         var Rcomb = misICP_mul3(icpRes.R, preAlign.R);
         var Rt_pre = misICP_mv3(icpRes.R, preAlign.t);
         var tcomb = [Rt_pre[0]+icpRes.t[0], Rt_pre[1]+icpRes.t[1], Rt_pre[2]+icpRes.t[2]];

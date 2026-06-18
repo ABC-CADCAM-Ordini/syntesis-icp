@@ -4,6 +4,24 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-17 — 8.67.2: FIX Misurare — allineamento: il pre-align scartava il fit rigido ottimo
+
+**Sintomo:** confronto di due STL **geometricamente congruenti** (stesso caso, scanner diversi ScanLogiQ vs Exocad) → RMSD 5145µm, asse medio 51°, voto "Critico", deviazioni per-cilindro 2.4–55.7mm quasi tutte in XY (rotazione globale sbagliata nel piano occlusale). Ricarica forzata ripetuta non cambiava nulla.
+
+**Root cause** (workflow audit a 9 agenti + riproduzione verbatim della pipeline sui file reali): `misICP_bruteForcePreAlign` prova le 720 permutazioni e calcola il miglior fit Kabsch (qui 30.8µm), ma l'orchestrazione (`misICP_run` ~6932) lo applicava **solo se `applied`**, dove `applied = (bestRmsd < baselineRmsd − 1e-3)` cioè "una permutazione DIVERSA dall'identità batte l'identità". Quando i 6 cluster di A e B sono nello **stesso ordine**, l'identità è già la permutazione migliore → `bestRmsd == baselineRmsd` → `applied=false` → `scanCentsBpre = scanCentsB` (fit a 30µm **buttato**) → `misICP_runICP` (nearest-neighbor point-to-point) riparte dai centroidi grezzi (frame ruotati >40°) e **diverge** in un minimo locale → 5700µm. Riproduzione offline fedele: `applied=false` → ICP 5701µm; col fix → 30.8µm. NON era rilevazione/HD/soglia/conteggio (6+6 cluster corretti). *(Errore di processo: il "30µm offline" iniziale era il BASELINE del brute-force, che la pipeline scarta — non l'output.)*
+
+Implementazione (`misICP_run`, ~6932-6962):
+- `var preUsable = (preAlign.n >= 3 && preAlign.n <= 8 && isFinite(preAlign.rmsd));` → applica **sempre** il miglior fit Kabsch come stato iniziale dell'ICP (non più gated su `applied`).
+- Guard dopo l'ICP: se `icpRes.rmsd > preAlign.rmsd` (l'ICP NN è divergente), scarta l'ICP e tiene il pre-align (`icpRes = {R:eye3, t:0, rmsd:preAlign.rmsd, angle:0}`).
+- Composizione `T_total` su `preUsable` (era `preAlign.applied`).
+- Casi già allineati invariati (best Kabsch ≈ identità → no-op); loader/mesh non toccati → **HD preservato**; OS/1T3 invariati.
+- `node --check` 8 blocchi `<script>` OK; `registry.py` AST OK. Bump PATCH 8.67.1→8.67.2 (registry+History; v3b `<title>`/`ANALIZZA_BUILD`); `docs/MAPPA_FUNZIONALE.md` (riga `misICP_run`).
+- Deploy su ENTRAMBI i servizi.
+
+**PENDING (hardening separato, direttiva HD, NON causa di questo caso):** il cap `idx.length>5000` in `misICP_isScanbody` (~6247) e `thresh=Math.max(threshA,threshB)` (~6916) sono fragilità su mesh HD da irrobustire a parte.
+
+---
+
 ## 2026-06-17 — 8.67.1: FIX Misurare — connessione SR orientata sul disco pieno (no ribaltamento)
 
 L'SR ha geometria CAD nativa Z-invertita (`flip X 180`): cap occlusale a −Z, connessione/origine a +Z. Verificato sui template reali (MarkerOS/MarkerSR/1T3): tutti con origine a (0,0,0) e cap a +6/−5/+10; gate **SR+OS+1T3 sullo stesso impianto → connessioni coincidenti a 0.6µm**. `misICP_orientCapward` sceglie il cap come "estremo con più area piatta": per OS/1T3 va bene (un cap dominante), ma per l'**SR sostituito** i due dischi sono GEMELLI per area (6.20≈6.23, rmax identico) → sceglieva a caso, ribaltando la connessione su 3 marker su 6 (#4/#5/#6).
