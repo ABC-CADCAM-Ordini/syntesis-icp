@@ -4,6 +4,20 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-20 — 8.67.3: DIAG Misurare/pre-align — log del ramo muto residuo (count-mismatch)
+
+**Contesto:** dopo l'8.67.2 (pre-align applicato **sempre** quando `preUsable`, con il caso *no-improvement* già loggato nel ramo `preUsable`), l'unico ramo dell'orchestrazione `misICP_run` rimasto **silenzioso** era l'`else` (~6953, `!preUsable`): raggiunto **solo** quando `misICP_bruteForcePreAlign` (~6494) ritorna dal gate di conteggio (`n !== centsB.length || n < 3 || n > 8`) con `rmsd=Infinity` e senza `n`. In quel caso il pre-align veniva saltato senza alcuna diagnosi live del perché.
+
+**Modifica (solo logging, comportamento della pipeline INVARIATO):** `console.warn` nel ramo `else` con `scanCentsA.length`, `scanCentsB.length`, `preAlign.n` (`n/a` se assente), `preAlign.rmsd` (`Inf` se non finito) e il motivo discriminato sulla stessa condizione del gate (`count-mismatch` vs `rmsd-non-finito`/fit degenere). Guardie `!= null` / `isFinite` → niente `NaN` nel log; prefisso `[Misurare pre-align]` coerente col log 8.67.2.
+
+Implementazione:
+- v3b `syntesis-analyzer-v3b.html` ~6953: blocco `try { … console.warn(…) } catch(_){}` nel ramo `else`.
+- Nessun elemento UI nuovo → `docs/MAPPA_FUNZIONALE.md` non toccata.
+- `node --check` 8 blocchi `<script>` OK; `registry.py` `py_compile` OK. Bump PATCH 8.67.2→8.67.3 (registry+History; v3b `<title>`/`ANALIZZA_BUILD`/`_DATE`).
+- Deploy su ENTRAMBI i servizi.
+
+---
+
 ## 2026-06-17 — 8.67.2: FIX Misurare — allineamento: il pre-align scartava il fit rigido ottimo
 
 **Sintomo:** confronto di due STL **geometricamente congruenti** (stesso caso, scanner diversi ScanLogiQ vs Exocad) → RMSD 5145µm, asse medio 51°, voto "Critico", deviazioni per-cilindro 2.4–55.7mm quasi tutte in XY (rotazione globale sbagliata nel piano occlusale). Ricarica forzata ripetuta non cambiava nulla.

@@ -13,7 +13,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Analizzare v8.67.2</title>
+<title>Syntesis-ICP - Analizzare v8.67.3</title>
 <style>
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
@@ -2440,8 +2440,8 @@ console.log('[Synthesis Core] iniettato in Analizza. SynRegistry, SynIcons, them
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.67.2';
-window.ANALIZZA_BUILD_DATE = '2026-06-17';
+window.ANALIZZA_BUILD = '8.67.3';
+window.ANALIZZA_BUILD_DATE = '2026-06-20';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 var scene,camera,renderer,controls;
 var scanMesh=null,scanOriginalGeo=null,muaObjects=[],muaExpanded={},axesVisible=false,scanbodiesVisible=true,placementMode=false,muaCounter=0,divergenceLabelsVisible=true;
@@ -6952,6 +6952,16 @@ function misICP_run(){
         } catch(_){}
       } else {
         scanCentsBpre = scanCentsB;
+        try {
+          var _na = scanCentsA.length, _nb = scanCentsB.length;
+          var _reason = (_na !== _nb || _na < 3 || _na > 8)
+            ? 'count-mismatch (n fuori 3..8 o A!=B)'
+            : 'rmsd-non-finito (fit degenere)';
+          console.warn('[Misurare pre-align] NON applicato (' + _reason +
+            '): scanCentsA.length=' + _na + ', scanCentsB.length=' + _nb +
+            ', n=' + (preAlign.n != null ? preAlign.n : 'n/a') +
+            ', rmsd=' + (isFinite(preAlign.rmsd) ? (preAlign.rmsd*1000).toFixed(1) + 'um' : 'Inf'));
+        } catch(_){}
       }
 
       // 5b. ICP tra i centroidi dei CLUSTER (gia' pre-allineati dal brute-force)
