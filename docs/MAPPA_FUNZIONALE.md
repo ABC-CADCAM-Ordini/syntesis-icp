@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.67.2 — **Data:** 2026-06-17
+> **Versione software mappata:** 8.68.0 — **Data:** 2026-06-23
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3).
@@ -450,6 +450,8 @@ Endpoint **solo backend** in `backend/main.py`, dietro `require_authorized` (adm
 | `setTab` / `checkStatus` / `logout` | accedi [263] / [359] / [421] | Tab login/reg / polling stato / logout | tabs, pannello pending |
 
 > **⚠️ Drift righe pre-esistente (da ri-verificare in un passo dedicato — NON introdotto dal refactor motore asse).** Alcuni riferimenti `[riga]` di questa tabella sono stale rispetto al codice 8.14.0, con drift disomogenea (per-voce, non un offset globale): `placeMUA` citato [2753] è realmente a ~2877; `sostStartPlacement` citato [15165] è a ~15238. Andrebbe ri-verificata per riga l'intera tabella "Funzioni chiave referenziate" a parte. I riferimenti toccati dal refactor di centralizzazione del motore asse sono invece allineati al codice corrente: `onAxisEngineChange` 3299, `misICP_cylAxis` 6327, `sostAlignAll` 15716 + ancore parete 15820/15995.
+>
+> **⚠️ 8.68.0 — shift +19218 righe (template HD).** L'embed dei template scanbody a piena risoluzione (`SOSTITUIRE_TEMPLATES_B64`, v3b ~13419) ha inserito **+19218 righe di base64**: TUTTE le citazioni `[riga]` di codice v3b oltre ~13419 (incluse le voci sost*/replace* di questa mappa, es. `sostAlignAll`/`replace*`/`openTaglio`/export Sostituire/tasto P) sono ulteriormente shiftate di +19218 rispetto alla loro posizione reale. **I numeri citati NON sono stati aggiornati aritmeticamente** perché in parte già drifati a monte (vedi nota sopra: un +19218 cieco su un numero già errato resterebbe errato). La ri-verifica per-riga dedicata della tabella "Funzioni chiave referenziate" — già pendente — ora copre anche questo offset. Riferimenti markup (`#L<n>` con n < 13419) e citazioni < 13419 INVARIATI.
 
 > **✅ Vedere — handler toolbar: RISOLTO.** Le funzioni legate ai bottoni toolbar sono ora tracciate per-bottone (nome + riga del binding) nella tabella "Toolbar viewer" della sezione Vedere.
 

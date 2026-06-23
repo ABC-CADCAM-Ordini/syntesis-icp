@@ -4,6 +4,23 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-23 — 8.68.0: QUALITY Sostituire — template scanbody 1T3/SR/OS a piena risoluzione HD
+
+**Contesto:** i template scanbody sorgente del workflow "Sostituire" (`SOSTITUIRE_TEMPLATES_B64` in v3b — i cilindri di riferimento su cui la scansione viene allineata) erano embedded **decimati a ~2000 triangoli, solo-cap**. L'utente ha fornito i CAD HD nativi (IPD Dental Group) chiedendo di usarli "sempre".
+
+**Modifica:** sostituiti i 3 base64 gzip dei template con gli STL HD forniti — **1T3 4334 / SR 11842 / OS 46140 triangoli**. Il frame è **identico** ai decimati (round-trip byte-identico vs STL sorgente; bbox/cap/raggio invariati al millesimo: 1T3 bboxZ[7.43,8.50] r2.515, SR[-5,-2] r2.030, OS[4.9,6.0] r1.780), quindi swap **drop-in**: nessun cambio a `SOSTITUIRE_Z_OFFSET_UNIVERSAL`(-0.40), zDisc, flip SR.
+
+**Nota tecnica (onestà di processo):** l'ICP di entrambi i Raffina (Sostituire `maxTplPts=400` ~19167; Replace-iT step `/400` ~17771) campiona il template a **~400 punti** a prescindere dalla densità → l'HD **non** migliora la precisione del piazzamento di un micron; il beneficio è il cilindro di riferimento HD a schermo + coerenza con la direttiva HD dell'utente. Il vero limite di Sostituire (~37µm vs ~1µm Exocad) è la **centratura click-seedata** = prossimo cantiere concordato.
+
+Implementazione:
+- v3b `syntesis-analyzer-v3b.html`: `SOSTITUIRE_TEMPLATES_B64` (~13419, blocco 2086→21304 righe, **+19218**); commento "decimati ~2000 tris" → "PIENA RISOLUZIONE HD". `<title>`/`ANALIZZA_BUILD`/`_DATE` → 8.68.0.
+- `registry.py`: `BACKEND_VERSION` 8.67.3→8.68.0, `LAST_UPDATED`, voce History. Bump **MINOR** (asset quality, retrocompatibile).
+- `docs/MAPPA_FUNZIONALE.md`: header → 8.68.0; nota drift §452 estesa (il +19218 shifta le citazioni v3b > ~13419; **non** riallineate aritmeticamente perché già drifate a monte — chip-task dedicato aperto).
+- Costo accettato (scelta utente embed-in-place vs asset statico cache-abile): monolite 4.12→5.59MB (+1.43MB; OS 46k tris da solo +1.1MB) caricato a ogni visita.
+- `node --check` script classici OK; round-trip 3/3 byte-identico. Deploy su ENTRAMBI i servizi.
+
+---
+
 ## 2026-06-20 — 8.67.3: DIAG Misurare/pre-align — log del ramo muto residuo (count-mismatch)
 
 **Contesto:** dopo l'8.67.2 (pre-align applicato **sempre** quando `preUsable`, con il caso *no-improvement* già loggato nel ramo `preUsable`), l'unico ramo dell'orchestrazione `misICP_run` rimasto **silenzioso** era l'`else` (~6953, `!preUsable`): raggiunto **solo** quando `misICP_bruteForcePreAlign` (~6494) ritorna dal gate di conteggio (`n !== centsB.length || n < 3 || n > 8`) con `rmsd=Infinity` e senza `n`. In quel caso il pre-align veniva saltato senza alcuna diagnosi live del perché.
