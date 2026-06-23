@@ -4,6 +4,22 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-23 — 8.68.1: FIX Misurare — scanbody HD scartati dal cap triangoli (detection)
+
+**Sintomo:** in Misurare, caricando un export HD di Sostituire (`id 2161 ..._scanbody_SR-3.stl`, 71052 tris = 6 marker SR HD), il file "collassa": rilevati solo **3 cilindri** invece di 6, angoli d'asse assurdi (**74°**), RMSD 80µm. Uno dei due file appare appiattito a schermo.
+
+**Root cause:** `misICP_isScanbody` (v3b ~6247) scartava ogni componente connessa con `idx.length > 5000` triangoli (euristica "è l'arcata"). Con l'8.68.0 i template SR sono passati a HD, quindi gli export hanno il **corpo** di ogni marker a ~11130 tris (vs 1848 del decimato) **> 5000 → scartato come arcata**. Sopravviveva solo il **disco-cap** (712 tris): un disco piatto → fit asse degenere (~74°), conteggio errato (3/6), "collasso" visivo. Verificato offline con le componenti connesse: HD = 6×11130 corpo (rifiutati) + 6×712 cap; originale = 6×4512 + 6×712 (tutti <5000, ok); decimato = 6×1848 + 6×151 (ok).
+
+**Fix:** cap `5000 → 40000` (`misICP_isScanbody`, `idx.length > 40000`). Il discriminatore geometrico VERO resta `bb.max < 15mm` (scanbody ~4-5mm vs arcata >30mm); l'arcata resta esclusa (>40000 tris **e** bbox>15mm). Era un PENDING già annotato in 8.67.2 ("fragilità su mesh HD, da irrobustire"), attivato proprio dall'HD dell'8.68.0.
+
+Implementazione:
+- v3b `syntesis-analyzer-v3b.html` ~6247: `misICP_isScanbody` cap 5000→40000 + commento aggiornato.
+- Verifica offline: col fix i 12 componenti del file HD passano → 6 scanbody corretti (corpo+cap clusterizzati). Col vecchio cap solo i 6 cap piatti sopravvivevano.
+- `node --check` script classici OK; `registry.py` ast OK. Bump **PATCH** 8.68.0→8.68.1. `misICP_isScanbody` non è elemento UI → MAPPA non toccata (solo header versione).
+- Deploy su ENTRAMBI i servizi.
+
+---
+
 ## 2026-06-23 — 8.68.0: QUALITY Sostituire — template scanbody 1T3/SR/OS a piena risoluzione HD
 
 **Contesto:** i template scanbody sorgente del workflow "Sostituire" (`SOSTITUIRE_TEMPLATES_B64` in v3b — i cilindri di riferimento su cui la scansione viene allineata) erano embedded **decimati a ~2000 triangoli, solo-cap**. L'utente ha fornito i CAD HD nativi (IPD Dental Group) chiedendo di usarli "sempre".
