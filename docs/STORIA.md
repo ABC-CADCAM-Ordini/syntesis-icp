@@ -4,6 +4,21 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-24 — 8.69.3: FIX Misurare — connessione rappresentata SIMMETRICA (roll indeterminabile)
+
+**Diagnosi (dopo 4 tentativi falliti sull'orientamento):** lo scanbody SR è **rotazionalmente simmetrico** (parete liscia, **asimmetria 0.0%** su 36 settori, verificato sui file). L'abutment `IPD.AB-SR-01-ZI` è **angolato** (feature di base decentrata ~0.2mm). Posare un oggetto angolato su un riferimento simmetrico lascia il **ROLL indeterminato**: nessun metodo (nemmeno un ICP 6-DOF) può ricavarlo dalla geometria scansionata — è **informazione mancante**. Nel flusso reale (Sostituire) il roll viene dal CAD sorgente orientato / dai 3 punti; Misurare non ce l'ha.
+
+**Scelta utente:** mostrare la connessione **simmetrica** (la forma fedele all'angolo non è ricavabile).
+
+**Fix:** sostituita la geometria reale (asset `/static/conn/IPD.AB-SR-01-ZI.stl`) con una **superficie di rivoluzione** (`THREE.LatheGeometry`, disponibile dal bridge r169) del **profilo raggio-vs-Z** misurato: base **r2.08@Z0** (= piattaforma impianto) → vita **r0.75@Z2.8** → post **r1.2@Z5.6**. Costruita a **runtime** (niente asset/fetch), asse **Y allineato all'asseCapward** (base a connA/lato impianto, post verso lo scanbody). Simmetrica → **roll irrilevante**, niente forma storta.
+
+Implementazione:
+- v3b ~7230: `_misConnGeoBuild` (LatheGeometry dal profilo); rimosso `_misLoadConnGeo`/fetch. Render ~7264: usa la geom + `setFromUnitVectors([0,1,0], connAxA)`.
+- Misura/datum INVARIATI. Asset `backend/static/conn/*.stl` ora inutilizzati (cleanup separato).
+- `node --check` OK; `THREE.LatheGeometry`/`Vector2` già nel bridge. Bump **PATCH** 8.69.2→8.69.3. docs. Deploy ENTRAMBI.
+
+---
+
 ## 2026-06-24 — 8.69.2: FIX Misurare — orientamento connessione definitivo (dal profilo della geometria)
 
 **Sintomo:** dopo l'8.69.1 l'utente: "va flippata, è al contrario". Il **post** dell'abutment puntava **via** dallo scanbody.
