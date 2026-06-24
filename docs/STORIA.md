@@ -4,6 +4,18 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-24 — 8.69.1: FIX Misurare — orientamento geometria connessione (verso impianto, non verso cap)
+
+**Sintomo (utente, frustrato):** la geometria connessione reale (8.69.0) appariva **sopra** il disco (verso il cap), non **sotto** come in Vedere. "La metti male da giorni."
+
+**Verifica SUI FILE** (`MarkerSR` + `IPD.AB-SR-01-ZI` condividono l'origine (0,0,0)): il **cap occlusale** SR (disco pieno, foro centrale rmin=0.090) è a **Z=−5**; la **connessione** IPD ha centroide a **Z=+2.2** = parte **OPPOSTA al cap** → la connessione deve estendersi verso **−asseCapward** (via dal cap, verso l'impianto) = **sotto** lo scanbody, come in Vedere.
+
+**Fix:** nel render (~7268) il +Z del CAD connessione mappa su **−asseCapward** (negato il vettore in `setFromUnitVectors`). Era +asseCapward (verso il cap) = sbagliato. **Solo orientamento del disegno**; punto-connessione / misura / datum (8.69.0) INVARIATI.
+
+- v3b ~7268: `setFromUnitVectors([0,0,1], -connAxA)`. `node --check` OK. Bump **PATCH** 8.69.0→8.69.1. docs STATO/STORIA/MAPPA header. Deploy ENTRAMBI.
+
+---
+
 ## 2026-06-24 — 8.69.0: FEAT Misurare — datum = ORIGINE (0,0,0 CAD) + geometria connessione reale
 
 **Indicazione utente (modello coordinate):** tutti i CAD IPD (scanbody marker + connessione `IPD.AB-SR-01-ZI` + analogo `AB-AR-00`) condividono l'**origine (0,0,0)** = piattaforma implantare. È il **datum** dove si misura la deriva; i file sono già orientati/posizionati rispetto a quel punto, uguali per OS/SR/1T3.
