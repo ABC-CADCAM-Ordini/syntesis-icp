@@ -4,6 +4,18 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-24 — 8.69.2: FIX Misurare — orientamento connessione definitivo (dal profilo della geometria)
+
+**Sintomo:** dopo l'8.69.1 l'utente: "va flippata, è al contrario". Il **post** dell'abutment puntava **via** dallo scanbody.
+
+**Analisi del PROFILO** `IPD.AB-SR-01-ZI` (raggio vs Z): base **larga** r=2.08 a **Z=0** (= origine = piattaforma/interfaccia impianto), **vita** r=0.75 a Z=2.8, **post** r=1.2 a **Z=5.6** (= lato protesico, verso lo scanbody). Inclinazione ~0.7° → **dritto/simmetrico** (nessun problema di roll). Quindi il **+Z** della geometria (origine→post) deve mappare su **+asseCapward** (post verso il cap/scanbody); la piattaforma resta ancorata a connA (lato impianto).
+
+**Fix:** render (~7272) — **rimosso il negate** dell'8.69.1 (torna a `+connAxA`). NB: sullo scan id2161 il cap occlusale è verso −Z e l'impianto verso +Z (scanbody "a testa in giù" nel frame scanner), quindi la connessione appare dal lato +Z. **Solo orientamento del disegno**; punto-connessione / misura / datum INVARIATI.
+
+- v3b ~7272: `setFromUnitVectors([0,0,1], +connAxA)`. `node --check` OK. Bump **PATCH** 8.69.1→8.69.2. docs. Deploy ENTRAMBI.
+
+---
+
 ## 2026-06-24 — 8.69.1: FIX Misurare — orientamento geometria connessione (verso impianto, non verso cap)
 
 **Sintomo (utente, frustrato):** la geometria connessione reale (8.69.0) appariva **sopra** il disco (verso il cap), non **sotto** come in Vedere. "La metti male da giorni."
