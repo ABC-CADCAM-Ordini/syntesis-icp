@@ -4,6 +4,21 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-24 — 8.69.0: FEAT Misurare — datum = ORIGINE (0,0,0 CAD) + geometria connessione reale
+
+**Indicazione utente (modello coordinate):** tutti i CAD IPD (scanbody marker + connessione `IPD.AB-SR-01-ZI` + analogo `AB-AR-00`) condividono l'**origine (0,0,0)** = piattaforma implantare. È il **datum** dove si misura la deriva; i file sono già orientati/posizionati rispetto a quel punto, uguali per OS/SR/1T3.
+
+**(1) Datum = origine.** La misura per-marker (|D| in report/scena/PDF) passa dal **centroide** all'**ORIGINE** = `centroide − L·asseCapward`, con L per-tipo dal CAD (`MIS_ORIGIN_OFFSET` ~6790: **SR 3.786 / OS 5.574 / 1T3 8.146 mm**, distanza centroide-AW→(0,0,0) dei marker template che condividono l'origine). Override di `p.d*`/`p.d*um` nel blocco connessione (~7042). L'allineamento globale resta sui centroidi (offline id2161: **origine-dev == centroide-dev ±1µm** perché asse ~0.02° → leva trascurabile); **score globale invariato** (usa l'RMSD ICP, non il |D| per-marker). Il punto-connessione È ora esattamente lo (0,0,0) — supera l'interim 8.68.3 (delta-da-A, che ancorava al cap rilevato).
+
+**(2) Geometria connessione reale.** Il disegno della connessione in Misurare passa dalla `MATEMATICA_B64` generica (unica, al cap) alla geometria **reale** `IPD.AB-SR-01-ZI` servita come **asset statico** (`backend/static/conn/IPD.AB-SR-01-ZI.stl`, mount `/static`, scelta utente — monolite invariato). Disegnata all'**origine** (connA) in orientamento nativo: l'STL ha origine Z=0=piattaforma e +Z=cap, quindi `grp@origine` + quaternion Z→asseCapward → forma fedele a Vedere (sale dalla piattaforma verso lo scanbody). Loader async con cache + re-render (`_misLoadConnGeo`/`misICP_renderConnections` ~7227); fail-soft (se l'asset non carica restano sfera-punto + linea). Copiato anche `AB-AR-00.stl` (analogo) per uso futuro.
+
+Implementazione:
+- v3b ~6790: `MIS_ORIGIN_OFFSET` + `misICP_capDelta`/`misICP_connectionPoint` (firma 8.68.3). Blocco misura ~7042: origine + override deviazione. Render ~7227: loader asset + geometria reale all'origine.
+- Asset: `backend/static/conn/IPD.AB-SR-01-ZI.stl` (770KB) + `AB-AR-00.stl` (142KB).
+- `node --check` OK; `registry.py` ast OK. Bump **MINOR** 8.68.3→8.69.0. MAPPA: header + nota connessione Misurare aggiornata. Deploy su ENTRAMBI. **Validare live:** ri-misura → |D| ~invariato (ora al datum), connessione viola = forma IPD reale ancorata alla piattaforma (come Vedere).
+
+---
+
 ## 2026-06-24 — 8.68.3: FIX Misurare — connessione: ghost ~85µm dal delta cap geometria-dipendente
 
 **Sintomo (segnalato dall'utente):** "la connessione è sempre sbagliata in Misurare, ma giusta in Analizza". Nel test Tara id2161/SR la riga **CONNESSIONE / cap-baricentro** mostrava **~85µm** di deviazione (tutta in **Z**, **−80µm costante** su tutti i marker) mentre i **centroidi coincidevano in Z** (~0µm). Un errore di posa non può dare centroidi-Z uguali e connessioni-Z diverse di 80µm → **ghost di calcolo**.
