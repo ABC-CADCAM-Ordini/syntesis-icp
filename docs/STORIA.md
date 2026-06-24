@@ -4,6 +4,27 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-24 — 8.68.2: FIX Sostituire — centratura SR: asse parete pulito prima della Kasa (Tara)
+
+**Sintomo:** test Tara su id2161/SR (sintetico-su-sintetico, dovrebbe dare ~0) dava errore per-marker **variabile 2-25µm** (decimato: 4-34µm), tutto nel centro XY, asse "finale" ~perfetto.
+
+**Diagnosi** (analisi offline su A=`t0.stl` / B=`SR-3.stl` HD + workflow 10 agenti con verifica avversariale):
+- L'errore-metrica (centroide AW) è **identico** all'errore-posa (posizione asse): il centroide misurato **è** la posizione dell'asse.
+- Lo scarto centroide↔asse è **0.0µm** su A e su B → **floor = 0 → zero raggiungibile**.
+- **A ≠ B** (raggio A=2.000 idealizzato vs B=2.030 template IPD SR) è **irrilevante**: il centroide di un cilindro simmetrico sta sull'asse a prescindere dal raggio.
+- Cause **escluse**: artefatto-metrica/tassellatura (8.66.1) <1µm qui; mis-seed da click (scatter ±0.6mm → 0.00µm — la parete SR 360° rende la Kasa click-invariante).
+- **Root:** il ramo `else` SR di `sostPlaceTemplate` (~37949) passava l'**asse cap-fit grezzo** (tilt per-marker ~0.05-0.08°) dritto nella Kasa `sostRobustCenter` (sensibilità **~450µm/°** → il tilt diventa offset del centro). L'OS aveva già il fix in 8.66.7 (`_sostGeomWallAxis`), l'SR no (era "robust solo-centro", validato 8.15.0).
+
+**Fix:** il ramo SR ora calcola `_sostGeomWallAxis` (asse parete seed-indipendente; parete SR 360° = ben condizionata, meglio dell'OS) e lo passa alla Kasa + lo imposta come asse finale. Fail-soft (guardia 5° → asse cap-fit = comportamento attuale, nessuna regressione). Il log CSV diagnostico ora cattura `geomAx` anche per SR.
+
+Implementazione:
+- v3b `syntesis-analyzer-v3b.html` ~37949: ramo `else` SR riscritto (mirror OS 8.66.7); commento stale a ~37901 ("SR resta com'era") aggiornato.
+- `node --check` script classici OK; `registry.py` ast OK. Bump **PATCH** 8.68.1→8.68.2.
+- `sostPlaceTemplate`/`_sostGeomWallAxis` non sono elementi UI → MAPPA solo header versione.
+- Deploy su ENTRAMBI. **Validazione live PENDENTE:** rifare il Tara su 2161 → errore per-marker deve scendere verso ~0 (gate RMSD centroide ≤8µm).
+
+---
+
 ## 2026-06-23 — 8.68.1: FIX Misurare — scanbody HD scartati dal cap triangoli (detection)
 
 **Sintomo:** in Misurare, caricando un export HD di Sostituire (`id 2161 ..._scanbody_SR-3.stl`, 71052 tris = 6 marker SR HD), il file "collassa": rilevati solo **3 cilindri** invece di 6, angoli d'asse assurdi (**74°**), RMSD 80µm. Uno dei due file appare appiattito a schermo.
