@@ -4,6 +4,29 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-24 — 8.69.4: FIX Misurare — ROOT CAUSE connessione (rilevamento cap non robusto sugli scan reali)
+
+**Il bug dietro i 4 fallimenti sull'orientamento della connessione.** Non era il segno del flip a valle (sia 8.69.0 `+asseCapward` che 8.69.1 `−asseCapward` venivano respinti "al contrario"): era **`misICP_orientCapwardSolid` (~6755)** che **non determinava il verso del cap** sugli scan reali, ritornando l'asse col **verso casuale del PCA**.
+
+**Diagnosi empirica** (python sui file dell'utente, funzioni reali di Misurare portate 1:1):
+- **Template SR pulito** (verità: disco a Z=−5, origine a Z=0): ritornava `capward=[0,0,+1]` (lontano dal disco) → `connA = centroide − L·capward` cadeva a **Z=−7.572** invece che a **0** = connessione 7.5mm fuori **e** flippata. (Il ramo "disco singolo" aveva pure il segno invertito.)
+- **6 scanbody REALI col cap**: cadeva nel ramo **`'no-disco'`** anche a soglia 0.6. Il gate flat-face `|normale·asse|>0.85` **fallisce sul cap SCANSIONATO** (lo scanner intraorale arrotonda il disco → normali sparse → nessuna faccia "piatta"). → verso casuale del PCA, sbagliato **6/6**.
+
+**Fix:** detector cap **ROBUSTO** = il cap è l'**ESTREMO con più AREA di superficie VICINO all'asse** (disco pieno); la base è aperta (anello) → nessuna superficie centrale. Misurato sulle bande dei **due estremi assiali** (non dal centroide: il disco-cap pesante sposta il centroide verso il cap, escludendone le facce). Indipendente dall'arrotondamento. `NEAR=1.0mm`, `BAND=0.7mm`; fallback deterministico (verso PCA) per tubo/ambiguo.
+
+**Validazione offline:** template → `connA = [0,0,0]` esatto; 6/6 scanbody reali col cap corretti.
+
+**Render connessione:** ripristinata la **geometria STL REALE** (`/static/conn/IPD.AB-SR-01-ZI.stl`, loader async `_misLoadConnGeo` della 8.69.0) orientata `+Z(CAD) → −connAxA` (8.69.1), ora con `connAxA` **corretto** = overlay nativo dei file in Vedere (base larga a `connA`/origine, post dal lato OPPOSTO al disco SR). Confermato dalle immagini Vedere dell'utente (1T3+OS+Connessione+SR a origine condivisa).
+
+**Effetto:** il datum per-marker è ora ancorato all'**origine vera** (era 2L=7.5mm fuori). Deviazione ~invariata sul self-test (A=B, capward consistente via riga 7038), correttamente ri-ancorata su A vs B reale. Misura globale (RMSD ICP)/score INVARIATI.
+
+Implementazione:
+- `misICP_orientCapwardSolid` (~6755): sostituito il gate flat-face+rmin con area-near-axis sui due estremi.
+- render connessione (~7239–7295): `_misLoadConnGeo` (fetch STL reale) al posto del `_misConnGeoBuild` Lathe (8.69.3); quaternione `setFromUnitVectors([0,0,1], −connAxA)`.
+- `node --check` OK. Bump PATCH 8.69.3→8.69.4. Deploy ENTRAMBI.
+
+---
+
 ## 2026-06-24 — 8.69.3: FIX Misurare — connessione rappresentata SIMMETRICA (roll indeterminabile)
 
 **Diagnosi (dopo 4 tentativi falliti sull'orientamento):** lo scanbody SR è **rotazionalmente simmetrico** (parete liscia, **asimmetria 0.0%** su 36 settori, verificato sui file). L'abutment `IPD.AB-SR-01-ZI` è **angolato** (feature di base decentrata ~0.2mm). Posare un oggetto angolato su un riferimento simmetrico lascia il **ROLL indeterminato**: nessun metodo (nemmeno un ICP 6-DOF) può ricavarlo dalla geometria scansionata — è **informazione mancante**. Nel flusso reale (Sostituire) il roll viene dal CAD sorgente orientato / dai 3 punti; Misurare non ce l'ha.
