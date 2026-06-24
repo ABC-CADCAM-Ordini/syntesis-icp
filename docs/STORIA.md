@@ -4,6 +4,21 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-24 — 8.68.3: FIX Misurare — connessione: ghost ~85µm dal delta cap geometria-dipendente
+
+**Sintomo (segnalato dall'utente):** "la connessione è sempre sbagliata in Misurare, ma giusta in Analizza". Nel test Tara id2161/SR la riga **CONNESSIONE / cap-baricentro** mostrava **~85µm** di deviazione (tutta in **Z**, **−80µm costante** su tutti i marker) mentre i **centroidi coincidevano in Z** (~0µm). Un errore di posa non può dare centroidi-Z uguali e connessioni-Z diverse di 80µm → **ghost di calcolo**.
+
+**Root:** `misICP_connectionPoint` (~6780) ricavava `delta` = **98° percentile** della proiezione dei vertici sull'asse capward (= distanza cap→centroide), calcolato **separatamente per A e B**. A (scan sorgente r=2.000) → delta=**1.790mm**; B (sostituto IPD r=2.030) → delta=**1.706mm** → **Δ84µm** → connessione proiettata a quote assiali diverse. L'allineamento globale allinea i **centroidi** (non i cap), quindi il Δdelta emerge tutto sulla connessione. Analizza non ha il ghost: usa `translate(0,0,−capZ)` **fisso** (~3025).
+
+**Fix:** estratto helper `misICP_capDelta`; il `delta` cap è calcolato **una volta dal RIFERIMENTO A** (scan reale/ground-truth) e usato **per A e B** → connessione consistente = capZ sotto il cap di A, B vi si ancora. Centroide/posa/asse **invariati** (la riga CONNESSIONE ora traccia il centroide reale). **Verificato offline** su id2161: conn-dev **85µm → 2-24µm** (= livello centroide).
+
+Implementazione:
+- v3b `syntesis-analyzer-v3b.html` ~6780: estratto `misICP_capDelta`; `misICP_connectionPoint` ora prende `(centroid, axisCapward, capZ, delta)`; il chiamante (~7030) calcola `_capDelta` da A e lo passa a entrambi.
+- `node --check` OK; `registry.py` ast OK. Bump **PATCH** 8.68.2→8.68.3. `misICP_connectionPoint` non è elemento UI → MAPPA solo header.
+- Deploy su ENTRAMBI. Da osservare live: la riga CONNESSIONE deve scendere al livello del centroide (non più ~85µm).
+
+---
+
 ## 2026-06-24 — 8.68.2: FIX Sostituire — centratura SR: asse parete pulito prima della Kasa (Tara)
 
 **Sintomo:** test Tara su id2161/SR (sintetico-su-sintetico, dovrebbe dare ~0) dava errore per-marker **variabile 2-25µm** (decimato: 4-34µm), tutto nel centro XY, asse "finale" ~perfetto.
