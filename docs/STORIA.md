@@ -4,6 +4,36 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-25 — 8.69.9: FEAT Sostituire — Method C esteso a OS/1T3 (shadow)
+
+Scelta utente: l'accoppiamento dei file piccoli come **OS** è migliorabile. OS è il caso
+più difficile (cap 3% d'area, alto 1.1mm, **immerso nella gengiva** → asse poco osservabile
+su parete corta). In 8.69.8 Method C era **solo-SR**: OS/1T3 passano per `_sostCylFitInvariant`
+e non lo chiamavano → nel CSV OS le colonne `mc*` erano **vuote** (confermato dal log utente).
+
+Fix: lo stesso candidato Method C è aggiunto al **ramo OS/1T3** di `sostPlaceTemplate` (~38234,
+dopo il kasa), inizializzato dalla **posa cap-fit** (`_cen` = baricentro del cap, `_ax` = asse
+parete che `_sostCylFitInvariant` già trova) — niente cap-plane per OS (è SR-specifico). La
+stima congiunta cap+parete+normali è proprio il rimedio per la parete corta dell'OS. Calcolato
+SEMPRE (shadow, ~30ms), applicato solo col flag `syntesis_sost_method_c`='on' (DEFAULT OFF =
+8.69.8 al bit). Le 13 colonne `mc*` del CSV ora si popolano anche per OS/1T3.
+
+**Validazione offline parziale** (e onesta): i file forniti (`export-grezzo` + `OS-sost`) **non
+combaciano col frame del log** — `export-grezzo` ha **0 facce** al `finalCen` OS (buco/scanbody
+rimosso), il sintetico OS sta solo nell'output (`OS-sost`, 46140 tris/marker) → impossibile
+gate-validare il fit OS sui punti del log come per SR. Verificato però sul **sintetico pulito**
+(`OS-sost`): le bande OS **agganciano** (ncap=1420, nwall=44720, **R_fit=1.779 = raggio OS
+nominale esatto**), cenShift ~0 (OS già a posto). **Caveat da tarare live**: sul sintetico
+perfetto l'`axDeg` arriva a 0.1-0.5° (il cap OS piccolo influenza l'asse del fit congiunto;
+#4 → `trust-axis` rollback a 0.548°) → il trust asse 0.5° (tarato su SR) è probabilmente
+stretto per OS; l'`axDeg` è comunque **loggato anche in rollback** → taratura dal CSV live.
+
+SR invariato (8.69.8 al bit). `node --check` OK. Bump PATCH. `<title>`/`ANALIZZA_BUILD`/`registry`
+8.69.9. **Validare LIVE**: ri-sostituire OS → il CSV deve mostrare `reason [mcShadow cXXaYY]` (o
+`(methodC <motivo>)`) e le colonne `mc*` popolate; poi flag on per l'A/B.
+
+---
+
 ## 2026-06-25 — 8.69.8: FEAT Sostituire/SR — Method C semantic local fit 5-DOF (opt-in + shadow)
 
 Scelta utente: spingere la precisione oltre il cap-plane. Dopo il reframe asse-dominante,
