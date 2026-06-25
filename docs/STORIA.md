@@ -4,6 +4,43 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-25 — 8.69.7: FEAT Sostituire/SR — cap-plane in SHADOW LOG (sempre nel CSV PosaDiag)
+
+Richiesta utente: togliere l'attrito del flag. In 8.69.6 il candidato cap-plane si
+attivava (e si vedeva nel CSV) solo con `localStorage syntesis_sost_cap_plane='on'`;
+in pratica era facile dimenticarlo o impostarlo sul dominio sbagliato (localStorage è
+per-origine) → il CSV mostrava solo `+geomAxisSR` e non si capiva cosa avrebbe fatto il
+cap-plane. Soluzione: **calcolare il cap-plane SEMPRE per SR e scriverne tutti i numeri
+nel CSV diagnostico a ogni Sostituire**, indipendentemente dal flag. L'**applicazione alla
+posa** resta gated dal flag (DEFAULT OFF = 8.69.5 al bit, regressione zero): il LOG è
+shadow, l'output mostrato non cambia.
+
+`_sostCapAnchoredPose` (~v3b:38021) refactor: ritorna **sempre** un oggetto diagnostico
+(mai `null`) `{applied, reason, dAng, planeRMS, coverageDeg, areaFrac, lamRatio, n, nWall,
+wallCov, centerShift, axis, center}`; `reason` = `ok | no-cap-fit | cap-gate | wall-gate |
+trust-region`. I gate e la matematica sono **identici a 8.69.6** (già validati 1:1 vs
+Python): cambia solo la forma del ritorno e la cattura dei campi. Il caller SR (~38121)
+cattura `_capDiag` sempre; la colonna `reason` mostra ora: `+capPlane(dXX)` = applicato
+(flag on + gate ok), `[capShadow dXX]` = calcolato ma non applicato (flag off), `(capPlane
+<motivo>)` = respinto dal gate.
+
+CSV PosaDiag: **16 colonne nuove** (`capApplied, capReason, capDAng, capPlaneRMSum, capCov,
+capAreaFrac, capLamRatio, capN, capNWall, capCenShiftUm, capAxX/Y/Z, capCenX/Y/Z`) →
+header+row da 40 a **56 campi** (verificato 56==56 con sim del row-builder, no off-by-one
+che sfaserebbe il CSV; `capCenShift` convertito in µm).
+
+Effetto: ogni Sostituire mostra **cosa farebbe il cap-plane** (sul grezzo id2161 i `dXX`
+attesi ~`[0.19,0.18,0.06,0.05,0.06,0.20]°`) senza dover attivare nulla = **shadow mode**
+per la raccolta dati multi-caso. È il preludio operativo a Method C (semantic local fit
+5-DOF, vedi verdetto roadmap) che andrà nello stesso CSV quando implementato.
+
+Implementazione:
+- v3b: refactor `_sostCapAnchoredPose` + caller SR + `_placeDiagCap` (~38139) + builder CSV.
+- Bump PATCH (additivo, shadow, output invariato). `<title>`/`ANALIZZA_BUILD`/`registry` 8.69.7.
+- `node --check` OK; sim row-builder 56 campi OK.
+
+---
+
 ## 2026-06-25 — 8.69.6: FEAT Sostituire/SR — PIANO DEL CAP per raffinare l'asse (opt-in, default OFF)
 
 Reframe del residuo dopo l'8.69.5, cross-validato con un'AI esterna (GPT) e riprodotto
