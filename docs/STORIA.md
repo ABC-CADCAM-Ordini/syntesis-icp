@@ -4,6 +4,51 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-25 — 8.69.8: FEAT Sostituire/SR — Method C semantic local fit 5-DOF (opt-in + shadow)
+
+Scelta utente: spingere la precisione oltre il cap-plane. Dopo il reframe asse-dominante,
+Method C è il candidato più forte emerso dall'analisi della roadmap (cross-validata con
+GPT + workflow gate-validato a 5 agenti): **held-out 2.62µm vs cap-plane 4.61µm**, dimezza
+l'incertezza d'asse (bootstrap), e **generalizza senza tuning di R** (il guadagno è il
+vincolo congiunto, non il raggio — imporre R=2.03 nominale invece PEGGIORA, refutato al bit).
+
+**Obiettivo** (per-marker, indipendente): `E(c,a) = w_c·cap-point-to-plane +
+w_w·wall-radiale(r−R_fit) + w_n·coerenza-normali(n·a)`, pesi Tukey IRLS robusto (c=4.685,
+4 outer-loop), **5 DOF** (3 traslazioni centro + 2 tilt asse, **roll congelato**). Risolto
+con un **Levenberg-Marquardt scritto a mano** (Jacobiano numerico a differenze centrali —
+niente scipy nel browser, vincolo del monolite). `R_fit` per-marker da un fit 6-DOF
+preliminare (~2.017, **non** 2.03). Init = posa cap-plane (8.69.6).
+
+Funzioni nuove: `_sostMCOn` (~38047, flag), `_mcMedian/_mcTukey/_mcBasis/_mcSolveLin/_mcDot`
+(helper), `_sostMethodCFit` (~38078, crop 6mm + bande cap/wall + LM+IRLS), `_sostMethodCPose`
+(~38149, 6-DOF→R_fit poi 5-DOF, gate).
+
+**Port JS validato 1:1 vs prototipo Python**: R_fit ESATTO (ΔR=0.00µm su tutti e 6), centro
+Δ0.002-0.006µm, asse Δ0.000° su 4/6 e su #2/#3 valle-piatta cost-equivalente (obiettivo
+JS/Py = 1.000000). Latenza **~30ms/marker** (198ms per 6) = impercettibile.
+
+`SHADOW`: Method C è calcolato SEMPRE per SR e loggato nel CSV; **applicato** alla posa solo
+col flag `syntesis_sost_method_c`='on' (DEFAULT OFF = 8.69.7 al bit). Quando applicato supera
+il cap-plane (stima congiunta, inizializzata dal cap-plane). Gate intrinseci: R_fit in
+[R−0.15, R+0.15], ncap≥150, nwall≥600, trust-region centro≤60µm e asse≤0.5° → altrimenti
+rollback; try/catch fail-soft. reason CSV: `+methodC(cXXaYY)` / `[mcShadow cXXaYY]` /
+`(methodC <motivo>)`. **13 colonne nuove** nel CSV PosaDiag (`mcApplied, mcReason,
+mcCenShiftUm, mcAxDeg, mcRfit, mcNcap, mcNwall, mcAxX/Y/Z, mcCenX/Y/Z`) → header+row 56→69
+(verificato 69==69).
+
+**Onestà metrologica**: il floor reale ~2.6µm held-out è **sotto il rumore scan-to-scan**
+(~14µm tra due scansioni reali dello stesso caso) → il guadagno è di **varianza/robustezza**,
+non clinico (siamo già un ordine di grandezza sotto la soglia Eccellente <50µm).
+
+Implementazione:
+- v3b: blocco Method C (~38047-38186) + innesto SR (~38266) + `_placeDiagCap` + builder CSV.
+- Bump PATCH (additivo, shadow, default OFF). `<title>`/`ANALIZZA_BUILD`/`registry` 8.69.8.
+- `node --check` OK; port validato 1:1 vs Python; sim row-builder 69 campi OK; latenza misurata.
+- **Validare LIVE**: `localStorage.setItem('syntesis_sost_method_c','on')` → ri-sostituire →
+  reason `+methodC`, poi Misurare A/B vs exocad. In shadow il CSV mostra già cosa farebbe.
+
+---
+
 ## 2026-06-25 — 8.69.7: FEAT Sostituire/SR — cap-plane in SHADOW LOG (sempre nel CSV PosaDiag)
 
 Richiesta utente: togliere l'attrito del flag. In 8.69.6 il candidato cap-plane si
