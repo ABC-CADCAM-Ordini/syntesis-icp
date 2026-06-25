@@ -14,7 +14,14 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 **Scope onesto:** corregge la parte d'**ASSE** del residuo (contributo leva). Il **CENTRO** resta il problema dominante — il marker peggiore (#4, 46µm) ha asse quasi perfetto (0.044°) = puro centro → affrontato separatamente (cap+parete, passo 2). L'accuratezza vera dell'asse fixato va confermata **live**.
 
-Implementazione: `_sostGeomWallAxis` (~37896): rough = refAxis se presente (else max-autovettore); aggiunto centroide relativo a `tris[]` + filtro radiale `[R−0.8,R+0.8]` nel loop parete. `node --check` OK. Bump PATCH 8.69.4→8.69.5. Deploy ENTRAMBI. Validare live: ri-sostituire id2161 → CSV `+geomAxisSR`, asse Misurare giù da 0.11°.
+Implementazione: `_sostGeomWallAxis` (~37896): rough = refAxis se presente (else max-autovettore); aggiunto centroide relativo a `tris[]` + filtro radiale `[R−0.8,R+0.8]` nel loop parete. `node --check` OK. Bump PATCH 8.69.4→8.69.5. Deploy ENTRAMBI.
+
+### ⭐ MILESTONE — VALIDATO LIVE (2026-06-25)
+Risultato confermato dall'utente sul caso reale id2161:
+- **GREZZO** (Synthesis auto, NO raffina, vs exocad): per-marker da **[30,19,27,46,9,14]µm (RMS 26, voto 89.82)** → **[12,9,4,5,9,10]µm (RMS ~9, voto 98.3)**. Il #4 da **46→5µm**. CSV: tutti `+geomAxisSR` (era `skip`). **Riproducibile** su due run (0929/1102).
+- **SINTETICO pulito** (Synthesis vs exocad): **0µm esatto** (RMSD 0.32, voto 99.99), tassellature diverse (5224 vs 11842 → non artefatto mesh-identità). exocad-vs-exocad = 0µm → **la verità exocad è esatta e il motore di placement Synthesis è CORRETTO** (raggiunge lo zero sul pulito).
+- **Lezione chiave:** il fix d'asse ha trascinato anche il CENTRO, perché il fit del centro (Kasa) gira nel piano ⊥ all'asse (sensibilità ~450µm/° di tilt). Asse pulito → piano giusto → centro giusto.
+- **Stato:** SR essenzialmente A POSTO. Residuo grezzo ~9µm = **pavimento fisico del rumore di scansione** (non difetto software). Leva opzionale residua = centro full-surface tissue-robusto (vedi sotto, "Raffina").
 
 ---
 
