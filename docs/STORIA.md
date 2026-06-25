@@ -4,6 +4,47 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-25 — 8.70.0: FEAT Misurare — click-to-seed scanbody per scansioni con tessuti
+
+**Bug segnalato dall'utente**: caricando una scansione clinica con gengiva, Misurare collassa
+(3 cilindri invece di 6, asse 53°, RMSD 7813µm, score Critico, arcata **schiacciata**).
+
+**Root cause** (riprodotto sui file utente): `misICP_isScanbody` (~6250) rileva gli scanbody
+come **componenti connesse** separate con bbox<15mm. Ma in una scansione reale gengiva e
+scanbody sono **un'unica mesh saldata** → `misICP_comps` dà 1 blob da 477.021 tris (bbox 58mm,
+scartato come arcata) + frammenti sparsi → 1-3 falsi scanbody → Kabsch/ICP su punti sbagliati →
+rotazione ~50° → l'arcata appare schiacciata. Non è un crash: è il limite del rilevamento a
+componenti connesse, che **non può isolare scanbody immersi nei tessuti**. (solo OS pulito = 12
+componenti, 6 scanbody OK; OS+tessuti = 2 componenti, 1 scanbody.)
+
+**Fix (scelta utente)**: modalità **click-to-seed**. L'utente clicca i N scanbody sulla mesh
+grezza; ogni click → `findScanbodyCenter` (centro+asse robusto, riusato da Analizza/Sostituire;
+raggio per tipo 1T3/OS/SR). **Architettura crop-and-clean** (1 solo innesto in `misICP_run`):
+ogni seed **ritaglia** la sua regione (cilindro raggio R+0.7, altezza sul lato del corpo, esclude
+la gengiva oltre il raggio) → mesh B "pulita" coi soli scanbody spazialmente separati → `misICP_run`
+la elabora **invariato** (l'auto-detection ritrova i N scanbody). Picking NDC = formula Sostituire
+`clientX/rect` (corretta sotto `body.zoom`).
+
+Funzioni nuove (~7216): `misICP_seedToggle/seedEnter/seedPick/seedUndo/seedAlign/seedExit/
+cropScanbody` + stato `misICP_seedMode/seedCenters/seedAxes/overrideTri`. Innesto run (~6919):
+`triA/triB = override se presente`. UI: pulsante `#misBtnSeed` + pannello `#misSeedPanel`
+(selettore `#misSeedType`, contatore `#misSeedCount`, Allinea/Annulla) dopo `#misBtnRun` (~1938).
+
+**Validazione**: `node --check` OK; crop-and-clean su geometria OS reale (solo-OS) → 6 cap →
+mesh pulita → l'auto-detection ritrova 6 scanbody. L'esclusione gengiva (radiale>R+0.7),
+`findScanbodyCenter` sullo scan reale e l'accuratezza del picking = **validazione live** (i file
+utente non sono nel frame del log → non gate-validabile offline). **Auto-path invariato**
+(override null = comportamento pre-8.70.0).
+
+Implementazione:
+- v3b: blocco click-seed (~7216) + innesto run (~6919) + UI (~1938).
+- Bump **MINOR** (nuova feature retrocompatibile). `<title>`/`ANALIZZA_BUILD`/`registry` 8.70.0.
+  MAPPA aggiornata (nuovi elementi UI).
+- **Validare LIVE**: carica scansione con tessuti → "Clicca gli scanbody" → tipo OS → clicca i
+  6 → "Allinea coi punti cliccati" → allineamento sano (no schiacciamento).
+
+---
+
 ## 2026-06-25 — 8.69.9: FEAT Sostituire — Method C esteso a OS/1T3 (shadow)
 
 Scelta utente: l'accoppiamento dei file piccoli come **OS** è migliorabile. OS è il caso
