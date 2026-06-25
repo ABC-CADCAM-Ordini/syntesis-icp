@@ -21,7 +21,7 @@ Rilascio di Syntesis-ICP sui due servizi Railway paralleli (LEGACY + BACKEND). C
 4. **Sanity**: i 3 marker versione devono coincidere fra loro; `CACHEBUST` strettamente crescente rispetto al precedente.
 5. **Doc**: aggiorna `STATO_SISTEMA.md` (tabella versioni live + snapshot date) + appende entry a `docs/STORIA.md`. Salta in modalita' doc-only (la modifica E' la doc).
 6. **Git**: `git add` selettivo dei file modificati + commit con stile (`FASE: cosa cambia`, <=60 char, body bullet, no `Co-Authored-By`) + `git push origin main`.
-7. **Railway**: `serviceInstanceDeploy(serviceId, environmentId, latestCommit:true)` su entrambi i servizi via curl GraphQL. Poi polling `deployments(first:1){status}` ogni 30s su entrambi finche' `SUCCESS` (timeout 5 min; stop&ask se >3 min in `BUILDING`/`DEPLOYING`). Skip in modalita' doc-only.
+7. **Railway**: `serviceInstanceDeploy(serviceId, environmentId, latestCommit:true)` su entrambi i servizi via curl GraphQL. **Subito dopo, verifica anti-race**: `meta.commitHash` del deployment == `git rev-parse HEAD` (Railway puo' avere ancora il commit vecchio se il deploy parte troppo presto dopo il push → ri-triggera). Poi polling `deployments(first:1){status}` ogni 30s su entrambi finche' `SUCCESS` (timeout 5 min; stop&ask se >3 min in `BUILDING`/`DEPLOYING`). Skip in modalita' doc-only.
 8. **Verifica live**: curl `/api/registry/constants` (`backend_version`) + `/analizzare` (grep `<title>` + `ANALIZZA_BUILD`) su entrambi i domini Railway diretti, escluso `app.syntesis-icp.com` (cert SSL pre-esistente, tracciato in STATO_SISTEMA).
 
 ## Regole versionamento
@@ -194,6 +194,38 @@ echo
 
 Risposta attesa per ogni servizio: `{"data":{"serviceInstanceDeploy":true}}`.
 
+### Verifica commit (anti-race) — OBBLIGATORIO prima del polling
+
+> **Gotcha (rilascio 8.70.0, 2026-06-25)**: `serviceInstanceDeploy(latestCommit:true)` lanciato
+> SUBITO dopo `git push` puo' prendere il commit **PRECEDENTE** — Railway impiega qualche secondo a
+> sincronizzare il nuovo commit da GitHub, e `latestCommit:true` risolve al commit che Railway conosce
+> in quel momento. Sintomo: il deploy va a `SUCCESS` ma la **verifica live mostra la versione VECCHIA**
+> (e NON e' cache: resta vecchia anche dopo minuti). Vedi memoria [[railway-deploy-build-hang]].
+
+Dopo OGNI `serviceInstanceDeploy`, **prima del polling status**, verifica che il deployment punti al
+commit appena pushato (`meta.commitHash` == `git rev-parse HEAD`):
+
+```bash
+sleep 8   # lascia sincronizzare il deployment appena creato
+HEAD=$(git rev-parse HEAD)
+check_commit(){
+  curl -sS -H "Authorization: Bearer $RW_TOKEN" -H "Content-Type: application/json" -H "User-Agent: Mozilla/5.0" \
+    -X POST "$RW_GQL" \
+    -d "{\"query\":\"query{deployments(first:1,input:{serviceId:\\\"$1\\\",environmentId:\\\"$RW_ENV_ID\\\"}){edges{node{status meta}}}}\"}" \
+    | python3 -c "import sys,json; n=json.load(sys.stdin)['data']['deployments']['edges'][0]['node']; m=n.get('meta') or {}; print(n['status'], (m.get('commitHash') or '')[:40])"
+}
+for SVC in "$RW_SVC_LEGACY" "$RW_SVC_BACKEND"; do
+  read ST CH <<< "$(check_commit "$SVC")"
+  if [ "$CH" = "$HEAD" ]; then echo "OK $SVC -> $ST commit=$CH"; \
+  else echo "MISMATCH $SVC: deployment su $CH ma HEAD=$HEAD -> RI-TRIGGERA serviceInstanceDeploy(latestCommit:true) e ri-verifica"; fi
+done
+```
+
+Se MISMATCH: ri-lancia `serviceInstanceDeploy(latestCommit:true)` su quel servizio (ora il commit e'
+sincronizzato), aspetta `sleep 8`, ri-verifica il commit. Procedi al polling SOLO quando
+`meta.commitHash == HEAD` su entrambi. Lo status `SUCCESS` da solo NON basta: deve essere SUCCESS **del
+commit giusto**.
+
 ### Polling
 
 Polling ogni 30s su entrambi i servizi. Status terminali: `SUCCESS` (ok) / `FAILED` / `CRASHED` (fail). Stati intermedi: `INITIALIZING`, `BUILDING`, `DEPLOYING`. Timeout 5 minuti totali. Stop&ask se >3 minuti in `BUILDING`/`DEPLOYING`.
@@ -259,7 +291,8 @@ echo "Re-deploying current main on Railway: $NEW_VER"
 | `git push` fallisce (non-fast-forward) | Stop&ask. Mostra l'errore. NON forzare con `--force`/`--force-with-lease` salvo richiesta esplicita. |
 | 1 servizio Railway `SUCCESS`, l'altro `FAILED`/`CRASHED` | Stop. Mostra logs deploy via GraphQL `deployments(){node{...}}` se disponibile. NON tentare auto-rollback. Suggerisci CLAUDE.md §9 Rollback. |
 | Polling >3 min in `BUILDING`/`DEPLOYING` | Stop&ask. L'utente sceglie: continua il polling, cancella il deploy, fa rollback git. |
-| `verify_live` mismatch versione (CDN/cache) | Wait 30s + retry una volta. Se ancora mismatch -> stop&ask. |
+| Deployment `SUCCESS` ma `meta.commitHash` != `git rev-parse HEAD` (RACE post-push) | Il deploy ha preso il commit precedente (sync GitHub non pronta). **Ri-triggera** `serviceInstanceDeploy(latestCommit:true)` su quel servizio, `sleep 8`, ri-verifica il commit; procedi solo quando combacia. Vedi sezione "Verifica commit (anti-race)". |
+| `verify_live` mismatch versione | PRIMA distingui: se persiste dopo 1-2 min NON e' cache -> e' la RACE commit (verifica `meta.commitHash`, vedi sopra). Se transitorio (combacia dopo 30s) era CDN/cache. Wait 30s + retry una volta; se ancora mismatch e commit giusto -> stop&ask. |
 | `app.syntesis-icp.com` SSL cert error | Segnala soltanto, non bloccare. Sospeso pre-esistente, non legato al deploy. |
 | `RW_TOKEN` mancante (no `scripts/.env.local`) | Chiedi all'utente, crea il file con `chmod 600`, prosegui. Non loggare il valore. |
 | Sanity check versioni mismatch | Stop&ask prima del commit. Probabile bump incompleto, va sistemato. |
