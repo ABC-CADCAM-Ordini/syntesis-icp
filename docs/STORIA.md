@@ -4,6 +4,51 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-25 — 8.69.6: FEAT Sostituire/SR — PIANO DEL CAP per raffinare l'asse (opt-in, default OFF)
+
+Reframe del residuo dopo l'8.69.5, cross-validato con un'AI esterna (GPT) e riprodotto
+localmente al bit (gate APP-esatto sul caso reale id2161). **Il residuo NON è più il
+centro.** Il centroide-mesh del sostituto vs exocad, allineato con Kabsch su blocchi
+contigui (A = 6×5224 tris, B = 6×11842 tris), è già **~1.85µm** = praticamente perfetto.
+Il "gate" del foglio Misure `[12,9,4,5,9,10]µm` (RMS 8.58) **non è il centroide**: è il
+**punto funzionale/connessione** `P = cap + 5mm·asse`, quindi **asse-dominato** (0.1-0.2°
+× 5mm di leva). Conclusione: per scendere si migliora l'**asse**, non il centro.
+
+Il cap occlusale è la feature più **pulita** dello scanbody → la sua normale è un asse
+meglio condizionato del solo wall-axis. Tre funzioni nuove (ramo SR di `sostPlaceTemplate`):
+- `_sostCapPlaneOn` (~37956): legge il flag opt-in `localStorage 'syntesis_sost_cap_plane'='on'`.
+- `_sostCapPlaneFit` (~37966): crop sfera 6mm; seleziona il cap (`|n·asse|≥0.65`, `|assiale|≤0.18mm`,
+  `radiale≤R+0.07`); fitta un **piano robusto IRLS origine-only** (orientamento da PCA
+  AREA-pesata via `misICP_jacobi3`, origine aggiornata con peso Tukey c=4.685,
+  σ=max(1.4826·MAD, 0.002), max 10 iter) → normale del cap = nuovo asse. Ritorna anche
+  `planeRMS`, `coverageDeg`, `areaFrac`, `lamRatio` per i gate.
+- `_sostCapAnchoredPose` (~38021): asse-cap + **riancoraggio assiale** al piano-cap +
+  **ri-Kasa** (`sostRobustCenter`) nel nuovo piano ⊥, dietro **gate intrinseci severi**
+  (n≥150, areaFrac≥0.70, coverageDeg≥300, planeRMS≤35µm, lamRatio≥0.55, dAng≤0.35°,
+  nWall≥600, wall-coverage≥180°, trust-region centro≤35µm) → altrimenti **ROLLBACK a 8.69.5**.
+  Nessuna verità exocad live: i gate sono tutti intrinseci.
+
+`PER-MARKER, NO cross-marker` (la rigidità tra marker nasconderebbe deviazioni implantari
+vere — direttiva utente). `DEFAULT OFF`: con flag spento il comportamento è 8.69.5 al bit
+(integrazione additiva nel ramo SR a ~38112, `try/catch` fail-soft). Il candidato è
+applicato solo se `_ok` (posa 8.69.5 valida) **e** flag on **e** tutti i gate passano.
+
+Risultato offline (id2161): gate funzionale `8.58 → 3.07µm`; l'asse-cap **raffina** la
+parete di 0.05-0.20° (Δ `[0.186,0.176,0.061,0.047,0.057,0.204]°`), non è un asse nuovo.
+**Port JS validato 1:1** vs prototipo Python (stesso Δ per-marker, n 537-605, planeRMS
+18-22µm, coverage ~356°). Reason CSV PosaDiag: `' +capPlane(dXX)'` se applicato /
+`' (capPlane rollback)'` se respinto. `node --check` OK.
+
+Implementazione:
+- v3b: 3 funzioni a ~37956-38033 + innesto SR a ~38110-38118 (+88 righe nette).
+- Bump PATCH (additivo, default OFF). `<title>`/`ANALIZZA_BUILD` 8.69.6, `registry.py`.
+- **Validare LIVE col flag ON**: `localStorage.setItem('syntesis_sost_cap_plane','on')` →
+  ri-sostituire id2161 → Misurare deve scendere (gate funzionale ~8.6 → ~3µm), reason
+  CSV `' +capPlane'`. Con flag OFF nessun cambiamento (regressione zero).
+- **Fase 2 (rinviata)**: riscrittura semantica di Raffina = registrazione 6-DOF.
+
+---
+
 ## 2026-06-25 — 8.69.5: FIX Sostituire — raffinamento asse robusto al tessuto (geomAxisSR skip sul grezzo)
 
 **Diagnosi gate-validata sul caso reale id2161** (scansione grezza `barra 1 prima scann` + CSV PosaDiag + xlsx vs exocad). Sul **grezzo** il raffinamento dell'asse del cilindro (`_sostGeomWallAxis` ~v3b:37896) **saltava su tutti e 6 i marker** (CSV: `(geomAxisSR skip)`), mentre sul sintetico pulito si applicava (`+geomAxisSR`). Conseguenza: asse medio **0.11°** sul grezzo (vs 0.02° sul pulito), RMSD **26µm** (vs 13µm).
