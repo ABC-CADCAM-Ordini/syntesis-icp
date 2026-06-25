@@ -4,6 +4,20 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-25 — 8.69.5: FIX Sostituire — raffinamento asse robusto al tessuto (geomAxisSR skip sul grezzo)
+
+**Diagnosi gate-validata sul caso reale id2161** (scansione grezza `barra 1 prima scann` + CSV PosaDiag + xlsx vs exocad). Sul **grezzo** il raffinamento dell'asse del cilindro (`_sostGeomWallAxis` ~v3b:37896) **saltava su tutti e 6 i marker** (CSV: `(geomAxisSR skip)`), mentre sul sintetico pulito si applicava (`+geomAxisSR`). Conseguenza: asse medio **0.11°** sul grezzo (vs 0.02° sul pulito), RMSD **26µm** (vs 13µm).
+
+**Root (dal codice + riproduzione APP-esatta offline):** la funzione stima la "direzione del disco" col **MAX-autovettore delle normali in una SFERA R+0.8mm** attorno al centro. Sul grezzo la sfera raccoglie la **GENGIVA** attorno alla base → le sue normali **dominano** il max-autovettore, che esce a **~89-90° dall'asse vero** → la selezione parete `|n·rough|<0.35` prende i triangoli sbagliati → l'asse risultante è >5° dal seed → scatta la guardia 5° → **return null (skip)**. Riprodotto offline (APP-esatto): tutti e 6 a ~90° → skip (= CSV, gate OK).
+
+**Fix:** se `refAxis` (= asse seed, già lungo l'asse del cilindro = direzione disco) è fornito, usarlo come direzione invece del max-autovettore inquinato; **+ filtro RADIALE** (distanza perp all'asse nell'anello [R−0.8, R+0.8]) per escludere gengiva/cap dalla sfera. Riproduzione offline post-fix: tutti e 6 → applica, asse **0.09-0.18°** (niente skip). Su dato **pulito** rough≈refAxis e niente tessuto → **NO-OP** (nessuna regressione sul sintetico). Usato sia da SR (~38011) sia da OS (~37985) robust.
+
+**Scope onesto:** corregge la parte d'**ASSE** del residuo (contributo leva). Il **CENTRO** resta il problema dominante — il marker peggiore (#4, 46µm) ha asse quasi perfetto (0.044°) = puro centro → affrontato separatamente (cap+parete, passo 2). L'accuratezza vera dell'asse fixato va confermata **live**.
+
+Implementazione: `_sostGeomWallAxis` (~37896): rough = refAxis se presente (else max-autovettore); aggiunto centroide relativo a `tris[]` + filtro radiale `[R−0.8,R+0.8]` nel loop parete. `node --check` OK. Bump PATCH 8.69.4→8.69.5. Deploy ENTRAMBI. Validare live: ri-sostituire id2161 → CSV `+geomAxisSR`, asse Misurare giù da 0.11°.
+
+---
+
 ## 2026-06-24 — 8.69.4: FIX Misurare — ROOT CAUSE connessione (rilevamento cap non robusto sugli scan reali)
 
 **Il bug dietro i 4 fallimenti sull'orientamento della connessione.** Non era il segno del flip a valle (sia 8.69.0 `+asseCapward` che 8.69.1 `−asseCapward` venivano respinti "al contrario"): era **`misICP_orientCapwardSolid` (~6755)** che **non determinava il verso del cap** sugli scan reali, ritornando l'asse col **verso casuale del PCA**.
