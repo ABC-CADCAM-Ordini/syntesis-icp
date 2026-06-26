@@ -4,6 +4,17 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-26 — 8.70.2: FIX UX Misurare/click-to-seed — nascondi la card che copre la mesh
+
+Segnalato dall'utente: entrando in modalità click, la card istruzioni `#misurareStage` ("Carica due STL...")
+resta sovrapposta al viewport e **copre visivamente la mesh** da cliccare (ha già `pointer-events:none`, quindi i
+click passano, ma non vedi dove mirare). FIX: `misICP_seedEnter` aggiunge `.hidden` (display:none) a
+`#misurareStage` entrando in modalità click; `misICP_seedExit(keepState, keepStageHidden)` ripristina la card su
+Annulla se non c'è un risultato; `misICP_seedAlign` la tiene nascosta (è `misICP_run` a mostrare il risultato).
+Solo UI, logica di allineamento invariata. `node --check` OK. Include l'8.70.1 per i servizi non aggiornati.
+
+---
+
 ## 2026-06-26 — 8.70.1: FIX Misurare/click-to-seed — redesign da crop-and-clean a innesto diretto
 
 L'8.70.0 (crop-and-clean) **falliva live** (utente: *"la mesh collassa"*): cliccando 6 scanbody
