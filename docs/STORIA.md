@@ -4,6 +4,39 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-26 — 8.70.1: FIX Misurare/click-to-seed — redesign da crop-and-clean a innesto diretto
+
+L'8.70.0 (crop-and-clean) **falliva live** (utente: *"la mesh collassa"*): cliccando 6 scanbody
+ne sopravvivevano **3**. Due bug:
+1. **Perdita di punti**: il crop + il ri-rilevamento automatico sulla mesh ritagliata perdeva/fondeva
+   metà dei click → 6 → 3.
+2. **Assi spazzatura**: l'asse veniva ricalcolato con la **PCA sulla regione ritagliata**, che attorno
+   alla base di un OS piccolo include gengiva → asse a caso (angolo medio **34.5°**).
+3. Con soli 3 punti matchati l'allineamento è **degenere**: RMSD ICP "0.0µm" è un **falso perfetto**
+   (il Kabsch sovrappone sempre 3 punti a 3, anche con corrispondenza sbagliata) → uno scanbody volava
+   via di **22mm**.
+
+**Fix**: `findScanbodyCenter` di ogni click **già dà centro+asse puliti** (fitta il cap). Ora li uso
+**direttamente** come centroidi+assi del file target, bypassando crop e ri-rilevamento. Ogni click =
+**1 punto garantito** (niente perdita). L'asse cliccato è trasformato dall'ICP (R) invece della PCA su
+crop → **niente contaminazione gengiva**. `misICP_clickSeeds={file,centers,axes}` consumato 1-volta da
+`misICP_run`; innesto a ~6970 (`scanCentsB`=seeds), assi a ~7056 (`_seedAxB` trasformato), `bgTrisB`=
+intera scansione a ~7138, guardia throw `partB.scan` a ~6955. `seedAlign` richiede ora **≥4 click**
+(con 3 il risultato è degenere); `seedPick` dà **feedback** se un click non aggancia. Rimossa
+`misICP_cropScanbody` (dead).
+
+**Auto-path invariato al bit** (`_seeds=null` → tutte le guardie tornano all'originale). `node --check`
+OK; nessun riferimento stale. **NB**: per un confronto completo A e B devono avere lo **stesso numero**
+di scanbody (se A=4 e clicchi 6 su B, solo 4 si matchano).
+
+Implementazione:
+- v3b: redesign innesto in `misICP_run` (~6970/7056/7138) + `seedAlign`/`seedPick` + rimozione crop.
+- Bump PATCH. `<title>`/`ANALIZZA_BUILD`/`registry` 8.70.1. MAPPA aggiornata.
+- **Validare LIVE**: scansione con tessuti → clicca tutti i scanbody (≥4) → Allinea → allineamento
+  sano (no collasso, asse plausibile).
+
+---
+
 ## 2026-06-25 — 8.70.0: FEAT Misurare — click-to-seed scanbody per scansioni con tessuti
 
 **Bug segnalato dall'utente**: caricando una scansione clinica con gengiva, Misurare collassa
