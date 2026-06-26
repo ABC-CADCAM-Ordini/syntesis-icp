@@ -4,6 +4,24 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-26 — 8.71.1: FIX Misurare/clustering — cap della soglia (risolve il collasso click-seed)
+
+**Diagnosi dal session log 8.71.0** (la feature appena messa, usata subito): il click-seed funzionava
+**perfettamente** (6 Shift+clic registrati, centri corretti, `findScanbodyCenter` 6/6) **ma** `RUN start`
+mostrava `nA=3, nB=6`: File A (riferimento, auto) aveva `autoScanA=6` (6 scanbody rilevati) che dopo il
+**clustering** diventavano **3** → 3-vs-6 → asse 80°, deviazioni mm. **Root** (riprodotto offline su
+scanbody_OS): `misICP_autoThresh` (~6347) calcola la soglia `min(bestT, spread*0.25)` poi `max(.., nn[0]*1.1)`;
+per 6 OS sull'arcata `spread~52mm` → `spread*0.25~13mm`, `nn[0]*1.1~9mm`; gli OS adiacenti distano 8-11mm →
+sotto soglia → fusi a coppie ({1,2},{3,4},{5,6}) = 3 cluster. La soglia (pensata per fondere cilindro+flangia
+di UNO scanbody) fonde scanbody **distinti** quando sono mono-componente (OS = solo cap). **Fix**: cap fisico
+`MAX_CLUSTER_MM=5.5` (componenti di uno scanbody ≤5mm; impianti distinti ≥6mm) → `result=min(bestT, spread*0.25,
+5.5)`, `return min(max(result,nn[0]*1.1), 5.5)`. Riproduzione: soglia 12.97→5.50mm, cluster **3→6**.
+
+Bug **generale** (colpiva anche l'auto-allineamento di file OS puliti), non solo il click-seed. Il picking
+click-seed era già ok da 8.70.4 — questo era il pezzo mancante. `node --check` OK.
+
+---
+
 ## 2026-06-26 — 8.71.0: FEAT session logger (debug) — log scaricabile via pallino+password
 
 Richiesta utente: smettere di tirare a indovinare sul click-seed e **registrare tutto** (orari, file, click,
