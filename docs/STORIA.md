@@ -4,6 +4,22 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-26 — 8.71.2: FIX Misurare/connessione — orientamento OPPOSTO per OS/1T3 vs SR
+
+Segnalato dall'utente dopo che l'8.71.1 ha sistemato l'allineamento (6 cilindri, 0µm, score 100 sul sintetico):
+*"tutto perfetto, solo le meccaniche invertite — sono OS non SR e la meccanica è opposta al SR"*. **Root**: la
+geometria connessione (`misICP_renderConnections` ~7482) usa l'STL `IPD.AB-SR-01-ZI` e mappa `+Z(CAD)` su
+`-connAxA`, **tarato su SR** (CAD SR flip X 180°/Z invertita, CLAUDE.md §8). Gli OS/1T3 (CAD **non** flippato)
+hanno la meccanica **opposta** → con `-connAxA` la connessione appariva girata al contrario. **Fix**:
+orientamento type-aware `_connSign = (p.sbType==='SR') ? -1 : 1`; SR invariato, OS/1T3 → `+connAxA`. Solo render
+3D (la tabella Diagnostica/PDF usa il cap-point `connA+capZ*connAxA`, sempre verso il cap, non toccata). La
+misura/datum/deviazioni **non** dipendono da questa mesh. `node --check` OK.
+
+NB: la *shape* resta l'abutment SR (per OS l'abutment IPD è diverso) → eventuale follow-up se serve la forma
+OS-specifica.
+
+---
+
 ## 2026-06-26 — 8.71.1: FIX Misurare/clustering — cap della soglia (risolve il collasso click-seed)
 
 **Diagnosi dal session log 8.71.0** (la feature appena messa, usata subito): il click-seed funzionava
