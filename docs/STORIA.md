@@ -4,6 +4,17 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-26 — 8.70.4: FIX Misurare/click-to-seed — il modificatore è SHIFT, non Alt
+
+Utente: *"schiaccio Alt e clicco ma non prende il clic"*. In 8.70.3 avevo gated il picking su
+`if(!ev.altKey)return`, ma la convenzione di **posa** dell'app (8.58.0, handler ~2660) è **Shift+clic** (la
+"freccia" ⇧ che l'utente chiamava "alt/freccia"): l'utente premeva Shift, il codice aspettava Alt → handler
+usciva subito → nessun seed. (Il 3934 con `altKey` è un picker diverso, MUA in Analizza.) Fix:
+`if(!ev.shiftKey && !ev.altKey) return` (accetta Shift o Alt, robusto all'equivoco); istruzione pannello →
+"Shift+clic". Logica seed invariata. `node --check` OK.
+
+---
+
 ## 2026-06-26 — 8.70.3: FIX Misurare/click-to-seed — crash 'forEach su undefined' + Alt+clic
 
 Segnalato dall'utente (6 scanbody, 6 click): l'allineamento col seed lanciava `Cannot read properties of
