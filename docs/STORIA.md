@@ -4,6 +4,24 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-26 — 8.71.0: FEAT session logger (debug) — log scaricabile via pallino+password
+
+Richiesta utente: smettere di tirare a indovinare sul click-seed e **registrare tutto** (orari, file, click,
+processi), scaricabile. Implementato nel frontend (v3b, copre Analizza/Misurare/Sostituire/Replace):
+`synLog(cat,msg,data)` (~2463) accumula eventi (timestamp ISO) in `SYN_LOG` (cap 4000) + persiste in
+`localStorage` (throttle 700ms) → sopravvive a crash/ricarica. **Pallino grigio fisso in basso a sinistra**
+(`#synLogDot`) → prompt password → se corretta scarica `SynthesisSessionLog_<ts>.txt`. La password **non è in
+chiaro** nel sorgente: confronto via **hash SHA-256** (gate morbido per un log di debug, non sicurezza forte —
+la frontend è servita in chiaro). Strumentati 19 punti: init sessione, `selectWorkflow`, caricamento file
+(nome+MB), `seedEnter`, **ogni `seedPick`** (shift/alt, raycast hit/no-hit, `findScanbodyCenter` ok/null/eccezione,
+centro+asse), `seedAlign`, `misICP_run` start/risultato/errore, `window.onerror`/`unhandledrejection`.
+
+**Scopo immediato**: il click-seed sui tessuti collassa ancora (3 cilindri/80°/4771µm); l'utente riprova,
+scarica il log e lo manda → si vede esattamente quanti Shift+clic registrano, i centri trovati, gli input
+dell'allineamento. Backend logger = follow-up. `node --check` OK; 19 `synLog`.
+
+---
+
 ## 2026-06-26 — 8.70.4: FIX Misurare/click-to-seed — il modificatore è SHIFT, non Alt
 
 Utente: *"schiaccio Alt e clicco ma non prende il clic"*. In 8.70.3 avevo gated il picking su
