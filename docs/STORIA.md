@@ -4,6 +4,20 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-06-26 — 8.70.3: FIX Misurare/click-to-seed — crash 'forEach su undefined' + Alt+clic
+
+Segnalato dall'utente (6 scanbody, 6 click): l'allineamento col seed lanciava `Cannot read properties of
+undefined (reading 'forEach')`. **Root**: il blocco connessione clinica (~7080) chiama
+`misICP_orientCapward(trisOfBt,...)`, ma nel percorso click-seed `trisOfBt` è **undefined** (il ramo che lo
+definisce è quello NON-seed; nel seed uso l'asse cliccato e `p.trisBt=null`) → dentro `orientCapward` fa
+`tris.forEach` su undefined → crash. **Fix**: se `trisOfBt` manca, `_axBc` = asse cliccato (`p.axBt`, già
+capward da `findScanbodyCenter`, poi flippato per concordare con A); il datum/connessione si calcola comunque
+(centro+asse cliccati, `_L` da `MIS_ORIGIN_OFFSET` per-tipo). 2ª richiesta utente: il picking seed ora richiede
+**Alt+clic** (come Sostituire/Analizza, `if(!ev.altKey)return`) così il trascinamento ruota la camera senza
+piazzare seed; istruzione pannello aggiornata. `node --check` OK.
+
+---
+
 ## 2026-06-26 — 8.70.2: FIX UX Misurare/click-to-seed — nascondi la card che copre la mesh
 
 Segnalato dall'utente: entrando in modalità click, la card istruzioni `#misurareStage` ("Carica due STL...")
