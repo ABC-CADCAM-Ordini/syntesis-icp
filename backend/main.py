@@ -46,7 +46,6 @@ from database import (
 import gdrive  # v7.3.9.048: modulo OAuth + Drive API
 import email_service  # v7.3.9.065 - email transazionali Resend
 from security_config import validate_security_config
-from rate_limit import limiter, ANALYZE_PUBLIC_LIMIT
 
 # Fail-fast all'import: rifiuta default pericolosi in produzione.
 # Deve stare PRIMA della creazione dell'app FastAPI.
@@ -101,14 +100,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Registra SlowAPI per rate limiting per IP (prima dei middleware CORS).
-# I 429 Too Many Requests vengono gestiti dal suo exception handler.
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
 
 # CORS: permetti solo il tuo dominio in produzione
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
@@ -124,7 +115,7 @@ app.add_middleware(
 )
 
 # v7.3.9.093 - Compressione gzip delle response.
-# Riduce ~75% il payload di /api/analyze-public (da ~6.8 MB a ~1.5 MB tipici).
+# Riduce ~75% i payload delle analisi ICP lato server (da ~6.8 MB a ~1.5 MB tipici).
 # Trasparente al client: i browser decomprimono automaticamente.
 # minimum_size=1024 evita compressione su payload piccoli (overhead).
 app.add_middleware(GZipMiddleware, minimum_size=1024)
@@ -338,89 +329,10 @@ async def leaderboard(
 
 
 
-# ── Endpoint analisi pubblica (no auth) ──────────────────────────────────────
-@app.post("/api/analyze-public")
-@limiter.limit(ANALYZE_PUBLIC_LIMIT)
-async def analyze_public(
-    request: Request,
-    file_a: UploadFile = File(...),
-    file_b: UploadFile = File(...),
-    landmarks: Optional[str] = Form(None),
-    lang: Optional[str] = Form(None)
-):
-    """Analisi STL senza autenticazione. La logica ICP gira sul server.
-    landmarks: JSON opzionale {"a":[{x,y,z}x3], "b":[{x,y,z}x3]} per pre-allineamento manuale."""
-    for f in [file_a, file_b]:
-        if not f.filename.lower().endswith(".stl"):
-            raise HTTPException(400, detail=f"'{f.filename}' non è un STL valido.")
-        if f.size and f.size > 50 * 1024 * 1024:
-            raise HTTPException(413, detail="File troppo grande (max 50 MB).")
-
-    data_a = await file_a.read()
-    data_b = await file_b.read()
-
-    if len(data_a) < 84 or len(data_b) < 84:
-        raise HTTPException(400, detail="File STL non valido o corrotto.")
-
-    # Parsing landmarks
-    lm_parsed = None
-    if landmarks:
-        try:
-            import json as _json
-            lm_parsed = _json.loads(landmarks)
-        except Exception:
-            lm_parsed = None
-
-    try:
-        result = await asyncio.wait_for(
-            asyncio.get_event_loop().run_in_executor(
-                None, analyze_stl_pair, data_a, data_b,
-                file_a.filename, file_b.filename, lm_parsed
-            ),
-            timeout=ICP_TIMEOUT_SECONDS
-        )
-    except asyncio.TimeoutError:
-        logger.warning(
-            f"Timeout ICP dopo {ICP_TIMEOUT_SECONDS}s su "
-            f"{file_a.filename} + {file_b.filename}"
-        )
-        raise HTTPException(
-            504,
-            detail=f"Analisi troppo lunga (>{ICP_TIMEOUT_SECONDS}s). "
-                   "File molto complessi o malformati."
-        )
-    except ValueError as e:
-        raise HTTPException(422, detail=str(e))
-    except Exception as e:
-        logger.error(f"Errore analisi ICP: {e}", exc_info=True)
-        raise HTTPException(500, detail="Errore interno durante l'analisi.")
-
-    return {
-        "pairs":            result["pairs"],
-        "cyl_axes":         result["cyl_axes"],
-        "icp_rmsd":         result["icp_rmsd"],
-        "icp_angle":        result["icp_angle"],
-        "score":            result["score"],
-        "score_label":      result["score_label"],
-        "detected_profile": result.get("detected_profile"),
-        "n_scan_a":         result.get("n_scan_a", 0),
-        "n_scan_b":         result.get("n_scan_b", 0),
-        "excluded_a":       result.get("excluded_a", 0),
-        "excluded_b":       result.get("excluded_b", 0),
-        "analysis_mode":    result.get("analysis_mode", "pairwise"),
-        "extra_instances_b": result.get("extra_instances_b", 0),
-        "off":              result.get("off", [0, 0, 0]),
-        "ct_a":             result.get("ct_a", []),
-        "ct_b_final":       result.get("ct_b_final", []),
-        "filename_a":       file_a.filename,
-        "filename_b":       file_b.filename,
-        # Dati mesh per anteprime e PDF
-        "tris_a":           result.get("tris_a", []),
-        "tris_b_all":       result.get("tris_b_all", []),
-        "bg_a":             result.get("bg_a", []),
-        "cyl_tris_a":       result.get("cyl_tris_a", []),
-        "cyl_tris_b":       result.get("cyl_tris_b", []),
-    }
+# ── /api/analyze-public RIMOSSO in 8.78.0 (audit: bypassava il gate 8.4.0;
+#    zero chiamanti nel frontend; l'analisi server autenticata resta su
+#    /api/place-mua e /api/misurare-*). Con lui e' uscito l'apparato SlowAPI
+#    (rate limit per-IP: serviva solo qui; il per-utente check_rate_limit resta).
 
 
 @app.get("/api/health")
@@ -781,14 +693,6 @@ async def place_mua_lab(req: PlaceMuaRequest, current_user: dict = Depends(requi
     }
 
 
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# /lab v8.0.0-fase3i: endpoint PUBBLICO senza auth per testing /lab.
-# Permette al modulo /lab di chiamare il weighted ICP server-side senza
-# richiedere il login dell'utente. Stessa logica di /api/place-mua-lab.
-# Coerente con /api/analyze-public per il modulo Misurare.
-# Rate limit: TBD (per ora open).
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1220,25 +1124,40 @@ async def me_gdrive_status(current_user: dict = Depends(require_authorized)):
     }
 
 
-@app.get("/auth/gdrive/connect")
-async def gdrive_connect_start(token: str):
-    """Inizia OAuth: ritorna URL Google. Il frontend chiama questo endpoint
-    passando il JWT come query param (perche' verra' aperto in window.location
-    o popup, non come fetch con header)."""
+# 8.78.0 — Audit C1: il JWT non viaggia piu' in query string (finiva in access
+# log, browser history e header Referer). Il frontend chiede un CODICE one-time
+# via POST autenticato, poi naviga con ?c=<code> (single-use, TTL 120s).
+# Store in-memory per-processo: init e redirect avvengono nella stessa sessione
+# browser sullo stesso servizio; su restart il codice si perde e l'utente
+# riprova dal pannello Cloud (fail-closed).
+import secrets as _secrets
+_GDRIVE_CONNECT_CODES: dict = {}   # code -> (user_id, expiry_epoch)
+_GDRIVE_CODE_TTL_S = 120
+
+
+@app.post("/auth/gdrive/connect-init")
+async def gdrive_connect_init(current_user: dict = Depends(require_authorized)):
+    """Emette il codice one-time per avviare l'OAuth Drive senza JWT in URL."""
     if not gdrive.is_configured():
         raise HTTPException(503, detail="OAuth non configurato sul server.")
-    # Verifico il JWT manualmente (l'endpoint accetta token come query param)
-    try:
-        import jwt as pyjwt
-        payload = pyjwt.decode(token, os.getenv("JWT_SECRET", ""), algorithms=["HS256"])
-        user_id = payload.get("user_id") or payload.get("sub")
-        if not user_id:
-            raise HTTPException(401, detail="Token JWT non valido.")
-    except Exception:
-        # Audit C7: niente interpolazione del messaggio dell'eccezione (puo'
-        # leakare info pyjwt-specifici sul motivo del fallimento).
-        raise HTTPException(401, detail="Token non valido.")
-    auth_url = gdrive.get_authorization_url(user_id)
+    now = time.time()
+    for k in [k for k, v in _GDRIVE_CONNECT_CODES.items() if v[1] < now]:
+        _GDRIVE_CONNECT_CODES.pop(k, None)
+    code = _secrets.token_urlsafe(32)
+    _GDRIVE_CONNECT_CODES[code] = (current_user["user_id"], now + _GDRIVE_CODE_TTL_S)
+    return {"code": code, "expires_in": _GDRIVE_CODE_TTL_S}
+
+
+@app.get("/auth/gdrive/connect")
+async def gdrive_connect_start(c: str = ""):
+    """Inizia OAuth: redirect all'URL Google. Consuma il codice one-time di
+    /auth/gdrive/connect-init (Audit C1: niente JWT in query string)."""
+    if not gdrive.is_configured():
+        raise HTTPException(503, detail="OAuth non configurato sul server.")
+    entry = _GDRIVE_CONNECT_CODES.pop(c, None) if c else None
+    if not entry or entry[1] < time.time():
+        raise HTTPException(401, detail="Codice di connessione mancante, scaduto o gia' usato. Riprova da Cloud > Connetti.")
+    auth_url = gdrive.get_authorization_url(entry[0])
     return RedirectResponse(url=auth_url, status_code=302)
 
 
@@ -1650,31 +1569,10 @@ class CreateFolderBody(BaseModel):
 
 
 
-@app.get("/api/me/gdrive/access-token")
-async def me_gdrive_access_token(
-    current_user: dict = Depends(require_authorized)
-):
-    """Ritorna un access_token Drive short-lived per uso lato browser.
-    Permette al frontend di scaricare file direttamente da Drive,
-    bypassando il nostro server. v7.3.9.079 - ottimizzazione bandwidth."""
-    creds_data = await get_gdrive_credentials(current_user["user_id"])
-    if not creds_data or not creds_data.get("refresh_token_encrypted"):
-        raise HTTPException(409, detail="Google Drive non connesso.")
-    try:
-        refresh_token = gdrive.decrypt_token(creds_data["refresh_token_encrypted"])
-    except Exception:
-        logger.exception("decrypt refresh_token fallito (access-token endpoint)")
-        raise HTTPException(500, detail="Token Drive corrotto. Disconnetti e riconnetti.")
-    try:
-        access_token, expires_in = gdrive.get_access_token(refresh_token)
-        return {
-            "access_token": access_token,
-            "expires_in": expires_in,
-            "token_type": "Bearer"
-        }
-    except Exception as e:
-        logger.error(f"[access-token] error: {e}")
-        raise HTTPException(500, detail=f"Errore generazione token: {str(e)[:200]}")
+# 8.78.0 — Audit C4: /api/me/gdrive/access-token RIMOSSO. Consegnava al browser
+# un access_token Google (esfiltrabile via XSS, scope Drive). Il download passa
+# dal proxy /api/me/gdrive/file/{id}/content (Bearer nostro, cap C3). Il costo
+# bandwidth (v7.3.9.079/080 lo evitava) e' accettato: sicurezza > banda.
 
 @app.post("/api/me/folders")
 async def me_create_folder(

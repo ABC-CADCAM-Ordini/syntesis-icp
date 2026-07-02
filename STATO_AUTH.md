@@ -152,3 +152,32 @@ MX della posta lo vietano). Azione manuale di Francesco sul pannello Register.it
 NON operativo: il backend risponde "Google login non configurato sul server."
 (`GOOGLE_CLIENT_ID` vuoto o flusso non cablato). I bottoni Google sono stati TOLTI dal
 pannello. Riattivare solo se/quando si configura il client OAuth. Bassa priorità.
+
+---
+
+## 8.78.0 (2026-07-02) — Pacchetto sicurezza pre-lancio: rollout gate COMPLETO + audit C1/C4
+
+1. **Gate client completo**: `syn-gate.js` ora incluso anche in `/vedere` e `/dashboard`
+   (prima solo `/analizzare`). Chiuso il sospeso "Gate accesso — completamento rollout"
+   del 2026-05-29. `/accedi` pubblica, `/gestione` protetta in pagina. La sicurezza vera
+   resta server-side (`auth.py:require_authorized`).
+2. **`/api/analyze-public` RIMOSSO** (bypassava il gate 8.4.0; zero chiamanti frontend).
+   Con lui: apparato SlowAPI (rate-limit per-IP, serviva solo lì) + `backend/rate_limit.py`.
+   Il rate-limit per-utente (`check_rate_limit`) resta. NB: dipendenza `slowapi` ancora in
+   requirements.txt (rimozione = build change, rinviata a un passo dedicato).
+3. **Audit C1 CHIUSO — JWT fuori dalla query string**: `/auth/gdrive/connect?token=<JWT>`
+   (finiva in access log/history/Referer) sostituito da codice one-time: il frontend fa
+   `POST /auth/gdrive/connect-init` (Bearer) → `{code}` (TTL 120s, single-use, store
+   in-memory per-processo) → naviga `/auth/gdrive/connect?c=<code>`. Su restart tra init
+   e redirect il codice si perde → 401 con messaggio, l'utente riprova (fail-closed).
+4. **Audit C4 CHIUSO — access-token Google mai al browser**: rimosso
+   `GET /api/me/gdrive/access-token` (v7.3.9.079); `fetchDriveFile` della dashboard passa
+   dal proxy `GET /api/me/gdrive/file/{id}/content` (Bearer nostro, cap anti-DoS
+   `MAX_DRIVE_PROXY_BYTES` 100MB — audit C3). Trade-off accettato: i bytes Drive tornano
+   a passare dal server (sicurezza > banda).
+5. Bonus: rimosso commento stantio "/lab endpoint PUBBLICO" in main.py (l'endpoint reale
+   `/api/place-mua-lab` è `require_authorized` da 8.4.0 — il commento fuorviava gli audit).
+
+**Da collaudare live dopo il deploy**: login → /vedere e /dashboard raggiungibili;
+anonimo → redirect /accedi con ritorno deep-link; pannello Cloud → "Connetti Drive"
+(flusso one-time) e un'anteprima file (proxy).

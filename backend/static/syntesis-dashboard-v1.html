@@ -7,6 +7,10 @@
      v7.3.9.091 - Backend utente con cambio password: mie analisi, profilo, classifica -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Syntesis-ICP - Area personale</title>
+<!-- Gate accesso (8.78.0, chiusura rollout sospeso 2026-05-29): pagina privata.
+     Anti-flash + verifica client; la sicurezza vera resta server-side (auth.py). -->
+<style>html{visibility:hidden}</style>
+<script src="/static/ds/syn-gate.js"></script>
 <style>
 /* v7.3.9.080 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 /* v7.3.9.080 - Cornice nera sobria, una sola, niente animazione */
@@ -2260,11 +2264,17 @@ function renderGdriveStatus(data){
 }
 
 function connectGdrive(){
-  // L'endpoint OAuth richiede il JWT come query param perche' fa redirect.
+  // 8.78.0 - Audit C1: niente JWT in query string. Si chiede un codice one-time
+  // (POST autenticato), poi si naviga con ?c=<code> (single-use, TTL 120s).
   var token = getToken();
   if(!token){ showToast('Devi essere autenticato.', true); return; }
-  // Apriamo nella stessa finestra: dopo OAuth Google torna con redirect su /dashboard
-  window.location.href = '/auth/gdrive/connect?token=' + encodeURIComponent(token);
+  fetch('/auth/gdrive/connect-init', { method: 'POST', headers: authHeaders() })
+    .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(d){
+      // Stessa finestra: dopo OAuth Google torna con redirect su /dashboard
+      window.location.href = '/auth/gdrive/connect?c=' + encodeURIComponent(d.code);
+    })
+    .catch(function(e){ showToast('Connessione Drive non riuscita: ' + e.message, true); });
 }
 
 async function disconnectGdrive(){
@@ -3772,41 +3782,15 @@ function fbPreviewExpand(){
 }
 
 
-// ── v7.3.9.080 - Drive direct access (no server proxy) ─────────────────
-// Token cache in memoria. L'access_token vive ~1h, ma rinnovo a 50min per sicurezza.
-var _driveTokenCache = { token: null, expires: 0 };
-
-async function getDriveToken(){
-  var now = Date.now();
-  if(_driveTokenCache.token && _driveTokenCache.expires > now + 60000){
-    return _driveTokenCache.token;
-  }
-  var r = await fetch('/api/me/gdrive/access-token', {
-    headers: { 'Authorization': 'Bearer ' + getToken() }
-  });
-  if(!r.ok) throw new Error('access-token HTTP ' + r.status);
-  var data = await r.json();
-  _driveTokenCache.token = data.access_token;
-  // Cache scadenza con 60s di margine
-  _driveTokenCache.expires = now + Math.max(60, (data.expires_in - 60)) * 1000;
-  return data.access_token;
-}
-
-// Fetch file direttamente da Drive bypassando il nostro server.
-// Risparmia bandwidth Railway perche\\' i bytes vanno
-// browser <-> Google senza passare da noi.
+// ── 8.78.0 - Audit C4: download Drive via PROXY server ─────────────────
+// L'access_token Google non arriva piu' al browser (esfiltrabile via XSS):
+// i bytes passano da /api/me/gdrive/file/{id}/content (Bearer nostro JWT,
+// cap anti-DoS MAX_DRIVE_PROXY_BYTES lato server — audit C3). Sostituisce
+// il percorso diretto browser<->googleapis di v7.3.9.080.
 async function fetchDriveFile(fileId){
-  var token = await getDriveToken();
-  var url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?alt=media&supportsAllDrives=true';
-  var r = await fetch(url, {
-    headers: { 'Authorization': 'Bearer ' + token }
+  var r = await fetch('/api/me/gdrive/file/' + encodeURIComponent(fileId) + '/content', {
+    headers: authHeaders()
   });
-  if(r.status === 401){
-    // Token scaduto in mezzo: invalido cache e riprovo una volta
-    _driveTokenCache = { token: null, expires: 0 };
-    token = await getDriveToken();
-    r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
-  }
   if(!r.ok) throw new Error('Drive HTTP ' + r.status);
   return await r.blob();
 }
