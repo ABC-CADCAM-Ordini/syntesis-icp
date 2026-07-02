@@ -4,6 +4,32 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-07-02 — 8.77.0: Pulizia dedicata (Fase D)
+
+Chiusura del capitolo "organismo unico" con la pulizia rinviata per regola (§3.4 CLAUDE.md: mai durante
+task funzionali). Rimossi **fisicamente**: il pannello **Scene Registry** nascosto dal Blocco 7a
+(`#synLayerPanel`: markup, CSS `.syn-layer-panel`/`.slp-*`, IIFE "Fase 3" ~16KB — le sue funzioni erano
+confluite nell'Albero Scena; il Synthesis Core `SynRegistry`/`SynIcons` resta, è usato dai bridge
+loadScan/placeMUA); i **CSS orfani del Comparator** (`.acc-*`, `.misurare-btn/-header/-count/-refresh/
+-selected`, `.slot*` ~4.2KB; `comp-radio`+`.sw` vivi nei radio scanbody); i **console.log di debug**
+(58 → 34: blocco `[fres-pick]` ×8, `[DIAG centro-vs-asse]`, `[ROBUST-DIAG]`, `[Synthesis Core]`, funzione
+console-only `syntesisDebugLabels`); l'**asset orfano** `conn/AB-AR-00.stl` (zero riferimenti; 404
+verificato live). `IPD.AB-SR-01-ZI.stl` conservato deliberatamente (riferimento CAD citato in History).
+Net −545 righe + 142KB.
+
+## 2026-07-02 — 8.76.0: Markup unico per i 3 alberi interni di v3b (Fase B, commit 3)
+
+Gli alberi di Analizza (riferimento), Sostituire e Replace-iT generano ora lo stesso markup: pillole
+`.tree-group-header` FILE / SCANSIONI + MARKER con `.group-count` anche in `sostRebuildTree`/
+`replaceRebuildTree` (in Replace la pillola MARKER è cliccabile col `.chevron` per il collapse, feature
+conservata); `.sost-caret` inline → `.chevron` (selettore esteso alle pillole); righe senza flex/gap
+inline; **slider unificati** `.tree-opacity-row`/`.tree-opacity-slider` nativi con `accent-color`
+(default `var(--blue)`; thumb custom webkit rimosso → anche lo slider scansione di Analizza è nativo)
+con override per-oggetto conservati (colore reale scansione, `tpl.color`, `var(--ghost)` Madre, colore
+figlio); % label `.tree-opacity-value`; token (`#0D1B2A`/`dashed #333` → `--dark`, `#0A84FF`/attivo →
+`--blue`, `#fff` → `--white`). 33 edit con assert 1:1. Fuori scope dichiarato: `mis-tree` di Misurare
+(pannello CATIA-style separato).
+
 ## 2026-07-02 — 8.75.0: Albero Scena unificato v3b ↔ Vedere (Fase B, commit 2)
 
 Feedback utente con due screenshot: *"fai attenzione all'albero, lo chiamiamo in due modi differenti e lo
