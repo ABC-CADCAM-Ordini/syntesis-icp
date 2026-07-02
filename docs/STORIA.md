@@ -4,6 +4,32 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-07-02 — 8.75.0: Albero Scena unificato v3b ↔ Vedere (Fase B, commit 2)
+
+Feedback utente con due screenshot: *"fai attenzione all'albero, lo chiamiamo in due modi differenti e lo
+gestiamo in due modi differenti"*. Unificati nome e grammatica: il pannello di Vedere passa da **"Layer"**
+a **"Albero Scena"** (titolo allineato allo stile v3b) e l'**occhio** per-riga diventa **checkbox** nativo
+(`.slp-vis`, `accent-color:var(--blue)`) come i tre alberi dell'analyzer; in v3b il pulsante toolbar passa
+da **"Livelli"** (terzo nome) a **"Albero Scena"** (scorciatoia L invariata). "Rimuovi layer" → "Rimuovi
+dalla scena". Vedere → v8.0.2-refactor.
+
+Implementazione:
+- Vedere: `.lp-title` testo+colore; template riga (`renderItem`): via `eyeIcon`/`eyeClass`, dentro `<input type="checkbox" data-action="toggle-visible">` sulla delega esistente (`closest('[data-action]')` → `toggleObjectVisibility` → re-render dal modello); CSS `.slp-eye` → `.slp-vis` (residui 0).
+- v3b: 2 varianti del pulsante (`#btnLivelli` + gemello sostituire-only), title "Albero Scena (L)".
+- Differenze funzionali dichiarate e NON toccate: azioni per-riga Centra/Isola/Rimuovi (solo Vedere), slider opacità per-riga (solo v3b).
+
+## 2026-07-02 — 8.74.0: Unificazione grafica v3b — token e CTA (Fase B, commit 1)
+
+Dall'audit 2026-07-02 ("i workflow non sono un solo organismo"): il chrome del monolite converge sul design
+system pastello 8.61.0. **Misurare** era rimasto all'era pre-pastello: `.mis-btn-run` passa dal gradiente
+blu `#0077CC/#0050A0` con testo bianco a `--fill-primary` + `--dark`; la modalità click-seed abbandona il
+viola Tailwind (`#8B5CF6/#7C3AED/#C4B5FD/#F5F3FF/#5B21B6`) per la famiglia **selezione**
+(`--fill-sel`/`--pearl`/`--blue`). Login in-app → stesso trattamento. Cutview `#1a1a22` → `var(--dark)`.
+Danger `#E24B4A/#A32D2D` → `--red`/`--fill-error`. Le 5 CTA di `#replaceFlow` adottano la specifica di
+Sostituire (`8px 10px / 12px / ls .03em`); `#sostBtnExport` passa dal nero pieno alla classe `.export-btn`
+(= Accoppia); nuova classe `.syn-select` su 6 select (via gli stili inline duplicati). Canvas/PDF, palette
+clinica e palette-dati non toccati. Patch script 27 edit con assert 1:1.
+
 ## 2026-07-02 — 8.73.0: Rimozione Comparator v7 (sorpassato dal Confronto ICP in-app)
 
 Dall'audit UI 2026-07-02, scelta utente: "se sorpassato ed abbandonato togliamolo". Il flusso di Accoppia
