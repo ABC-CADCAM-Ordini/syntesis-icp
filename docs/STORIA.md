@@ -4,6 +4,46 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-07-02 — 8.73.0: Rimozione Comparator v7 (sorpassato dal Confronto ICP in-app)
+
+Dall'audit UI 2026-07-02, scelta utente: "se sorpassato ed abbandonato togliamolo". Il flusso di Accoppia
+"Accoppiamenti recenti + Confronta nel Comparator" apriva un tool ESTERNO su github.io (`COMPARATOR_V7_URL`)
+scaricando 2 STL da ricaricare a mano — sorpassato dal Confronto ICP in-app di Misurare (`panelMisurareICP`,
+invariato). Rimozione con patch script ad assert per-anchor + 22 assert-residui a zero; `_escHtml` (condiviso)
+e `downloadBlob` conservati. Net −485 righe.
+
+Implementazione:
+- Markup: via `#panelMisurareList` + `#panelMisurareCompare` (lista, refresh, slot/upload src-tgt, radio `compMis`, `#btnOpenComparator`).
+- JS: via `misurareState`, render/selezione/upload, `openComparatorV7`, `COMPARATOR_V7_URL`, helper dedicati (`_pad2`/`_formatAccTs`/`_hoursLeft`/`_compLabelHtml`/`_findMisurareItem`).
+- Layer `SyntesisDB` (IndexedDB `syntesis_icp`, TTL 24h) rimosso per intero: esisteva solo per questo flusso; via anche il blocco di salvataggio in `exportComponents` e la frase "24 ore" nella export-note. I dati residui nei client scadono da soli.
+- `selectWorkflow`: via dichiarazioni e 5 coppie show/hide `panMisL`/`panMisC`.
+- CSS orfani `.acc-*`/`.slot*`/`.comp-radio` lasciati alla pulizia dedicata (Fase D).
+
+## 2026-07-02 — 8.72.0: Area Expert — gating .expert-only con sub-password
+
+Dall'audit UI 2026-07-02 (workflow "non un solo organismo" + stratificazione), scelta utente: "tutto sotto
+un'area Expert segreta con sub-password, compresi i readout RMSD". Il pallino log (`#synLogDot`, 8.71.0)
+accetta ora una seconda password (SHA-256 client `SYN_EXPERT_PW_HASH` ~r.2472) che attiva/disattiva l'area:
+`synExpertToggle`/`synExpertApply` → `body.expert-mode` + `window.SYN.expert` + `localStorage
+syntesis_expert_mode` (persistente; pallino blu quando attiva). CSS: `body:not(.expert-mode)
+.expert-only{display:none !important}` (convive coi display inline di `selectWorkflow`) +
+`body.expert-mode .expert-hide{...}` per l'alternativa semplice. Occultamento UI, NON sicurezza: il gating
+sensibile resta server-side (CLAUDE.md §5).
+
+Implementazione:
+- `.expert-only`: Raffina+ (`#replaceBtnRefineSrv`), ↺ Seed (`#replaceBtnResetSeed`), span RMSD albero Replace (×2), RMSD lista MUA + albero Analizza (con `.expert-hide` "Accoppiato"/"accoppiato"), cella `#misSumRmsd`, bottone CSV `sostDownloadDiagLog`, tab Impostazioni→Algoritmo (`#settingsTabAlgoBtn`).
+- Gate JS (`window.SYN.expert`): righello A/B `_replaceRecordAB` early-return (salta anche `_replaceEvalFit` O(n·m)); stringhe RMSD negli status (ICP Misurare → "Allineamento completato: N scanbody accoppiati", posa 3pt e conferma impianto Replace); RMSD nella label lista impianti.
+- Patch script con assert per-anchor (21 edit, tutti 1:1); node --check 8 blocchi JS.
+
+## 2026-07-02 — 8.71.3: FIX v3b UI — reticolo Sostituire + resize colonna dx
+
+Due difetti segnalati dall'utente in Sostituire. (1) La vista Reticolo/Both della barra `#vmBar` non
+raggiungeva le mesh di Sostituire (restava solid): nuova `sostApplyRenderMode()` applica la modalità a
+`sostMesh` + alle Mesh dei gruppi piazzati (le `THREE.Line` degli assi restano intatte), invocata da
+`applyRenderModeToScene` e in coda a `sostRebuildTree`. (2) Il renderer seguiva solo `window.resize`:
+collassando la colonna destra il canvas non riempiva lo spazio → `ResizeObserver` sul viewport ridimensiona
+camera+renderer a ogni cambio del box (vale per tutti i workflow, canvas condiviso).
+
 ## 2026-06-26 — 8.71.2: FIX Misurare/connessione — orientamento OPPOSTO per OS/1T3 vs SR
 
 Segnalato dall'utente dopo che l'8.71.1 ha sistemato l'allineamento (6 cilindri, 0µm, score 100 sul sintetico):
