@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.72.0 — **Data:** 2026-07-02
+> **Versione software mappata:** 8.73.0 — **Data:** 2026-07-02
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3).
@@ -93,7 +93,7 @@ Quinto workflow, **NUOVO e SEPARATO**: clona i mattoni di Sostituire — che res
 
 ### Pannelli a visibilità per-id (non per-classe)
 
-Oltre alle classi, `selectWorkflow` commuta `style.display` di numerosi pannelli **per id** (non per classe). Da tabellare integralmente in Fase 2 nella sezione "Stato globale e classi di visibilità". Variabili raccolte in testa alla funzione ([4995-5005](../backend/static/syntesis-analyzer-v3b.html#L4995)): `panelAngleList`, `panelAxisInfo`, `panelExport`, `panelMisurareList`, `panelMisurareCompare`, `panelMisurareICP`, `panelClinicalStatus`, `panelMuaList`, `panelScanLoad`, `layersPanel`, `misurareStage`. Più due gestiti fuori da quel blocco: `panelSostituire` (mostrato nel ramo sostituire [5130-5131], nascosto in uscita [5029-5030]) e **`panelScanbodyType`** (gestione centralizzata aggiunta in 8.4.5 [5014-5015]: visibile solo in analizza/accoppia).
+Oltre alle classi, `selectWorkflow` commuta `style.display` di numerosi pannelli **per id** (non per classe). Da tabellare integralmente in Fase 2 nella sezione "Stato globale e classi di visibilità". Variabili raccolte in testa alla funzione ([4995-5005](../backend/static/syntesis-analyzer-v3b.html#L4995)): `panelAngleList`, `panelAxisInfo`, `panelExport`, `panelMisurareICP`, `panelClinicalStatus`, `panelMuaList`, `panelScanLoad`, `layersPanel`, `misurareStage`. Più due gestiti fuori da quel blocco: `panelSostituire` (mostrato nel ramo sostituire [5130-5131], nascosto in uscita [5029-5030]) e **`panelScanbodyType`** (gestione centralizzata aggiunta in 8.4.5 [5014-5015]: visibile solo in analizza/accoppia). **8.73.0**: rimossi `panelMisurareList`/`panelMisurareCompare` (Comparator v7 eliminato).
 
 ---
 
@@ -177,8 +177,7 @@ Valori = `style.display` impostato in ciascun ramo (`''` = visibile, `none` = na
 | `panelAngleList` | `''` [4638] | none [4660] | none [4682] | none [4707] | data-pview anglelist, collapsible |
 | `panelAxisInfo` | `''` [4639] | none [4661] | none [4683] | none [4708] | data-pview axisinfo; contiene btn "Fresatura avanzata" [1730] |
 | `panelExport` | none [4640] | `''` [4662] | none [4684] | none [4709] | — |
-| `panelMisurareList` | none [4641] | `''` [4663] | none [4685] | none [4710] | — |
-| `panelMisurareCompare` | none [4642] | `''` [4664] | none [4686] | none [4711] | — |
+| ~~`panelMisurareList`~~ ~~`panelMisurareCompare`~~ | — | — | — | — | **RIMOSSI 8.73.0** (Comparator v7 eliminato: markup + JS + `SyntesisDB`) |
 | `panelMisurareICP` | none [4643] | none [4665] | `''` [4687] | none [4712] | — |
 | `panelClinicalStatus` | `''` [4644] | `''` [4666] | none [4689] | none [4713] | data-pview clinical; btn Report MUA [1687] |
 | `panelMuaList` | `''` [4645] | `''` [4667] | none [4690] | none [4714] | data-pview mualist; albero MUA dinamico |
@@ -234,10 +233,7 @@ Esporta/confronta accoppiamenti. Condivide la toolbar `.analisi-only` con analiz
 |---|---|---|---|---|---|
 | Export: Scanbody/Matematica/Analogo | `#expSB`/`#expMT`/`#expAN` | checkbox | (lette da `exportComponents`) | selezione componenti | [1769-1771] |
 | Esporta STL | `#btnExportComponents` | onclick | `exportComponents` | scarica STL componenti | [1774] |
-| Aggiorna lista | `#btnMisurareRefresh` | onclick | `refreshMisurareList` | ricarica accoppiamenti | [1782] |
-| Upload source/target | `#uploadMisurareSrc/Tgt` | onchange | `uploadMisurareFile(event,'src'/'tgt')` | carica STL confronto | [1810-1813] |
-| Radio confronto 1T3/MT/AN | `name="compMis"` | radio | (lette da comparator) | tipo confronto | [1818-1820] |
-| Apri Comparator v7 | `#btnOpenComparator` | onclick | `openComparatorV7` | apre comparator | [1822] | disabled di default |
+| ~~Lista accoppiamenti + Comparator v7~~ | `#panelMisurareList`/`#panelMisurareCompare` (lista+refresh, upload src/tgt, radio `compMis`, `#btnOpenComparator`) | — | — | **RIMOSSO in 8.73.0** (scelta utente, audit 2026-07-02): il Comparator v7 era un tool ESTERNO (github.io) con ricaricamento manuale degli STL, sorpassato dal Confronto ICP in-app (`panelMisurareICP`). Eliminati markup, JS (`misurareState`/render/selezione/upload/`openComparatorV7`/`COMPARATOR_V7_URL`) e layer `SyntesisDB` (IndexedDB TTL 24h, esisteva solo per questo flusso; via anche il salvataggio in `exportComponents` e la promessa '24 ore' nella export-note). `_escHtml` conservato (condiviso). CSS `.acc-*`/`.slot*`/`.comp-radio` orfani → pulizia Fase D | — |
 
 ### Sotto-sezione — workflow **misurare** (`analysisMode='misurare'`, ramo [4678])
 
