@@ -4,6 +4,25 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-07-02 — 8.78.0: Pacchetto sicurezza pre-lancio (gate completo + audit C1/C4)
+
+Chiusi in una release i quattro punti di sicurezza rimasti aperti. (1) **Rollout gate completo**:
+`syn-gate.js` incluso anche in `/vedere` e `/dashboard` (anti-flash + `/auth/me`, deep-link preservato) —
+chiuso il sospeso del 2026-05-29; il terzo punto di quel sospeso (deep-link in `/accedi`) era già risolto
+dall'8.5.0, voce stantia. (2) **`/api/analyze-public` rimosso**: analisi ICP server senza autenticazione,
+bypassava il modello di accesso 8.4.0; zero chiamanti frontend; via anche l'apparato SlowAPI (per-IP,
+serviva solo lì) e `backend/rate_limit.py` (`check_rate_limit` per-utente resta; `slowapi` ancora in
+requirements → passo dedicato). (3) **Audit C1**: `/auth/gdrive/connect` non accetta più `?token=<JWT>`
+(finiva in access log/history/Referer); nuovo `POST /auth/gdrive/connect-init` (Bearer) emette un codice
+one-time (TTL 120s, single-use, store in-memory per-processo, fail-closed su restart); la dashboard naviga
+con `?c=<code>`. (4) **Audit C4**: rimosso `GET /api/me/gdrive/access-token` (consegnava al browser un
+access_token Google esfiltrabile via XSS, scope Drive); `fetchDriveFile` passa dal proxy
+`/api/me/gdrive/file/{id}/content` (Bearer, cap anti-DoS C3 100MB, configurabile
+`MAX_DRIVE_PROXY_BYTES`); trade-off banda accettato, file Drive >100MB non più scaricabili da dashboard.
+Bonus: rimosso un commento stantio che dichiarava pubblico l'endpoint `/api/place-mua-lab` (protetto
+dall'8.4.0). v3b non toccato (`ANALIZZA_BUILD` resta 8.77.0). Collaudo utente pendente: login →
+Vedere/Dashboard, pannello Cloud → Connetti Drive, anteprima file.
+
 ## 2026-07-02 — 8.77.0: Pulizia dedicata (Fase D)
 
 Chiusura del capitolo "organismo unico" con la pulizia rinviata per regola (§3.4 CLAUDE.md: mai durante
