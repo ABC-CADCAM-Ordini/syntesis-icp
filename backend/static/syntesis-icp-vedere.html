@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Syntesis-ICP - Vedere v8.0.1-refactor (Synthesis Core)
+<!-- Syntesis-ICP - Vedere v8.0.2-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Vedere v8.0.1-refactor</title>
+<title>Syntesis-ICP - Vedere v8.0.2-refactor</title>
 <!-- Syntesis Design System (8.3.0+). Pilota: header + bottone primario.
      Inclusione PRIMA dello <style> embedded: la cascade fa vincere l'embedded
      sui suoi selettori, mentre le classi .syn-* portano regole nuove. -->
@@ -459,7 +459,7 @@ body{
 }
 .lp-title{
   font-family:var(--mono);font-size:11px;font-weight:800;
-  letter-spacing:.1em;text-transform:uppercase;color:var(--dark);
+  letter-spacing:.1em;text-transform:uppercase;color:var(--gray);
 }
 .lp-add-btn{
   width:24px;height:24px;border-radius:5px;
@@ -524,14 +524,10 @@ body{
   width:1px;background:var(--border);
 }
 
-.slp-eye{
-  width:18px;height:18px;display:flex;align-items:center;justify-content:center;
-  border:none;background:transparent;color:var(--gray);
-  border-radius:3px;cursor:pointer;flex-shrink:0;
-  transition:all .12s;
+.slp-vis{
+  width:13px;height:13px;accent-color:var(--blue);
+  cursor:pointer;flex-shrink:0;margin:0 2px 0 1px;
 }
-.slp-eye:hover{background:rgba(0,101,179,.1);color:var(--blue)}
-.slp-eye.hidden{color:#C0CCD8}
 .slp-color-dot{
   width:11px;height:11px;border-radius:50%;
   border:1.5px solid var(--white);
@@ -941,7 +937,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.1-refactor</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.2-refactor</span>
     </div>
   </div>
   <button class="btn-home" onclick="goHomeNewSession()" data-tooltip="Home (nuova sessione)">
@@ -1046,7 +1042,7 @@ input[type="file"]{display:none}
 
     <div class="layer-panel">
       <div class="lp-header">
-        <span class="lp-title">Layer</span>
+        <span class="lp-title">Albero Scena</span>
         <button class="lp-add-btn" id="btnAdd" data-tooltip="Aggiungi file">+</button>
       </div>
       <div class="lp-body" id="layerBody">
@@ -7367,11 +7363,9 @@ setStatus('Pronto');
     const hidden = !obj.visual.visible ? ' hidden' : '';
     const child = isChild ? ' child' : '';
     const meta = metaForObj(obj);
-    const eyeIcon = obj.visual.visible ? window.SynIcons.eye({size:13}) : window.SynIcons.eyeOff({size:13});
-    const eyeClass = obj.visual.visible ? '' : ' hidden';
     const color = colorForObj(obj);
     return `<div class="slp-item${sel}${hidden}${child}" data-id="${obj.id}">
-      <button class="slp-eye${eyeClass}" data-action="toggle-visible" data-tooltip="Mostra/nascondi">${eyeIcon}</button>
+      <input type="checkbox" class="slp-vis" data-action="toggle-visible" data-tooltip="Mostra/nascondi"${obj.visual.visible ? ' checked' : ''}>
       ${(obj.type === 'mesh' || obj.type === 'pointcloud')
         ? `<input type="color" class="tree-color" value="${color}" title="Colore" onclick="event.stopPropagation()" onchange="setSceneObjectColor('layer:${obj.id}', this.value)">`
         : `<span class="slp-color-dot" style="background:${color}"></span>`}
@@ -7798,7 +7792,7 @@ if (window.SynCutViewManager) {
         <button class="props-action-btn" data-action="center">${window.SynIcons.centerView({size:13})} Centra vista</button>
         <button class="props-action-btn" data-action="isolate">${window.SynIcons.isolate({size:13})} Isola</button>
         <button class="props-action-btn" data-action="restore-defaults">${window.SynIcons.chevronDown({size:13})} Ripristina default</button>
-        <button class="props-action-btn danger" data-action="delete">${window.SynIcons.trash({size:13})} Rimuovi layer</button>
+        <button class="props-action-btn danger" data-action="delete">${window.SynIcons.trash({size:13})} Rimuovi dalla scena</button>
       </div>
     `;
   }
