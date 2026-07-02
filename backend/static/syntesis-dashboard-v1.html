@@ -6,7 +6,8 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      v7.3.9.091 - Backend utente con cambio password: mie analisi, profilo, classifica -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Syntesis-ICP - Area personale</title>
+<title>Synthesis-ICP - Area personale</title>
+<link rel="stylesheet" href="/static/ds/tokens.css">
 <!-- Gate accesso (8.78.0, chiusura rollout sospeso 2026-05-29): pagina privata.
      Anti-flash + verifica client; la sicurezza vera resta server-side (auth.py). -->
 <style>html{visibility:hidden}</style>
@@ -75,16 +76,6 @@ body{scrollbar-width:thin;scrollbar-color:rgba(122,144,164,.35) transparent}
   --radius:14px;
   --font:'Helvetica Neue',Helvetica,Arial,sans-serif;
   --mono:'Helvetica Neue',Helvetica,Arial,sans-serif;
-  /* Palette Mario Bros (Blocco 5q): tonalita' calde e giocose per accenti UI.
-     Allineata a Vedere v8 e Synthesis Core. */
-  --mario-green:#5BB04C;
-  --mario-red:#D13A35;
-  --mario-orange:#E89042;
-  --mario-yellow:#F5C518;
-  --mario-cream:#F2DE7E;
-  --mario-purple:#A855F7;
-  --mario-cyan:#0891B2;
-  --mario-navy:#2C3275;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none!important}
@@ -1122,7 +1113,7 @@ body{
         <div style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="contactsCount">&mdash;</div>
       </div>
       <div style="background:var(--blue-light);border:1.5px solid #BAE0FF;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:12px;color:#065B8A;font-family:var(--mono);line-height:1.6">
-        <b>Rubrica per scambio file.</b> Aggiungi gli utenti Syntesis con cui collabori (cliniche, laboratori). Se l\'email non e\' ancora registrata su Syntesis, il contatto resta in attesa: appena la persona si registra con quella email, viene attivato automaticamente.
+        <b>Rubrica per scambio file.</b> Aggiungi gli utenti Synthesis con cui collabori (cliniche, laboratori). Se l\'email non e\' ancora registrata su Syntesis, il contatto resta in attesa: appena la persona si registra con quella email, viene attivato automaticamente.
       </div>
       <div id="contactsContainer" class="loading"><span class="spinner"></span>Caricamento...</div>
     </div>
@@ -2244,7 +2235,7 @@ function renderGdriveStatus(data){
     actionsEl.innerHTML =
       '<button class="btn-cta" onclick="connectGdrive()">Connetti Google Drive</button>' +
       '<div style="font-size:10px;color:var(--gray);margin-top:8px;font-family:var(--mono);line-height:1.5">' +
-      'Verrai rediretto a Google per autorizzare. Syntesis-ICP otterra\' accesso solo ai file che lui stesso crea (mai al resto del tuo Drive).' +
+      'Verrai rediretto a Google per autorizzare. Synthesis-ICP otterra\' accesso solo ai file che lui stesso crea (mai al resto del tuo Drive).' +
       '</div>';
   } else {
     var connectedAt = data.connected_at ? fmtDate(data.connected_at) : '—';

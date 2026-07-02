@@ -1,4 +1,4 @@
-/* Syntesis-ICP Design System — tokens.css
+/* Synthesis-ICP Design System — tokens.css
  *
  * Single source of truth per i token visuali condivisi tra i moduli.
  * Namespace --syn-* per non collidere con i token esistenti --blue/--gray/--radius
@@ -6,6 +6,9 @@
  * var(--blue) con var(--syn-blue), ecc.
  *
  * Pilota: introdotto in 8.3.0 con migrazione header + bottone primario di /vedere.
+ * 8.79.0 (Fase C): completato (ghost, palette clinica, palette Mario centralizzata)
+ * e linkato da TUTTE le pagine satellite (home/accedi/dashboard/gestione/vedere).
+ * v3b resta self-contained: il suo :root inline e' il canone; questo file lo specchia.
  */
 :root {
   /* === Colori === */
@@ -32,6 +35,26 @@
   --fill-warn:       #FFE08A;
   --fill-error:      #FF8D85;
   --fill-sel:        #7DBDF2;
+
+  /* 8.79.0 — token condivisi mancanti (fonte: :root canonico di v3b) */
+  --syn-ghost:       #8090A8;
+
+  /* Palette clinica d3 (CLAUDE.md §9) — IMMUTABILE senza autorizzazione */
+  --clin-good:       #639922;
+  --clin-warn:       #D97706;
+  --clin-risk:       #F97316;
+  --clin-bad:        #EF4444;
+
+  /* Palette Mario (accenti Vedere/Dashboard, Blocco 5i/5q) — centralizzata 8.79.0,
+     era duplicata identica nei :root dei due file */
+  --mario-green:     #5BB04C;
+  --mario-red:       #D13A35;
+  --mario-orange:    #E89042;
+  --mario-yellow:    #F5C518;
+  --mario-cream:     #F2DE7E;
+  --mario-purple:    #A855F7;
+  --mario-cyan:      #0891B2;
+  --mario-navy:      #2C3275;
 
   /* === Radius scale === */
   --syn-radius-sm:   6px;
