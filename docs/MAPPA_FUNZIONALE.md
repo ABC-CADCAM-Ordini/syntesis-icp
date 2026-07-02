@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.71.2 — **Data:** 2026-06-26
+> **Versione software mappata:** 8.71.3 — **Data:** 2026-07-02
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3).
@@ -270,6 +270,10 @@ Sostituzione scan body con ICP. Pannello `panelSostituire` [1965]:
 | Esporta STL | `#sostBtnExport` | onclick | `sostExportSTL` | `_sostExportPending` | apre **`#sostExportDialog`** (nome file precompilato) → Conferma scarica col nome scelto (sanificato, `.stl` auto); Annulla non scarica | [1996] | `display:none` default; dialog nome file (8.4.7) |
 
 > **Box B vs Box A**: Box B (`sostSourceTemplate`) = tipo di marker **già presente** nella scansione di partenza, per la registrazione (`SOSTITUIRE_TEMPLATE_INFO`, `BBOX_LOCAL`, `T_ROOT` — [34803]/[38085]/[38084]). NON è ridondante con Box A (`_ANALYZE_SBTYPE`, che guida `placeMUA` in Analizza). Vedi fix 8.4.5 e 8.4.6 sopra.
+
+> **Modalità render globale in `sostituire` (8.71.3, fix):** la barra `#vmBar` (solid/wireframe/both) ora raggiunge anche le mesh di Sostituire — prima la vista Reticolo/Both restava solid. `sostApplyRenderMode()` [v3b ~36669] applica la modalità a `sostMesh` + alle Mesh dentro ogni `p.groups[k]` (guardia `o.isMesh` → le `THREE.Line` dell'asse restano intatte); invocata da `applyRenderModeToScene` [~13141] e in coda a `sostRebuildTree` [~39904] (i marker piazzati dopo la scelta vista ereditano la modalità). Gemello di `replaceApplyRenderMode`.
+
+> **Resize renderer sul viewport (8.71.3, fix):** collassando la colonna destra (rail) il `.viewport` (`flex:1`) si allarga via CSS ma **senza** un `resize` della finestra → il canvas restava con la larghezza vecchia (banda vuota). Un `ResizeObserver` sul `#viewport` [v3b ~2709, dopo il listener `window.resize`] ridimensiona `renderer`+`camera.aspect` a ogni cambio del box (anche durante la transizione CSS `.25s` di `.panel`). Canvas unico condiviso → vale per tutti i workflow.
 
 ---
 
