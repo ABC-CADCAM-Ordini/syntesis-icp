@@ -4,6 +4,26 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-07-02 — 8.79.0: Fase C — coerenza cross-pagine (chiude il piano audit A→B→C→D)
+
+`ds/tokens.css` completato (`--syn-ghost`, palette clinica `--clin-*` — immutabile, ora dichiarata nella
+fonte comune —, palette **Mario** ×8 centralizzata: era duplicata *identica* nei `:root` di Vedere e
+Dashboard, rimossa dai locali con assert delta=8) e **linkato da tutte le pagine satellite** (home,
+accedi, dashboard, gestione; Vedere già linkava). **v3b resta self-contained** per scelta documentata:
+il suo `:root` inline è il canone, tokens.css lo specchia. I `:root` locali restanti sono alias/temi
+deliberati (home dark: blu soft per lo splash scuro; accedi/gestione: alias semantici con valori canonici).
+
+**Brand "Synthesis"** (con h — direzione documentata, correzione avviata in 8.10.1) sulle superfici
+visibili: `<title>` di tutte le pagine, wordmark topbar di gestione, testi UI di accedi e dashboard,
+topbar di Vedere, e le 22 intestazioni/footer dei **PDF clinici** di v3b. Non toccati (deliberato):
+cartella Drive `Syntesis-ICP` (nome letterale della cartella creata dal backend), nomi dei file
+scaricati (`SyntesisICP_*`), tag di log, identificatori interni, repo e domini. Vedere → v8.0.3-refactor.
+
+Nota deploy: verifica live eseguita con IP pinnato (`curl --resolve`) per un guasto DNS **transitorio
+della rete locale** (query UDP/53 perse ~10 min, SERVFAIL apparenti anche verso 1.1.1.1); via
+DNS-over-HTTPS Google/Cloudflare la zona register.it rispondeva NOERROR per tutta la durata —
+nessun impatto per gli utenti.
+
 ## 2026-07-02 — 8.78.0: Pacchetto sicurezza pre-lancio (gate completo + audit C1/C4)
 
 Chiusi in una release i quattro punti di sicurezza rimasti aperti. (1) **Rollout gate completo**:
