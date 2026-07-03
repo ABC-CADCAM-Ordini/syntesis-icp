@@ -4,6 +4,31 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-07-03 — 8.79.1: Pulizia residui sicurezza 8.78.0 (slowapi, get_access_token)
+
+Il "passo dedicato" annunciato in 8.78.0, eseguito a piano audit A→B→C→D chiuso. Due rimozioni:
+(1) `slowapi==0.1.9` da `backend/requirements.txt` — l'apparato SlowAPI (import, exception-handler,
+middleware, `rate_limit.py`) era uscito in 8.78.0 insieme a `/api/analyze-public`; la dipendenza
+restava solo nel build. Zero import residui (le occorrenze rimaste sono commenti storici).
+(2) `gdrive.get_access_token` (~r.194, 19 righe) — generava l'access_token Google da consegnare al
+browser, cioè il pattern C4 chiuso in 8.78.0 rimuovendo `GET /api/me/gdrive/access-token`; zero
+chiamanti (il proxy usa `get_drive_service`/`download_file_bytes`;
+`build_credentials_from_refresh_token` resta, condivisa da entrambe le vie).
+
+v3b NON toccato: `ANALIZZA_BUILD`/`<title>` restano 8.79.0 (ultimo bump = Fase C), `BACKEND_VERSION`
+è il discriminatore. La voce History 8.79.1 in registry citava per svista "restano 8.77.0",
+corretta nel commit DOC. Nessun elemento UI → MAPPA invariata nei contenuti (aggiornata la sola
+versione mappata). ast.parse OK su gdrive/registry/main.
+
+Chiuso in STATO_SISTEMA anche il sospeso stantio Media #4 "Merge Albero Scena + Scene Registry":
+superato dai fatti in 8.77.0 (Scene Registry rimosso fisicamente, funzioni già confluite
+nell'Albero Scena) — merge avvenuto per assorbimento.
+
+Deploy: LEGACY canary (anti-race commit OK, SUCCESS ~30s, verifica live 8.79.1/200/403) →
+BACKEND (SUCCESS a cache calda, anti-race OK) → verifica live su production +
+app.syntesis-icp.com + app.synthesis-icp.com: tutti backend_version 8.79.1, /analizzare 200,
+gating /auth/me 403.
+
 ## 2026-07-02 — 8.79.0: Fase C — coerenza cross-pagine (chiude il piano audit A→B→C→D)
 
 `ds/tokens.css` completato (`--syn-ghost`, palette clinica `--clin-*` — immutabile, ora dichiarata nella
