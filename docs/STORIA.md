@@ -4,6 +4,43 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-07-04 — 8.80.0: Fix correttezza report PDF Misurare (dall'audit multi-agente)
+
+Un audit multi-agente del report PDF di "Misurare" (6 pagine, verifica avversariale + lenti cliniche
+incrociate col framework Ruggiero et al., *J Dent* 2026;173:106791) ha mostrato che le descrizioni del
+report erano DERIVATE dal codice: alla 8.69.0 la misura per-marker era passata dal centroide al
+datum/piattaforma implantare (origine CAD = centroide − L·asse), ma i testi non erano stati aggiornati.
+Sei edit chirurgici, solo `syntesis-analyzer-v3b.html`, nessun restauro strutturale.
+
+**Sicurezza** — pagina Distanza Inter-Centroide: il sottotesto della colonna VALUTAZIONE era la stringa
+hardcoded `'B vicino ad A'` (subValues[3], ~r.9087), stampata per OGNI coppia, anche sotto il badge
+rosso "Verifica" (Δ>200µm) — cioè il report rassicurava testualmente proprio sui casi da rifiutare.
+Ora condizionale a `ic.lv`: Ottimo/Buono → "B coerente con A", Accettabile → "scostamento da verificare",
+Verifica → "oltre soglia: verificare".
+
+**Dati** — palette Tabella 1 del glossario (~r.8840) era `['#639922','#84B025','#D97706','#EF4444','#A855F7']`,
+difforme dal canonico `d3_hex` (`#84B025` inesistente, `#D97706` finiva su "Rischio" invece di `#F97316`):
+la legenda non coincideva coi colori che la mappa applica via window.SYN. Corretta al canonico. La Tabella 2
+(scala Δ inter-centroide) NON toccata: lì `#84B025` è legittimo. Etichette classi d3 allineate al
+runtime/canonico: "Rischio"→"Rischioso", "Fuori"→"Fuori posizione".
+
+**Descrizione** — didascalie metodologiche: `|D| 3D` non è più "distanza fra centroide A e B" ma
+"deviazione di posa al datum/piattaforma implantare" (leva-dipendente, amplifica il tilt d'asse);
+"Centroide" = baricentro di superficie area-pesato (punto su cui l'ICP allinea), non "centro di massa
+geometrico"; "Angolo asse" = cap-based PCA per 1T3/OS, raffinamento lateral-wall per gli SR alti (era
+"cap-based PCA" per tutti, falso per SR). Pagina cilindro: sottotitolo connessione obsoleto
+"— capZ sotto il cap —" → "— datum, L mm sotto il centroide —".
+
+`ANALIZZA_BUILD`/`<title>` 8.80.0. MAPPA non impattata (solo testo/dati del PDF generato, nessun elemento
+UI). Rinviati (decisione prodotto o restauro): riconciliazione soglia 100µm (prosa "inaffidabile" vs
+tabella Δ "Accettabile"), dedup del blocco CONNESSIONE (righe identiche post-override), definizione di
+"RMSD ICP" sulla cover, aggiunte cliniche (verdetto passive-fit d'arcata, P95/SD, convenzione assi),
+pagina "Quadro metrologico" riscritta sui fatti.
+
+Deploy: LEGACY (SUCCESS, verifica live utente `backend_version` 8.80.0 con `d3_hex` canonico e classi
+"Rischioso"/"Fuori posizione" nel JSON constants) → BACKEND principale (SUCCESS su commit c34ae53).
+node --check sui blocchi JS OK; ast.parse registry OK.
+
 ## 2026-07-03 — 8.79.1: Pulizia residui sicurezza 8.78.0 (slowapi, get_access_token)
 
 Il "passo dedicato" annunciato in 8.78.0, eseguito a piano audit A→B→C→D chiuso. Due rimozioni:
