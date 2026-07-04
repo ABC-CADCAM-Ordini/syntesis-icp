@@ -4,6 +4,37 @@ Cronologia delle feature e fix significativi. Stile: una entry per modifica, in 
 
 ---
 
+## 2026-07-04 — 8.80.2: Fix mesh grigia orfana in Misurare (seed cleanup)
+
+Segnalata dall'utente ("c'è un oggetto grigio che non compare nell'albero"). Identificata via
+console del browser: `scene.children[33]` = `Mesh` colore `#9aa7b0`, `userData` vuoto =
+`misICP_seedRawMesh`, la mesh grezza mostrata durante il **click-to-seed** (scansioni con gengiva,
+dove l'utente clicca manualmente gli scanbody). Restava orfana nella scena 3D — senza voce
+nell'albero perché mai registrata come layer — quando l'analisi renderizzava il risultato senza
+passare da `misICP_seedExit` (l'unico punto che la rimuoveva). Puro residuo visivo: l'ICP e i
+calcoli usano i triangoli grezzi `triA`/`triB` e i centri dai click, non questa mesh.
+
+Fix in `misICP_renderPerCylinder` (~r.7209, nel blocco di cleanup già esistente): rimozione +
+dispose di `misICP_seedRawMesh` e dei `misICP_seedMarkers` ad ogni render del risultato, così non
+può restare alcun orfano qualunque sia il percorso d'ingresso. node --check OK. Bump PATCH.
+
+## 2026-07-04 — 8.80.1: Fix font/encoding del report PDF (WinAnsi)
+
+Regressione di rendering **pre-esistente**, emersa collaudando il PDF 8.80.0 (screenshot utente:
+la riga "Angolo asse" delle Note metodologiche usciva dalla pagina). Causa: jsPDF con i font
+standard usa la codifica **WinAnsi** (CP1252); un carattere fuori WinAnsi forza l'intera stringa
+in codifica **2-byte-per-glifo**, che rompe sia il calcolo di larghezza (il testo non va a capo e
+**sfora la pagina**) sia il glifo (θ → "¸", μ → quadratino). Diagnosi analizzando i byte del PDF
+generato con pypdf: stringhe 2-byte con θ (U+03B8), μ greco (U+03BC), Δ (U+0394), − (U+2212).
+
+Fix su `syntesis-analyzer-v3b.html`: μ greco → **µ micro-sign** (U+00B5, WinAnsi) ovunque (70 µ,
+ogni "µm" ora 1-byte → spariscono gli sforamenti su glossario, pagine cilindro, inter-centroide e
+legende); didascalia "Angolo asse" senza θ → "scostamento angolare fra gli assi"; glossario
+Tabella 2: `Δ = B − A` → `(B - A)`, header `|Δ|` → `|B-A|`; caption inter-centroide `differenza Δ`
+→ `(B - A)`. Non toccati (renderizzano bene): la θ dei diagrammi canvas, Δ/− in UI HTML,
+box-drawing/frecce nei commenti. Verifica alla sorgente: 0 caratteri non-WinAnsi nel testo jsPDF;
+node --check OK. Il pipe `|` di `|D|` (che si legge "IDI") è WinAnsi e non rompe il layout: lasciato.
+
 ## 2026-07-04 — 8.80.0: Fix correttezza report PDF Misurare (dall'audit multi-agente)
 
 Un audit multi-agente del report PDF di "Misurare" (6 pagine, verifica avversariale + lenti cliniche
