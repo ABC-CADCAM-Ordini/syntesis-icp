@@ -1,5 +1,16 @@
 # Storia delle modifiche
 
+## 2026-07-05 — 8.86.0: MODULARIZZAZIONE Fase 5 (pannelli/chrome → ds/)
+
+Il pannello Impostazioni esce dal monolite: 36 funzioni (ambiente, render mode, palette, fresatore, controlli 3D, UI zoom, dialog+tab) in ds/syn-env.js con estrazione "functions-only" (pattern F4). Lo stato resta nel monolite alla posizione originale — il vincolo è reale, non estetico: il try di millerSettings scrive MAX_MILLING_ANGLE dichiarato prima nel MAIN, e spostare gli statement eseguibili in testa avrebbe invertito l'ordine perdendo l'override da localStorage. Divergenza deliberata dallo studio (prescriveva mecc. A): applicata la sua stessa regola di sicurezza — l'IIFE strict avrebbe richiesto 25 ri-esposizioni per zero beneficio (precedente: syn-panel 8.12.0). Il perimetro è salito da 33 a 36 in corso d'opera: applyRenderModeToMesh/Scene e applyEnvToScene appartengono fisicamente alla sezione ma sfuggivano al pattern del censimento. I blocchi IIFE vmBar e login (già "mecc. A" di fatto) sono rilocati IN-PLACE in ds/syn-vmbar.js e ds/syn-auth-ui.js, stessa posizione = stessa semantica DOM.
+
+Gate doppio: Node (scripts/gate/env/gate.mjs — 36 fn verbatim md5 ancorate a golden committato, 13 marker di residuo-stato, blocchi byte-identici) + harness browser richiesto dallo studio (build_harness.mjs genera run-old da git HEAD vs run-new dai moduli; scenarios.js, 18 scenari con snapshot localStorage+DOM — VERDE 18/18; al primo run ha còlto la contaminazione localStorage cross-iframe dell'harness stesso, corretto con clear anticipato). Verifica avversariale multi-agente 6 lenti (ordering/exposure/in-place/self-consistency/cross-page/checklist): 6/6 PASS, zero blocker; i fix minori suggeriti sono stati applicati (golden rinominato fuori dal pattern gitignore, censimento rigenerato post-bump, riferimenti MAPPA).
+
+Implementazione:
+- estrazione via scripts/extract_env_f5.mjs (brace-matcher condiviso col gate; 8 tombstone §PURELIB-ENV; banner §AUTH-LOGIN resta come commento HTML, anchors 36/36)
+- monolite 19.050 → 18.258 righe; batteria completa verde (purelib 78/78 invariato, inline, node --check 3/3)
+- deploy sequenziale LEGACY→BACKEND (anti-race ok); live: 8.86.0 sui 4 domini, pagina servita BYTE-IDENTICA al monolite locale (md5) su entrambi i servizi, 3 moduli md5-identici, gating 403
+
 ## 2026-07-05 — 8.85.0: MODULARIZZAZIONE Fase 4 (libreria pura → ds/)
 
 Prima estrazione di CODICE del piano ratificato (dopo gli asset di F1 e il CSS di F3): 27 funzioni a zero stato escono verbatim dal monolite in ds/syn-math.js (14 — parser STL, Kabsch+SVD, ICP, helper numerici Method C), ds/syn-geom.js (8 — estrattori facce/sezioni/proiezioni) e ds/syn-color.js (5 — classificazioni colore pure + escape HTML), caricati come script classici in testa (THREE/SynRender letti solo a call-time, pattern syn-render). Nel sorgente restano 12 tombstone grep-able `// §PURELIB:`. Il perimetro è sceso da 30 a 27 in corso d'opera: buildUndercutColors legge il globale muaObjects (il censimento non lo tracciava) ed è rimasta nel monolite con le altre 2 stateful note — il criterio della fase è "zero stato", non l'appartenenza al dominio del censimento.
