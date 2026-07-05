@@ -502,11 +502,11 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 <!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
 
-### Fotografia (8.84.1 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+### Fotografia (8.84.2 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
 
 | Metrica | Valore |
 |---|---|
-| Righe / peso | **20235** / **1.07 MB** |
+| Righe / peso | **19308** / **1.02 MB** |
 | JS applicativo REALE | **17860** righe in 8 blocchi `<script>` (grezzo 17860, meno il blob B64) |
 | Asset B64 embedded | **0.0 MB** in 0 righe (**0%** del file) |
 | Funzioni top-level | 491 |
@@ -528,17 +528,17 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 | `tree` | 13 | 0 | 7 | 8 | 3 |
 | `diag` | 12 | 0 | 0 | 4 | 10 |
 | `geom` | 10 | 0 | 2 | 0 | 9 |
-| `export` | 8 | 1 | 2 | 5 | 2 |
 | `chrome` | 8 | 0 | 0 | 3 | 4 |
+| `export` | 8 | 1 | 2 | 5 | 2 |
 | `colorclass` | 6 | 0 | 0 | 0 | 5 |
 | `auth` | 6 | 0 | 0 | 3 | 0 |
-| `scene` | 5 | 0 | 6 | 0 | 4 |
 | `log` | 5 | 0 | 0 | 0 | 1 |
-| `io` | 4 | 1 | 8 | 1 | 1 |
+| `scene` | 5 | 0 | 6 | 0 | 4 |
 | `report` | 4 | 0 | 3 | 1 | 0 |
+| `io` | 4 | 1 | 8 | 1 | 1 |
+| `cut` | 3 | 0 | 1 | 3 | 3 |
 | `bootstrap` | 3 | 2 | 7 | 1 | 1 |
 | `other` | 3 | 0 | 0 | 0 | 3 |
-| `cut` | 3 | 0 | 1 | 3 | 3 |
 | `find` | 1 | 0 | 0 | 0 | 1 |
 
 ### Accoppiamenti call-graph più pesanti (dominio→dominio: # funzioni)
