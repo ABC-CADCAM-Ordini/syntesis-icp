@@ -22,7 +22,9 @@
 > monolite 41.480→20.189 righe (−51%), gate MD5 9/9, prova funzionale live ok.
 > ✅ **Fase 2 COMPLETATA** (2026-07-05, 8.84.1 commit 49fa8b3): TOC 36 voci + 36 banner §anchor,
 > storia→STORIA.md, gate comments_only_diff (byte-identico) + check_anchors PERMANENTI.
-> ▶ Prossimo: **Fase 3** (CSS → css/analyzer.css, effort S).
+> ✅ **Fase 3 COMPLETATA** (2026-07-05, 8.84.2 commit 26b12f9): CSS 927 righe → css/analyzer.css
+> byte-verbatim; monolite a 19.310 righe. **BLOCCO FRONT-LOADED (fasi 0-3) COMPLETO**.
+> ▶ Prossimo: **Fase 4** (libreria pura ds/syn-math + syn-geom + syn-color, gate golden-master).
 
 ---
 

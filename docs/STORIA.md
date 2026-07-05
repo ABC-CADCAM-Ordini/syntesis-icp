@@ -1,5 +1,12 @@
 # Storia delle modifiche
 
+## 2026-07-05 — 8.84.2: MODULARIZZAZIONE Fase 3 (CSS → css/analyzer.css)
+
+Chiusura del blocco front-loaded (fasi 0-3) del piano ratificato, tutte nello stesso giorno. I 2 blocchi <style> del monolite (principale 891 righe + vmBar 36) escono VERBATIM in /static/css/analyzer.css, stesso ordine = cascata identica; il <link> prende la posizione del blocco principale; l'anti-flash resta inline (coppia di syn-gate). Gate byte-verbatim severo: 927/927 righe identiche alla concat dei blocchi a HEAD — il primo run ha COLTO una riga vuota di giunzione introdotta dal writer (rigenerato strict): il gate non è un timbro.
+
+Verifica live: css servito 47.012 byte esatti su entrambi i servizi, 382 regole dal foglio esterno, 6 selettori sentinella via computed style, render identico. Bilancio fasi 0-3: monolite 41.480 → 19.310 righe (−53%) / 5,75 → 1,0 MB, indice §anchor, CSS separato, README/CONTRIBUTING, fixtures golden-master. Il grosso del valore umano promesso dal piano è in cassa.
+
+
 ## 2026-07-05 — 8.84.1: MODULARIZZAZIONE Fase 2 (TOC + §anchor, solo commenti)
 
 Il monolite diventa un documento con indice: TOC di 36 voci dopo <title> e 36 banner canonici `==== §TOKEN ====` ai confini di sezione (JS/HTML/CSS). Navigazione con grep sul token, mai numeri di riga. 4 blocchi di commenti-storia (32 righe) migrati in coda a questo file (annex Fase 2). Landmark verificati unici (35/35) da workflow 3-agenti; il verificatore ha intercettato un off-by-one nei conteggi dei blocchi storia PRIMA dell'applicazione — lo script applicatore è comunque difensivo (rimuove solo righe di puro commento).
