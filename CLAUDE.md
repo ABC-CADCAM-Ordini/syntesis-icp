@@ -116,6 +116,13 @@ Non prendere iniziativa su questi punti. Se pensi che servano, FERMATI e chiedi.
 - Le voci marcate **DA CHIARIRE** vanno risolte quando si tocca la parte di codice
   relativa (es. tracciare gli handler della toolbar Vedere quando si lavora su
   `syntesis-icp-vedere.html`).
+- **Mappa strutturale (UNICA mappa, decisione 2026-07-05)**: la MAPPA_FUNZIONALE
+  contiene anche la sezione "Mappa strutturale del monolite" (composizione, domini,
+  superficie di accoppiamento), GENERATA — mai editata a mano — da
+  `python3 scripts/dep_census.py --write-mappa` (marker DEP-CENSUS). Va rigenerata:
+  (a) a ogni bump MINOR; (b) SEMPRE prima di qualsiasi passo di estrazione dal
+  monolite. `docs/MODULARIZZAZIONE_STUDIO.md` resta la strategia (meccanismi,
+  ordine, rischi) e NON contiene numeri: i numeri vivono solo nella MAPPA.
 
 ## 5. Autorizzazione (modello a stati)
 - Endpoint operativi / di prodotto (analisi, ICP, report, leaderboard, scrittura

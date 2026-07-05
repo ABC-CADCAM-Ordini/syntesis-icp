@@ -492,3 +492,51 @@ Più i pannelli per-id nella **matrice di visibilità** della sezione Analizzare
 ---
 
 _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE aperta**. Storico risolto: (1) handler toolbar Vedere → tracciati per-bottone; (2) "primo click a vuoto" `#btnPick` → **RISOLTO in 8.4.8** (rimosso doppio trigger: onclick inline su #btnPick, ora solo addEventListener)._
+
+---
+
+## Mappa strutturale del monolite (generata)
+
+<!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
+
+### Fotografia (8.81.1 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+
+| Metrica | Valore |
+|---|---|
+| Righe / peso | **41380** / **5.75 MB** |
+| JS applicativo | 39101 righe in 8 blocchi `<script>` |
+| Asset B64 embedded | **2.9 MB** in 6 righe (**50%** del file) |
+| Funzioni top-level | 487 |
+| Globali condivise | 147 (di cui **44** toccate da 2+ domini) |
+| Export surface (handler inline) | 139 funzioni da preservare su `window` |
+
+### Domini: dimensione e superficie di accoppiamento
+
+| Dominio | # fn | stato scritto→altri | stato letto←altri | API inline | API cross-dominio |
+|---|---|---|---|---|---|
+| `mis` | 123 | 3 | 4 | 19 | 7 |
+| `replace` | 92 | 7 | 8 | 33 | 11 |
+| `other` | 88 | 11 | 10 | 24 | 56 |
+| `sost` | 47 | 7 | 6 | 16 | 11 |
+| `mua` | 33 | 5 | 12 | 11 | 24 |
+| `fres` | 31 | 0 | 1 | 2 | 9 |
+| `env` | 16 | 2 | 2 | 12 | 5 |
+| `workflow` | 15 | 16 | 10 | 5 | 3 |
+| `tree` | 13 | 0 | 7 | 8 | 3 |
+| `auth` | 6 | 0 | 0 | 3 | 0 |
+| `scene` | 6 | 1 | 9 | 1 | 4 |
+| `log` | 5 | 0 | 0 | 0 | 1 |
+| `report` | 4 | 0 | 3 | 1 | 0 |
+| `export` | 4 | 0 | 4 | 1 | 1 |
+| `cut` | 3 | 0 | 1 | 3 | 3 |
+| `find` | 1 | 0 | 0 | 0 | 1 |
+
+### Accoppiamenti call-graph più pesanti (dominio→dominio: # funzioni)
+
+`other→mua:37` · `mua→other:29` · `env→other:25` · `sost→other:17` · `other→env:15` · `mis→other:15` · `other→replace:14` · `other→sost:14` · `other→scene:13` · `mua→tree:12` · `other→mis:10` · `tree→mua:10`
+
+> Elenchi completi per-dominio (globali, API) in `scripts/dep_census_out.json`.
+> Ordine di estrazione e meccanismi: `docs/MODULARIZZAZIONE_STUDIO.md` (strategia).
+> Regola §4: rigenerare questa sezione a ogni bump MINOR e prima di ogni estrazione.
+
+<!-- DEP-CENSUS:END -->

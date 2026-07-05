@@ -1,7 +1,7 @@
 # Studio di modularizzazione — Syntesis-ICP
 
 > **Stato:** studio preliminare di fattibilità — **nessun codice toccato.**
-> **Data:** 2026-06-14 · **Versione live di riferimento:** 8.61.2
+> **Data studio:** 2026-06-14 (strategia) · **Numeri correnti:** vedi MAPPA_FUNZIONALE (generati, sempre aggiornati)
 > **Scopo:** valutare come ridurre il monolite `backend/static/syntesis-analyzer-v3b.html`
 > rendendolo gestibile e scalabile nel tempo, a compartimenti, senza big-bang.
 > **Vincolo:** sempre INCREMENTALE col gate di equivalenza, mai riscrittura. Coerente
@@ -21,31 +21,17 @@ rischio inaccettabile su software clinico in produzione.
 
 ---
 
-## 1. Fotografia quantitativa (misurata il 2026-06-14)
+## 1. Fotografia quantitativa
 
-| Metrica | Valore |
-|---|---|
-| Dimensione file | **3,87 MB** (4.067.056 byte) |
-| Righe totali | **21.684** |
-| Blocco `<script>` gigante | righe **2414 → 19982** (~17.500 righe in un blob) |
-| Funzioni top-level | **526** |
-| Dichiarazioni globali (const/let/var) | **1.505** |
-| Esposizioni esplicite `window.*` | **9** (il resto è scope globale implicito) |
-| Handler inline (`onclick`/`onchange`/`oninput`) | 145 + 92 + 20 = **257** |
-| Funzioni globali distinte richiamate da handler inline | **150** |
-| `addEventListener` | 47 |
-| `<script>` totali nel file | 17 |
-
-**Distribuzione per dominio** (prefisso funzione, nel blocco 2414–19982):
-
-| Prefisso | # funzioni | Dominio | Note estrazione |
-|---|---|---|---|
-| `mis*` | 106 | Core metrologico/ICP (Kabsch+SVD, cap-PCA, deviazioni) | **Ultimo** — gate golden-master su MUA reali |
-| `sost*` | 40 | Replace-iT / Sostituire | Stato `sost*` co-locato; dipende dal core |
-| `fres*` | 34 | Fresabilità 5 assi | Prossimo candidato; analisi già fatta |
-| `find*` | 4 | Detection scanbody (`findScanbodyCenter`) | Vicino al core |
-| `tree*` | 3 | Albero scena / colori | Isolato, buon candidato precoce |
-| `render*` | 3 | Rendering | Parzialmente già in `ds/syn-render.js` |
+> **SPOSTATA** (decisione utente 2026-07-05: la mappa e' UNA sola). La fotografia
+> strutturale vive in **`docs/MAPPA_FUNZIONALE.md` → "Mappa strutturale del monolite"**,
+> sezione GENERATA da `python3 scripts/dep_census.py --write-mappa` e tenuta fresca
+> dalla regola CLAUDE.md §4 (rigenerazione a ogni bump MINOR e prima di ogni passo
+> di estrazione). Dettaglio per-dominio (globali lette/scritte, API da preservare):
+> `scripts/dep_census_out.json`.
+>
+> Questo documento resta la STRATEGIA (meccanismi di estrazione, ordine, rischi):
+> non contiene piu' numeri che possano invecchiare.
 
 ---
 
