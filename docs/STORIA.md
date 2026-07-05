@@ -1,5 +1,12 @@
 # Storia delle modifiche
 
+## 2026-07-05 — 8.84.1: MODULARIZZAZIONE Fase 2 (TOC + §anchor, solo commenti)
+
+Il monolite diventa un documento con indice: TOC di 36 voci dopo <title> e 36 banner canonici `==== §TOKEN ====` ai confini di sezione (JS/HTML/CSS). Navigazione con grep sul token, mai numeri di riga. 4 blocchi di commenti-storia (32 righe) migrati in coda a questo file (annex Fase 2). Landmark verificati unici (35/35) da workflow 3-agenti; il verificatore ha intercettato un off-by-one nei conteggi dei blocchi storia PRIMA dell'applicazione — lo script applicatore è comunque difensivo (rimuove solo righe di puro commento).
+
+Prova formale della fase: gate `comments_only_diff.mjs` (char-scanner con stati stringhe/template/regex, strip HTML/CSS) VERDE pre-bump = codice a commenti-strippati byte-identico a HEAD; post-bump le uniche 2 righe divergenti sono title e ANALIZZA_BUILD. Gate permanenti aggiunti alla checklist: comments_only_diff + check_anchors (TOC↔banner 1:1).
+
+
 ## 2026-07-05 — 8.84.0: MODULARIZZAZIONE Fase 0 + Fase 1 (asset B64 fuori, −51%)
 
 Prime due fasi del piano ratificato (MODULARIZZAZIONE_STUDIO.md). Fase 0 (fd9f7fc, doc/tooling only): README+CONTRIBUTING frontend (onboarding 15 min), dep_census.py corretto (bug one-liner + blob B64 escluso → JS reale 17.872 righe, domini fini → 'other' 92→3), make_fixtures.py + fixtures golden-master dai CAD in repo (coppie A/B con T nota, gate 9/9).

@@ -20,7 +20,9 @@
 > gate `scripts/gate/fixtures/gate.mjs` (9/9 verde).
 > ✅ **Fase 1 COMPLETATA** (2026-07-05, 8.84.0 commit 8b893f1): 7 asset → `assets/` verbatim,
 > monolite 41.480→20.189 righe (−51%), gate MD5 9/9, prova funzionale live ok.
-> ▶ Prossimo: **Fase 2** (TOC + §anchor + MAPPA anti-drift).
+> ✅ **Fase 2 COMPLETATA** (2026-07-05, 8.84.1 commit 49fa8b3): TOC 36 voci + 36 banner §anchor,
+> storia→STORIA.md, gate comments_only_diff (byte-identico) + check_anchors PERMANENTI.
+> ▶ Prossimo: **Fase 3** (CSS → css/analyzer.css, effort S).
 
 ---
 
