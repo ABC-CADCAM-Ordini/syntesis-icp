@@ -1,5 +1,14 @@
 # Storia delle modifiche
 
+## 2026-07-05 — 8.83.0 / 8.83.1: velocità mouse anche in Vedere (condivisa) + fix scope
+
+"Tutto uguale per tutti" (richiesta utente dopo l'8.82.0 su Analizza): stessa sezione "Controlli 3D (mouse)" nel pannello Impostazioni di Vedere — che era un placeholder "preferenze in arrivo", ora reale. Condivisione via stesso localStorage 'syntesis_controls' e stessi moltiplicatori: impostato una volta, vale in Analizza e Vedere. Vedere usa TrackballControls (SPEED_BASE {3.0,2.0,1.2}) con turbo Shift×2; refactor: tutte le assegnazioni di velocità passano da vApplyControlsSpeed(turbo) così il turbo/keyup/blur non azzerano la preferenza (prima resettavano ai base hardcoded).
+
+8.83.1 = fix di un bug scoperto nel COLLAUDO LIVE dell'8.83.0 prima di dichiarare fatto: le funzioni v* erano definite dentro initThree() (scope locale, dove sta il setup scena copiato da Analizza) ma chiamate da fuori (handler inline oninput/onclick + openVedereSettings). In un non-module gli inline handler risolvono contro window → non raggiungibili → gli slider renderizzavano ma erano inerti (probe browser: openVedereSettings=function, vApplyControlsSpeed=undefined). Fix: esposte su window (closure sulle locali). In Analizza il bug non c'era (funzioni gemelle top-level). Lezione: verificare sempre le feature UI col browser, non solo col markup.
+
+Implementazione (commit 309e919 + 43601a6): Vedere v8.0.3→8.0.5-refactor. Verifiche: node --check 3/3, test funzionale end-to-end in produzione (rotate 2.0×→6.0, turbo Shift reale→12.0, rilascio→6.0 preferenza preservata, condivisione localStorage, Ripristina→3.0). MAPPA aggiornata (modal Vedere).
+
+
 ## 2026-07-05 — 8.82.0: velocità mouse personalizzabili (Impostazioni → Interfaccia)
 
 Richiesta utente: poter rendere il movimento della camera (rotazione, spostamento, ingrandimento) più o meno aggressivo. Aggancio naturale: la OrbitControls custom del monolite espone già rotateSpeed/panSpeed/zoomSpeed come proprietà lette live. Nel corso dell'implementazione emerso che panSpeed era dichiarato (0.6) ma MAI usato in pan() → il pan non era di fatto regolabile; corretto.
