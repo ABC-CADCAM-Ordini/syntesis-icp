@@ -1,5 +1,14 @@
 # Storia delle modifiche
 
+## 2026-07-05 — 8.84.0: MODULARIZZAZIONE Fase 0 + Fase 1 (asset B64 fuori, −51%)
+
+Prime due fasi del piano ratificato (MODULARIZZAZIONE_STUDIO.md). Fase 0 (fd9f7fc, doc/tooling only): README+CONTRIBUTING frontend (onboarding 15 min), dep_census.py corretto (bug one-liner + blob B64 escluso → JS reale 17.872 righe, domini fini → 'other' 92→3), make_fixtures.py + fixtures golden-master dai CAD in repo (coppie A/B con T nota, gate 9/9).
+
+Fase 1 (8b893f1): i 7 asset embedded — 80% del file — escono dal sorgente in /static/assets/ con rilocazione VERBATIM: 5 var STL single-line → *.b64.js caricati <script src> sincroni in-order prima del consumer; SOSTITUIRE_TEMPLATES_B64 (21.301 righe in mezzo al MAIN) → sost-templates.b64.js; logo data-URI → logo.png. Var globali identiche, zero logica toccata, semantica embed 8.68.0 preservata. Estrazione via script (il b64 non è mai passato dal contesto agent). Monolite: 41.480 → 20.189 righe / 5,75 → 1,06 MB.
+
+Gate e verifiche: verify_b64.mjs MD5 buffer decodificati old≡new 9/9 (5 STL + 3 template gunzip + logo, asset eseguiti in vm); node --check 8/8; deploy canary LEGACY (7 path asset 200 + Content-Length esatto) → BACKEND; prova funzionale browser live (var definite, decode reali via b64toArrayBuffer e sostDecodeTemplate, logo caricato, zero errori console). Censimento/MAPPA rigenerati: asset B64 0%.
+
+
 ## 2026-07-05 — 8.83.0 / 8.83.1: velocità mouse anche in Vedere (condivisa) + fix scope
 
 "Tutto uguale per tutti" (richiesta utente dopo l'8.82.0 su Analizza): stessa sezione "Controlli 3D (mouse)" nel pannello Impostazioni di Vedere — che era un placeholder "preferenze in arrivo", ora reale. Condivisione via stesso localStorage 'syntesis_controls' e stessi moltiplicatori: impostato una volta, vale in Analizza e Vedere. Vedere usa TrackballControls (SPEED_BASE {3.0,2.0,1.2}) con turbo Shift×2; refactor: tutte le assegnazioni di velocità passano da vApplyControlsSpeed(turbo) così il turbo/keyup/blur non azzerano la preferenza (prima resettavano ai base hardcoded).

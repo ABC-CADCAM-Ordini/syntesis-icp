@@ -17,7 +17,10 @@
 > `docs/frontend/README.md` + `CONTRIBUTING.md`; `dep_census.py` corretto (bug one-liner,
 > blob B64 escluso → JS reale 17.872 righe non 39.166, domini fini → 'other' da 92 a 3);
 > `make_fixtures.py` + fixtures golden-master (3 scanbody reali, coppie A/B con T nota) +
-> gate `scripts/gate/fixtures/gate.mjs` (9/9 verde). ▶ Prossimo: **Fase 1** (sgonfiaggio asset).
+> gate `scripts/gate/fixtures/gate.mjs` (9/9 verde).
+> ✅ **Fase 1 COMPLETATA** (2026-07-05, 8.84.0 commit 8b893f1): 7 asset → `assets/` verbatim,
+> monolite 41.480→20.189 righe (−51%), gate MD5 9/9, prova funzionale live ok.
+> ▶ Prossimo: **Fase 2** (TOC + §anchor + MAPPA anti-drift).
 
 ---
 
