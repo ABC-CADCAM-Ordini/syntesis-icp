@@ -1,5 +1,14 @@
 # Storia delle modifiche
 
+## 2026-07-05 — 8.82.0: velocità mouse personalizzabili (Impostazioni → Interfaccia)
+
+Richiesta utente: poter rendere il movimento della camera (rotazione, spostamento, ingrandimento) più o meno aggressivo. Aggancio naturale: la OrbitControls custom del monolite espone già rotateSpeed/panSpeed/zoomSpeed come proprietà lette live. Nel corso dell'implementazione emerso che panSpeed era dichiarato (0.6) ma MAI usato in pan() → il pan non era di fatto regolabile; corretto.
+
+Implementazione (commit 989642f): sezione "Controlli 3D (mouse)" nel tab Interfaccia con 3 slider 0.3×–2.5× (default 1.0×) + Ripristina; moltiplicatori su CONTROLS_BASE {rotate:0.8,pan:0.6,zoom:1.2}, persistiti in localStorage 'syntesis_controls'; applyControlsSettings applica live a controls (init dopo la creazione + ogni slider-change, stile apply-immediato come lo zoom testo); openSettings popola gli slider dai valori salvati. Solo Analizzare (Vedere ha controlli propri, eventuale follow-up).
+
+Verifiche: node --check 8/8, ID markup↔JS coerenti, a 1.0× valori identici ai base (zero cambio comportamento di default); test funzionale end-to-end in produzione (rotate 2.0×→1.6, zoom 0.5×→0.6, persistenza, Ripristina); MAPPA aggiornata (tab Interfaccia + sezione strutturale rigenerata da dep_census, regola §4 per il MINOR).
+
+
 ## 2026-07-05 — 8.81.1: CLEANUP catena "template custom" Sostituire
 
 L'utente, non riconoscendo la funzione annotata in 8.81.0, ne ha chiesto la storia: ricostruita da git, era la 4a opzione 'Custom' del radio template del prototipo Sostituire (02e76e1, 23-04-2026) — caricare un proprio STL come marker sostitutivo. Mai agganciata al motore di posa (sostCustomStlBuffer scritto, mai letto) e resa irraggiungibile lo stesso giorno dalla semplificazione del pannello (a4268a8). Vissuta nella UI meno di un giorno, 14 mesi da orfana nel monolite. Rimozione integrale su decisione utente; l'esigenza e' coperta da Replace-iT + librerie /gestione (8.50.0+).
