@@ -1,5 +1,12 @@
 # Storia delle modifiche
 
+## 2026-07-05 — 8.81.1: CLEANUP catena "template custom" Sostituire
+
+L'utente, non riconoscendo la funzione annotata in 8.81.0, ne ha chiesto la storia: ricostruita da git, era la 4a opzione 'Custom' del radio template del prototipo Sostituire (02e76e1, 23-04-2026) — caricare un proprio STL come marker sostitutivo. Mai agganciata al motore di posa (sostCustomStlBuffer scritto, mai letto) e resa irraggiungibile lo stesso giorno dalla semplificazione del pannello (a4268a8). Vissuta nella UI meno di un giorno, 14 mesi da orfana nel monolite. Rimozione integrale su decisione utente; l'esigenza e' coperta da Replace-iT + librerie /gestione (8.50.0+).
+
+Implementazione (commit 322817f): markup #sostInputCustom + #sostCustomName, sostOnCustomPicked, var sostCustomStlBuffer, reset in _hardResetSostituire, guard 'custom' in sostLoadScanToScene; MAPPA riga 'Upload custom' -> nota storica. Verifiche: zero riferimenti residui, node --check 8/8, deploy sequenziale anti-race, live 8.81.1 sui 4 domini, markup assente dal servito.
+
+
 ## 2026-07-05 — 8.81.0: CLEANUP dead code dai 14 refutati dell'audit
 
 Primo passo della direttiva "preparare la divisione del monolite": rimossi i rami morti individuati (e refutati come innocui) dall'audit 8.80.4. Ogni voce era double-verified; prima della rimozione ri-confermato zero-call-site sul working tree; dopo, review avversariale del diff (3 reviewer) = 0 finding. Net -107 righe.
