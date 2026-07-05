@@ -1,5 +1,19 @@
 # Storia delle modifiche
 
+## 2026-07-05 — 8.80.4: debug campaign, 35 fix da audit multi-agente
+
+Campagna di debug completa richiesta dall'utente ("debug completo e approfondito, errori nascosti da lavorazioni precedenti"). Audit con 72 agenti su 12 dimensioni (handler rotti, id orfani, altre pagine, backend, duplicati, leak THREE.js, contaminazione stato, drift registry, CSS/tokens, diff non committato, async, XSS), ogni finding verificato da uno scettico avversariale indipendente: 45 confermati (28 unici), 14 refutati (dead code con guardie, annotati per pulizia dedicata). Dopo i fix, review avversariale del diff (11 agenti): 7 residui trovati e corretti. Pattern ricorrente scoperto: le riscritture di pannelli (4b4c297 dashboard, 3fa4cab fres, f15c885 auth) perdevano markup lasciando JS e bottoni vivi -> TypeError su funzioni intere (Fresatura avanzata, Rinomina analisi, Progetti, inviti cartelle). Include 8.80.3 (Sostituire: istruzione SHIFT+CLIC + drop workflow-aware), mai deployata separatamente.
+
+Implementazione (commit f026339, dettaglio riga-per-riga in registry.py History):
+- v3b: crash #fresBtnRemove/#syntAuthRegErr guardati; _hardResetMisurare delega a misICP_seedExit+misICP_reset; reset completati (placementMode, clinicalBanner/undercutLegend, closeFresability, #labelLines in replace, cursori); orfani MUA (colored/undercut/meanAxisLines/spline); dispose (scan, coni, _misDisposeConnObj); STL corrotto fail-safe; _escHtml sui filename; drop Misurare=hint + cleanup #dropOverlay; Excel da MIS_CLIN_AX; PDF 100->200um (scelta utente); .keyboard-pulse; btnLivelli
+- vedere: proxy Drive /api/me/gdrive/file/{id}/content (era /access-token rimosso 8.78.0 -> "Apri in Vedere" rotto end-to-end) con messaggi 409/413; setSectionPlaceMode(false) al posto di cancelSectionPlacement (mai esistita) prima del toggle ruler-active; disposeMeasureDots nei delete; guardie pickSelectable; feature endDots
+- dashboard: RIPRISTINATI #modalEdit e #modalProject dal markup storico; AGGIUNTO #inviteBanner; XSS Classifica chiuso (escapeHtml + textContent)
+- backend: UniqueViolationError specifico + try/except per-invito in me_create_shared_folder; startup.py senza calibrator
+- docs: MAPPA_FUNZIONALE ri-verificata riga-per-riga (shift +5/+63 da inserimenti dashboard)
+
+Verifiche: node --check 12 blocchi JS + py_compile OK; deploy sequenziale LEGACY->BACKEND con anti-race commit; live 8.80.4 su 4 domini, gating 403, proxy Drive gated.
+
+
 Cronologia delle feature e fix significativi. Stile: una entry per modifica, in ordine cronologico inverso (piu' recente in alto).
 
 ---
