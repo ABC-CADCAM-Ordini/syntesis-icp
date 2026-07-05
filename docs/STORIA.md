@@ -1,5 +1,17 @@
 # Storia delle modifiche
 
+## 2026-07-05 — 8.85.0: MODULARIZZAZIONE Fase 4 (libreria pura → ds/)
+
+Prima estrazione di CODICE del piano ratificato (dopo gli asset di F1 e il CSS di F3): 27 funzioni a zero stato escono verbatim dal monolite in ds/syn-math.js (14 — parser STL, Kabsch+SVD, ICP, helper numerici Method C), ds/syn-geom.js (8 — estrattori facce/sezioni/proiezioni) e ds/syn-color.js (5 — classificazioni colore pure + escape HTML), caricati come script classici in testa (THREE/SynRender letti solo a call-time, pattern syn-render). Nel sorgente restano 12 tombstone grep-able `// §PURELIB:`. Il perimetro è sceso da 30 a 27 in corso d'opera: buildUndercutColors legge il globale muaObjects (il censimento non lo tracciava) ed è rimasta nel monolite con le altre 2 stateful note — il criterio della fase è "zero stato", non l'appartenenza al dominio del censimento.
+
+Il gate nuovo permanente (scripts/gate/purelib/gate.mjs, il più forte del piano) è un golden-master numerico a precisione piena: 78 scenari su fixtures STL reali + casi degeneri (kabsch coplanare/riflessione/NaN/n<3, SVD e solver singolari, triangolo nel piano), ogni numero serializzato come bit Float64 in hex ⇒ confronto Object.is inclusi −0/NaN; il golden ancora anche l'md5 del sorgente di ogni funzione = prova formale del verbatim. Il golden è stato generato dal monolite PRE-edit ed è committato: dopo l'estrazione non è più rigenerabile dal monolite, è la ground-truth per ogni futuro tocco ai moduli.
+
+Implementazione:
+- estrazione via scripts/extract_purelib_f4.mjs (stesso brace-matcher del gate → span identici per costruzione; gruppi contigui → 1 tombstone, commenti attaccati migrano con le funzioni)
+- monolite 19.310 → 19.050 righe; 3 `<script src>` dopo syn-clip (r.12-14)
+- esito gate: 78/78 scenari + 27/27 verbatim; check_anchors 36/36; check_inline OK; node --check 8/8 blocchi + 3/3 moduli; fixtures 9/9
+- deploy sequenziale LEGACY→BACKEND (anti-race commit verificato su entrambi); live: 8.85.0 sui 2 domini, moduli serviti con md5 identico al locale su entrambi i servizi, gating 403
+
 ## 2026-07-05 — 8.84.2: MODULARIZZAZIONE Fase 3 (CSS → css/analyzer.css)
 
 Chiusura del blocco front-loaded (fasi 0-3) del piano ratificato, tutte nello stesso giorno. I 2 blocchi <style> del monolite (principale 891 righe + vmBar 36) escono VERBATIM in /static/css/analyzer.css, stesso ordine = cascata identica; il <link> prende la posizione del blocco principale; l'anti-flash resta inline (coppia di syn-gate). Gate byte-verbatim severo: 927/927 righe identiche alla concat dei blocchi a HEAD — il primo run ha COLTO una riga vuota di giunzione introdotta dal writer (rigenerato strict): il gate non è un timbro.

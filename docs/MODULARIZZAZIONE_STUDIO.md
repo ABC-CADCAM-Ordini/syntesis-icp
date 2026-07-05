@@ -24,7 +24,11 @@
 > storia→STORIA.md, gate comments_only_diff (byte-identico) + check_anchors PERMANENTI.
 > ✅ **Fase 3 COMPLETATA** (2026-07-05, 8.84.2 commit 26b12f9): CSS 927 righe → css/analyzer.css
 > byte-verbatim; monolite a 19.310 righe. **BLOCCO FRONT-LOADED (fasi 0-3) COMPLETO**.
-> ▶ Prossimo: **Fase 4** (libreria pura ds/syn-math + syn-geom + syn-color, gate golden-master).
+> ✅ **Fase 4 COMPLETATA** (2026-07-05, 8.85.0 commit aa0ce0e): 27 fn pure → ds/syn-math (14) +
+> syn-geom (8) + syn-color (5), verbatim; esclusa in corso d'opera ANCHE buildUndercutColors
+> (legge muaObjects: il criterio è zero-stato, non il dominio del censimento). Gate golden-master
+> permanente scripts/gate/purelib/ (78 scenari Object.is su fixtures+degeneri, md5 verbatim per fn).
+> ▶ Prossimo: **Fase 5** (pannelli/chrome: ds/syn-env ~700 r mecc. A + rilocazioni B minori, gate harness browser).
 
 ---
 
