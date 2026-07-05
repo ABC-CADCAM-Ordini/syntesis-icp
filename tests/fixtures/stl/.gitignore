@@ -1,0 +1,5 @@
+# Fixtures STL golden-master: binari RIGENERABILI da scripts/make_fixtures.py
+# (ground-truth versionato in MANIFEST.json). Non committare i .stl.
+base/
+pairs/
+*.stl

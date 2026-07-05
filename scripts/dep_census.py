@@ -37,21 +37,33 @@ MARK_S = "<!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non edita
 MARK_E = "<!-- DEP-CENSUS:END -->"
 
 # (nome dominio, regex sul nome funzione) — primo match vince, l'ordine conta
+# Ordine: LIBRERIE PURE e regole specifiche PRIMA delle generiche (primo match vince).
+# Nomi presi dalla dissezione ricognizione 2026-07-05 (workflow monolith-strategy-design)
+# per svuotare il bucket 'other' (era 92 fn, gran parte assegnabili a sotto-domini reali).
 DOMAIN_RULES = [
+    # ── librerie pure (target ds/*.js: math/geom/color, zero stato) ──
+    ("math",     re.compile(r'^(parseSTL|centroid|kabsch|matMul|transpose|det3|svd3x3|samplePoints|runICP|_mc[A-Z])')),
+    ("geom",     re.compile(r'^(extractScanTopFaceNear|extractTopFacePts|getTransformedTriangles|intersectPlaneTriangle|extractCutSegments|projectTo2D|b64toArrayBuffer|makeGradientTexture|extractScanbodyScanFor|rebuildScanMeshGeometry)')),
+    ("colorclass", re.compile(r'^(classifyDivergence|undercutColorForAngle|buildUndercutColors|getGroupArrowColor|getGroupArrowColorInt|_escHtml)')),
+    # ── domini applicativi (prefisso o nomi espliciti) ──
     ("mis",      re.compile(r'^(misICP_|_mis|mis[A-Z]|MIS_)')),
     ("sost",     re.compile(r'^_?sost')),
     ("replace",  re.compile(r'^_?replace')),
-    ("fres",     re.compile(r'^_?fres')),
+    ("fres",     re.compile(r'^(_?fres|openFresability|closeFresability|renderFresGroupSingle|openGroupDialog|closeGroupDialog|confirmGroup|resetGroups|getMuaByGroup)')),
     ("auth",     re.compile(r'^syntAuth')),
     ("workflow", re.compile(r'^(selectWorkflow|updateWorkflowUI|setMode$|_hardReset|_setAnalyza|_setSostituire|_hasUnsavedData|toggle(Workflow|File|View|Reset)Menu|close(Workflow|File|View)Menu)')),
     ("tree",     re.compile(r'^(tree|rebuildTree|toggleLayer|openLayersPanel|closeLayersPanel|toggleLayersPanel|toggleMua|setSceneObjectColor|getGroupBadgeColor|__synApplyColor)')),
-    ("mua",      re.compile(r'^(placeMUA|removeMUA|clearAllMUA|newCase$|startPlacement|onViewportClick|alignAll|calc|calculate|create(Divergence|Mean)|clear(Divergence|Group)|toggle(Divergence|All|Undercut|Scanbody)|updateGroup|updateDivergence|ensureLabel|applyUndercut|removeUndercut|computeClinical|updateClinical|updateRaffina)')),
+    ("mua",      re.compile(r'^(placeMUA|removeMUA|clearAllMUA|newCase$|startPlacement|onViewportClick|alignAll|calc|calculate|create(Divergence|Mean)|clear(Divergence|Group)|toggle(Divergence|All|Undercut|Scanbody|Axes|SingleSB)|updateGroup|updateDivergence|updateMuaPanel|undoLastMUA|ensureLabel|applyUndercut|removeUndercut|computeClinical|updateClinical|updateRaffina)')),
     ("find",     re.compile(r'^find')),
     ("report",   re.compile(r'^(analReport_|report|pdf|addFooter|addCornerLogo)')),
     ("cut",      re.compile(r'^(cut|openCutView|closeCutView|renderCutView|synClip)')),
-    ("env",      re.compile(r'^(env|onEnv|settings|openSettings|closeSettings|miller|applyMiller|applyUiZoom|syntesisGetUiZoom)')),
-    ("scene",    re.compile(r'^(animate|applyRenderMode|applyEnvToScene|initScene|resetCamera|animateTarget|hardReset$)')),
-    ("export",   re.compile(r'^(export|writeBinarySTL|download|_makeTRoot)')),
+    ("env",      re.compile(r'^(env|onEnv|settings|openSettings|closeSettings|cancelSettings|saveSettings|switchSettingsTab|updateSettings|updateMillerSettings|miller|applyMiller|applyUiZoom|loadUiZoom|refreshUiZoom|syntesisGetUiZoom|applyControlsSettings|onControlsSettingChange|resetControlsSettings|syncControlsSettingsUI|updateCustom|updateRenderModeUI|updateEnvSwatch|buildPaletteGrid|syncMuaColorsFromPalette)')),
+    ("diag",     re.compile(r'^(onAlgoChange|onAxisEngineChange|onSostCenterChange|onReplaceICPChange|refreshAlgoDiagnostics|synAxis|synSost|_trackClientAlgo|synExpert|synDumpClicks)')),
+    ("io",       re.compile(r'^(loadScan|loadScanFile|saveCase|exportCase)')),
+    ("export",   re.compile(r'^(export|writeBinarySTL|download|_makeTRoot|openSostExport|closeSostExport|confirmSostExport|closeReplaceExport|confirmReplaceExport)')),
+    ("chrome",   re.compile(r'^(closeResetMenu|toggleResetMenu|setViewMode|updateViewModeBar|showStatus|_synSetVersionLabels|setAnalyzeSbType|getAnalyzeSb|toggleFileMenu|closeFileMenu|toggleWorkflowMenu|closeWorkflowMenu|toggleViewMenu|closeViewMenu)')),
+    ("scene",    re.compile(r'^(animate|applyRenderMode|applyEnvToScene|initScene|resetCamera|animateTarget)')),
+    ("bootstrap",re.compile(r'^(init$|installAltClickPivot|hardReset$)')),
     ("log",      re.compile(r'^_?synLog')),
 ]
 
@@ -86,17 +98,25 @@ def main():
     js_lines = js.split("\n")
 
     # ── composizione grezza del file ────────────────────────────────────────
+    # Due tipi di asset B64 embedded: (1) var single-line lunghissime (>5000 char:
+    # SCANBODY_*_B64, MATEMATICA_B64, ANALOGO_B64); (2) blob MULTI-riga concatenato
+    # (SOSTITUIRE_TEMPLATES_B64, ~21.300 righe di chunk quotati dentro il MAIN — FIX F0:
+    # prima contate come "JS", il codice reale e' ~17.900 righe non ~39.000).
     b64_lines = [l for l in all_lines if len(l) > 5000]
+    rx_b64chunk = re.compile(r'''^\s*["'][A-Za-z0-9+/=]{20,}["']?\s*[+,]?\s*$''')
+    b64_str_lines = [l for l in js_lines if rx_b64chunk.match(l)]
     style = re.search(r'<style>(.*?)</style>', src, re.S)
     comp = {
         "version": version,
         "file_lines": len(all_lines),
         "file_mb": round(len(src.encode("utf-8")) / 1e6, 2),
-        "js_lines": len(js_lines),
+        "js_lines": len(js_lines),                                 # grezzo (include il blob)
+        "js_lines_real": len(js_lines) - len(b64_str_lines),       # codice vero
         "js_blocks": len(blocks),
         "css_lines": style.group(1).count("\n") if style else 0,
-        "b64_asset_lines": len(b64_lines),
-        "b64_asset_mb": round(sum(len(l) for l in b64_lines) / 1e6, 2),
+        "b64_asset_lines": len(b64_lines) + len(b64_str_lines),
+        "b64_asset_mb": round((sum(len(l) for l in b64_lines)
+                               + sum(len(l) for l in b64_str_lines)) / 1e6, 2),
     }
 
     # ── funzioni top-level ──────────────────────────────────────────────────
@@ -109,6 +129,15 @@ def main():
         if m:
             starts.append((i, m.group(1)))
     for i, name in starts:
+        # FIX F0 (bug ricognizione 2026-07-05): le funzioni ONE-LINER
+        # (parseSTL/kabsch/svd3x3/runICP/showStatus...) hanno graffe BILANCIATE sulla
+        # riga di apertura -> il corpo e' quella riga sola. Prima si chiudeva al primo
+        # '}' a colonna 0 successivo, inglobando decine di righe -> stato/chiamate fasulle
+        # attribuite al nucleo piu' pulito. Multi-riga: graffe sbilanciate -> vecchia euristica.
+        oc = js_lines[i].count("{")
+        if oc and oc == js_lines[i].count("}"):
+            funcs.append((name, i, i))
+            continue
         end = len(js_lines) - 1
         for j in range(i + 1, len(js_lines)):
             if js_lines[j].startswith("}"):
@@ -155,6 +184,22 @@ def main():
             if re.search(r'\b' + re.escape(fn) + r'\b', txt):
                 ds_refs[func_domain[fn]].add((os.path.basename(mod), fn))
 
+    # ── multi-file (F0): funzioni GIA' estratte in ds/*.js e wf/*.js ────────────
+    # Additivo: NON entra nel grafo stato/chiamate del monolite (che resta la mappa di
+    # "cosa e' ancora nel monolite"). Serve a vedere DOVE vive ogni dominio man mano che
+    # si estrae, cosi' i totali per dominio restano leggibili senza manutenzione manuale.
+    rx_extfn = re.compile(r'^\s{0,4}(?:window\.)?function\s+([A-Za-z_$][\w$]*)\s*\('
+                          r'|^\s{0,4}window\.([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function')
+    external = defaultdict(lambda: defaultdict(list))   # dominio -> file -> [fn]
+    for pat in ("backend/static/ds/*.js", "backend/static/wf/*.js"):
+        for mod in sorted(glob.glob(pat)):
+            label = os.path.relpath(mod, "backend/static").replace(os.sep, "/")
+            for l in open(mod, encoding="utf-8").read().split("\n"):
+                m = rx_extfn.match(l)
+                if m:
+                    fn = m.group(1) or m.group(2)
+                    external[domain_of(fn)][label].append(fn)
+
     # ── superficie per dominio ──────────────────────────────────────────────
     dom_count = defaultdict(int)
     for n in func_names:
@@ -177,6 +222,8 @@ def main():
             "ds_refs": sorted(f for _, f in ds_refs.get(dom, [])),
         }
 
+    ext_summary = {d: {f: len(fns) for f, fns in sorted(files.items())}
+                   for d, files in sorted(external.items())}
     out = {
         "composizione": comp,
         "func_count_by_domain": dict(sorted(dom_count.items(), key=lambda x: -x[1])),
@@ -186,13 +233,16 @@ def main():
             {"var": g, "write": sorted(d["w"]), "read": sorted(d["r"])}
             for g, d in sorted(shared, key=lambda x: -len(x[1]["r"] | x[1]["w"]))],
         "surface_by_domain": surface,
+        "external_modules": ext_summary,      # dominio -> {file estratto: n. fn}
         "inline_export_count": len(inline_called),
     }
     json.dump(out, open(OUT_JSON, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
     # ── stdout ──────────────────────────────────────────────────────────────
     print(f"CENSIMENTO v3 — {PATH} @ {version}")
-    print(f"  {comp['file_lines']} righe / {comp['file_mb']} MB | JS {comp['js_lines']} righe in {comp['js_blocks']} blocchi | asset B64 {comp['b64_asset_mb']} MB ({round(comp['b64_asset_mb']/comp['file_mb']*100)}%)")
+    print(f"  {comp['file_lines']} righe / {comp['file_mb']} MB | JS reale {comp['js_lines_real']} righe "
+          f"(grezzo {comp['js_lines']}, blob B64 {comp['js_lines']-comp['js_lines_real']}) in {comp['js_blocks']} blocchi | "
+          f"asset B64 {comp['b64_asset_mb']} MB ({round(comp['b64_asset_mb']/comp['file_mb']*100)}%)")
     print(f"  funzioni {len(func_names)} | globali {len(gvars)} | handler-export {len(inline_called)} | globali multi-dominio {len(shared)}")
     for d, n in sorted(dom_count.items(), key=lambda x: -x[1]):
         s = surface[d]
@@ -207,7 +257,7 @@ def main():
         md.append("| Metrica | Valore |")
         md.append("|---|---|")
         md.append(f"| Righe / peso | **{comp['file_lines']}** / **{comp['file_mb']} MB** |")
-        md.append(f"| JS applicativo | {comp['js_lines']} righe in {comp['js_blocks']} blocchi `<script>` |")
+        md.append(f"| JS applicativo REALE | **{comp['js_lines_real']}** righe in {comp['js_blocks']} blocchi `<script>` (grezzo {comp['js_lines']}, meno il blob B64) |")
         md.append(f"| Asset B64 embedded | **{comp['b64_asset_mb']} MB** in {comp['b64_asset_lines']} righe (**{round(comp['b64_asset_mb']/comp['file_mb']*100)}%** del file) |")
         md.append(f"| Funzioni top-level | {len(func_names)} |")
         md.append(f"| Globali condivise | {len(gvars)} (di cui **{len(shared)}** toccate da 2+ domini) |")

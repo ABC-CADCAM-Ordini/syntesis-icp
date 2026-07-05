@@ -13,6 +13,12 @@
 > **Vincolo:** sempre INCREMENTALE col gate di equivalenza, mai riscrittura. Coerente
 > con CLAUDE.md §3 (no build step, no npm frontend, no refactor big-bang).
 
+> **AVANZAMENTO:** ✅ **Fase 0 COMPLETATA** (2026-07-05, doc/tooling only, nessun deploy):
+> `docs/frontend/README.md` + `CONTRIBUTING.md`; `dep_census.py` corretto (bug one-liner,
+> blob B64 escluso → JS reale 17.872 righe non 39.166, domini fini → 'other' da 92 a 3);
+> `make_fixtures.py` + fixtures golden-master (3 scanbody reali, coppie A/B con T nota) +
+> gate `scripts/gate/fixtures/gate.mjs` (9/9 verde). ▶ Prossimo: **Fase 1** (sgonfiaggio asset).
+
 ---
 
 ## 0. Sintesi esecutiva

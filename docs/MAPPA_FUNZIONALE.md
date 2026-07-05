@@ -501,15 +501,15 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 <!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
 
-### Fotografia (8.82.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+### Fotografia (8.83.1 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
 
 | Metrica | Valore |
 |---|---|
 | Righe / peso | **41480** / **5.75 MB** |
-| JS applicativo | 39166 righe in 8 blocchi `<script>` |
-| Asset B64 embedded | **2.9 MB** in 6 righe (**50%** del file) |
+| JS applicativo REALE | **17872** righe in 8 blocchi `<script>` (grezzo 39166, meno il blob B64) |
+| Asset B64 embedded | **4.67 MB** in 21300 righe (**81%** del file) |
 | Funzioni top-level | 491 |
-| Globali condivise | 151 (di cui **44** toccate da 2+ domini) |
+| Globali condivise | 151 (di cui **38** toccate da 2+ domini) |
 | Export surface (handler inline) | 141 funzioni da preservare su `window` |
 
 ### Domini: dimensione e superficie di accoppiamento
@@ -517,25 +517,32 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 | Dominio | # fn | stato scritto→altri | stato letto←altri | API inline | API cross-dominio |
 |---|---|---|---|---|---|
 | `mis` | 123 | 3 | 4 | 19 | 7 |
-| `other` | 92 | 11 | 10 | 26 | 57 |
 | `replace` | 92 | 7 | 8 | 33 | 11 |
-| `sost` | 47 | 7 | 6 | 16 | 11 |
-| `mua` | 33 | 5 | 12 | 11 | 24 |
-| `fres` | 31 | 0 | 1 | 2 | 9 |
-| `env` | 16 | 2 | 2 | 12 | 5 |
-| `workflow` | 15 | 16 | 10 | 5 | 3 |
+| `sost` | 47 | 7 | 6 | 16 | 10 |
+| `fres` | 39 | 1 | 1 | 7 | 3 |
+| `mua` | 37 | 5 | 11 | 14 | 25 |
+| `env` | 33 | 4 | 0 | 18 | 5 |
+| `workflow` | 15 | 16 | 10 | 5 | 1 |
+| `math` | 14 | 0 | 0 | 0 | 9 |
 | `tree` | 13 | 0 | 7 | 8 | 3 |
+| `diag` | 12 | 0 | 0 | 4 | 10 |
+| `geom` | 10 | 0 | 2 | 0 | 9 |
+| `chrome` | 8 | 0 | 0 | 3 | 4 |
+| `export` | 8 | 1 | 2 | 5 | 2 |
+| `colorclass` | 6 | 0 | 0 | 0 | 5 |
 | `auth` | 6 | 0 | 0 | 3 | 0 |
-| `scene` | 6 | 1 | 9 | 1 | 4 |
 | `log` | 5 | 0 | 0 | 0 | 1 |
-| `export` | 4 | 0 | 4 | 1 | 1 |
+| `scene` | 5 | 0 | 6 | 0 | 4 |
 | `report` | 4 | 0 | 3 | 1 | 0 |
+| `io` | 4 | 1 | 8 | 1 | 1 |
+| `bootstrap` | 3 | 2 | 7 | 1 | 1 |
 | `cut` | 3 | 0 | 1 | 3 | 3 |
+| `other` | 3 | 0 | 0 | 0 | 3 |
 | `find` | 1 | 0 | 0 | 0 | 1 |
 
 ### Accoppiamenti call-graph più pesanti (dominio→dominio: # funzioni)
 
-`other→mua:37` · `mua→other:29` · `env→other:26` · `sost→other:17` · `other→env:15` · `mis→other:15` · `other→sost:14` · `other→replace:14` · `other→scene:13` · `mua→tree:12` · `other→mis:10` · `tree→mua:10`
+`mua→tree:12` · `mua→chrome:11` · `env→scene:11` · `tree→mua:10` · `workflow→mua:9` · `mua→geom:7` · `mis→chrome:7` · `sost→math:7` · `mua→cut:6` · `auth→chrome:6` · `workflow→mis:5` · `workflow→replace:5`
 
 > Elenchi completi per-dominio (globali, API) in `scripts/dep_census_out.json`.
 > Ordine di estrazione e meccanismi: `docs/MODULARIZZAZIONE_STUDIO.md` (strategia).
