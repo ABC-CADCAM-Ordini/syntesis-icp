@@ -9,11 +9,14 @@
 <script src="/static/ds/syn-gate.js"></script>
 <script src="/static/ds/syn-render.js"></script>
 <script src="/static/ds/syn-clip.js"></script>
+<script src="/static/ds/syn-math.js"></script>
+<script src="/static/ds/syn-geom.js"></script>
+<script src="/static/ds/syn-color.js"></script>
 <!-- Syntesis-ICP - Analizzare v2
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Analizzare v8.84.2</title>
+<title>Synthesis-ICP - Analizzare v8.85.0</title>
 <!--
 ==== INDICE (§anchor grep-able) ============================================
 Navigazione: grep -n sul token (es. grep -n 'MISURARE-ICP'). Banner UNICI (gate:
@@ -1020,7 +1023,7 @@ function getAnalyzeSbCfg(){ return SCANBODY_CFG[getAnalyzeSbType()] || SCANBODY_
 
 // §ASSETS-B64: MATEMATICA_B64 estratto in /static/assets/matematica.b64.js (Fase 1, caricato in testa)
 // §ASSETS-B64: ANALOGO_B64 estratto in /static/assets/analogo.b64.js (Fase 1, caricato in testa)
-function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8Array(len);for(var i=0;i<len;i++)bytes[i]=bin.charCodeAt(i);return bytes.buffer}
+// §PURELIB: b64toArrayBuffer → /static/ds/syn-geom.js (Fase 4, caricato in testa)
 </script>
 <!-- ==== §IMPORTMAP-THREE ==== -->
 <script type="importmap">
@@ -1326,7 +1329,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.84.2';
+window.ANALIZZA_BUILD = '8.85.0';
 window.ANALIZZA_BUILD_DATE = '2026-07-05';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 
@@ -1554,18 +1557,7 @@ var MUA_COLORS=[0x0065B3,0xF59E0B,0x0D9E6E,0xDC2626,0x8B5CF6,0xEC4899,0x06B6D4,0
   el.addEventListener('touchend',onTE);
 }})();
 
-// STL Parser
-function parseSTL(buffer){var dv=new DataView(buffer),n=dv.getUint32(80,true);if(84+n*50===buffer.byteLength&&n>0){var geo=new THREE.BufferGeometry(),verts=new Float32Array(n*9),norms=new Float32Array(n*9);for(var i=0;i<n;i++){var off=84+i*50,nx=dv.getFloat32(off,true),ny=dv.getFloat32(off+4,true),nz=dv.getFloat32(off+8,true);for(var j=0;j<3;j++){var vi=off+12+j*12;verts[i*9+j*3]=dv.getFloat32(vi,true);verts[i*9+j*3+1]=dv.getFloat32(vi+4,true);verts[i*9+j*3+2]=dv.getFloat32(vi+8,true);norms[i*9+j*3]=nx;norms[i*9+j*3+1]=ny;norms[i*9+j*3+2]=nz}}geo.setAttribute('position',new THREE.BufferAttribute(verts,3));geo.setAttribute('normal',new THREE.BufferAttribute(norms,3));return{geometry:geo,triangles:n}}var text=new TextDecoder().decode(buffer),positions=[],normals=[],fn=[0,0,0];text.split('\n').forEach(function(line){line=line.trim();if(line.startsWith('facet normal')){var p=line.split(/\s+/);fn=[parseFloat(p[2]),parseFloat(p[3]),parseFloat(p[4])]}else if(line.startsWith('vertex')){var p=line.split(/\s+/);positions.push(parseFloat(p[1]),parseFloat(p[2]),parseFloat(p[3]));normals.push(fn[0],fn[1],fn[2])}});var geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(positions),3));geo.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(normals),3));return{geometry:geo,triangles:positions.length/9}}
-
-// ICP
-function centroid(pts){var n=pts.length,c=[0,0,0];for(var i=0;i<n;i++){c[0]+=pts[i][0];c[1]+=pts[i][1];c[2]+=pts[i][2]}return[c[0]/n,c[1]/n,c[2]/n]}
-function kabsch(A,B,W){var n=A.length;if(n<3)return{R:[[1,0,0],[0,1,0],[0,0,1]],t:[0,0,0]};var w=W||A.map(function(){return 1}),sW=0;for(var i=0;i<n;i++)sW+=w[i];var cA=[0,0,0],cB=[0,0,0];for(var i=0;i<n;i++){cA[0]+=A[i][0]*w[i];cA[1]+=A[i][1]*w[i];cA[2]+=A[i][2]*w[i];cB[0]+=B[i][0]*w[i];cB[1]+=B[i][1]*w[i];cB[2]+=B[i][2]*w[i]}cA[0]/=sW;cA[1]/=sW;cA[2]/=sW;cB[0]/=sW;cB[1]/=sW;cB[2]/=sW;var Ac=A.map(function(p){return[p[0]-cA[0],p[1]-cA[1],p[2]-cA[2]]});var Bc=B.map(function(p){return[p[0]-cB[0],p[1]-cB[1],p[2]-cB[2]]});var H=[[0,0,0],[0,0,0],[0,0,0]];for(var i=0;i<n;i++)for(var j=0;j<3;j++)for(var k=0;k<3;k++)H[j][k]+=w[i]*Ac[i][j]*Bc[i][k];var sv=svd3x3(H);var R=matMul(sv.V,transpose(sv.U));if(det3(R)<0){sv.V[0][2]*=-1;sv.V[1][2]*=-1;sv.V[2][2]*=-1;R=matMul(sv.V,transpose(sv.U))}var t=[cB[0]-(R[0][0]*cA[0]+R[0][1]*cA[1]+R[0][2]*cA[2]),cB[1]-(R[1][0]*cA[0]+R[1][1]*cA[1]+R[1][2]*cA[2]),cB[2]-(R[2][0]*cA[0]+R[2][1]*cA[1]+R[2][2]*cA[2])];return{R:R,t:t}}
-function matMul(A,B){var R=[[0,0,0],[0,0,0],[0,0,0]];for(var i=0;i<3;i++)for(var j=0;j<3;j++)for(var k=0;k<3;k++)R[i][j]+=A[i][k]*B[k][j];return R}
-function transpose(M){return[[M[0][0],M[1][0],M[2][0]],[M[0][1],M[1][1],M[2][1]],[M[0][2],M[1][2],M[2][2]]]}
-function det3(M){return M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1])-M[0][1]*(M[1][0]*M[2][2]-M[1][2]*M[2][0])+M[0][2]*(M[1][0]*M[2][1]-M[1][1]*M[2][0])}
-function svd3x3(H){var ATA=matMul(transpose(H),H);var V=[[1,0,0],[0,1,0],[0,0,1]],S=[[ATA[0][0],ATA[0][1],ATA[0][2]],[ATA[1][0],ATA[1][1],ATA[1][2]],[ATA[2][0],ATA[2][1],ATA[2][2]]];for(var iter=0;iter<50;iter++){for(var p=0;p<3;p++)for(var q=p+1;q<3;q++){if(Math.abs(S[p][q])<1e-10)continue;var tau=(S[q][q]-S[p][p])/(2*S[p][q]);var t=((tau>=0)?1:-1)/(Math.abs(tau)+Math.sqrt(1+tau*tau));var c=1/Math.sqrt(1+t*t),s=t*c;var G=[[1,0,0],[0,1,0],[0,0,1]];G[p][p]=c;G[q][q]=c;G[p][q]=s;G[q][p]=-s;S=matMul(matMul(transpose(G),S),G);V=matMul(V,G)}}var sigma=[Math.sqrt(Math.max(0,S[0][0])),Math.sqrt(Math.max(0,S[1][1])),Math.sqrt(Math.max(0,S[2][2]))];var U=[[0,0,0],[0,0,0],[0,0,0]];for(var i=0;i<3;i++){if(sigma[i]>1e-10){for(var j=0;j<3;j++){U[j][i]=0;for(var k=0;k<3;k++)U[j][i]+=H[j][k]*V[k][i];U[j][i]/=sigma[i]}}else{U[0][i]=(i===0)?1:0;U[1][i]=(i===1)?1:0;U[2][i]=(i===2)?1:0}}return{U:U,S:sigma,V:V}}
-function samplePoints(geometry,count){var pos=geometry.attributes.position.array,nTri=pos.length/9,pts=[],step=Math.max(1,Math.floor(nTri/count));for(var i=0;i<nTri&&pts.length<count;i+=step){var idx=i*9;pts.push([(pos[idx]+pos[idx+3]+pos[idx+6])/3,(pos[idx+1]+pos[idx+4]+pos[idx+7])/3,(pos[idx+2]+pos[idx+5]+pos[idx+8])/3])}return pts}
-function runICP(fixedPts,movingPts,maxIter,mW){maxIter=maxIter||40;var moving=movingPts.map(function(p){return p.slice()});var W=mW||movingPts.map(function(){return 1});var Racc=[[1,0,0],[0,1,0],[0,0,1]],tacc=[0,0,0];for(var it=0;it<maxIter;it++){var pf=[],pm=[],pw=[];for(var i=0;i<moving.length;i++){var minD=Infinity,minJ=-1;for(var j=0;j<fixedPts.length;j++){var dx=moving[i][0]-fixedPts[j][0],dy=moving[i][1]-fixedPts[j][1],dz=moving[i][2]-fixedPts[j][2],d=dx*dx+dy*dy+dz*dz;if(d<minD){minD=d;minJ=j}}pf.push(fixedPts[minJ]);pm.push(moving[i]);pw.push(W[i])}var kb=kabsch(pm,pf,pw);for(var i=0;i<moving.length;i++){var p=moving[i],np=[0,0,0];for(var j=0;j<3;j++)np[j]=kb.R[j][0]*p[0]+kb.R[j][1]*p[1]+kb.R[j][2]*p[2]+kb.t[j];moving[i]=np}Racc=matMul(kb.R,Racc);tacc=[kb.R[0][0]*tacc[0]+kb.R[0][1]*tacc[1]+kb.R[0][2]*tacc[2]+kb.t[0],kb.R[1][0]*tacc[0]+kb.R[1][1]*tacc[1]+kb.R[1][2]*tacc[2]+kb.t[1],kb.R[2][0]*tacc[0]+kb.R[2][1]*tacc[1]+kb.R[2][2]*tacc[2]+kb.t[2]]}var rmsd=0;for(var i=0;i<moving.length;i++){var minD=Infinity;for(var j=0;j<fixedPts.length;j++){var dx=moving[i][0]-fixedPts[j][0],dy=moving[i][1]-fixedPts[j][1],dz=moving[i][2]-fixedPts[j][2];minD=Math.min(minD,dx*dx+dy*dy+dz*dz)}rmsd+=minD}rmsd=Math.sqrt(rmsd/moving.length);return{R:Racc,t:tacc,rmsd:rmsd}}
+// §PURELIB: parseSTL, centroid, kabsch, matMul, transpose, det3, svd3x3, samplePoints, runICP → /static/ds/syn-math.js (Fase 4, caricato in testa)
 
 // Init
 function init(){
@@ -2126,46 +2118,7 @@ function placeMUA(rawPoint,rawNormal){
 
 // ICP
 
-// Extract scan points on the flat face near click (for precise ICP targeting)
-function extractScanTopFaceNear(scanGeo, clickPos, clickNormal, radiusMm){
-  // Estrae cilindro corto dalla scansione, SEPARATO in flat (piano appoggio) e side (cilindro laterale)
-  // Priorita' flat (normale allineata al click), side solo per centratura
-  radiusMm = radiusMm || 3.0;
-  var cylHeight = 3.0;
-  var pos = scanGeo.attributes.position.array;
-  var norm = scanGeo.attributes.normal.array;
-  var nTri = pos.length / 9;
-  var flat = [], side = [];
-  var cnx = clickNormal.x, cny = clickNormal.y, cnz = clickNormal.z;
-  var cpx = clickPos.x, cpy = clickPos.y, cpz = clickPos.z;
-  var r2 = radiusMm * radiusMm;
-  for(var i = 0; i < nTri; i++){
-    var ni = i * 9;
-    var cx = (pos[ni] + pos[ni+3] + pos[ni+6]) / 3;
-    var cy = (pos[ni+1] + pos[ni+4] + pos[ni+7]) / 3;
-    var cz = (pos[ni+2] + pos[ni+5] + pos[ni+8]) / 3;
-    var dx = cx - cpx, dy = cy - cpy, dz = cz - cpz;
-    var axialDist = dx*cnx + dy*cny + dz*cnz;
-    if(axialDist > 0.5 || axialDist < -cylHeight) continue;
-    var latX = dx - axialDist*cnx, latY = dy - axialDist*cny, latZ = dz - axialDist*cnz;
-    var latDist2 = latX*latX + latY*latY + latZ*latZ;
-    if(latDist2 > r2) continue;
-    // Normale media triangolo
-    var nx = (norm[ni] + norm[ni+3] + norm[ni+6]) / 3;
-    var ny = (norm[ni+1] + norm[ni+4] + norm[ni+7]) / 3;
-    var nz = (norm[ni+2] + norm[ni+5] + norm[ni+8]) / 3;
-    var nLen = Math.sqrt(nx*nx + ny*ny + nz*nz);
-    if(nLen < 0.01) continue;
-    nx /= nLen; ny /= nLen; nz /= nLen;
-    // Allineamento con la normale del click
-    var alignDot = nx*cnx + ny*cny + nz*cnz;
-    if(alignDot > 0.80) flat.push([cx, cy, cz]);
-    else if(alignDot > -0.3) side.push([cx, cy, cz]);
-    // Esclude normali opposte (interno dell impianto)
-  }
-  function subsample(arr,max){if(arr.length<=max)return arr;var step=Math.floor(arr.length/max),r=[];for(var k=0;k<arr.length;k+=step)r.push(arr[k]);return r}
-  return{flat:subsample(flat,200),side:subsample(side,200)};
-}
+// §PURELIB: extractScanTopFaceNear → /static/ds/syn-geom.js (Fase 4, caricato in testa)
 
 function alignAll(){
   // v7.3.9.082 - DUAL ALGORITHM ROUTING
@@ -3256,30 +3209,7 @@ function toggleAllSB(){
 }
 
 /* ==== §ASSE-MEDIO-CONI ==== */
-// ── EXTRACT TOP FACE ────────────────────────────────────────────
-function extractTopFacePts(geometry){
-  // Estrae punti del cilindro superiore dello scanbody MARCATI per priorita':
-  //   - normale.z > 0.85 -> punto FLAT (peso alto, definisce piano)
-  //   - altrimenti      -> punto SIDE (peso basso, solo centratura XY)
-  var pos=geometry.attributes.position.array;
-  var norm=geometry.attributes.normal.array;
-  var nTri=pos.length/9,zMax=-Infinity;
-  for(var i=0;i<pos.length;i+=3){if(pos[i+2]>zMax)zMax=pos[i+2]}
-  var zThresh=zMax-3.0;
-  var flat=[],side=[];
-  for(var i=0;i<nTri;i++){
-    var ni=i*9;
-    var cx=(pos[ni]+pos[ni+3]+pos[ni+6])/3,cy=(pos[ni+1]+pos[ni+4]+pos[ni+7])/3,cz=(pos[ni+2]+pos[ni+5]+pos[ni+8])/3;
-    if(cz<zThresh)continue;
-    // Normale media del triangolo
-    var avgNz=(norm[ni+2]+norm[ni+5]+norm[ni+8])/3;
-    if(avgNz>0.85)flat.push([cx,cy,cz]);
-    else side.push([cx,cy,cz])
-  }
-  // Subsampling bilanciato: max 150 flat + 150 side
-  function subsample(arr,max){if(arr.length<=max)return arr;var step=Math.floor(arr.length/max),r=[];for(var k=0;k<arr.length;k+=step)r.push(arr[k]);return r}
-  return{flat:subsample(flat,150),side:subsample(side,150)};
-}
+// §PURELIB: extractTopFacePts → /static/ds/syn-geom.js (Fase 4, caricato in testa)
 
 // ── MEAN AXIS ───────────────────────────────────────────────────
 var meanAxisLine=null;
@@ -10073,49 +10003,7 @@ function misICP_bindCutviewWheel(){
 // ║  EXPORT STL (binary) - Scanbody / Matematica / Analogo           ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
-// Estrae i triangoli di una mesh applicando la trasformazione matrixWorld
-// (posizione dal click, orientamento dalla normale, raffinamento ICP).
-function getTransformedTriangles(mesh){
-  if(!mesh || !mesh.geometry) return [];
-  mesh.updateMatrixWorld(true);
-  var m = mesh.matrixWorld;
-  var pos = mesh.geometry.getAttribute('position');
-  if(!pos) return [];
-  var idx = mesh.geometry.getIndex();
-  var out = [];
-  var vA = new THREE.Vector3();
-  var vB = new THREE.Vector3();
-  var vC = new THREE.Vector3();
-  var cb = new THREE.Vector3();
-  var ab = new THREE.Vector3();
-  var n  = new THREE.Vector3();
-
-  function pushTri(ia, ib, ic){
-    vA.fromBufferAttribute(pos, ia).applyMatrix4(m);
-    vB.fromBufferAttribute(pos, ib).applyMatrix4(m);
-    vC.fromBufferAttribute(pos, ic).applyMatrix4(m);
-    cb.subVectors(vC, vB);
-    ab.subVectors(vA, vB);
-    n.crossVectors(cb, ab);
-    var len = n.length();
-    if(len > 0) n.divideScalar(len);
-    out.push({
-      n: [n.x, n.y, n.z],
-      v: [[vA.x, vA.y, vA.z], [vB.x, vB.y, vB.z], [vC.x, vC.y, vC.z]]
-    });
-  }
-
-  if(idx){
-    for(var i = 0; i < idx.count; i += 3){
-      pushTri(idx.getX(i), idx.getX(i+1), idx.getX(i+2));
-    }
-  } else {
-    for(var j = 0; j < pos.count; j += 3){
-      pushTri(j, j+1, j+2);
-    }
-  }
-  return out;
-}
+// §PURELIB: getTransformedTriangles → /static/ds/syn-geom.js (Fase 4, caricato in testa)
 
 // Binary STL: 80-byte header, uint32 LE count, 50 byte per triangolo
 // (normale f32 x3 + vertici f32 x3 x3 + uint16 attribute).
@@ -10298,11 +10186,7 @@ function exportComponents(){
   showStatus(msg);
 }
 
-function _escHtml(s){
-  return String(s || '').replace(/[&<>"']/g, function(c){
-    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-  });
-}
+// §PURELIB: _escHtml → /static/ds/syn-color.js (Fase 4, caricato in testa)
 
 // Keyboard shortcut: Ctrl+Z / Cmd+Z per undo
 document.addEventListener('keydown', function(e){
@@ -10375,74 +10259,7 @@ function closeCutView(){
   document.getElementById('cutViewOverlay').style.display = 'none';
 }
 
-// Intersezione piano-triangolo: ritorna 0 o 2 punti (un segmento)
-function intersectPlaneTriangle(p, planePoint, planeNormal){
-  // p = [[x,y,z],[x,y,z],[x,y,z]]
-  // Distanza segno dei 3 vertici dal piano
-  var d = [0,0,0];
-  for(var i = 0; i < 3; i++){
-    d[i] = (p[i][0] - planePoint[0]) * planeNormal[0]
-         + (p[i][1] - planePoint[1]) * planeNormal[1]
-         + (p[i][2] - planePoint[2]) * planeNormal[2];
-  }
-  var positives = 0, negatives = 0, zeros = 0;
-  for(var i = 0; i < 3; i++){
-    if(d[i] > 1e-6) positives++;
-    else if(d[i] < -1e-6) negatives++;
-    else zeros++;
-  }
-  // Se tutti dallo stesso lato: no intersezione
-  if(positives === 3 || negatives === 3) return null;
-  if(zeros === 3) return null; // triangolo nel piano, ignoro
-  
-  // Trovo le 2 edge che attraversano il piano
-  var pts = [];
-  for(var i = 0; i < 3; i++){
-    var j = (i + 1) % 3;
-    if(d[i] * d[j] < 0){
-      // Edge attraversa il piano, interpolo
-      var t = d[i] / (d[i] - d[j]);
-      pts.push([
-        p[i][0] + t * (p[j][0] - p[i][0]),
-        p[i][1] + t * (p[j][1] - p[i][1]),
-        p[i][2] + t * (p[j][2] - p[i][2])
-      ]);
-    } else if(d[i] === 0){
-      pts.push([p[i][0], p[i][1], p[i][2]]);
-    }
-  }
-  if(pts.length === 2) return pts;
-  return null;
-}
-
-// Estrai tutti i segmenti di intersezione da una BufferGeometry trasformata
-function extractCutSegments(geometry, matrixWorld, planePoint, planeNormal){
-  var pos = geometry.attributes.position.array;
-  var nTri = pos.length / 9;
-  var segments = [];
-  var v = new THREE.Vector3();
-  for(var i = 0; i < nTri; i++){
-    var ni = i * 9;
-    var tri = [];
-    for(var j = 0; j < 3; j++){
-      v.set(pos[ni + j*3], pos[ni + j*3 + 1], pos[ni + j*3 + 2]);
-      if(matrixWorld) v.applyMatrix4(matrixWorld);
-      tri.push([v.x, v.y, v.z]);
-    }
-    var seg = intersectPlaneTriangle(tri, planePoint, planeNormal);
-    if(seg) segments.push(seg);
-  }
-  return segments;
-}
-
-// Proietta punto 3D su piano 2D (assi u, w definiti dal piano)
-function projectTo2D(pt3, origin, uAxis, wAxis){
-  var dx = pt3[0] - origin[0], dy = pt3[1] - origin[1], dz = pt3[2] - origin[2];
-  return [
-    dx * uAxis[0] + dy * uAxis[1] + dz * uAxis[2],
-    dx * wAxis[0] + dy * wAxis[1] + dz * wAxis[2]
-  ];
-}
+// §PURELIB: intersectPlaneTriangle, extractCutSegments, projectTo2D → /static/ds/syn-geom.js (Fase 4, caricato in testa)
 
 function renderCutView(){
   var mua = muaObjects[cutState.muaIdx];
@@ -10599,12 +10416,7 @@ function toggleMuaExpand(num){
 
 
 // ── DIVERGENCE LABELS (HTML overlay) ────────────────────────────
-function classifyDivergence(angle){
-  if(angle <= 15) return 'good';
-  if(angle <= 25) return 'warn';
-  if(angle <= 45) return 'risk';
-  return 'bad';
-}
+// §PURELIB: classifyDivergence → /static/ds/syn-color.js (Fase 4, caricato in testa)
 
 
 
@@ -11227,16 +11039,7 @@ function getMuaByGroup(){
 
 // Helper: colore unico per badge gruppo
 
-// Helper v7.3.9.082: colore freccia di setup per gruppo
-// Distinto da getGroupBadgeColor per coerenza visiva (gid 0 blu primario,
-// non grigio come il badge che e' "senza gruppo")
-function getGroupArrowColor(gid){
-  var colors = ['#0065B3', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899', '#06B6D4'];
-  return colors[(gid|0) % colors.length];
-}
-function getGroupArrowColorInt(gid){
-  return parseInt(getGroupArrowColor(gid).replace('#',''), 16);
-}
+// §PURELIB: getGroupArrowColor, getGroupArrowColorInt → /static/ds/syn-color.js (Fase 4, caricato in testa)
 
 function getGroupBadgeColor(gid){
   var colors = ['#64748B', '#0065B3', '#8B5CF6', '#EC4899', '#10B981', '#F59E0B'];
@@ -11349,35 +11152,7 @@ var UNDERCUT_T1 = 80.0; // <= safe
 var UNDERCUT_T2 = 88.0; // <= warning
 var UNDERCUT_T3 = 90.0; // <= critico
 
-// Dato un angolo (gradi), ritorna il colore RGB [r,g,b] in 0..1
-// Gradiente continuo tipo "jet": blu(0°)->ciano(30°)->verde(50°)->giallo(65°)->arancio(80°)->rosso(90°)->rossoscuro(>90°)
-function undercutColorForAngle(ang){
-  // Punti chiave del gradiente (angolo, [r,g,b])
-  var stops = [
-    [  0, [0.00, 0.20, 0.80]],  // blu scuro
-    [ 30, [0.00, 0.72, 1.00]],  // ciano
-    [ 50, [0.27, 1.00, 0.40]],  // verde
-    [ 65, [1.00, 1.00, 0.00]],  // giallo
-    [ 80, [1.00, 0.42, 0.00]],  // arancio
-    [ 90, [0.90, 0.00, 0.00]]   // rosso
-  ];
-  if(ang <= 0) return stops[0][1];
-  if(ang > 90) return [0.50, 0.00, 0.00]; // rosso scuro (sottosquadro)
-  // Trova il segmento e interpola linearmente
-  for(var i = 0; i < stops.length - 1; i++){
-    var a0 = stops[i][0], a1 = stops[i+1][0];
-    if(ang >= a0 && ang <= a1){
-      var t = (ang - a0) / (a1 - a0);
-      var c0 = stops[i][1], c1 = stops[i+1][1];
-      return [
-        c0[0] + (c1[0]-c0[0])*t,
-        c0[1] + (c1[1]-c0[1])*t,
-        c0[2] + (c1[2]-c0[2])*t
-      ];
-    }
-  }
-  return stops[stops.length-1][1];
-}
+// §PURELIB: undercutColorForAngle → /static/ds/syn-color.js (Fase 4, caricato in testa)
 
 // Costruisce l'array colors-per-vertex per la mesh matMesh del MUA
 // rispetto all'asse medio del gruppo (o asse MUA se non disponibile)
@@ -11664,11 +11439,7 @@ function applyRenderModeToScene(){
   if(typeof sostApplyRenderMode === 'function') sostApplyRenderMode();
 }
 
-// Crea una CanvasTexture lineare con due colori e angolo
-function makeGradientTexture(c1, c2, angleDeg){
-  // Delega alla fonte unica ds/syn-render.js (logica identica: canvas 2D sRGB, stesso angolo/colori).
-  return SynRender.makeGradientTexture(THREE, c1, c2, angleDeg);
-}
+// §PURELIB: makeGradientTexture → /static/ds/syn-geom.js (Fase 4, caricato in testa)
 
 // Genera CSS background per il viewport (<div>) -- stesso risultato della texture Three
 function envBgCss(){
@@ -15477,35 +15248,7 @@ function _sostCapAnchoredPose(scanGeo, center0, axis0, R){
 // Offline (id2161 grezzo): held-out 2.62µm vs cap-plane 4.61µm; dimezza l'incertezza d'asse. Per-marker, NO cross-marker.
 // Init = posa cap-plane (8.69.6). Opt-in 'syntesis_sost_method_c'='on'; DEFAULT OFF; shadow-loggato sempre nel CSV.
 function _sostMCOn(){ try { return localStorage.getItem('syntesis_sost_method_c')==='on'; } catch(e){ return false; } }
-function _mcMedian(arr){ var s=arr.slice().sort(function(a,b){return a-b;}); var n=s.length,m=n>>1; return (n%2===0)?(s[m-1]+s[m])/2:s[m]; }
-function _mcTukey(res,c){
-  var med=_mcMedian(res); var ad=new Array(res.length),i;
-  for(i=0;i<res.length;i++) ad[i]=Math.abs(res[i]-med);
-  var s=Math.max(1.4826*_mcMedian(ad),1e-6); var w=new Array(res.length);
-  for(i=0;i<res.length;i++){ var z=(res[i]-med)/s, az=Math.abs(z); w[i]=(az>=c)?0:Math.pow(1-(z/c)*(z/c),2); }
-  return w;
-}
-function _mcBasis(ax){
-  var aL=Math.hypot(ax[0],ax[1],ax[2])||1; var a=[ax[0]/aL,ax[1]/aL,ax[2]/aL];
-  var ref=(Math.abs(a[0])<0.8)?[1,0,0]:[0,1,0];
-  var u=[a[1]*ref[2]-a[2]*ref[1], a[2]*ref[0]-a[0]*ref[2], a[0]*ref[1]-a[1]*ref[0]];
-  var uL=Math.hypot(u[0],u[1],u[2])||1; u=[u[0]/uL,u[1]/uL,u[2]/uL];
-  var v=[a[1]*u[2]-a[2]*u[1], a[2]*u[0]-a[0]*u[2], a[0]*u[1]-a[1]*u[0]];
-  return {u:u,v:v,a:a};
-}
-function _mcSolveLin(A,b){
-  var n=b.length,i,r,c; var M=[]; for(i=0;i<n;i++){ M[i]=A[i].slice(); M[i].push(b[i]); }
-  for(i=0;i<n;i++){
-    var p=i; for(r=i+1;r<n;r++) if(Math.abs(M[r][i])>Math.abs(M[p][i])) p=r;
-    if(Math.abs(M[p][i])<1e-20) return null;
-    var t=M[i]; M[i]=M[p]; M[p]=t;
-    for(r=i+1;r<n;r++){ var f=M[r][i]/M[i][i]; for(c=i;c<=n;c++) M[r][c]-=f*M[i][c]; }
-  }
-  var x=new Array(n);
-  for(i=n-1;i>=0;i--){ var s=M[i][n]; for(c=i+1;c<n;c++) s-=M[i][c]*x[c]; x[i]=s/M[i][i]; }
-  return x;
-}
-function _mcDot(a,b){ var s=0; for(var i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
+// §PURELIB: _mcMedian, _mcTukey, _mcBasis, _mcSolveLin, _mcDot → /static/ds/syn-math.js (Fase 4, caricato in testa)
 // fit_semantic: crop sfera 6mm attorno a cInit, bande cap/wall rel. (cInit,aInit), LM+IRLS. fitR=true -> 6° DOF (R).
 function _sostMethodCFit(scanGeo, cInit, aInit, Rinit, wc, ww, wn, fitR){
   if(!scanGeo || !scanGeo.attributes || !scanGeo.attributes.position) return null;
