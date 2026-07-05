@@ -502,28 +502,28 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 <!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
 
-### Fotografia (8.84.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+### Fotografia (8.84.1 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
 
 | Metrica | Valore |
 |---|---|
-| Righe / peso | **20190** / **1.06 MB** |
-| JS applicativo REALE | **17868** righe in 8 blocchi `<script>` (grezzo 17868, meno il blob B64) |
+| Righe / peso | **20235** / **1.07 MB** |
+| JS applicativo REALE | **17860** righe in 8 blocchi `<script>` (grezzo 17860, meno il blob B64) |
 | Asset B64 embedded | **0.0 MB** in 0 righe (**0%** del file) |
 | Funzioni top-level | 491 |
-| Globali condivise | 145 (di cui **38** toccate da 2+ domini) |
+| Globali condivise | 145 (di cui **37** toccate da 2+ domini) |
 | Export surface (handler inline) | 141 funzioni da preservare su `window` |
 
 ### Domini: dimensione e superficie di accoppiamento
 
 | Dominio | # fn | stato scritto→altri | stato letto←altri | API inline | API cross-dominio |
 |---|---|---|---|---|---|
-| `mis` | 123 | 3 | 4 | 19 | 7 |
+| `mis` | 123 | 2 | 4 | 19 | 7 |
 | `replace` | 92 | 7 | 8 | 33 | 11 |
 | `sost` | 47 | 7 | 6 | 16 | 10 |
 | `fres` | 39 | 1 | 1 | 7 | 3 |
 | `mua` | 37 | 5 | 11 | 14 | 25 |
 | `env` | 33 | 4 | 0 | 18 | 5 |
-| `workflow` | 15 | 16 | 10 | 5 | 1 |
+| `workflow` | 15 | 16 | 9 | 5 | 1 |
 | `math` | 14 | 0 | 0 | 0 | 9 |
 | `tree` | 13 | 0 | 7 | 8 | 3 |
 | `diag` | 12 | 0 | 0 | 4 | 10 |
@@ -534,11 +534,11 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 | `auth` | 6 | 0 | 0 | 3 | 0 |
 | `scene` | 5 | 0 | 6 | 0 | 4 |
 | `log` | 5 | 0 | 0 | 0 | 1 |
-| `report` | 4 | 0 | 3 | 1 | 0 |
 | `io` | 4 | 1 | 8 | 1 | 1 |
+| `report` | 4 | 0 | 3 | 1 | 0 |
+| `bootstrap` | 3 | 2 | 7 | 1 | 1 |
 | `other` | 3 | 0 | 0 | 0 | 3 |
 | `cut` | 3 | 0 | 1 | 3 | 3 |
-| `bootstrap` | 3 | 2 | 7 | 1 | 1 |
 | `find` | 1 | 0 | 0 | 0 | 1 |
 
 ### Accoppiamenti call-graph più pesanti (dominio→dominio: # funzioni)

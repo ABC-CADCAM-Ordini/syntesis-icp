@@ -2107,3 +2107,54 @@ Verifica end-to-end attesa:
 - Schema renderizzato nitido.
 - Numero totale pagine = 19 (era 18) sul caso di test 001422_modificato3 vs 001422_modificato2.
 - `/api/registry/constants` risponde con `backend_version: 8.1.8-A.5.1` su entrambi i domini Railway.
+
+---
+
+## Commenti-storia migrati dal sorgente (Fase 2 modularizzazione, 2026-07-05)
+
+Blocchi rimossi da `syntesis-analyzer-v3b.html` perché raccontavano solo il passato
+(le spiegazioni ATTUALI restano nel codice; il changelog canonico è registry.py History).
+
+```
+// 8.81.0 CLEANUP (audit 8.80.4): rimossi sostOnTemplateChange (il container
+// #sostTemplateRadio non esiste piu' dal 2026-04-23) e SOSTITUIRE_Z_OFFSET_UNIVERSAL
+// (-0.40, taratura 2026-04-23; dead code gia' tracciato nella History 8.62.2 —
+// il valore storico resta in git e in registry.py History 8.68.0).
+// 8.81.1: rimossa anche l'intera catena "template custom" (decisione utente):
+// #sostInputCustom + #sostCustomName (markup), sostOnCustomPicked, sostCustomStlBuffer
+// e relativi reset. Era uno stub del prototipo 23-04-2026 MAI agganciato al motore
+// di posa (il buffer non veniva letto da sostPlaceTemplate/sostDecodeTemplate) e
+// irraggiungibile da UI da quel giorno. L'esigenza "CAD proprio come sostituto" e'
+// coperta da Replace-iT + librerie /gestione (8.50.0+).
+```
+
+```
+  // La versione precedente duplicava una PARTE della pulizia e lasciava buchi:
+  //   - misICP_stlA/stlB/trisA/trisB non azzerati -> al rientro in Misurare bastava
+  //     caricare il solo A perche' "Esegui" confrontasse col B FANTASMA della
+  //     sessione precedente (dropzone B visivamente vuota);
+  //   - la modalita' click-to-seed (8.70.x) sopravviveva al cambio workflow: mesh
+  //     grezza + marker in scena, listener pointerdown attivo, seedMode=true
+  //     (gemello del bug 8.80.2);
+  //   - toglieva la classe 'loaded' dalle dropzone, ma il load applica 'ok';
+  //   - non nascondeva #misSummary/#misScbListWrap (riepilogo stantio al rientro).
+```
+
+```
+// 8.81.0 CLEANUP (audit 8.80.4): rimossi sostOnZOffsetChange + sostApplyOffsetDelta
+// (lo slider #sostZOffset non esiste piu' nel markup; sostApplyOffsetDelta era
+// chiamata SOLO dal handler morto) e sostOnExportTemplateChange +
+// sostOnExportContentChange (i radio-container #sostExportAsRadio /
+// #sostExportContentRadio non esistono piu'; le var sostExportTemplate /
+// sostExportContent non erano LETTE da nessuno — l'export 8.46.0+ sceglie
+// dall'albero scena).
+```
+
+```
+// Audit C8 (cleanup 2026-05-06): rimosse 5 ridefinizioni morte di
+// fresClearAllArrows() e 5 di fresBuildAllArrows() ravvicinate qui sopra
+// (r.5029-5234 storiche). Erano residuo di un refactor non concluso
+// dell'arrow rendering: le 5 versioni precedenti erano shadowate dalla
+// 6a (sotto) tramite hoisting JS, quindi dead code che non veniva mai
+// eseguito. La versione attiva e' l'unica seguente.
+```

@@ -13,8 +13,52 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Analizzare v8.84.0</title>
+<title>Synthesis-ICP - Analizzare v8.84.1</title>
+<!--
+==== INDICE (§anchor grep-able) ============================================
+Navigazione: grep -n sul token (es. grep -n 'MISURARE-ICP'). Banner UNICI (gate:
+scripts/gate/check_anchors.py). NON usare numeri di riga nei riferimenti:
+driftano a ogni edit; gli anchor no. Convenzioni: docs/frontend/CONTRIBUTING.md.
+  §CSS-GLOBALE               foglio stile unico: layout, toolbar, pannelli, temi
+  §BOOTSTRAP-SYN             fallback sincrono window.SYN prima di ogni lettore
+  §MARKUP-HEADER-TOOLBAR     header, logo, drop overlay, toolbar workflow
+  §MARKUP-MAIN-VIEWPORT      viewport 3D, overlay fissi, layersPanel, albero Misurare
+  §MARKUP-PANNELLO-DESTRO    rightPanel: rail e sezioni dei 5 workflow
+  §ASSETS-B64                asset CAD B64 esterni (Fase 1): 6 script + logo
+  §SCANBODY-SELECTOR-LAB     selettore tipo scanbody 1T3/OS/SR, decode b64
+  §IMPORTMAP-THREE           importmap three r169, bridge ESM, CDN jsPDF/xlsx
+  §SYNREGISTRY-CORE          Synthesis Core Fase 1: SynRegistry, SynIcons, theme
+  §MAIN-CORE-3D              core: OrbitControls, parseSTL, kabsch/ICP, init, loadScan, placeMUA
+  §FILE-MENU-ALBERO          menu file, salva caso JSON, layer tree, opacita
+  §ASSE-MEDIO-CONI           extract top face, asse medio, coni divergenza
+  §MUA-MANAGEMENT            delete/undo/reset MUA, nuovo caso, esporta caso
+  §WORKFLOW-SWITCH           selectWorkflow, toggle toolbar, reset totale sessione
+  §FRESABILITA               modulo fresabilita 5 assi, frecce, overlay scene
+  §MISURARE-ICP              motore Misurare: pSTL, componenti, Kabsch+SVD+ICP
+  §ASSE-CILINDRO-CONN        asse cap-based, connessione clinica 8.64.x, disegno origine
+  §MISURARE-PDF              report PDF Misurare 6 pagine dal Comparator
+  §REPORT-PIPELINE           pipeline report multi-formato, disegni tecnici, note/glossario
+  §CERTIFICATO-TARATURA      certificato taratura: modal, pagine PDF, appendici
+  §MISURARE-VIZ              label 3D, cutview, albero CATIA di Misurare
+  §EXPORT-STL                export STL binario scanbody/matematica/analogo
+  §CUTVIEW-POPUP             cut view popup Analizza, divergence labels overlay
+  §ANALISI-CLINICA           banner clinico, visibilita scansione, gruppi MUA
+  §SPLINE-UNDERCUT           spline di gruppo, undercut map connessione IPD
+  §IMPOSTAZIONI-RUNTIME      ambiente, render mode, fresatore, controlli 3D, UI zoom
+  §SOSTITUIRE                Sostituire: template b64, click placement, findScanbodyCenter
+  §REPLACE-IT                Replace-iT: UI, fetch librerie, seeding 3 punti, allineamento
+  §REPLACE-CUT-SCAN          taglio scansione adattivo attorno ai marker Replace-iT
+  §SOST-CENTRAGGIO-ROBUSTO   centraggio robusto asse lateral-wall, diagnostica click
+  §SOST-RAFFINA-FINALE       Raffina ICP, lista marker, pulizia scena, visibilita artefatti
+  §MARKUP-MODALI             modali: crea gruppo, export sost/replace, settingsDialog
+  §VMBAR                     view mode bar: CSS, markup e logica solid/wireframe
+  §MARKUP-CALIBRAZIONE       include syn-panel e modal certificato taratura
+  §AUTH-LOGIN                auth: token localStorage, login, gating UI
+  §REPORT-MUA-PDF            report MUA PDF 6 pagine: copertina, angolare, criticita
+=============================================================================
+-->
 <style>
+/* ==== §CSS-GLOBALE ==== */
 /* v7.3.9.082 - Cornice colorata sul body + overflow:hidden per spigoli arrotondati */
 html{background:#000;margin:0;padding:0}
 body{
@@ -907,6 +951,7 @@ body:not(.expert-mode) .expert-only{display:none !important}
 body.expert-mode .expert-hide{display:none !important}
 </style>
 <script>
+/* ==== §BOOTSTRAP-SYN ==== */
 // ── A.5.1 BOOTSTRAP window.SYN ────────────────────────────────────
 // Fallback canonico SINCRONO: deve essere disponibile prima di qualsiasi
 // codice (SCANBODY_CFG, MUA_*, MIS_CLIN, ...) che legga window.SYN.*
@@ -977,6 +1022,7 @@ if (document.readyState === 'loading') {
 }
 </script>
 </head>
+<!-- ==== §MARKUP-HEADER-TOOLBAR ==== -->
 <body><div class="header">
   <img class="logo-img" src="/static/assets/logo.png" alt="Syntesis-ICP">
   <div class="workflow-title-block">
@@ -1214,6 +1260,7 @@ if (document.readyState === 'loading') {
   </div>
 </div>
 
+<!-- ==== §MARKUP-MAIN-VIEWPORT ==== -->
 <div class="main">
   <div class="drop-overlay" id="dropOverlay"><div class="drop-text">Rilascia la scansione STL qui</div></div>
 
@@ -1418,6 +1465,7 @@ if (document.readyState === 'loading') {
     </div>
   </div>
 
+<!-- ==== §MARKUP-PANNELLO-DESTRO ==== -->
   <div class="panel" id="rightPanel">
     <!-- Strisce con icone visibili solo quando la colonna e' collassata in rail mode -->
     <div class="panel-rail-icons" id="panelRailTitles">
@@ -1804,6 +1852,7 @@ if (document.readyState === 'loading') {
   <div class="stat">Div. media: <span class="num" id="avgDiv">--</span></div>
 </div>
 
+<!-- ==== §ASSETS-B64 ==== -->
 <!-- ==== §ASSETS-B64 (Fase 1 modularizzazione): asset CAD estratti VERBATIM. -->
 <!-- Script CLASSICI SINCRONI in-order: le var globali esistono prima di ogni consumer -->
 <script src="/static/assets/scanbody-1t3.b64.js"></script>
@@ -1817,6 +1866,7 @@ if (document.readyState === 'loading') {
 // §ASSETS-B64: SCANBODY_OS_B64 estratto in /static/assets/scanbody-os.b64.js (Fase 1, caricato in testa)
 // §ASSETS-B64: SCANBODY_SR_B64 estratto in /static/assets/scanbody-sr.b64.js (Fase 1, caricato in testa)
 
+/* ==== §SCANBODY-SELECTOR-LAB ==== */
 // ── /lab v8.0.0-fase4: Scanbody type selector (1T3 / OS) ─────────
 // Configurazione per Analizza:
 //   1T3 -> cap z=10, raggio 2.515, searchR 5.0mm (default storico)
@@ -1862,6 +1912,7 @@ function getAnalyzeSbCfg(){ return SCANBODY_CFG[getAnalyzeSbType()] || SCANBODY_
 // §ASSETS-B64: ANALOGO_B64 estratto in /static/assets/analogo.b64.js (Fase 1, caricato in testa)
 function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8Array(len);for(var i=0;i<len;i++)bytes[i]=bin.charCodeAt(i);return bytes.buffer}
 </script>
+<!-- ==== §IMPORTMAP-THREE ==== -->
 <script type="importmap">
 { "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.169.0/three.module.min.js" } }
 </script>
@@ -1889,6 +1940,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
+<!-- ==== §SYNREGISTRY-CORE ==== -->
 <!-- ================================================================
      SYNTHESIS CORE - iniezione Fase 1 (28 aprile 2026)
      Aggiunge SynRegistry/SynIcons/theme senza modificare il codice
@@ -2149,6 +2201,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 <script>
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §MAIN-CORE-3D ==== */
 // ║  SYNTESIS-ICP ANALYZER MUA                                      ║
 // ║  Struttura modulare (pronto per estrazione in file separati)    ║
 // ║                                                                  ║
@@ -2163,7 +2216,7 @@ function b64toArrayBuffer(b64){var bin=atob(b64),len=bin.length,bytes=new Uint8A
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.84.0';
+window.ANALIZZA_BUILD = '8.84.1';
 window.ANALIZZA_BUILD_DATE = '2026-07-05';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 
@@ -3552,6 +3605,7 @@ function updateMuaPanel(){
 }
 
 function resetCamera(){if(!scanMesh)return;var c=scanMesh.geometry.boundingSphere.center,r=scanMesh.geometry.boundingSphere.radius;controls.target.copy(c);camera.position.set(c.x+r*1.5,c.y+r,c.z+r*1.5)}
+/* ==== §FILE-MENU-ALBERO ==== */
 // ── FILE MENU ─────────────────────────────────────────────
 function toggleFileMenu(ev){
   ev.stopPropagation();
@@ -4091,6 +4145,7 @@ function toggleAllSB(){
   rebuildTree();
 }
 
+/* ==== §ASSE-MEDIO-CONI ==== */
 // ── EXTRACT TOP FACE ────────────────────────────────────────────
 function extractTopFacePts(geometry){
   // Estrae punti del cilindro superiore dello scanbody MARCATI per priorita':
@@ -4312,6 +4367,7 @@ function calcMeanAxis(){
 
 
 
+/* ==== §MUA-MANAGEMENT ==== */
 // ── MUA MANAGEMENT (delete, undo, reset) ────────────────────────
 function removeMUA(idx){
   var m = muaObjects[idx];
@@ -4568,6 +4624,7 @@ function exportCase(){
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §WORKFLOW-SWITCH ==== */
 // ║  WORKFLOW SWITCH: Analizza / Accoppia / Misurare                ║
 // ╚══════════════════════════════════════════════════════════════════╝
 // v6: il toggle Misura/Accoppia e' stato sostituito da un menu WorkFlow
@@ -4728,15 +4785,6 @@ function _hardResetAnalizza(){
 
 function _hardResetMisurare(){
   // 8.80.4: riscritto delegando a misICP_reset() (il Reset ufficiale del workflow).
-  // La versione precedente duplicava una PARTE della pulizia e lasciava buchi:
-  //   - misICP_stlA/stlB/trisA/trisB non azzerati -> al rientro in Misurare bastava
-  //     caricare il solo A perche' "Esegui" confrontasse col B FANTASMA della
-  //     sessione precedente (dropzone B visivamente vuota);
-  //   - la modalita' click-to-seed (8.70.x) sopravviveva al cambio workflow: mesh
-  //     grezza + marker in scena, listener pointerdown attivo, seedMode=true
-  //     (gemello del bug 8.80.2);
-  //   - toglieva la classe 'loaded' dalle dropzone, ma il load applica 'ok';
-  //   - non nascondeva #misSummary/#misScbListWrap (riepilogo stantio al rientro).
   try {
     if(typeof misICP_seedExit === 'function'){ try { misICP_seedExit(false); } catch(e){} }
     if(typeof misICP_unmountViewport === 'function') misICP_unmountViewport();
@@ -5056,6 +5104,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §FRESABILITA ==== */
 // ║  FRESABILITA' AVANZATA — modulo additivo (v0.5 specifica)         ║
 // ║                                                                   ║
 // ║  Spec: FRESABILITY_MODEL_v0.5.md                                  ║
@@ -5366,12 +5415,6 @@ function fresBuildArrow(gid, origin){
   return grp;
 }
 
-// Audit C8 (cleanup 2026-05-06): rimosse 5 ridefinizioni morte di
-// fresClearAllArrows() e 5 di fresBuildAllArrows() ravvicinate qui sopra
-// (r.5029-5234 storiche). Erano residuo di un refactor non concluso
-// dell'arrow rendering: le 5 versioni precedenti erano shadowate dalla
-// 6a (sotto) tramite hoisting JS, quindi dead code che non veniva mai
-// eseguito. La versione attiva e' l'unica seguente.
 function fresClearAllArrows(){
   Object.keys(fresState.arrowsByGid).forEach(function(k){
     var g = fresState.arrowsByGid[k];
@@ -5998,6 +6041,7 @@ function fresDetachMouseHandlers(){
 
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §MISURARE-ICP ==== */
 // ║  MISURARE ICP: Kabsch+SVD+ICP tra due STL                        ║
 // ╚══════════════════════════════════════════════════════════════════╝
 // Matematica portata verbatim da modulo-4-calibrare.html (Comparator v7).
@@ -6407,6 +6451,7 @@ function misICP_applyTform(tris,R,t){
   });
 }
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §ASSE-CILINDRO-CONN ==== */
 // ║  ASSE DEL CILINDRO: metodo cap-based (verbatim dal Comparator)   ║
 // ╠══════════════════════════════════════════════════════════════════╣
 // ║  Lavora sui vertici dei triangoli, non sulle face-normals: cosi  ║
@@ -7626,6 +7671,7 @@ function misICP_reset(){
 
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §MISURARE-PDF ==== */
 // ║  MISURARE PDF: report 6 pagine (copertina + 1 per scanbody)      ║
 // ║  Pipeline portata verbatim dalla funzione pdf() del Comparator v7 ║
 // ║  (modulo-4-calibrare.html, linee 2517-2920). Le pagine 7-16 delle ║
@@ -8119,6 +8165,7 @@ function misICP_paintView(cv, triA, triB, trisBg, ax1, ax2, axD, title){
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §REPORT-PIPELINE ==== */
 // ║  PIPELINE REPORT MULTI-FORMATO (v7.3.9.001)                       ║
 // ║                                                                   ║
 // ║  Quattro tipi di report sulla stessa sorgente dati:               ║
@@ -9345,6 +9392,7 @@ function misICP_renderClinicalPDF(data){
 // ────────────────────────────────────────────────────────────────────
 
 
+/* ==== §CERTIFICATO-TARATURA ==== */
 // ── CERTIFICATO DI TARATURA v7.3.9.082 ─────────────────────────────
 // Modal di raccolta metadati + helpers di classificazione PASS/VERIFICA/FAIL
 // Soglie industriali standard: PASS \u2264 50\u00b5m, VERIFICA 50-100\u00b5m, FAIL > 100\u00b5m
@@ -10359,6 +10407,7 @@ function misICP_generatePDF(){
 
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §MISURARE-VIZ ==== */
 // ║  MISURARE LABELS 3D: #N · d3um_µm  sopra ogni scanbody            ║
 // ╚══════════════════════════════════════════════════════════════════╝
 // Usa overlay HTML posizionato in assoluto sul viewport. Ad ogni frame
@@ -10910,6 +10959,7 @@ function misICP_bindCutviewWheel(){
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §EXPORT-STL ==== */
 // ║  EXPORT STL (binary) - Scanbody / Matematica / Analogo           ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
@@ -11170,6 +11220,7 @@ document.addEventListener('keydown', function(e){
 
 
 
+/* ==== §CUTVIEW-POPUP ==== */
 // ── CUT VIEW POPUP ──────────────────────────────────────────────
 var cutState = {
   angle: 0,           // gradi rotazione piano attorno all asse MUA
@@ -11579,6 +11630,7 @@ function toggleDivergenceLabels(on){
 }
 
 
+/* ==== §ANALISI-CLINICA ==== */
 // ── ANALISI CLINICA: INSERIBILITA' + FRESABILITA' ────────────────
 function updateClinicalBanner(status){
   var banner = document.getElementById('clinicalBanner');
@@ -12082,6 +12134,7 @@ function getGroupBadgeColor(gid){
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §SPLINE-UNDERCUT ==== */
 // ║  SPLINE DI GRUPPO: curva morbida che collega i MUA di un gruppo   ║
 // ╚══════════════════════════════════════════════════════════════════╝
 // Per ogni gruppo con >= 2 MUA crea una CatmullRomCurve3 che passa per
@@ -12383,6 +12436,7 @@ function refreshActiveUndercutMaps(){
 
 
 
+/* ==== §IMPOSTAZIONI-RUNTIME ==== */
 // ── IMPOSTAZIONI AMBIENTE ───────────────────────────────────────
 var MUA_PALETTES = {
   'syntesis': { name: 'Syntesis', colors: [0x0065B3, 0xF59E0B, 0x0D9E6E, 0xDC2626, 0x8B5CF6, 0xEC4899, 0x06B6D4, 0x84CC16] },
@@ -13106,6 +13160,7 @@ function saveSettings(){
 
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §SOSTITUIRE ==== */
 // ║  SOSTITUIRE: sostituzione scan body via clic manuale              ║
 // ║  Pipeline identica ad Analizza: findScanbodyCenter + placement    ║
 // ╚══════════════════════════════════════════════════════════════════╝
@@ -13251,17 +13306,6 @@ function sostShowStatus(msg, isError){
   s.style.color = isError ? '#EF4444' : 'var(--gray)';
 }
 
-// 8.81.0 CLEANUP (audit 8.80.4): rimossi sostOnTemplateChange (il container
-// #sostTemplateRadio non esiste piu' dal 2026-04-23) e SOSTITUIRE_Z_OFFSET_UNIVERSAL
-// (-0.40, taratura 2026-04-23; dead code gia' tracciato nella History 8.62.2 —
-// il valore storico resta in git e in registry.py History 8.68.0).
-// 8.81.1: rimossa anche l'intera catena "template custom" (decisione utente):
-// #sostInputCustom + #sostCustomName (markup), sostOnCustomPicked, sostCustomStlBuffer
-// e relativi reset. Era uno stub del prototipo 23-04-2026 MAI agganciato al motore
-// di posa (il buffer non veniva letto da sostPlaceTemplate/sostDecodeTemplate) e
-// irraggiungibile da UI da quel giorno. L'esigenza "CAD proprio come sostituto" e'
-// coperta da Replace-iT + librerie /gestione (8.50.0+).
-
 // Scansione di partenza: marker presente nella Multi-A
 function sostOnSourceChange(radio){
   sostSourceTemplate = radio.value;
@@ -13270,14 +13314,6 @@ function sostOnSourceChange(radio){
   labels.forEach(function(l){ l.classList.remove('active'); });
   radio.parentElement.classList.add('active');
 }
-
-// 8.81.0 CLEANUP (audit 8.80.4): rimossi sostOnZOffsetChange + sostApplyOffsetDelta
-// (lo slider #sostZOffset non esiste piu' nel markup; sostApplyOffsetDelta era
-// chiamata SOLO dal handler morto) e sostOnExportTemplateChange +
-// sostOnExportContentChange (i radio-container #sostExportAsRadio /
-// #sostExportContentRadio non esistono piu'; le var sostExportTemplate /
-// sostExportContent non erano LETTE da nessuno — l'export 8.46.0+ sceglie
-// dall'albero scena).
 
 // ── Caricamento Multi-A ──
 function sostOnScanPicked(evt){
@@ -13446,6 +13482,7 @@ function sostUpdateLabels(){
 }
 
 // ════════════════════════════════════════════════════════════════════════
+/* ==== §REPLACE-IT ==== */
 // REPLACE-iT (workflow 'replace') — UI + fetch marker + SEEDING a 3 punti
 // ════════════════════════════════════════════════════════════════════════
 // Workflow NUOVO SEPARATO. CLONA i mattoni di Sostituire (che resta
@@ -14755,6 +14792,7 @@ function replaceTogglePlacedVisibility(num, on){
 var replaceTreeUI = { markersCollapsed: false };
 function replaceToggleMarkersCollapse(){ replaceTreeUI.markersCollapsed = !replaceTreeUI.markersCollapsed; replaceRebuildTree(); }
 
+/* ==== §REPLACE-CUT-SCAN ==== */
 // 2b-3d: TAGLIA SCANSIONE (clone di rebuildScanMeshGeometry di Analizza). Ricostruisce
 // replaceMesh.geometry dalla ORIGINALE escludendo i triangoli dentro i cilindri dei
 // marker con p.cutScan===true -> buco attorno allo scanbody per vederlo "seduto".
@@ -15985,6 +16023,7 @@ function sostBuildTemplateGroup(key, geo, connectionWorld, axis, mirror){
   return group;
 }
 
+/* ==== §SOST-CENTRAGGIO-ROBUSTO ==== */
 // ── Centraggio robusto click-invariante (Replace-iT, dietro flag 'syntesis_sost_center'='robust') ──
 // Ri-fitta il CENTRO dello scanbody ancorandosi all'ASSE lateral-wall (robusto) invece che al
 // crop del click: re-crop cilindrico ITERATO della parete attorno all'asse + fit cerchio
@@ -16945,6 +16984,7 @@ function sostPlaceTemplate(rawPoint, rawNormal){
   });
 }
 
+/* ==== §SOST-RAFFINA-FINALE ==== */
 // ── Raffina (pipeline Analizza alignAll) ──
 var sostAlignInProgress = false;   // 8.62.2: lock anti-rientranza (no doppio Raffina async su doppio-click)
 function sostAlignAll(){
@@ -18289,6 +18329,7 @@ function sostRenderCutView(){
 window.addEventListener('DOMContentLoaded',init);
 </script>
 
+<!-- ==== §MARKUP-MODALI ==== -->
 <!-- Dialog crea gruppo -->
 <div id="groupDialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:12px;padding:24px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
@@ -18678,6 +18719,7 @@ window.addEventListener('DOMContentLoaded',init);
 </div>
 
 
+<!-- ==== §VMBAR ==== -->
 <!-- ═══ VIEW MODE BAR (v7.3.5.002) ═══ -->
 <!--
   Syntesis-ICP — View Mode Bar v2 (compact, icon-only)
@@ -18811,6 +18853,7 @@ window.addEventListener('DOMContentLoaded',init);
 })();
 </script>
 
+<!-- ==== §MARKUP-CALIBRAZIONE ==== -->
 <script src="/static/ds/syn-panel.js"></script>
 
 
@@ -18901,6 +18944,7 @@ window.addEventListener('DOMContentLoaded',init);
 
 
 <script>
+/* ==== §AUTH-LOGIN ==== */
 // v7.3.9.082 - Sistema login/registrazione FastAPI backend
 (function(){
   var SYNT_TOKEN_KEY = 'syntesis_token';
@@ -19059,6 +19103,7 @@ window.addEventListener('DOMContentLoaded',init);
 "use strict";
 
 // ╔══════════════════════════════════════════════════════════════════╗
+/* ==== §REPORT-MUA-PDF ==== */
 // ║  REPORT MUA PDF - Blocco 6a (prima versione, fondamenta)         ║
 // ║  Genera un PDF strutturato con i dati MUA gia disponibili.       ║
 // ║  Sezioni con placeholder per dati non ancora calcolati.          ║
