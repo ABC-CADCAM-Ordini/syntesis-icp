@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.81.1 (rimossa catena "template custom" Sostituire — stub prototipo mai funzionante. Base 8.81.0: CLEANUP dead code dai 14 refutati dell'audit — nessun elemento UI visibile toccato: rimossi handler/var/funzioni orfani v3b+dashboard+vedere e import Python inutilizzati, dettaglio in registry History. Base 8.80.4: debug campaign da audit — dashboard modali #modalEdit/#modalProject RIPRISTINATI + #inviteBanner nuovo + XSS Classifica; v3b fix reset/crash/dispose + drop Misurare=hint; vedere Drive via proxy. Include 8.80.3: testo posa SHIFT+CLIC Sostituire + drop globale workflow-aware) — **Data:** 2026-07-05
+> **Versione software mappata:** 8.82.0 (FEATURE velocità mouse personalizzabili in Impostazioni→Interfaccia; sezione strutturale rigenerata. Base 8.81.1: rimossa catena template custom Sostituire; 8.81.0: CLEANUP dead code audit; 8.80.4: debug campaign; 8.80.3: SHIFT+CLIC + drop workflow-aware) — **Data:** 2026-07-05
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3). **8.74.0 (Fase B, commit 1 — unificazione chrome):** il pannello **Misurare** entra nel sistema FILL (via i gradienti pre-pastello: `.mis-btn-run` blu `#0077CC/#0050A0` → `--fill-primary`+`--dark`; modalità click-seed viola Tailwind `#8B5CF6/#7C3AED/#C4B5FD/#F5F3FF/#5B21B6` → famiglia **selezione** `--fill-sel`/`--pearl`/`--blue`; Annulla → `--pearl`+bordo); login in-app idem → `--fill-primary`; cutview `#1a1a22` → `var(--dark)`; danger `#E24B4A/#A32D2D` → `--red`/`--fill-error` (`.btn.danger`, hover del-btn dark). **CTA di pannello unificate** alla specifica di Sostituire (`padding:8px 10px; font-size:12px; letter-spacing:.03em`): i 5 bottoni di `#replaceFlow` allineati; `#sostBtnExport` passa da nero pieno a classe **`.export-btn`** (= Accoppia). Nuova classe **`.syn-select`** (bordo/raggio/font unici) sui 5 select di `#panelReplace` + `#misSeedType`. Canvas/PDF e palette-dati (gruppi, sfondo ambiente) NON toccati.
@@ -127,7 +127,8 @@ App monolite (~3.87 MB). 4 workflow interni commutati da `selectWorkflow(wf)` ([
 | → Importa | | onclick | `inputScan.click()` | — | apre file dialog STL | [1226] | delega a `#inputScan` |
 | → Salva (JSON) | | onclick | `saveCase` | `muaObjects` | scarica `.json` | [1231] | |
 | → Esporta (PNG+JSON) | | onclick | `exportCase` | `scanMesh` | screenshot PNG + json | [1236] | |
-| → Impostazioni | | onclick | `openSettings` | `envSettings` | apre modal impostazioni | [1242] | |
+| → Impostazioni | | onclick | `openSettings` | `envSettings` | apre modal impostazioni (tab Ambiente / Macchine / Interfaccia / Algoritmo-expert) | [1242] | |
+| ↳ Impostazioni → **Interfaccia → Controlli 3D (mouse)** | `#ctrlSpeed_rotate` / `#ctrlSpeed_pan` / `#ctrlSpeed_zoom` + Ripristina | oninput/onclick | `onControlsSettingChange('rotate'/'pan'/'zoom', v)` / `resetControlsSettings` | `controlsSettings` (moltiplicatori) + localStorage `syntesis_controls` | **8.82.0**: 3 slider 0.3×–2.5× (default 1.0×) per rotazione/pan/zoom camera; applicano subito via `applyControlsSettings` su `CONTROLS_BASE {0.8/0.6/1.2}`. Popolati da `syncControlsSettingsUI` in `openSettings`; applicati all'avvio in `init` dopo la creazione di `controls`. Bugfix incluso: `panSpeed` ora usato in `pan()` della OrbitControls custom (prima ignorato) | tab `#settingsTabUi` | Solo Analizzare (Vedere ha controlli propri) |
 | → Accedi/Logout | `#fmAuthItem` | onclick | `syntAuthClick` | token localStorage | login/logout | [1248] | testo dinamico `#fmAuthLabel` |
 | → Area personale | `#fmDashboardItem` | onclick | `window.open('/dashboard')` | — | apre dashboard | [1255] | `display:none` di default |
 | **Reset** | `.btn` | onclick | `hardReset` | `scanMesh`, `muaObjects` | ricarica app con `?_r=Date.now()` | [1262] | feat 8.4.4 |
@@ -499,24 +500,24 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 <!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
 
-### Fotografia (8.81.1 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+### Fotografia (8.82.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
 
 | Metrica | Valore |
 |---|---|
-| Righe / peso | **41380** / **5.75 MB** |
-| JS applicativo | 39101 righe in 8 blocchi `<script>` |
+| Righe / peso | **41480** / **5.75 MB** |
+| JS applicativo | 39166 righe in 8 blocchi `<script>` |
 | Asset B64 embedded | **2.9 MB** in 6 righe (**50%** del file) |
-| Funzioni top-level | 487 |
-| Globali condivise | 147 (di cui **44** toccate da 2+ domini) |
-| Export surface (handler inline) | 139 funzioni da preservare su `window` |
+| Funzioni top-level | 491 |
+| Globali condivise | 151 (di cui **44** toccate da 2+ domini) |
+| Export surface (handler inline) | 141 funzioni da preservare su `window` |
 
 ### Domini: dimensione e superficie di accoppiamento
 
 | Dominio | # fn | stato scritto→altri | stato letto←altri | API inline | API cross-dominio |
 |---|---|---|---|---|---|
 | `mis` | 123 | 3 | 4 | 19 | 7 |
+| `other` | 92 | 11 | 10 | 26 | 57 |
 | `replace` | 92 | 7 | 8 | 33 | 11 |
-| `other` | 88 | 11 | 10 | 24 | 56 |
 | `sost` | 47 | 7 | 6 | 16 | 11 |
 | `mua` | 33 | 5 | 12 | 11 | 24 |
 | `fres` | 31 | 0 | 1 | 2 | 9 |
@@ -526,14 +527,14 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 | `auth` | 6 | 0 | 0 | 3 | 0 |
 | `scene` | 6 | 1 | 9 | 1 | 4 |
 | `log` | 5 | 0 | 0 | 0 | 1 |
-| `report` | 4 | 0 | 3 | 1 | 0 |
 | `export` | 4 | 0 | 4 | 1 | 1 |
+| `report` | 4 | 0 | 3 | 1 | 0 |
 | `cut` | 3 | 0 | 1 | 3 | 3 |
 | `find` | 1 | 0 | 0 | 0 | 1 |
 
 ### Accoppiamenti call-graph più pesanti (dominio→dominio: # funzioni)
 
-`other→mua:37` · `mua→other:29` · `env→other:25` · `sost→other:17` · `other→env:15` · `mis→other:15` · `other→replace:14` · `other→sost:14` · `other→scene:13` · `mua→tree:12` · `other→mis:10` · `tree→mua:10`
+`other→mua:37` · `mua→other:29` · `env→other:26` · `sost→other:17` · `other→env:15` · `mis→other:15` · `other→sost:14` · `other→replace:14` · `other→scene:13` · `mua→tree:12` · `other→mis:10` · `tree→mua:10`
 
 > Elenchi completi per-dominio (globali, API) in `scripts/dep_census_out.json`.
 > Ordine di estrazione e meccanismi: `docs/MODULARIZZAZIONE_STUDIO.md` (strategia).
