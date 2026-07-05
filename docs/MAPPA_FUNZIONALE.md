@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.79.1 (UI identica a 8.79.0: la .1 è pulizia backend-only) — **Data:** 2026-07-03
+> **Versione software mappata:** 8.80.4 (debug campaign da audit: dashboard modali #modalEdit/#modalProject RIPRISTINATI + #inviteBanner nuovo + XSS Classifica; v3b fix reset/crash/dispose + drop Misurare=hint; vedere Drive via proxy. Include 8.80.3: testo posa SHIFT+CLIC Sostituire + drop globale workflow-aware) — **Data:** 2026-07-05
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3). **8.74.0 (Fase B, commit 1 — unificazione chrome):** il pannello **Misurare** entra nel sistema FILL (via i gradienti pre-pastello: `.mis-btn-run` blu `#0077CC/#0050A0` → `--fill-primary`+`--dark`; modalità click-seed viola Tailwind `#8B5CF6/#7C3AED/#C4B5FD/#F5F3FF/#5B21B6` → famiglia **selezione** `--fill-sel`/`--pearl`/`--blue`; Annulla → `--pearl`+bordo); login in-app idem → `--fill-primary`; cutview `#1a1a22` → `var(--dark)`; danger `#E24B4A/#A32D2D` → `--red`/`--fill-error` (`.btn.danger`, hover del-btn dark). **CTA di pannello unificate** alla specifica di Sostituire (`padding:8px 10px; font-size:12px; letter-spacing:.03em`): i 5 bottoni di `#replaceFlow` allineati; `#sostBtnExport` passa da nero pieno a classe **`.export-btn`** (= Accoppia). Nuova classe **`.syn-select`** (bordo/raggio/font unici) sui 5 select di `#panelReplace` + `#misSeedType`. Canvas/PDF e palette-dati (gruppi, sfondo ambiente) NON toccati.
@@ -259,10 +259,10 @@ Sostituzione scan body con ICP. Pannello `panelSostituire` [1965]:
 
 | Elemento | id | Evento | Funzione | Stato | Effetto | Righe |
 |---|---|---|---|---|---|---|
-| Drop scansione partenza | `#sostSlotScan` / `#sostInputScan` | onclick/onchange | `sostInputScan.click()` / `sostOnScanPicked` | — | carica STL partenza | [1972-1975] |
+| Drop scansione partenza | `#sostSlotScan` / `#sostInputScan` | onclick/onchange | `sostInputScan.click()` / `sostOnScanPicked` | — | carica STL partenza. **8.80.3**: anche il **drop globale sul viewport** (listener `document` 'drop', v3b ~r.2445) ora è **workflow-aware** e instrada a `sostOnScanPicked` quando `analysisMode==='sostituire'` (prima cablato su `loadScanFile`→`scanMesh`, invisibile all'albero Sostituire); analogo per `replace`→`replaceOnScanPicked`, altrimenti `loadScanFile`. **8.80.4**: in `misurare` il drop globale NON carica (hint "usa gli slot A/B" via `misICP_showError`; prima doppio caricamento in `scanMesh` Analizza) e `misICP_onDrop` fa `stopPropagation` | [1972-1975] |
 | **Radio "Scansione di partenza" 1T3/SR/OS (Box B)** | `#sostSourceRadio` | onchange | `sostOnSourceChange` | `sostSourceTemplate`, `sostActiveTemplate` | tipo marker presente (allineamento) | [1978-1981] |
 | Upload custom | `#sostInputCustom` | onchange | `sostOnCustomPicked` | — | template custom | [1984] |
-| + Posiziona | `#sostBtnPlace` | onclick | `sostStartPlacement` | — | placement marker; **8.58.0: SHIFT+CLIC pulito** posa (`sostOnViewportClick`→`sostPlaceTemplate`), guardia movimento >6px = rotazione + hint senza Shift; aggiunta guardia `.face` (come Analizza) | [1988] |
+| + Posiziona | `#sostBtnPlace` | onclick | `sostStartPlacement` | — | placement marker; **8.58.0: SHIFT+CLIC pulito** posa (`sostOnViewportClick`→`sostPlaceTemplate`), guardia movimento >6px = rotazione + hint senza Shift; aggiunta guardia `.face` (come Analizza). **8.80.3**: testo istruzione del pannello (`panelSostituire` ~r.1680) reso esplicito su **SHIFT+CLIC** (prima diceva solo "Clicca su ogni marker" → equivoco "il clic non posiziona"); comportamento invariato | [1988] |
 | Raffina | `#sostBtnRefine` | onclick | `sostAlignAll` | — | ICP sostituzione — il point-ICP **centra** soltanto; l'**asse** del marker viene da un fit lateral-wall della parete scansionata. Gate motore (**8.14.0**): `auto` (default) = lateral solo se `sostSourceTemplate==='SR'`; `lateralwall` = sempre (era incondizionato in 8.13.0); `cap` = mai (→ asse dal point-ICP). Fallback `R·seed` se <8 triangoli parete — vedi `sostAlignAll` [38426]/[38607] | [1989] | disabled di default |
 | Esporta STL | `#sostBtnExport` | onclick | `sostExportSTL` | `_sostExportPending` | apre **`#sostExportDialog`** (nome file precompilato) → Conferma scarica col nome scelto (sanificato, `.stl` auto); Annulla non scarica | [1996] | `display:none` default; dialog nome file (8.4.7) |
 
@@ -328,18 +328,21 @@ Area personale (~3992 righe). Sidebar a tab (`switchTab` [1461]) + sezioni. Dive
 | Logout | onclick | `doLogout` | logout | [936] | |
 | Tab sidebar | onclick | `switchTab('analyses'/'projects'/'files'/'contacts'/'cloud'/'profile'/'leaderboard'/casi-*/…)` | cambia sezione | [975-1043] | ~17 voci |
 | Filtro analisi attive/archiviate | onclick | `switchFilter('active'/'archived')` | filtra | [1052-1053] | |
-| Nuovo progetto | onclick | `openProjectCreate` | modal | [1066] | |
-| Filtro progetti | onclick | `switchProjectFilter(...)` | filtra | [1068-1069] | |
-| Nuova cartella condivisa | onclick | `openCreateSharedFolder` | modal | [1093] | |
-| Nuovo contatto | onclick | `openContactCreate` | modal | [1113] | |
-| Leaderboard filtri | onclick | `LBdash.filterBy('tipo',…,this)` | filtra classifica | [1184-1188] | |
-| Ruolo PRO medico/laboratorio | onclick | `selectProRole(...)` | seleziona ruolo | [1302-1307] | |
-| Conferma ruolo | onclick | `confirmProRole` | salva ruolo | [1313] | |
-| Modal preview: scarica / chiudi | onclick | `downloadPreviewFile` / `closeModal('modalPreview');cleanupPreview()` | preview file | [1326-1327] | |
-| Modal contatto: chiudi / salva | onclick | `closeModal('modalContact')` / `saveContact` | gestione contatto | [1365-1366] | |
-| **(dinamico)** Analisi: dettaglio/modifica/PDF/archivia/elimina | onclick (injected) | `openDetail`/`openEdit`/`downloadPdf`/`setArchived`/`deleteAnalysis` | azioni per-analisi | [1701-1714] | iniettati a runtime |
-| **(dinamico)** Paginazione | onclick (injected) | `changePage(-1/1)` | naviga pagine | [1726-1728] | |
-| **(dinamico)** Progetti: dettaglio/modifica | onclick (injected) | `openProjectDetail`/`openProjectEdit` | azioni per-progetto | [2018-2028] | |
+| Nuovo progetto | onclick | `openProjectCreate` | modal | [1064] | |
+| Filtro progetti | onclick | `switchProjectFilter(...)` | filtra | [1066-1067] | |
+| Nuova cartella condivisa | onclick | `openCreateSharedFolder` | modal | [1096] | riga aggiornata 8.80.4 (shift +5 da #inviteBanner) |
+| Nuovo contatto | onclick | `openContactCreate` | modal | [1116] | riga aggiornata 8.80.4 |
+| Leaderboard filtri | onclick | `LBdash.filterBy('tipo',…,this)` | filtra classifica | [1187-1191] | righe aggiornate 8.80.4 |
+| Ruolo PRO medico/laboratorio | onclick | `selectProRole(...)` | seleziona ruolo | [1305-1310] | riga aggiornata 8.80.4 (shift da inserimenti) |
+| Conferma ruolo | onclick | `confirmProRole` | salva ruolo | [1316] | riga aggiornata 8.80.4 |
+| Modal preview: scarica / chiudi | onclick | `downloadPreviewFile` / `closeModal('modalPreview');cleanupPreview()` | preview file | [1389-1390] | righe aggiornate 8.80.4 (shift +63 dai modali ripristinati) |
+| Modal contatto: chiudi / salva | onclick | `closeModal('modalContact')` / `saveContact` | gestione contatto | [1428-1429] | righe aggiornate 8.80.4 |
+| **Modal rinomina analisi** `#modalEdit` | onclick | `closeEditModal` / `saveModal` | rinomina/note analisi | [1326-1343] | **8.80.4: markup RIPRISTINATO** (perso in 4b4c297/v7.3.9.055 con JS+bottone 'Modifica' rimasti vivi → TypeError; risolto anche ESC che non chiudeva il modal Profilo) |
+| **Modal progetto** `#modalProject` | onclick | `closeProjectModal` / `saveProjectModal` + `.color-swatch` (delegato) | crea/modifica progetto | [1347-1379] | **8.80.4: markup RIPRISTINATO** (stessa storia di #modalEdit: '+ Nuovo progetto' e 'Modifica' crashavano) |
+| **Banner inviti** `#inviteBanner` | onclick (injected) | `acceptInvite`/`declineInvite` via `renderIncomingInvites` | inviti cartelle condivise | [1088] | **8.80.4: contenitore AGGIUNTO** in cima a tabFiles (prima inesistente: inviti invisibili/non accettabili) |
+| **(dinamico)** Analisi: dettaglio/modifica/PDF/archivia/elimina | onclick (injected) | `openDetail`/`openEdit`/`downloadPdf`/`setArchived`/`deleteAnalysis` | azioni per-analisi | [1764-1777] | iniettati a runtime; righe aggiornate 8.80.4 |
+| **(dinamico)** Paginazione | onclick (injected) | `changePage(-1/1)` | naviga pagine | [1789-1791] | righe aggiornate 8.80.4 |
+| **(dinamico)** Progetti: dettaglio/modifica | onclick (injected) | `openProjectDetail`/`openProjectEdit` | azioni per-progetto | [2081-2091] | righe aggiornate 8.80.4 |
 
 ## Vista: Accedi (`/accedi` → `syntesis-accedi.html`)
 

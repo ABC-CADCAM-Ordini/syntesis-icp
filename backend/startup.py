@@ -9,9 +9,12 @@ STATIC_DIR.mkdir(exist_ok=True)
 
 GITHUB_RAW = "https://raw.githubusercontent.com/ABC-CADCAM-Ordini/syntesis-icp/main/backend/static"
 
-FILES_TO_CHECK = [
-    "syntesis-calibrator-v4.html",
-]
+# 8.80.4: lista svuotata. L'unica voce era syntesis-calibrator-v4.html, reliquia
+# del modulo Calibrator dismesso (v7.3.9.001, cleanup 8.2.3): il download da
+# raw.githubusercontent falliva SEMPRE in silenzio a ogni boot (repo privato ->
+# 404) e il file non e' referenziato da alcuna route. Il meccanismo resta per
+# eventuali futuri asset pubblici.
+FILES_TO_CHECK = []
 
 for fname in FILES_TO_CHECK:
     fpath = STATIC_DIR / fname

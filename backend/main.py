@@ -1630,11 +1630,20 @@ async def me_create_shared_folder(
         email = (email or "").lower().strip()
         if not email or email == current_user.get("email", "").lower():
             continue
-        m = await add_shared_folder_member(
-            shared_folder_id=sf["id"],
-            member_email=email,
-            invited_by_user_id=current_user["user_id"],
-        )
+        # 8.80.4: add_shared_folder_member ora propaga gli errori DB non-UNIQUE
+        # (prima li mascherava come already_invited). Un errore inatteso su UN
+        # invito non deve abortire il giro con 500 a stato parziale (cartella gia'
+        # creata, inviti precedenti persistiti): finisce in skipped con log.
+        try:
+            m = await add_shared_folder_member(
+                shared_folder_id=sf["id"],
+                member_email=email,
+                invited_by_user_id=current_user["user_id"],
+            )
+        except Exception as e:
+            print(f"[shared-folders] invito {email} fallito: {e}")
+            skipped.append({"email": email, "reason": "db_error"})
+            continue
         if m.get("error"):
             skipped.append({"email": email, "reason": m["error"]})
             continue

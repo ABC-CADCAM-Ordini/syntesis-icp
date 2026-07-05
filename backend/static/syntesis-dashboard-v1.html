@@ -1082,6 +1082,11 @@ body{
         </div>
       </div>
 
+      <!-- 8.80.4: contenitore inviti in arrivo. renderIncomingInvites lo cercava per id
+           ma il markup non esisteva: gli inviti a cartelle condivise erano invisibili
+           e non accettabili dalla UI (il guard if(!box) return usciva in silenzio). -->
+      <div id="inviteBanner" style="display:none;margin-bottom:16px"></div>
+
       <div id="sharedFoldersSection" style="margin-bottom:24px">
         <div class="sf-header">
           <div class="sf-title-block">
@@ -1310,6 +1315,66 @@ body{
       </div>
       <button id="prConfirm" onclick="confirmProRole()" disabled style="width:100%;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-weight:800;font-family:var(--font);font-size:13px;cursor:pointer;letter-spacing:.04em;opacity:.4;transition:.15s">Conferma scelta</button>
       <div style="text-align:center;margin-top:14px;font-size:10px;color:var(--gray);font-family:var(--mono);letter-spacing:.04em">Per modificare in seguito contatta il supporto</div>
+    </div>
+  </div>
+
+  <!-- MODAL: RINOMINA/MODIFICA ANALISI (8.80.4: markup RIPRISTINATO — perso nella
+       riscrittura 4b4c297/v7.3.9.055, mentre openEdit/saveModal/closeEditModal e il
+       bottone 'Modifica' delle righe analisi erano rimasti vivi: la funzione crashava
+       con TypeError. Annulla adattato a closeEditModal(), il CSS .modal-overlay/.show
+       e' sempre rimasto nel file.) -->
+  <div class="modal-overlay" id="modalEdit">
+    <div class="modal">
+      <div class="modal-title">Modifica analisi</div>
+      <div class="modal-sub">I file STL originali non vengono memorizzati. Puoi solo cambiare nome e note.</div>
+      <div class="modal-field">
+        <label>Nome dell'analisi</label>
+        <input type="text" id="modalName" maxlength="200" placeholder="Es. Caso Rossi - 12 marzo">
+      </div>
+      <div class="modal-field">
+        <label>Note (opzionale)</label>
+        <textarea id="modalNotes" maxlength="5000" placeholder="Annotazioni cliniche, ID paziente, dettagli..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-outline" onclick="closeEditModal()">Annulla</button>
+        <button class="btn-cta" onclick="saveModal()">Salva</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NUOVO/MODIFICA PROGETTO (8.80.4: markup RIPRISTINATO, stessa storia di
+       #modalEdit — '+ Nuovo progetto' e 'Modifica' progetto erano rotti.) -->
+  <div class="modal-overlay" id="modalProject">
+    <div class="modal">
+      <div class="modal-title" id="modalProjectTitle">Nuovo progetto</div>
+      <div class="modal-sub">Un progetto raggruppa analisi e file correlati. Es. un caso clinico o un paziente.</div>
+      <div class="modal-field">
+        <label>Nome progetto *</label>
+        <input type="text" id="projectName" maxlength="200" placeholder="Es. Caso Rossi - quadrante 1">
+      </div>
+      <div class="modal-field">
+        <label>Riferimento paziente (opzionale)</label>
+        <input type="text" id="projectPatient" maxlength="200" placeholder="ID paziente, codice anonimo, etc.">
+      </div>
+      <div class="modal-field">
+        <label>Descrizione (opzionale)</label>
+        <textarea id="projectDescription" maxlength="2000" placeholder="Note sul caso, decorso, vincoli..."></textarea>
+      </div>
+      <div class="modal-field">
+        <label>Colore identificativo</label>
+        <div style="display:flex;gap:6px">
+          <span class="color-swatch" data-c="#0065B3" style="width:28px;height:28px;background:#0065B3;border-radius:6px;cursor:pointer;border:2.5px solid var(--blue)"></span>
+          <span class="color-swatch" data-c="#0D9E6E" style="width:28px;height:28px;background:#0D9E6E;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+          <span class="color-swatch" data-c="#F59E0B" style="width:28px;height:28px;background:#F59E0B;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+          <span class="color-swatch" data-c="#DC2626" style="width:28px;height:28px;background:#DC2626;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+          <span class="color-swatch" data-c="#7C3AED" style="width:28px;height:28px;background:#7C3AED;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+          <span class="color-swatch" data-c="#0E7490" style="width:28px;height:28px;background:#0E7490;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)"></span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-outline" onclick="closeProjectModal()">Annulla</button>
+        <button class="btn-cta" onclick="saveProjectModal()">Salva</button>
+      </div>
     </div>
   </div>
 
@@ -2583,7 +2648,7 @@ var LBdash = (function(){
       b.setAttribute('data-ftype', ftype);
       b.setAttribute('data-fval', val);
       b.addEventListener('click', function(){ LBdash.filterBy(ftype, val, b); });
-      b.innerHTML = label;
+      b.textContent = label;   // 8.80.4: era innerHTML — label arriva da province/citta' Supabase (stored XSS)
       w.appendChild(b);
     }
     makeBtn(allLbl, 'all');
@@ -2643,13 +2708,15 @@ var LBdash = (function(){
       var cls = i<3 ? 'top'+(i+1) : '';
       var dt = '';
       try { dt = new Date(e.created_at).toLocaleDateString('it-IT',{day:'2-digit',month:'short',year:'2-digit'}); } catch(_){}
+      // 8.80.4: campi Supabase (inseribili da qualunque utente) ESCAPATI — erano
+      // concatenati raw in innerHTML: stored XSS per chiunque aprisse la Classifica.
       h += '<div class="lb-row' + (cls?' '+cls:'') + '">' +
         '<span class="lb-rank' + (i<3?' r'+(i+1):'') + '">' + em + '</span>' +
         '<div>' +
-          '<div class="lb-loc">' + flag(e.country) + ' ' + (e.city||'') + (e.province?' ('+e.province+')':'') + '</div>' +
-          '<div class="lb-loc-sub">' + (e.country||'') + (e.cylinders?(' \xb7 '+e.cylinders+' cil.'):'') + '</div>' +
+          '<div class="lb-loc">' + flag(e.country) + ' ' + escapeHtml(e.city||'') + (e.province?' ('+escapeHtml(e.province)+')':'') + '</div>' +
+          '<div class="lb-loc-sub">' + escapeHtml(e.country||'') + (e.cylinders?(' \xb7 '+escapeHtml(String(e.cylinders))+' cil.'):'') + '</div>' +
         '</div>' +
-        '<span class="lb-type">' + tl(e.tipo) + '</span>' +
+        '<span class="lb-type">' + escapeHtml(tl(e.tipo)) + '</span>' +
         '<span class="lb-date">' + dt + '</span>' +
         '<div style="text-align:right">' +
           '<div class="lb-score" style="color:' + col + '">' + sc.toFixed(0) + '</div>' +

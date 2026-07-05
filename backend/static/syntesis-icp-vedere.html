@@ -2809,26 +2809,24 @@ filePicker.addEventListener('change', async e => {
       return;
     }
 
-    // Step 2: chiedo al backend un access_token Drive
-    const tokRes = await fetch('/api/me/gdrive/access-token', {
+    // Step 2+3 (8.80.4): scarico via PROXY backend /api/me/gdrive/file/{id}/content
+    // (Bearer nostro, cap dimensione C3) — stesso pattern della dashboard
+    // (fetchDriveFile). Il vecchio flusso chiedeva /api/me/gdrive/access-token,
+    // endpoint RIMOSSO in 8.78.0 (Audit C4): "Apri in Vedere" era rotto
+    // end-to-end (HTTP 404).
+    const fileRes = await fetch('/api/me/gdrive/file/' + encodeURIComponent(fileId) + '/content', {
       headers: { 'Authorization': 'Bearer ' + jwt }
-    });
-    if (!tokRes.ok) {
-      setStatus('Errore: non posso ottenere token Drive (HTTP ' + tokRes.status + ')');
-      showToast('Token Drive non disponibile. Riconnetti Drive da dashboard', 'error');
-      return;
-    }
-    const tokData = await tokRes.json();
-    const driveToken = tokData.access_token;
-
-    // Step 3: scarico il file direttamente da Drive (browser → Google, no proxy)
-    const driveUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?alt=media&supportsAllDrives=true';
-    const fileRes = await fetch(driveUrl, {
-      headers: { 'Authorization': 'Bearer ' + driveToken }
     });
     if (!fileRes.ok) {
       setStatus('Errore: file non scaricabile (Drive HTTP ' + fileRes.status + ')');
-      showToast('File non trovato o non accessibile su Drive', 'error');
+      // 8.80.4 (review): il proxy segnala Drive-non-connesso con 409 e file
+      // oltre il cap con 413 (main.py ~1516/1531) — messaggi dedicati.
+      var _msg;
+      if (fileRes.status === 409) _msg = 'Google Drive non connesso. Riconnetti Drive dalla dashboard';
+      else if (fileRes.status === 413) _msg = 'File troppo grande per l\'apertura da Drive';
+      else if (fileRes.status === 401 || fileRes.status === 403) _msg = 'Sessione scaduta. Accedi di nuovo dalla dashboard';
+      else _msg = 'File non trovato o non accessibile su Drive';
+      showToast(_msg, 'error');
       return;
     }
     const blob = await fileRes.blob();
@@ -2951,6 +2949,19 @@ function buildMeasureLine(p1, p2, colorHex) {
   return line;
 }
 
+// Pallino d'estremità di una misura: resta visibile anche a gizmo nascosto
+// e funge da bersaglio di selezione (oltre alla linea). NON è una maniglia
+// di trascinamento (quelle sono i gizmi rossi P1/P2, mostrati solo da selezionato).
+function buildMeasureEndDot() {
+  const geo = new THREE.SphereGeometry(0.14, 16, 12);
+  const mat = new THREE.MeshBasicMaterial({ color: 0x0F1923, depthTest: false });
+  const m = new THREE.Mesh(geo, mat);
+  m.renderOrder = 1000;
+  m.layers.set(GIZMO_LAYER);
+  m.userData.isSelectGeom = true;
+  return m;
+}
+
 function eventToNDC(e) {
   const rect = canvas.getBoundingClientRect();
   mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -3040,6 +3051,11 @@ function setAngleActive(on) {
   }
   state.anglePendingObjs = [];
   state.anglePoints = [];
+  // 8.80.4: esci dalla modalita' piazza-sezione PRIMA di impostare 'ruler-active'
+  // (setSectionPlaceMode(false) fa toggle('ruler-active', false) incondizionato e
+  // avrebbe cancellato la classe appena messa -> niente crosshair in modalita' Angolo).
+  // Era cancelSectionPlacement(), funzione MAI definita -> ReferenceError.
+  if (on && state.sectionPlaceMode) setSectionPlaceMode(false);
   document.getElementById('btnAngle').classList.toggle('active', on);
   document.getElementById('viewport').classList.toggle('ruler-active', on);  // riusa cursor crosshair
   hoverMarker.visible = false;
@@ -3048,7 +3064,6 @@ function setAngleActive(on) {
     deselectLayer();
     if (state.rulerActive) setRulerActive(false);
     if (state.circleActive) setCircleActive(false);
-    if (state.sectionPlaceMode) cancelSectionPlacement();
   }
 }
 
@@ -3477,7 +3492,7 @@ function setEraserActive(on) {
     if (state.rulerActive) setRulerActive(false);
     if (state.angleActive) setAngleActive(false);
     if (state.circleActive) setCircleActive(false);
-    if (state.sectionPlaceMode) cancelSectionPlacement();
+    if (state.sectionPlaceMode) setSectionPlaceMode(false);   // 8.80.4: era cancelSectionPlacement(), funzione MAI definita -> ReferenceError
     setStatus('Gomma attiva. Cliccare/trascinare per cancellare. ESC per uscire.');
   } else {
     setStatus('');
@@ -4003,9 +4018,15 @@ function rulerOnClick(e) {
       Vmeas.clone(), Vmeas.clone().negate(),
       measureNormal.clone(), measureNormal.clone().negate()
     ]);
-    addRotationRings(gizmoC, axis, Vmeas, measureNormal);
+    // Niente anello di rotazione lungo l'asse della misura: ruotare una linea
+    // attorno alla propria direzione non ha alcun effetto (rimangono V e normale).
+    addRotationRings(gizmoC, axis, Vmeas, measureNormal, ['rotU']);
     gizmoC.position.copy(center);
     scene.add(gizmoC);
+
+    // Pallini d'estremità sempre visibili (bersaglio di selezione)
+    const dotP1 = buildMeasureEndDot(); dotP1.position.copy(p1); scene.add(dotP1);
+    const dotP2 = buildMeasureEndDot(); dotP2.position.copy(p2); scene.add(dotP2);
 
     const measure = {
       id: state.nextId++,
@@ -4016,6 +4037,7 @@ function rulerOnClick(e) {
       p2: p2.clone(),
       axis, Vmeas, normal: measureNormal,
       line, labelEl, distance: dist,
+      endDots: [dotP1, dotP2],
       handles: [
         { mesh: gizmoP1, axis: 'P1' },
         { mesh: gizmoP2, axis: 'P2' },
@@ -4037,6 +4059,8 @@ function rulerOnClick(e) {
       visual: { visible: true, color: measureColor },
     }).id;
     updateMeasureLabels();
+    // Appena creata è selezionata: il gizmo è visibile e trascinabile
+    if (measure.synId) window.SynRegistry.select([measure.synId]);
 
     // Reset per misura successiva
     state.rulerFirstPoint = null;
@@ -4079,6 +4103,11 @@ function updateMeasureVisuals(measure) {
     else if (h.axis === 'P2') h.mesh.position.copy(p2);
     else if (h.axis === 'C')  h.mesh.position.copy(p1).add(p2).multiplyScalar(0.5);
   });
+  // Riposiziono i pallini d'estremità
+  if (measure.endDots) {
+    measure.endDots[0].position.copy(p1);
+    measure.endDots[1].position.copy(p2);
+  }
 
   measure.labelEl.textContent = formatDistance(measure.distance);
 }
@@ -4309,6 +4338,7 @@ function clearAllMeasures() {
         }
       });
     });
+    disposeMeasureDots(m);
     m.labelEl.remove();
     if (m.synId) window.SynRegistry.remove(m.synId);
   });
@@ -4334,7 +4364,8 @@ function toggleMeasureVisibility(id) {
     if (m.arcGroup) m.arcGroup.style.display = m.visible ? '' : 'none';
   } else {
     m.line.visible = m.visible;
-    m.handles.forEach(h => h.mesh.visible = m.visible);
+    if (m.endDots) m.endDots.forEach(d => d.visible = m.visible);
+    applyGizmoSelection();  // il gizmo resta nascosto se non selezionato
     m.labelEl.style.display = m.visible ? '' : 'none';
   }
   renderLayerList();
@@ -4368,6 +4399,7 @@ function removeMeasure(id) {
         }
       });
     });
+    disposeMeasureDots(m);
     m.labelEl.remove();
     if (m.synId) window.SynRegistry.remove(m.synId);
   }
@@ -4836,6 +4868,8 @@ function circleOnClick(e) {
   }).id;
   updateCircleVisuals(circle);
   updateCircleLabels();
+  // Appena creata è selezionata: il gizmo è visibile e trascinabile
+  if (circle.synId) window.SynRegistry.select([circle.synId]);
 
   // Modalità si spegne automaticamente: per una nuova forma bisogna riattivare il bottone
   setCircleActive(false);
@@ -5093,12 +5127,13 @@ function buildHandleGizmo(colorHex, axisDirs) {
 // Aggiunge 3 anelli di rotazione attorno alla sfera centrale del gizmo.
 // Ogni anello è un toroide sottile orientato perpendicolare al proprio asse.
 // Colori: rosso per U, verde per V, blu per normal (convenzione standard).
-function addRotationRings(group, U, V, N) {
+function addRotationRings(group, U, V, N, skip) {
+  const skipSet = new Set(skip || []);
   const ringSpec = [
     { axis: U.clone(), color: 0xDC2626, name: 'rotU' },
     { axis: V.clone(), color: 0x0D9E6E, name: 'rotV' },
     { axis: N.clone(), color: 0x0065B3, name: 'rotN' }
-  ];
+  ].filter(s => !skipSet.has(s.name));
   const RING_RADIUS = 1.55;
   const TUBE_RADIUS = 0.022;
   const yAxis = new THREE.Vector3(0, 1, 0);
@@ -5210,6 +5245,9 @@ function updateCircleVisuals(circle) {
 
   // Rigenero le maniglie con il nuovo orientamento U/V/normal
   rebuildHandles(circle);
+  // Le maniglie appena rigenerate sono visibili di default: le nascondo se
+  // la forma non è selezionata.
+  applyGizmoSelection();
 
   circle.labelEl.textContent = formatShapeLabel(shapeKind, radius);
 }
@@ -5233,13 +5271,91 @@ function setGizmoHighlight(group, on) {
   });
 }
 
+// ---- Selezione dei gizmi (mostra/nascondi il sistema di coordinate) ----
+// Il gizmo di una forma/misura è visibile SOLO quando l'oggetto è selezionato
+// (via SynRegistry) ed è visibile. La geometria (anello / linea + pallini)
+// resta invece sempre visibile e serve da bersaglio per selezionare.
+function isGizmoSelected(synId) {
+  if (!synId) return false;
+  const o = window.SynRegistry.get(synId);
+  return !!(o && o.visual && o.visual.selected);
+}
+
+function applyGizmoSelection() {
+  state.circles.forEach(c => {
+    const on = c.visible && isGizmoSelected(c.synId);
+    c.handles.forEach(h => { h.mesh.visible = on; });
+  });
+  state.measures.forEach(m => {
+    if (!m.handles) return;
+    const on = m.visible && isGizmoSelected(m.synId);
+    m.handles.forEach(h => { h.mesh.visible = on; });
+  });
+}
+
+// Seleziona forma/misura passando dal registry (allinea albero + pannello + gizmo).
+function selectGizmoObject(obj) {
+  if (obj && obj.synId) window.SynRegistry.select([obj.synId]);
+  applyGizmoSelection();
+}
+
+// Clic nel vuoto: deseleziona forma/misura (non tocca layer/sezione).
+function deselectGizmo() {
+  const sel = window.SynRegistry.getSelected();
+  if (sel && (sel.type === 'shape' || sel.type === 'measure')) {
+    window.SynRegistry.select([]);
+  }
+  applyGizmoSelection();
+}
+
+// Raycast sulla geometria selezionabile (anelli forma, linee e pallini misura).
+// Ritorna la forma/misura sotto il puntatore, o null.
+function pickSelectable(e) {
+  eventToNDC(e);
+  raycaster.setFromCamera(mouseNDC, camera);
+  const savedThr = raycaster.params.Line.threshold;
+  raycaster.params.Line.threshold = 0.5;  // tolleranza per pickare la linea sottile
+  const targets = [];
+  state.circles.forEach(c => {
+    if (c.visible && c.ring) { c.ring.userData._selRef = c; targets.push(c.ring); }
+  });
+  state.measures.forEach(m => {
+    if (!m.visible) return;
+    if (m.line) { m.line.userData._selRef = m; targets.push(m.line); }
+    if (m.endDots) m.endDots.forEach(d => { d.userData._selRef = m; targets.push(d); });
+  });
+  let ref = null;
+  if (targets.length) {
+    const hits = raycaster.intersectObjects(targets, false);
+    if (hits.length) ref = hits[0].object.userData._selRef || null;
+  }
+  raycaster.params.Line.threshold = savedThr;
+  return ref;
+}
+
+// Libera i pallini d'estremità di una misura.
+function disposeMeasureDots(m) {
+  if (!m.endDots) return;
+  m.endDots.forEach(d => {
+    scene.remove(d);
+    if (d.geometry) d.geometry.dispose();
+    if (d.material) d.material.dispose();
+  });
+  m.endDots = null;
+}
+
+// Ogni cambio di selezione (albero, 3D o pannello) riallinea la visibilità dei gizmi.
+window.SynRegistry.subscribe('select', applyGizmoSelection);
+
 function pickHandle(e) {
-  // Test raycaster sulle parti (sfera + frecce + anelli rotazione) di tutti i gizmo,
-  // sia di forme (state.circles) sia di misure (state.measures).
+  // Test raycaster sulle parti (sfera + frecce + anelli rotazione) dei gizmo,
+  // ma SOLO degli oggetti selezionati (il gizmo esiste solo da selezionati).
+  // La sezione (cut view) resta sempre pickabile.
   eventToNDC(e);
   raycaster.setFromCamera(mouseNDC, camera);
   const meshes = [];
   state.circles.forEach(c => {
+    if (!isGizmoSelected(c.synId)) return;
     c.handles.forEach(h => {
       h.mesh.traverse(o => {
         if (o.isMesh && o.userData.isHandlePart) meshes.push(o);
@@ -5247,7 +5363,7 @@ function pickHandle(e) {
     });
   });
   state.measures.forEach(m => {
-    if (!m.handles) return;
+    if (!m.handles || !isGizmoSelected(m.synId)) return;
     m.handles.forEach(h => {
       h.mesh.traverse(o => {
         if (o.isMesh && o.userData.isHandlePart) meshes.push(o);
@@ -5297,9 +5413,26 @@ function pickHandle(e) {
 
 function onCanvasPointerDown(e) {
   if (e.button !== 0) return;
-  if (state.rulerActive || state.circleActive) return;
+  // 8.80.4 (review): guardia estesa anche a angolo/piazza-sezione/gomma — il nuovo
+  // percorso pickSelectable (selezione misura dal corpo) altrimenti seleziona/deseleziona
+  // durante il piazzamento o il tratto della gomma (gizmo spurio sullo stesso gesto).
+  if (state.rulerActive || state.circleActive || state.angleActive || state.sectionPlaceMode || state.eraserActive) return;
   const pick = pickHandle(e);
-  if (!pick) return;
+  if (!pick) {
+    // Nessun gizmo colpito: provo a selezionare una forma/misura dalla sua geometria.
+    const selRef = pickSelectable(e);
+    if (selRef) {
+      selectGizmoObject(selRef);
+      if (window.SynLayerPanel && window.SynLayerPanel.render) window.SynLayerPanel.render();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    // Clic nel vuoto → deseleziono e nascondo il gizmo.
+    deselectGizmo();
+    if (window.SynLayerPanel && window.SynLayerPanel.render) window.SynLayerPanel.render();
+    return;
+  }
 
   // ===== DRAG SU MISURA =====
   if (pick.kind === 'measure') {
@@ -5439,12 +5572,17 @@ function onCanvasPointerMoveDrag(e) {
     // Hover: cambio cursore + emissive highlight se sopra una maniglia
     if (!state.rulerActive && !state.circleActive) {
       const pick = pickHandle(e);
-      canvas.style.cursor = pick ? 'grab' : '';
       // Reset highlight di tutti i gizmi (cerchi + misure)
       state.circles.forEach(c => c.handles.forEach(h => setGizmoHighlight(h.mesh, false)));
       state.measures.forEach(m => m.handles && m.handles.forEach(h => setGizmoHighlight(h.mesh, false)));
-      // Applico highlight al gizmo sotto al puntatore
-      if (pick) setGizmoHighlight(pick.handle.mesh, true);
+      if (pick) {
+        canvas.style.cursor = 'grab';
+        // Applico highlight al gizmo sotto al puntatore
+        setGizmoHighlight(pick.handle.mesh, true);
+      } else {
+        // Sopra la geometria di un oggetto non selezionato → cursore di selezione
+        canvas.style.cursor = pickSelectable(e) ? 'pointer' : '';
+      }
     }
     return;
   }
@@ -5745,7 +5883,7 @@ function toggleCircleVisibility(id) {
   if (!c) return;
   c.visible = !c.visible;
   c.ring.visible = c.visible;
-  c.handles.forEach(h => h.mesh.visible = c.visible);
+  applyGizmoSelection();  // il gizmo resta nascosto se non selezionato
   c.labelEl.style.display = c.visible ? '' : 'none';
   updateTechDimension();
   renderLayerList();
@@ -7490,7 +7628,8 @@ setStatus('Pronto');
       if (m) {
         m.visible = newVisible;
         m.line.visible = newVisible;
-        m.handles.forEach(h => h.mesh.visible = newVisible);
+        if (m.endDots) m.endDots.forEach(d => d.visible = newVisible);
+        applyGizmoSelection();
         if (m.labelEl) m.labelEl.style.display = newVisible ? '' : 'none';
       }
     } else if (obj.type === 'shape') {
@@ -7498,7 +7637,7 @@ setStatus('Pronto');
       if (c) {
         c.visible = newVisible;
         c.ring.visible = newVisible;
-        c.handles.forEach(h => h.mesh.visible = newVisible);
+        applyGizmoSelection();
         if (c.labelEl) c.labelEl.style.display = newVisible ? '' : 'none';
       }
     } else if (obj.type === 'section') {
@@ -7586,6 +7725,7 @@ setStatus('Pronto');
           scene.remove(h.mesh);
           h.mesh.traverse(o => { if (o.isMesh) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); } });
         });
+        disposeMeasureDots(m);   // 8.80.4: senza, i pallini d'estremita' (endDots, depthTest:false) restavano orfani in scena
         if (m.labelEl) m.labelEl.remove();
         state.measures.splice(idx, 1);
         window.SynRegistry.remove(obj.id);
@@ -7956,10 +8096,10 @@ if (window.SynCutViewManager) {
         if (layer) { layer.visible = newVisible; layer.group.visible = newVisible; }
       } else if (sel.type === 'measure' && sel.role !== 'linear-2d-section') {
         const m = state.measures.find(x => x.synId === sel.id);
-        if (m) { m.visible = newVisible; m.line.visible = newVisible; m.handles.forEach(h => h.mesh.visible = newVisible); if (m.labelEl) m.labelEl.style.display = newVisible ? '' : 'none'; }
+        if (m) { m.visible = newVisible; m.line.visible = newVisible; if (m.endDots) m.endDots.forEach(d => d.visible = newVisible); applyGizmoSelection(); if (m.labelEl) m.labelEl.style.display = newVisible ? '' : 'none'; }
       } else if (sel.type === 'shape') {
         const c = state.circles.find(x => x.synId === sel.id);
-        if (c) { c.visible = newVisible; c.ring.visible = newVisible; c.handles.forEach(h => h.mesh.visible = newVisible); if (c.labelEl) c.labelEl.style.display = newVisible ? '' : 'none'; }
+        if (c) { c.visible = newVisible; c.ring.visible = newVisible; applyGizmoSelection(); if (c.labelEl) c.labelEl.style.display = newVisible ? '' : 'none'; }
       } else if (sel.type === 'section') {
         if (state.section && state.section.synId === sel.id) { state.section.visible = newVisible; state.section.rect.visible = newVisible; state.section.handles.forEach(h => h.mesh.visible = newVisible); applySectionClipping(newVisible); }
       }
@@ -8148,6 +8288,7 @@ if (window.SynCutViewManager) {
           scene.remove(m.line);
           m.line.geometry.dispose(); m.line.material.dispose();
           m.handles.forEach(h => { scene.remove(h.mesh); h.mesh.traverse(o => { if (o.isMesh) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); } }); });
+          disposeMeasureDots(m);   // 8.80.4: senza, i pallini d'estremita' (endDots) restavano orfani in scena
           if (m.labelEl) m.labelEl.remove();
           state.measures.splice(idx, 1);
           window.SynRegistry.remove(sel.id);

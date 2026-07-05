@@ -1406,9 +1406,12 @@ async def add_shared_folder_member(
                     (id, shared_folder_id, member_user_id, member_email, status, invited_by)
                 VALUES ($1, $2, $3, $4, 'pending', $5)
             """, member_id, shared_folder_id, member_user_id, member_email, invited_by_user_id)
-        except Exception as e:
-            # Probabilmente UNIQUE violation (gia' invitato)
+        except asyncpg.UniqueViolationError:
+            # Gia' invitato (vincolo UNIQUE cartella+email)
             return {"id": None, "error": "already_invited"}
+        # 8.80.4: era `except Exception -> already_invited`: QUALSIASI errore DB
+        # (FK, colonna, connessione) veniva mascherato come "gia' invitato".
+        # Solo la UNIQUE violation mappa su already_invited; il resto propaga.
     return {
         "id": member_id,
         "member_email": member_email,
