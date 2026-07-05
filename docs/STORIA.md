@@ -1,5 +1,17 @@
 # Storia delle modifiche
 
+## 2026-07-05 — 8.81.0: CLEANUP dead code dai 14 refutati dell'audit
+
+Primo passo della direttiva "preparare la divisione del monolite": rimossi i rami morti individuati (e refutati come innocui) dall'audit 8.80.4. Ogni voce era double-verified; prima della rimozione ri-confermato zero-call-site sul working tree; dopo, review avversariale del diff (3 reviewer) = 0 finding. Net -107 righe.
+
+Implementazione (commit 3817901, dettaglio in registry.py History 8.81.0):
+- v3b: syntAuthDoRegister, sostOnTemplateChange+SOSTITUIRE_Z_OFFSET_UNIVERSAL, sostOnZOffsetChange+sostApplyOffsetDelta, sostOnExportTemplateChange/ContentChange + var sostZOffsetMm/sostExportTemplate/sostExportContent (mai lette), lookup #wfSubtitle, div duplicato #fresCustomInfo; MIS_SEED_RADIUS da window.SYN.scanbody; .catch su _sostDoExport; commento axisLine corretto
+- vedere: 4 fallback role morti di colorForObj; dashboard: loadLeaderboard; backend: 11 import inutilizzati (main.py/auth.py, AST-verified)
+- ANNOTATO non rimosso: catena template custom di Sostituire ora non raggiungibile da UI (era triggherata solo dal radio rimosso) — da decidere: rimozione o ripristino trigger
+
+Verifiche: zero riferimenti residui per-simbolo, node --check 12 blocchi, py_compile, deploy sequenziale con anti-race, live 8.81.0 sui 4 domini, simboli rimossi assenti dal servito.
+
+
 ## 2026-07-05 — 8.80.4: debug campaign, 35 fix da audit multi-agente
 
 Campagna di debug completa richiesta dall'utente ("debug completo e approfondito, errori nascosti da lavorazioni precedenti"). Audit con 72 agenti su 12 dimensioni (handler rotti, id orfani, altre pagine, backend, duplicati, leak THREE.js, contaminazione stato, drift registry, CSS/tokens, diff non committato, async, XSS), ogni finding verificato da uno scettico avversariale indipendente: 45 confermati (28 unici), 14 refutati (dead code con guardie, annotati per pulizia dedicata). Dopo i fix, review avversariale del diff (11 agenti): 7 residui trovati e corretti. Pattern ricorrente scoperto: le riscritture di pannelli (4b4c297 dashboard, 3fa4cab fres, f15c885 auth) perdevano markup lasciando JS e bottoni vivi -> TypeError su funzioni intere (Fresatura avanzata, Rinomina analisi, Progetti, inviti cartelle). Include 8.80.3 (Sostituire: istruzione SHIFT+CLIC + drop workflow-aware), mai deployata separatamente.
