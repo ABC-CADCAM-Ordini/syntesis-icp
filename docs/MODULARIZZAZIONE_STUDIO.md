@@ -28,7 +28,12 @@
 > syn-geom (8) + syn-color (5), verbatim; esclusa in corso d'opera ANCHE buildUndercutColors
 > (legge muaObjects: il criterio è zero-stato, non il dominio del censimento). Gate golden-master
 > permanente scripts/gate/purelib/ (78 scenari Object.is su fixtures+degeneri, md5 verbatim per fn).
-> ▶ Prossimo: **Fase 5** (pannelli/chrome: ds/syn-env ~700 r mecc. A + rilocazioni B minori, gate harness browser).
+> ✅ **Fase 5 COMPLETATA** (2026-07-05, 8.86.0 commit 0118e89): syn-env 36 fn functions-only
+> (stato nel monolite: vincolo d'ordine MAX_MILLING_ANGLE; mecc. A→B applicando la regola di
+> sicurezza di questo stesso studio) + syn-vmbar/syn-auth-ui in-place; harness browser 18/18 +
+> verifica avversariale 6 lenti PASS; monolite a 18.258 righe.
+> ▶ Prossimo: **Fase 6** (un file per workflow: 6a fres → 6b tree → 6c report → 6d-0
+> INVERSIONE CENTRALINO (release autonoma) → 6d sost → 6e replace → 6f mis ULTIMO a golden-master).
 
 ---
 
