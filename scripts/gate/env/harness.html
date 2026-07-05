@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Gate F5 — harness env old/new</title>
+<style>body{font-family:monospace;padding:16px} .ok{color:#0a7a2f;font-weight:bold} .fail{color:#c21807;font-weight:bold} pre{background:#f5f5f5;padding:10px;overflow:auto;max-height:400px}</style>
+</head><body>
+<h2>Gate F5 — pannelli/chrome: old (git HEAD) vs new (ds/*.js)</h2>
+<div id="verdict">in esecuzione…</div>
+<pre id="detail"></pre>
+<iframe id="fOld" src="build/run-old.html" style="width:1px;height:1px;visibility:hidden"></iframe>
+<iframe id="fNew" src="build/run-new.html" style="width:1px;height:1px;visibility:hidden"></iframe>
+<script>
+// I due iframe condividono la stessa origin e lo stesso localStorage: si serializzano
+// (old prima, new dopo) ricaricando fNew quando old ha finito, cosi' ogni run parte
+// da localStorage.clear() proprio e gli snapshot sono confrontabili.
+var snaps = {};
+var phase = "old";
+document.getElementById("fNew").removeAttribute("src");
+window.addEventListener("message", function (ev) {
+  if (!ev.data || !ev.data.harness) return;
+  snaps[phase] = ev.data.snap;
+  if (phase === "old") {
+    phase = "new";
+    document.getElementById("fNew").src = "build/run-new.html";
+    return;
+  }
+  // diff ricorsivo old vs new
+  var diffs = [];
+  function walk(a, b, path) {
+    var keys = {};
+    Object.keys(a || {}).concat(Object.keys(b || {})).forEach(function (k) { keys[k] = 1; });
+    Object.keys(keys).forEach(function (k) {
+      var va = a ? a[k] : undefined, vb = b ? b[k] : undefined;
+      if (typeof va === "object" && va && typeof vb === "object" && vb) return walk(va, vb, path + "." + k);
+      if (JSON.stringify(va) !== JSON.stringify(vb))
+        diffs.push(path + "." + k + ":\n  old=" + JSON.stringify(va) + "\n  new=" + JSON.stringify(vb));
+    });
+  }
+  walk(snaps.old, snaps.new, "");
+  var nSteps = Object.keys(snaps.old.steps).length;
+  var nErrOld = Object.keys(snaps.old.errors).length;
+  var v = document.getElementById("verdict");
+  if (diffs.length === 0) {
+    v.className = "ok";
+    v.textContent = "VERDE — " + nSteps + " scenari identici old/new (errori intercettati identici: " + nErrOld + ")";
+  } else {
+    v.className = "fail";
+    v.textContent = "ROSSO — " + diffs.length + " differenze";
+  }
+  document.getElementById("detail").textContent =
+    (diffs.length ? diffs.join("\n\n") + "\n\n" : "") +
+    "— snapshot old —\n" + JSON.stringify(snaps.old, null, 1);
+  window.__VERDICT = { ok: diffs.length === 0, diffs: diffs, steps: nSteps, errors: snaps.old.errors };
+});
+</script>
+</body></html>

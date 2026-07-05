@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.85.0 (MODULARIZZAZIONE F4: 27 funzioni pure estratte VERBATIM in `ds/syn-math.js`+`syn-geom.js`+`syn-color.js`, zero UI toccata — nel monolite 12 tombstone `// §PURELIB:`; escluse le stateful rebuildScanMeshGeometry/extractScanbodyScanFor/buildUndercutColors. Base 8.84.0-.2: F1 asset B64 → `assets/`, F2 TOC+36 §anchor, F3 CSS → `css/analyzer.css`; 8.83.0: velocità mouse anche in Vedere) — **Data:** 2026-07-05
+> **Versione software mappata:** 8.86.0 (MODULARIZZAZIONE F5: pannello Impostazioni → `ds/syn-env.js` (36 fn, stato resta nel monolite §IMPOSTAZIONI-RUNTIME), barra viewMode → `ds/syn-vmbar.js` e login → `ds/syn-auth-ui.js` (blocchi IIFE rilocati in-place, stessa posizione); zero UI toccata. Base 8.85.0 (F4: 27 fn pure → syn-math/geom/color); 8.84.0-.2: F1 asset B64 → `assets/`, F2 TOC+36 §anchor, F3 CSS → `css/analyzer.css`) — **Data:** 2026-07-05
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3). **8.74.0 (Fase B, commit 1 — unificazione chrome):** il pannello **Misurare** entra nel sistema FILL (via i gradienti pre-pastello: `.mis-btn-run` blu `#0077CC/#0050A0` → `--fill-primary`+`--dark`; modalità click-seed viola Tailwind `#8B5CF6/#7C3AED/#C4B5FD/#F5F3FF/#5B21B6` → famiglia **selezione** `--fill-sel`/`--pearl`/`--blue`; Annulla → `--pearl`+bordo); login in-app idem → `--fill-primary`; cutview `#1a1a22` → `var(--dark)`; danger `#E24B4A/#A32D2D` → `--red`/`--fill-error` (`.btn.danger`, hover del-btn dark). **CTA di pannello unificate** alla specifica di Sostituire (`padding:8px 10px; font-size:12px; letter-spacing:.03em`): i 5 bottoni di `#replaceFlow` allineati; `#sostBtnExport` passa da nero pieno a classe **`.export-btn`** (= Accoppia). Nuova classe **`.syn-select`** (bordo/raggio/font unici) sui 5 select di `#panelReplace` + `#misSeedType`. Canvas/PDF e palette-dati (gruppi, sfondo ambiente) NON toccati.
@@ -128,9 +128,9 @@ App monolite (~3.87 MB). 4 workflow interni commutati da `selectWorkflow(wf)` ([
 | → Importa | | onclick | `inputScan.click()` | — | apre file dialog STL | [1226] | delega a `#inputScan` |
 | → Salva (JSON) | | onclick | `saveCase` | `muaObjects` | scarica `.json` | [1231] | |
 | → Esporta (PNG+JSON) | | onclick | `exportCase` | `scanMesh` | screenshot PNG + json | [1236] | |
-| → Impostazioni | | onclick | `openSettings` | `envSettings` | apre modal impostazioni (tab Ambiente / Macchine / Interfaccia / Algoritmo-expert) | [1242] | |
+| → Impostazioni | | onclick | `openSettings` | `envSettings` | apre modal impostazioni (tab Ambiente / Macchine / Interfaccia / Algoritmo-expert). **8.86.0 (F5)**: le 36 fn del pannello (open/close/cancel/save, tab, ambiente/render/palette/fresatore/controlli/zoom) vivono in `ds/syn-env.js`; lo STATO (`envSettings`/`millerSettings`/`controlsSettings` + load) resta nel monolite (§IMPOSTAZIONI-RUNTIME) | [1242] | |
 | ↳ Impostazioni → **Interfaccia → Controlli 3D (mouse)** | `#ctrlSpeed_rotate` / `#ctrlSpeed_pan` / `#ctrlSpeed_zoom` + Ripristina | oninput/onclick | `onControlsSettingChange('rotate'/'pan'/'zoom', v)` / `resetControlsSettings` | `controlsSettings` (moltiplicatori) + localStorage `syntesis_controls` | **8.82.0**: 3 slider 0.3×–2.5× (default 1.0×) per rotazione/pan/zoom camera; applicano subito via `applyControlsSettings` su `CONTROLS_BASE {0.8/0.6/1.2}`. Popolati da `syncControlsSettingsUI` in `openSettings`; applicati all'avvio in `init` dopo la creazione di `controls`. Bugfix incluso: `panSpeed` ora usato in `pan()` della OrbitControls custom (prima ignorato) | tab `#settingsTabUi` | Solo Analizzare (Vedere ha controlli propri) |
-| → Accedi/Logout | `#fmAuthItem` | onclick | `syntAuthClick` | token localStorage | login/logout | [1248] | testo dinamico `#fmAuthLabel` |
+| → Accedi/Logout | `#fmAuthItem` | onclick | `syntAuthClick` | token localStorage | login/logout. **8.86.0 (F5)**: blocco IIFE login/registrazione rilocato verbatim in `ds/syn-auth-ui.js` (stessa posizione, banner §AUTH-LOGIN resta nel monolite) | [1248] | testo dinamico `#fmAuthLabel` |
 | → Area personale | `#fmDashboardItem` | onclick | `window.open('/dashboard')` | — | apre dashboard | [1255] | `display:none` di default |
 | **Reset** | `.btn` | onclick | `hardReset` | `scanMesh`, `muaObjects` | ricarica app con `?_r=Date.now()` | [1262] | feat 8.4.4 |
 | Menu **WorkFlow** | `#workflowMenu` | onclick | `toggleWorkflowMenu` | — | apre dropdown | [1267] | |
@@ -270,7 +270,7 @@ Sostituzione scan body con ICP. Pannello `panelSostituire` [1965]:
 
 > **Box B vs Box A**: Box B (`sostSourceTemplate`) = tipo di marker **già presente** nella scansione di partenza, per la registrazione (`SOSTITUIRE_TEMPLATE_INFO`, `BBOX_LOCAL`, `T_ROOT` — [34803]/[38085]/[38084]). NON è ridondante con Box A (`_ANALYZE_SBTYPE`, che guida `placeMUA` in Analizza). Vedi fix 8.4.5 e 8.4.6 sopra.
 
-> **Modalità render globale in `sostituire` (8.71.3, fix):** la barra `#vmBar` (solid/wireframe/both) ora raggiunge anche le mesh di Sostituire — prima la vista Reticolo/Both restava solid. `sostApplyRenderMode()` [v3b ~36669] applica la modalità a `sostMesh` + alle Mesh dentro ogni `p.groups[k]` (guardia `o.isMesh` → le `THREE.Line` dell'asse restano intatte); invocata da `applyRenderModeToScene` [~13141] e in coda a `sostRebuildTree` [~39904] (i marker piazzati dopo la scelta vista ereditano la modalità). Gemello di `replaceApplyRenderMode`.
+> **Modalità render globale in `sostituire` (8.71.3, fix):** la barra `#vmBar` (solid/wireframe/both) ora raggiunge anche le mesh di Sostituire — prima la vista Reticolo/Both restava solid. `sostApplyRenderMode()` [v3b ~36669] applica la modalità a `sostMesh` + alle Mesh dentro ogni `p.groups[k]` (guardia `o.isMesh` → le `THREE.Line` dell'asse restano intatte); invocata da `applyRenderModeToScene` [**ds/syn-env.js** dall'8.86.0 (F5)] e in coda a `sostRebuildTree` [~39904] (i marker piazzati dopo la scelta vista ereditano la modalità). Gemello di `replaceApplyRenderMode`.
 
 > **Resize renderer sul viewport (8.71.3, fix):** collassando la colonna destra (rail) il `.viewport` (`flex:1`) si allarga via CSS ma **senza** un `resize` della finestra → il canvas restava con la larghezza vecchia (banda vuota). Un `ResizeObserver` sul `#viewport` [v3b ~2709, dopo il listener `window.resize`] ridimensiona `renderer`+`camera.aspect` a ogni cambio del box (anche durante la transizione CSS `.25s` di `.panel`). Canvas unico condiviso → vale per tutti i workflow.
 
@@ -449,7 +449,7 @@ Endpoint **solo backend** in `backend/main.py`, dietro `require_authorized` (adm
 | `_hardResetSostituire` | v3b [4894] | Reset stato Sostituire all'uscita | `selectWorkflow` [4986] |
 | `misICP_run` | v3b [6883] | ICP di confronto fra 2 STL (Misurare). **8.67.2 FIX allineamento**: il pre-align brute-force (`misICP_bruteForcePreAlign`) calcola il miglior fit Kabsch ma l'orchestrazione (~6932) lo applicava solo se `applied` (una permutazione ≠ identità batte l'identità). Con i cluster A/B nello STESSO ordine l'identità è già la migliore → `applied=false` → fit ottimo (~30µm) SCARTATO → `misICP_runICP` riparte dai centroidi GREZZI → minimo locale (RMSD scala-mm su STL congruenti, rotazione XY). Fix: `preUsable` (n∈[3..8] & rmsd finita) applica SEMPRE il best Kabsch come stato iniziale ICP + guard (scarta l'ICP se peggiora `preAlign.rmsd`) + composizione su `preUsable`. Casi già allineati invariati (best Kabsch≈identità=no-op); HD preservato. | btn `#misBtnRun` [1938] |
 | `toggleLayersPanel` | v3b [3807] | Toggle albero scena (`layersPanel`) | btn Albero Scena [1349] |
-| `openFresability` / `exportComponents` / `openCutView` / `openGroupDialog` / `openSettings` | v3b [5878] / [10940] / [11536] / [12356] / [13296] | Pannelli/dialog: fresabilità, export STL, cutview, gruppi, impostazioni | toolbar/pannelli Analizza/Accoppia |
+| `openFresability` / `exportComponents` / `openCutView` / `openGroupDialog` / `openSettings` | v3b [5878] / [10940] / [11536] / [12356] / **ds/syn-env.js (8.86.0)** | Pannelli/dialog: fresabilità, export STL, cutview, gruppi, impostazioni | toolbar/pannelli Analizza/Accoppia |
 | `saveCase` / `exportCase` / `undoLastMUA` / `clearAllMUA` / `toggleAxes` | v3b [3730] / [4610] / [4486] / [4493] / [3681] | Salva, esporta, annulla, reset MUA, toggle assi | menu File / toolbar |
 | `syntesisOpenFileDialog` | ds/syn-panel.js [284] | Apre file dialog STL | btn Carica file [1343] |
 | `switchTab` | dashboard [1461] | Cambia sezione della dashboard | sidebar [975-1043] |
@@ -502,47 +502,45 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 <!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
 
-### Fotografia (8.85.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+### Fotografia (8.86.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
 
 | Metrica | Valore |
 |---|---|
-| Righe / peso | **19051** / **1.0 MB** |
-| JS applicativo REALE | **17600** righe in 8 blocchi `<script>` (grezzo 17600, meno il blob B64) |
+| Righe / peso | **18259** / **0.97 MB** |
+| JS applicativo REALE | **16802** righe in 6 blocchi `<script>` (grezzo 16802, meno il blob B64) |
 | Asset B64 embedded | **0.0 MB** in 0 righe (**0%** del file) |
-| Funzioni top-level | 464 |
-| Globali condivise | 145 (di cui **37** toccate da 2+ domini) |
-| Export surface (handler inline) | 141 funzioni da preservare su `window` |
+| Funzioni top-level | 420 |
+| Globali condivise | 145 (di cui **35** toccate da 2+ domini) |
+| Export surface (handler inline) | 119 funzioni da preservare su `window` |
 
 ### Domini: dimensione e superficie di accoppiamento
 
 | Dominio | # fn | stato scritto→altri | stato letto←altri | API inline | API cross-dominio |
 |---|---|---|---|---|---|
-| `mis` | 123 | 2 | 4 | 19 | 7 |
-| `replace` | 92 | 7 | 8 | 33 | 11 |
-| `sost` | 47 | 7 | 6 | 16 | 10 |
+| `mis` | 123 | 1 | 3 | 19 | 7 |
+| `replace` | 92 | 7 | 8 | 33 | 10 |
+| `sost` | 47 | 7 | 6 | 16 | 9 |
 | `fres` | 39 | 1 | 1 | 7 | 3 |
-| `mua` | 37 | 5 | 11 | 14 | 25 |
-| `env` | 33 | 4 | 0 | 18 | 5 |
+| `mua` | 37 | 5 | 8 | 14 | 23 |
 | `workflow` | 15 | 16 | 9 | 5 | 1 |
-| `tree` | 13 | 0 | 7 | 8 | 3 |
-| `diag` | 12 | 0 | 0 | 4 | 10 |
-| `chrome` | 8 | 0 | 0 | 3 | 4 |
+| `tree` | 13 | 0 | 6 | 8 | 3 |
+| `diag` | 12 | 0 | 0 | 4 | 7 |
 | `export` | 8 | 1 | 2 | 5 | 2 |
-| `auth` | 6 | 0 | 0 | 3 | 0 |
-| `scene` | 5 | 0 | 6 | 0 | 4 |
+| `chrome` | 6 | 0 | 0 | 2 | 4 |
 | `log` | 5 | 0 | 0 | 0 | 1 |
-| `io` | 4 | 1 | 8 | 1 | 1 |
-| `report` | 4 | 0 | 3 | 1 | 0 |
+| `io` | 4 | 1 | 5 | 1 | 1 |
+| `report` | 4 | 0 | 2 | 1 | 0 |
 | `cut` | 3 | 0 | 1 | 3 | 3 |
-| `bootstrap` | 3 | 2 | 7 | 1 | 1 |
 | `other` | 3 | 0 | 0 | 0 | 3 |
+| `bootstrap` | 3 | 2 | 6 | 1 | 1 |
+| `scene` | 2 | 0 | 2 | 0 | 1 |
 | `geom` | 2 | 0 | 2 | 0 | 2 |
-| `find` | 1 | 0 | 0 | 0 | 1 |
 | `colorclass` | 1 | 0 | 0 | 0 | 1 |
+| `find` | 1 | 0 | 0 | 0 | 1 |
 
 ### Accoppiamenti call-graph più pesanti (dominio→dominio: # funzioni)
 
-`mua→tree:12` · `mua→chrome:11` · `env→scene:11` · `tree→mua:10` · `workflow→mua:9` · `mis→chrome:7` · `mua→cut:6` · `auth→chrome:6` · `workflow→mis:5` · `workflow→replace:5` · `fres→chrome:5` · `mis→log:5`
+`mua→tree:12` · `mua→chrome:11` · `tree→mua:10` · `workflow→mua:9` · `mis→chrome:7` · `mua→cut:6` · `workflow→mis:5` · `workflow→replace:5` · `fres→chrome:5` · `mis→log:5` · `sost→tree:5` · `sost→mis:5`
 
 > Elenchi completi per-dominio (globali, API) in `scripts/dep_census_out.json`.
 > Ordine di estrazione e meccanismi: `docs/MODULARIZZAZIONE_STUDIO.md` (strategia).
