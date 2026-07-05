@@ -2005,42 +2005,9 @@ function closeProfileModal(){
 }
 
 // ── Classifica ──────────────────────────────────────────────────────────────
-async function loadLeaderboard(){
-  var box = document.getElementById('leaderboardContainer');
-  box.className = 'loading';
-  box.innerHTML = '<span class="spinner"></span>Caricamento classifica...';
-  try {
-    var r = await fetch('/api/leaderboard?limit=50', { headers: authHeaders() });
-    if(!r.ok) throw new Error('HTTP ' + r.status);
-    var data = await r.json();
-    var rows = data.rows || data || [];
-    box.className = '';
-    if(!rows || rows.length === 0){
-      box.className = 'empty-state';
-      box.innerHTML = '<div class="ico">&#x1F3C6;</div>Nessuna entry in classifica al momento.';
-      return;
-    }
-    var html = '<table class="analysis-table"><thead><tr>' +
-               '<th style="width:40px">#</th><th>Operatore</th><th>Sede</th>' +
-               '<th class="right">Voto</th><th class="right">RMSD</th>' +
-               '<th class="right">Coppie</th><th class="right">Data</th></tr></thead><tbody>';
-    rows.forEach(function(row, i){
-      var rmsdUm = row.rmsd != null ? Math.round(row.rmsd * 1000) + ' &mu;m' : '—';
-      html += '<tr><td style="font-weight:800;color:var(--blue)">#' + (i+1) + '</td>' +
-        '<td>' + escapeHtml(row.operator_name || '—') + '</td>' +
-        '<td style="color:var(--gray);font-size:12px">' + escapeHtml(row.location || '—') + '</td>' +
-        '<td class="right">' + scoreBadge(row.score) + '</td>' +
-        '<td class="right" style="font-family:var(--mono);font-size:12px">' + rmsdUm + '</td>' +
-        '<td class="right" style="font-family:var(--mono);font-size:12px">' + (row.n_pairs || '—') + '</td>' +
-        '<td class="right" style="font-family:var(--mono);font-size:11px;color:var(--gray)">' + fmtDate(row.created_at) + '</td></tr>';
-    });
-    html += '</tbody></table>';
-    box.innerHTML = html;
-  } catch(e){
-    box.className = 'empty-state';
-    box.innerHTML = '<div class="ico">&#9888;</div>Errore caricamento: ' + e.message;
-  }
-}
+// 8.81.0 CLEANUP (audit 8.80.4): rimossa loadLeaderboard — dead code (zero
+// call-site, referenziava #leaderboardContainer inesistente): il tab Classifica
+// usa il modulo LBdash (Supabase) piu' sotto.
 
 // ── Progetti ────────────────────────────────────────────────────────────────
 var projectsState = { filter: 'active', editing: null, items: [] };

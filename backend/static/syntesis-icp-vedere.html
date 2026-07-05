@@ -7471,10 +7471,10 @@ setStatus('Pronto');
 
   function colorForObj(obj) {
     if (obj.visual && obj.visual.color) return obj.visual.color;
-    if (obj.role === 'os')  return '#0D9E6E';
-    if (obj.role === 'sr')  return '#0065B3';
-    if (obj.role === '1t3') return '#F59E0B';
-    if (obj.role === 'mua') return '#A855F7';
+    // 8.81.0 CLEANUP (audit 8.80.4): rimossi i fallback per role os/sr/1t3/mua —
+    // rami morti (nessun oggetto del registry di Vedere ha mai quei role) e con
+    // colori in drift dai brand canonici del registry. Se un domani Vedere
+    // ospitera' scanbody, leggere da window.SYN.scanbody[k].color_hex.
     if (obj.type === 'measure') return '#0065B3';
     if (obj.type === 'shape')   return '#5A6E82';
     if (obj.type === 'section') return '#0065B3';

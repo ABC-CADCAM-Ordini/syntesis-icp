@@ -3,7 +3,9 @@ Syntesis-ICP — Backend API
 Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
 """
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header, Request, BackgroundTasks
+# 8.81.0 CLEANUP (audit 8.80.4): rimossi import inutilizzati Form, Request (fastapi),
+# timedelta (datetime) e 5 nomi dal blocco database (verifica AST: zero riferimenti).
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, RedirectResponse, Response
@@ -15,7 +17,7 @@ import os
 import uuid
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 from pathlib import Path
 
@@ -33,14 +35,13 @@ from database import (
     set_gdrive_credentials, get_gdrive_credentials, clear_gdrive_credentials,
     set_project_gdrive_folder,
     list_user_contacts, create_user_contact, update_user_contact,
-    delete_user_contact, reconcile_pending_contacts,
-    get_user_storage_status, log_usage, can_upload_bytes, PLAN_LIMITS,
+    delete_user_contact,
+    get_user_storage_status,
     create_shared_folder, add_shared_folder_member,
     get_shared_folder, list_owned_shared_folders, list_member_shared_folders,
     list_pending_invites_for_user, get_membership,
     accept_shared_invite, decline_shared_invite,
     list_active_members_of_folder, get_shared_folder_by_drive_id,
-    reconcile_pending_shared_invites,
     get_user_pro_role, set_user_pro_role,
 )
 import gdrive  # v7.3.9.048: modulo OAuth + Drive API

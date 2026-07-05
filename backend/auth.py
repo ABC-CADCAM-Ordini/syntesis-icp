@@ -14,10 +14,13 @@ import time
 import json
 import base64
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Header
+# 8.81.0 CLEANUP (audit 8.80.4): rimossi import inutilizzati Header (fastapi) e
+# create_user/verify_license (vecchio flusso registrazione-con-licenza pre-8.4.0;
+# il flusso vivo usa create_user_pending, import locale nel handler).
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from database import get_user_by_email, create_user, verify_license
+from database import get_user_by_email
 
 router = APIRouter()
 security = HTTPBearer()
