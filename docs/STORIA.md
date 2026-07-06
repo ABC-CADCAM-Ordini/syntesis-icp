@@ -1,5 +1,18 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.89.0: MODULARIZZAZIONE Fase 6b (secondo workflow → wf/tree.js)
+
+Secondo workflow estratto dal monolite: l'Albero Scena di Analizza (pannello "Livelli", rebuildTree che rigenera il DOM dell'albero, opacità globale scan+mua, ghost/restore, toggle visibilità layer/mua, espansione nodi). 10 function declaration escono verbatim in backend/static/wf/tree.js (secondo file wf/, dopo fresabilita.js), functions-only. Il dominio tree è pura vista: non possiede stato proprio salvo muaExpanded (mappa expand/collapse per-MUA) che resta nel monolite; zero monkey-patch.
+
+Decisione di confine (scouting 5-lenti Opus): dei 13 nomi che il censimento attribuiva a "tree" per regex, solo 10 sono tree-view genuine. Le altre 3 restano nel monolite perché NON sono tree: setSceneObjectColor + __synApplyColor sono utilità di scena/colore condivise da scan/mua/icp/sost/replace (metterle in wf/tree.js accoppierebbe erroneamente il tree agli altri workflow), e getGroupBadgeColor è una funzione colore pura (gemella di getGroupArrowColor già in ds/syn-color.js) — candidata a un passo di consolidamento colorclass dedicato, annotata. toggleAllSB (dead-code, zero caller) è stata lasciata intatta (§3.4).
+
+Doppio gate come 6a: Node (scripts/gate/tree/gate.mjs — 10 md5-verbatim vs golden pre-estrazione + esposizione + residuo + wiring 1:1) e — il gate che lo studio prescrive esplicitamente per 6b — harness browser classList/display (carica il vero wf/tree.js: 10/10 esposte come window global, apertura/chiusura/toggle del pannello Livelli su #layersPanel.style.display + #btnLivelli.classList + localStorage, opacità material+label, rebuildTree smoke, toggleMuaExpand che alterna; l'harness ha còlto uno stub mua incompleto, corretto). Verifica avversariale 4-lenti Opus post-estrazione: 4/4 PASS, 0 blocker (diff del monolite = 7 inserzioni + 262 rimozioni, 6 hunk, nessun collaterale).
+
+Implementazione:
+- vincolo hard: rebuildTree è chiamata da ds/syn-clip.js (root.rebuildTree) + ds/syn-env.js + ~23 siti nel monolite; toggleLayersPanel dallo shortcut tastiera 'L'; i toggle e treeUnified_* dagli handler inline generati da rebuildTree — tutti bare-global invariati (functions-only li preserva)
+- monolite da 17.393 a 17.138 righe; censimento post-estrazione: 3 tree nel monolite (le condivise) + 10 in wf/tree.js
+- deploy sequenziale LEGACY→BACKEND (anti-race ok); verifica live incl. Claude Chrome sull'app reale: 8.89.0 sui domini, wf/tree.js servito 200 con md5 identico al locale su entrambi i servizi, 10/10 fn tree esposte, il pannello Albero Scena si apre e chiude davvero, zero errori console, gating 403
+
 ## 2026-07-06 — 8.88.0: MODULARIZZAZIONE Fase 6a (primo workflow → wf/fresabilita.js)
 
 Prima estrazione di un WORKFLOW intero dal monolite: il dominio fresabilità (analisi angolare per fresatura 5 assi — catalogo macchine, classificazione angoli, asse medio/minimax/custom, overlay frecce 3D per-gruppo, pannello "Fresatura avanzata"). 34 function declaration escono verbatim in backend/static/wf/fresabilita.js (primo file della cartella wf/), meccanismo functions-only (pattern F5): lo stato resta nel monolite. Restano in loco: il banner §FRESABILITA (tracciato da check_anchors), le var di stato (FRES_BUILTIN_MACHINES/FRES_STORAGE_KEY/FRES_PROXIMITY_DEG/fresState/fresOverlayScene/fresOverlayLights), il monkey-patch di calculateAngles (IIFE che deve restare nel monolite per un vincolo d'ordine parse-time: cattura calculateAngles definito nel MAIN), e il cluster group-dialog (openGroupDialog…getMuaByGroup) che il regex del censimento attribuiva a fres ma è gestione gruppi MUA.

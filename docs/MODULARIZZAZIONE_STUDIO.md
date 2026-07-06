@@ -36,8 +36,14 @@
 > workflow FRESABILITA → wf/fresabilita.js (functions-only; stato/banner/monkey-patch restano;
 > group-dialog escluso perché è gestione gruppi MUA). Scouting 6-lenti + avversariale 4-lenti
 > (Opus) 4/4 PASS; gate Node + harness browser; monolite a 17.393 righe.
-> ▶ Prossimo: **Fase 6b** (wf/tree.js ~600 r, mecc. A, gate harness browser classList/display),
-> poi 6c report → 6d-0 INVERSIONE CENTRALINO (release autonoma) → 6d sost → 6e replace → 6f mis ULTIMO.
+> ✅ **Fase 6b COMPLETATA** (2026-07-06, 8.89.0 commit 472eb35): 10 fn tree-view → wf/tree.js
+> (functions-only; muaExpanded resta; escluse setSceneObjectColor/__synApplyColor/getGroupBadgeColor
+> = utility scena/colore condivise). Scouting 5-lenti + avversariale 4-lenti (Opus) 4/4 PASS; gate
+> Node + harness browser classList/display; verifica live incl. Claude Chrome (pannello apre/chiude
+> sull'app reale). Monolite a 17.138 righe.
+> ▶ Prossimo: **Fase 6c** (wf/report-analizza.js ~1.200 r blocco 9 + wf/report-comune.js, mecc. B;
+> gate = shim jsPDF che diffa la sequenza di API-call old/new + smoke visivo; PDF Misurare NON si
+> separa da mis), poi 6d-0 INVERSIONE CENTRALINO (release autonoma) → 6d sost → 6e replace → 6f mis ULTIMO.
 
 ---
 
