@@ -32,8 +32,12 @@
 > (stato nel monolite: vincolo d'ordine MAX_MILLING_ANGLE; mecc. A→B applicando la regola di
 > sicurezza di questo stesso studio) + syn-vmbar/syn-auth-ui in-place; harness browser 18/18 +
 > verifica avversariale 6 lenti PASS; monolite a 18.258 righe.
-> ▶ Prossimo: **Fase 6** (un file per workflow: 6a fres → 6b tree → 6c report → 6d-0
-> INVERSIONE CENTRALINO (release autonoma) → 6d sost → 6e replace → 6f mis ULTIMO a golden-master).
+> ✅ **Fase 6a COMPLETATA** (2026-07-06, 8.88.0 commit acb7a2f; prep dedup 8.87.2): 34 fn del
+> workflow FRESABILITA → wf/fresabilita.js (functions-only; stato/banner/monkey-patch restano;
+> group-dialog escluso perché è gestione gruppi MUA). Scouting 6-lenti + avversariale 4-lenti
+> (Opus) 4/4 PASS; gate Node + harness browser; monolite a 17.393 righe.
+> ▶ Prossimo: **Fase 6b** (wf/tree.js ~600 r, mecc. A, gate harness browser classList/display),
+> poi 6c report → 6d-0 INVERSIONE CENTRALINO (release autonoma) → 6d sost → 6e replace → 6f mis ULTIMO.
 
 ---
 

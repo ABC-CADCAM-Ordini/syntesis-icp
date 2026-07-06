@@ -1,5 +1,18 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.88.0: MODULARIZZAZIONE Fase 6a (primo workflow → wf/fresabilita.js)
+
+Prima estrazione di un WORKFLOW intero dal monolite: il dominio fresabilità (analisi angolare per fresatura 5 assi — catalogo macchine, classificazione angoli, asse medio/minimax/custom, overlay frecce 3D per-gruppo, pannello "Fresatura avanzata"). 34 function declaration escono verbatim in backend/static/wf/fresabilita.js (primo file della cartella wf/), meccanismo functions-only (pattern F5): lo stato resta nel monolite. Restano in loco: il banner §FRESABILITA (tracciato da check_anchors), le var di stato (FRES_BUILTIN_MACHINES/FRES_STORAGE_KEY/FRES_PROXIMITY_DEG/fresState/fresOverlayScene/fresOverlayLights), il monkey-patch di calculateAngles (IIFE che deve restare nel monolite per un vincolo d'ordine parse-time: cattura calculateAngles definito nel MAIN), e il cluster group-dialog (openGroupDialog…getMuaByGroup) che il regex del censimento attribuiva a fres ma è gestione gruppi MUA.
+
+Preceduta dalla release 8.87.2 (prep, passo dedicato per CLAUDE.md §3.4): dedup di fresUpdateAllArrows, che era definita 4 volte byte-identiche con zero call-site (doppiamente morta) → tenuta 1, rimosse 3. Passo separato dall'estrazione perché la rimozione di dead-code non va mescolata a un task funzionale, ed era propedeutico: il gate md5-verbatim-per-funzione avrebbe altrimenti visto 4 span per lo stesso nome.
+
+Metodo (il rituale del cuore del piano): scouting comprensivo 6-lenti multi-agente (Opus) PRIMA di toccare codice — ha scoperto che openFresability/closeFresability erano sfuggite al pattern 'fres[A-Z]' del censimento (il blocco reale è 34 fn, non 32) e che il group-dialog andava escluso. Estrazione via scripts/extract_fres_f6a.mjs (brace-matcher per-nome, immune allo shift di righe del dedup; rileva automaticamente i 2 run di funzioni separati dallo stato overlay). Doppio gate: Node (scripts/gate/fres/gate.mjs — 34 md5-verbatim vs golden pre-estrazione + probe esposizione + residuo stato/banner/patch + wiring 1:1) e harness browser (carica il vero wf/fresabilita.js come <script src>: 34/34 esposte come window global + funzioni pure eseguite corrette; la harness ha còlto un mio buco d'assert che lasciava passare un NaN, corretto). Verifica avversariale 4-lenti (Opus) POST-estrazione: 4/4 PASS, 0 blocker — il diff del monolite è solo 5 hunk (title, build, tag script, 2 tombstone §WF-FRES) con 852 righe rimosse = esclusivamente corpi di funzione.
+
+Implementazione:
+- vincolo hard rispettato: syn-clip.js (LIVE) legge window.fresState e chiama window.closeFresability → i nomi bare-global sono invariati (functions-only li preserva a costo zero, come gli 8 handler inline, il monkey-patch e il reset)
+- monolite da 18.258 a 17.393 righe (−18 dedup, −852 estrazione + 2 tombstone); censimento post-estrazione: 5 fres nel monolite (group-dialog) + 34 in wf/
+- deploy sequenziale LEGACY→BACKEND (anti-race ok); live: 8.88.0 sui domini, wf/fresabilita.js servito 200 con md5 identico al locale su entrambi i servizi, redirect del vecchio host ancora 308, gating 403
+
 ## 2026-07-06 — 8.87.1: DOMINIO (2/2) — pulizia testo brand senza-h → con-h
 
 Secondo e ultimo rilascio del consolidamento del dominio: dopo il redirect 8.87.0 che opera sull'URL, questo corregge i **testi visibili** ancora scritti col nome legacy senza-h. Cambiate le stringhe di contenuto: campo "Sito" del PDF report clinico (×2, `https://synthesis-icp.com`), footer legale della dashboard (`synthesis-icp.com`), testo del prompt di Vedere (`app.synthesis-icp.com`), e i fallback API di gestione/accedi (usati solo se `location.origin` manca → `https://app.synthesis-icp.com`).
