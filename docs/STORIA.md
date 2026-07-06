@@ -1,5 +1,21 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.95.3: Dead-code — rimosse 3 funzioni a 0 chiamanti
+
+Passo dedicato di pulizia (CLAUDE.md §3.4, mai durante un task funzionale). Ri-applica su main una pulizia che era rimasta in sospeso: una sessione precedente aveva rimosso 3 funzioni morte su un branch/worktree isolato (`claude/quizzical-pike-234138`, commit `8.91.1`), ma quel branch non era mai stato mergiato ed era fermo a un baseline vecchio (8.91.0) — un merge diretto avrebbe fatto conflitto coi cambi 8.95.1/.2 su `wf/sostituire.js`. Ho ri-verificato che le 3 funzioni sono ancora presenti in main e ancora senza chiamanti, e le ho rimosse fresche.
+
+- `_sostLocalWallAxis` (wf/sostituire.js): helper per l'asse lateral-wall introdotto in 8.63.0, superato dal fit cilindro cap-baricentro `_sostCylFitInvariant` dal 8.63.4, da allora mai più chiamato.
+- `sostTogglePlacedVisibility` (wf/sostituire.js): toggle di visibilità legacy, soppiantato.
+- `toggleAllSB` (monolite, dominio tree): morto dal 6b; il tombstone §WF-TREE adiacente resta.
+
+Aggiornati di conseguenza gli artefatti di estrazione/gate: `SOST_FNS` 47→45 (`scripts/extract_sost_f6d.mjs`), il gate sost (contatore 47→45), `golden.json` (−2 md5), il gate tree (rimossa `toggleAllSB` dal RESIDUE), e i commenti in `extract_tree_f6b.mjs` + `wf/tree.js`. La rimozione è chirurgica: 2 hunk in sostituire.js + 1 nel monolite, nessun collasso di righe vuote sparso (un primo tentativo con un regex globale toccava blank in tutto il file — scartato e rifatto normalizzando solo la giunzione del punto di rimozione).
+
+Batteria completa verde (sost 45 + tree 10 + replace 92 + fres 34 + report 4 + mis-icp 59 + mis-pdf 41 + mis-viz 23 + golden-master, anchors 36/36, check_inline, node --check). Il worktree e il branch vecchi sono stati rimossi (il loro lavoro è ora in main). Deploy su entrambi i servizi, 8.95.3 live; il `sostituire.js` servito non contiene più le funzioni rimosse.
+
+Implementazione:
+- Rimozione: wf/sostituire.js (_sostLocalWallAxis, sostTogglePlacedVisibility), monolite (toggleAllSB).
+- Tooling: extract_sost_f6d.mjs, gate/sost/{gate.mjs,golden.json}, gate/tree/gate.mjs, extract_tree_f6b.mjs, wf/tree.js. Registry + v3b title/ANALIZZA_BUILD 8.95.3.
+
 ## 2026-07-06 — 8.95.2: Bugfix — Sostituire posa lo scanbody anche in vista reticolo/both
 
 Il bug "shift+clic non posa" su Sostituire, individuato grazie alla diagnostica synLog aggiunta in 8.95.1. L'utente ha riprodotto sul suo scan reale (Multi-A con gengiva e più scanbody) e ha inviato le righe `[sost]` del log: `clic viewport {shift:true, hits:1842, face:false}`. Cioè: lo Shift era premuto, il raycast colpiva (1842 hit!), ma `hits[0].face` era falso, quindi la guardia `if(hits[0].face)` respingeva la posa.
