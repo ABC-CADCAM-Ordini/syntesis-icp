@@ -4,7 +4,7 @@
 //      per funzione, catturato da git HEAD prima dell'edit);
 //   2. ESPOSIZIONE: il file, valutato, DEFINISCE tutte e 10 le fn come function (probe sandbox);
 //   3. RESIDUO INTATTO: il monolite conserva ancora lo stato tree (muaExpanded) e le fn CONDIVISE
-//      lasciate di proposito (setSceneObjectColor/__synApplyColor/getGroupBadgeColor) + toggleAllSB;
+//      lasciate di proposito (setSceneObjectColor/__synApplyColor/getGroupBadgeColor);
 //   4. il monolite NON definisce più le 10 fn; lo <script src> wf/tree.js esiste 1 volta.
 //
 //   node scripts/gate/tree/gate.mjs --write-golden   # PRIMA dell'edit (old = git HEAD)
@@ -26,7 +26,6 @@ const RESIDUE = [
   "function setSceneObjectColor(target, hex){",  // utility scena condivisa (non tree)
   "function __synApplyColor(x, col){",           // helper di setSceneObjectColor
   "function getGroupBadgeColor(gid){",           // colore puro condiviso (candidato syn-color)
-  "function toggleAllSB(){",                     // dead-code adiacente (non toccato, §3.4)
 ];
 
 function headMono() { return execSync(`git show HEAD:${MONO}`, { maxBuffer: 64 * 1024 * 1024 }).toString(); }

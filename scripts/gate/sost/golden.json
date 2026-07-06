@@ -13,7 +13,6 @@
   "sostApplyRenderMode": "13506afa2d7162ad9589d092355b759b",
   "sostBuildTemplateGroup": "d798bd8cca61dc8c778f6fd0141d7906",
   "sostRobustCenter": "8775b75b622bcb1417a10f3ba6b657d4",
-  "_sostLocalWallAxis": "747c6dc769d9b2d6bebd6be61a8db86f",
   "_sostCylFitInvariant": "df89ff070496e4d44db912635272ed43",
   "_sostGeomWallAxis": "d2f6aba0e839f49747869b476adcded8",
   "_sostCapPlaneOn": "f01918c9cc3d1bcac1137a8d73738c45",
@@ -44,7 +43,6 @@
   "sostOnScanOpacityChange": "d19cb771c49719f6bafae54da25915ef",
   "sostTogglePlacedTplVisibility": "d560a2fe10795c1f141942e8f235f4e7",
   "sostToggleGroupVisibility": "98ba34994abb3e0ef2ac1cd836dc2d7e",
-  "sostTogglePlacedVisibility": "1f3ff3b34b6a6b3c17f14c704a425d3c",
   "sostOpenCutView": "1c6c4a0fcd6ae9692c1bc6067f5aff6b",
   "sostRenderCutView": "4ede95ad7190b76773f148d8335081fc"
  },

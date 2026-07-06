@@ -5,8 +5,8 @@
 // VISTA: nessuno stato proprio salvo muaExpanded (resta nel MAIN, riga ~1419), zero monkey-patch.
 // ESCLUSE di proposito (scouting 5-lenti): setSceneObjectColor + __synApplyColor (utility di
 // scena/colore CONDIVISE da 6 workflow — restano nel monolite) e getGroupBadgeColor (colore puro,
-// candidata a ds/syn-color.js in un passo colorclass dedicato — resta per ora). toggleAllSB è
-// dead-code adiacente (0 caller): NON estratto, NON rimosso (§3.4).
+// candidata a ds/syn-color.js in un passo colorclass dedicato — resta per ora). toggleAllSB era
+// dead-code adiacente (0 caller): lasciata nel monolite da F6b (§3.4), rimossa in 8.95.3.
 // I RUN sono rilevati AUTOMATICAMENTE (si spezzano dove c'è codice non-estratto tra due funzioni:
 // __synApplyColor/setSceneObjectColor fra rebuildTree e treeUnified; toggleAllSB dopo toggleMuaLayer).
 //
@@ -41,7 +41,7 @@ const HEADER = `/*
  * ESCLUSE dal modulo (scouting): setSceneObjectColor + __synApplyColor (utility di scena/colore
  * CONDIVISE da scan/mua/icp/sost/replace — restano nel monolite, non sono tree) e getGroupBadgeColor
  * (colore puro, gemella di getGroupArrowColor già in ds/syn-color.js — resta, candidata a un passo
- * colorclass dedicato). toggleAllSB è dead-code adiacente non estratto.
+ * colorclass dedicato). toggleAllSB era dead-code adiacente: rimossa dal monolite in 8.95.3.
  *
  * CARICAMENTO: <script src> classico NON-strict in testa (dopo wf/fresabilita.js), PRIMA del MAIN.
  * Le fn si limitano a essere DEFINITE a parse-time; leggono stato/THREE/scene/DOM solo a CALL-TIME

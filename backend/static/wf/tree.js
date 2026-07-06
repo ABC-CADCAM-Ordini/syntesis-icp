@@ -13,7 +13,7 @@
  * ESCLUSE dal modulo (scouting): setSceneObjectColor + __synApplyColor (utility di scena/colore
  * CONDIVISE da scan/mua/icp/sost/replace — restano nel monolite, non sono tree) e getGroupBadgeColor
  * (colore puro, gemella di getGroupArrowColor già in ds/syn-color.js — resta, candidata a un passo
- * colorclass dedicato). toggleAllSB è dead-code adiacente non estratto.
+ * colorclass dedicato). toggleAllSB era dead-code adiacente: rimossa dal monolite in 8.95.3.
  *
  * CARICAMENTO: <script src> classico NON-strict in testa (dopo wf/fresabilita.js), PRIMA del MAIN.
  * Le fn si limitano a essere DEFINITE a parse-time; leggono stato/THREE/scene/DOM solo a CALL-TIME

@@ -1,5 +1,5 @@
 // FASE 6d modularizzazione — estrazione del workflow SOSTITUIRE dal monolite:
-//   wf/sostituire.js  (47 fn: placement scanbody via click, motore robusto centro+asse, export STL,
+//   wf/sostituire.js  (45 fn: placement scanbody via click, motore robusto centro+asse, export STL,
 //                      albero, cutview; §SOSTITUIRE + funzioni sparse fino a ~15400)
 // Meccanismo "functions-only" (pattern 6a/6b/6c, LIVE): escono SOLO le function declaration,
 // VERBATIM, in <script src> classico non-strict in testa (dopo wf/report-analizza.js). Le fn girano
@@ -18,19 +18,20 @@ import { extractFunction } from "./gate/purelib/extract.mjs";
 
 const MONO = "backend/static/syntesis-analyzer-v3b.html";
 
-// 47 function declaration top-level del dominio Sostituire (ordine irrilevante: estrazione per-nome).
+// 45 function declaration top-level del dominio Sostituire (ordine irrilevante: estrazione per-nome).
+// (F6d ne estrasse 47; _sostLocalWallAxis + sostTogglePlacedVisibility rimosse come dead-code in 8.95.3)
 export const SOST_FNS = [
   "sostDecodeTemplate", "sostParseSTLToGeometry", "sostShowStatus", "sostOnSourceChange",
   "sostOnScanPicked", "sostLoadScanToScene", "sostStartPlacement", "sostOnViewportClick",
   "sostEnsureLabelElements", "sostUpdateLabels", "sostApplyRenderMode", "sostBuildTemplateGroup",
-  "sostRobustCenter", "_sostLocalWallAxis", "_sostCylFitInvariant", "_sostGeomWallAxis",
+  "sostRobustCenter", "_sostCylFitInvariant", "_sostGeomWallAxis",
   "_sostCapPlaneOn", "_sostCapPlaneFit", "_sostCapAnchoredPose", "_sostMCOn", "_sostMethodCFit",
   "_sostMethodCPose", "sostPlaceTemplate", "sostAlignAll", "sostRenderPlacedList", "sostDownloadDiagLog",
   "sostExportSTL", "_sostDoExport", "sostBuildExportTriangles", "sostSerializeBinarySTL", "sostRemovePlaced",
   "sostUpdateRefineButtonState", "_sostDisposePlaced", "sostClearScene", "sostRebuildTree",
   "sostToggleGroupCollapse", "sostOnGroupOpacityChange", "sostToggleScanVisibility", "sostToggleLabelsVisibility",
   "sostToggleScanCut", "sostRebuildScanGeometry", "sostOnScanOpacityChange", "sostTogglePlacedTplVisibility",
-  "sostToggleGroupVisibility", "sostTogglePlacedVisibility", "sostOpenCutView", "sostRenderCutView",
+  "sostToggleGroupVisibility", "sostOpenCutView", "sostRenderCutView",
 ];
 
 const HEADER = `/*

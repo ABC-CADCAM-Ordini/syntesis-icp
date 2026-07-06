@@ -1,9 +1,9 @@
 // Gate F6d — estrazione workflow SOSTITUIRE (wf/sostituire.js).
-//   1. VERBATIM: le 47 fn byte-identiche al monolite PRE-estrazione (golden md5 per fn da git HEAD);
-//   2. ESPOSIZIONE: il file valutato DEFINISCE tutte e 47 le fn come function (probe sandbox);
+//   1. VERBATIM: le 45 fn byte-identiche al monolite PRE-estrazione (golden md5 per fn da git HEAD);
+//   2. ESPOSIZIONE: il file valutato DEFINISCE tutte e 45 le fn come function (probe sandbox);
 //   3. RESIDUO INTATTO: lo STATO sost (sostMesh/sostPlaced/sostStl/...) e il banner §SOSTITUIRE
 //      restano nel monolite;
-//   4. il monolite NON definisce più le 47 fn; lo <script src> esiste 1 volta.
+//   4. il monolite NON definisce più le 45 fn; lo <script src> esiste 1 volta.
 //
 //   node scripts/gate/sost/gate.mjs --write-golden   # PRIMA dell'edit
 //   node scripts/gate/sost/gate.mjs --check          # dopo

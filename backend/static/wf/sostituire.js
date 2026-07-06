@@ -375,51 +375,6 @@ function sostRobustCenter(scanGeo, roughCenter, axis, R){
   return { applied:true, center:new THREE.Vector3(cx,cy,cz), coverageDeg:coverageDeg, nWall:nWall };
 }
 
-// 8.63.0: asse lateral-wall LOCALE per il centraggio robusto su 1T3/OS. Il motore asse globale
-// (synAxisUseLateral 'auto') usa cap-media per 1T3/OS; ma sostRobustCenter ancora il centro al piano
-// ⊥ asse -> un asse cap-media inclinato gli farebbe ereditare il tilt (fix illusorio). Qui ricavo
-// l'asse dalla PARETE (min-eigenvector di Σ area·n·nᵀ sui triangoli laterali nell'anello), SOLO in
-// questo branch -> NON tocca synAxisUseLateral / Analizza / report PDF. Fail-soft: parete povera
-// (< 12 triangoli) -> ritorna null -> resta l'asse cap-media. Stessa banda/anello di sostRobustCenter.
-function _sostLocalWallAxis(scanGeo, roughCenter, roughAxis, R){
-  if(!scanGeo || !scanGeo.attributes || !scanGeo.attributes.normal) return null;
-  var pos = scanGeo.attributes.position.array, nrm = scanGeo.attributes.normal.array;
-  var nTri = pos.length / 9;
-  var ax0 = roughAxis.x, ax1 = roughAxis.y, ax2 = roughAxis.z;
-  var cx = roughCenter.x, cy = roughCenter.y, cz = roughCenter.z;
-  var Rlo = R - 0.8, Rhi = R + 0.6;
-  var S = [[0,0,0],[0,0,0],[0,0,0]], nWall = 0;
-  for(var i = 0; i < nTri; i++){
-    var ni = i*9;
-    var tx=(pos[ni]+pos[ni+3]+pos[ni+6])/3, ty=(pos[ni+1]+pos[ni+4]+pos[ni+7])/3, tz=(pos[ni+2]+pos[ni+5]+pos[ni+8])/3;
-    var nx=(nrm[ni]+nrm[ni+3]+nrm[ni+6])/3, ny=(nrm[ni+1]+nrm[ni+4]+nrm[ni+7])/3, nz=(nrm[ni+2]+nrm[ni+5]+nrm[ni+8])/3;
-    var nl=Math.sqrt(nx*nx+ny*ny+nz*nz); if(nl<0.01) continue; nx/=nl; ny/=nl; nz/=nl;
-    if(Math.abs(nx*ax0+ny*ax1+nz*ax2) >= 0.35) continue;           // solo parete laterale
-    var dx=tx-cx, dy=ty-cy, dz=tz-cz;
-    var axial = dx*ax0+dy*ax1+dz*ax2; if(Math.abs(axial) > 3.5) continue;
-    var px=dx-axial*ax0, py=dy-axial*ax1, pz=dz-axial*ax2;
-    var rad=Math.sqrt(px*px+py*py+pz*pz); if(rad < Rlo || rad > Rhi) continue;
-    var e1x=pos[ni+3]-pos[ni], e1y=pos[ni+4]-pos[ni+1], e1z=pos[ni+5]-pos[ni+2];
-    var e2x=pos[ni+6]-pos[ni], e2y=pos[ni+7]-pos[ni+1], e2z=pos[ni+8]-pos[ni+2];
-    var crx=e1y*e2z-e1z*e2y, cry=e1z*e2x-e1x*e2z, crz=e1x*e2y-e1y*e2x;
-    var ar=0.5*Math.sqrt(crx*crx+cry*cry+crz*crz);
-    S[0][0]+=ar*nx*nx; S[0][1]+=ar*nx*ny; S[0][2]+=ar*nx*nz;
-    S[1][0]+=ar*ny*nx; S[1][1]+=ar*ny*ny; S[1][2]+=ar*ny*nz;
-    S[2][0]+=ar*nz*nx; S[2][1]+=ar*nz*ny; S[2][2]+=ar*nz*nz;
-    nWall++;
-  }
-  if(nWall < 12) return null;
-  var ej = misICP_jacobi3(S);
-  var mi = 0;
-  if(ej.vals[1] < ej.vals[mi]) mi = 1;
-  if(ej.vals[2] < ej.vals[mi]) mi = 2;
-  var wx = ej.vecs[0][mi], wy = ej.vecs[1][mi], wz = ej.vecs[2][mi];
-  var wl = Math.sqrt(wx*wx+wy*wy+wz*wz); if(wl < 1e-9) return null;
-  wx/=wl; wy/=wl; wz/=wl;
-  if(wx*ax0+wy*ax1+wz*ax2 < 0){ wx=-wx; wy=-wy; wz=-wz; }            // verso concorde col cap-media
-  return new THREE.Vector3(wx, wy, wz);
-}
-
 function _sostCylFitInvariant(scanGeo, roughCenter, roughAxis, R){
   if(!scanGeo || !scanGeo.attributes || !scanGeo.attributes.normal){ _sostInvLastReason='no-vertex-normals'; return null; }
   var pos = scanGeo.attributes.position.array, nrm = scanGeo.attributes.normal.array;
@@ -2331,19 +2286,6 @@ function sostToggleGroupVisibility(tplKey, on){
     var g = p.groups && p.groups[tplKey];
     if(g) g.visible = on;
   });
-  sostRebuildTree();
-}
-
-// Legacy: kept for compatibility but redirected
-function sostTogglePlacedVisibility(num, on){
-  var p = sostPlaced.find(function(x){ return x.num === num; });
-  if(!p) return;
-  // Toggle all 3 template variants together
-  ['1T3','SR','OS'].forEach(function(k){
-    var g = p.groups && p.groups[k];
-    if(g) g.visible = on;
-  });
-  if(p.axisLine) p.axisLine.visible = false;
   sostRebuildTree();
 }
 
