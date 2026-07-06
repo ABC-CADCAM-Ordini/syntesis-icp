@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.91.0 (MODULARIZZAZIONE F6d: quarto workflow fuori dal monolite — 47 fn del dominio SOSTITUIRE (placement/motore robusto/export/albero/cutview) → `wf/sostituire.js` (functions-only, 11 run/tombstone; lo STATO sost `sostMesh/sostPlaced/...` + banner §SOSTITUIRE restano nel monolite; RMSD 7,9µm preservato per verbatim). F6c: 4 fn report Analizza → `wf/report-analizza.js`; F6b: 10 fn tree → `wf/tree.js`; F6a: 34 fn FRESABILITA → `wf/fresabilita.js`; prep 8.87.2 dedup. Base 8.87.0-.1 redirect+testi con-h; 8.86.0 F5 → `ds/syn-env.js`; 8.85.0 F4; 8.84.0-.2 F1-F3) — **Data:** 2026-07-06
+> **Versione software mappata:** 8.92.0 (MODULARIZZAZIONE F6e: quinto workflow fuori dal monolite — 92 fn del dominio REPLACE-IT (cascata librerie, seeding 3-punti, allineamento, raffina client/server, export, taglio, anteprima 3D) → `wf/replace.js` (functions-only, file unico 2329 r; lo STATO replace + banner §REPLACE-IT/§REPLACE-CUT-SCAN restano nel monolite; **formula NDC picking preservata per verbatim**). F6d: 47 fn SOSTITUIRE → `wf/sostituire.js`; F6c: 4 fn report Analizza → `wf/report-analizza.js`; F6b: 10 fn tree → `wf/tree.js`; F6a: 34 fn FRESABILITA → `wf/fresabilita.js`. Base 8.87.x redirect+testi con-h; 8.86.0 F5; 8.85.0 F4; 8.84.0-.2 F1-F3. Resta solo Misurare (6f). — **Data:** 2026-07-06
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3). **8.74.0 (Fase B, commit 1 — unificazione chrome):** il pannello **Misurare** entra nel sistema FILL (via i gradienti pre-pastello: `.mis-btn-run` blu `#0077CC/#0050A0` → `--fill-primary`+`--dark`; modalità click-seed viola Tailwind `#8B5CF6/#7C3AED/#C4B5FD/#F5F3FF/#5B21B6` → famiglia **selezione** `--fill-sel`/`--pearl`/`--blue`; Annulla → `--pearl`+bordo); login in-app idem → `--fill-primary`; cutview `#1a1a22` → `var(--dark)`; danger `#E24B4A/#A32D2D` → `--red`/`--fill-error` (`.btn.danger`, hover del-btn dark). **CTA di pannello unificate** alla specifica di Sostituire (`padding:8px 10px; font-size:12px; letter-spacing:.03em`): i 5 bottoni di `#replaceFlow` allineati; `#sostBtnExport` passa da nero pieno a classe **`.export-btn`** (= Accoppia). Nuova classe **`.syn-select`** (bordo/raggio/font unici) sui 5 select di `#panelReplace` + `#misSeedType`. Canvas/PDF e palette-dati (gruppi, sfondo ambiente) NON toccati.
@@ -39,7 +39,7 @@ Non sono route: sono stati interni di `syntesis-analyzer-v3b.html`, commutati da
 | accoppia | [5064](../backend/static/syntesis-analyzer-v3b.html#L5064) | `'accoppia'` | Esporta/confronta accoppiamenti. |
 | misurare | [5084](../backend/static/syntesis-analyzer-v3b.html#L5084) | `'misurare'` | Monta viewport ICP dedicato (2 STL). |
 | sostituire | [5110](../backend/static/syntesis-analyzer-v3b.html#L5110) | `'sostituire'` | Posizionamento marker su scansione di partenza. |
-| **replace** | [~5139](../backend/static/syntesis-analyzer-v3b.html#L5139) | `'replace'` | **Replace-iT (8.18.0, slice 2b-1)**: workflow NUOVO SEPARATO (Sostituisci resta bit-identico). `WORKFLOWS['replace']` [~4699]. Mostra `#panelReplace` [~2007], nasconde tutti gli altri pannelli/toolbar. Vedi sezione dedicata sotto. |
+| **replace** | [~5139](../backend/static/syntesis-analyzer-v3b.html#L5139) | `'replace'` | **Replace-iT (8.18.0, slice 2b-1)**: workflow NUOVO SEPARATO (Sostituisci resta bit-identico). `WORKFLOWS['replace']` [~4699]. Mostra `#panelReplace` [~2007], nasconde tutti gli altri pannelli/toolbar. **8.92.0 (F6e)**: le 92 fn del dominio (`replace*`/`_replace*`: cascata librerie, seeding 3-punti, allineamento, raffina client/server, export, taglio, anteprima 3D) vivono in `wf/replace.js`; lo STATO replace + banner §REPLACE-IT/§REPLACE-CUT-SCAN + il listener pointerdown (`replacePickDown*`) restano nel monolite; formula NDC preservata verbatim. Vedi sezione dedicata sotto. |
 
 ---
 
@@ -502,43 +502,42 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 <!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
 
-### Fotografia (8.90.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+### Fotografia (8.92.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
 
 | Metrica | Valore |
 |---|---|
-| Righe / peso | **13582** / **0.75 MB** |
-| JS applicativo REALE | **12121** righe in 6 blocchi `<script>` (grezzo 12121, meno il blob B64) |
+| Righe / peso | **11297** / **0.61 MB** |
+| JS applicativo REALE | **9835** righe in 6 blocchi `<script>` (grezzo 9835, meno il blob B64) |
 | Asset B64 embedded | **0.0 MB** in 0 righe (**0%** del file) |
-| Funzioni top-level | 325 |
-| Globali condivise | 145 (di cui **30** toccate da 2+ domini) |
-| Export surface (handler inline) | 82 funzioni da preservare su `window` |
+| Funzioni top-level | 233 |
+| Globali condivise | 145 (di cui **25** toccate da 2+ domini) |
+| Export surface (handler inline) | 49 funzioni da preservare su `window` |
 
 ### Domini: dimensione e superficie di accoppiamento
 
 | Dominio | # fn | stato scritto→altri | stato letto←altri | API inline | API cross-dominio |
 |---|---|---|---|---|---|
 | `mis` | 123 | 1 | 3 | 19 | 7 |
-| `replace` | 92 | 7 | 8 | 33 | 9 |
-| `mua` | 37 | 5 | 8 | 5 | 15 |
-| `workflow` | 15 | 13 | 7 | 5 | 1 |
+| `mua` | 37 | 5 | 8 | 5 | 14 |
+| `workflow` | 15 | 8 | 6 | 5 | 1 |
 | `diag` | 12 | 0 | 0 | 4 | 7 |
-| `export` | 8 | 0 | 1 | 5 | 1 |
+| `export` | 8 | 0 | 1 | 5 | 0 |
 | `chrome` | 6 | 0 | 0 | 2 | 4 |
 | `fres` | 5 | 0 | 0 | 3 | 0 |
 | `log` | 5 | 0 | 0 | 0 | 1 |
 | `io` | 4 | 1 | 5 | 1 | 1 |
-| `bootstrap` | 3 | 2 | 6 | 1 | 1 |
 | `other` | 3 | 0 | 0 | 0 | 3 |
-| `tree` | 3 | 0 | 3 | 1 | 2 |
+| `tree` | 3 | 0 | 2 | 1 | 1 |
+| `bootstrap` | 3 | 2 | 5 | 1 | 0 |
 | `cut` | 3 | 0 | 1 | 3 | 3 |
-| `geom` | 2 | 0 | 2 | 0 | 2 |
 | `scene` | 2 | 0 | 2 | 0 | 1 |
-| `colorclass` | 1 | 0 | 0 | 0 | 1 |
+| `geom` | 2 | 0 | 2 | 0 | 2 |
 | `find` | 1 | 0 | 0 | 0 | 1 |
+| `colorclass` | 1 | 0 | 0 | 0 | 1 |
 
 ### Accoppiamenti call-graph più pesanti (dominio→dominio: # funzioni)
 
-`mua→chrome:11` · `workflow→mua:9` · `mis→chrome:7` · `mua→cut:6` · `workflow→mis:5` · `workflow→replace:5` · `mis→log:5` · `io→mua:4` · `mua→other:4` · `mis→find:4` · `mua→geom:4` · `fres→mua:4`
+`mua→chrome:11` · `workflow→mua:9` · `mis→chrome:7` · `mua→cut:6` · `workflow→mis:5` · `mis→log:5` · `io→mua:4` · `mua→other:4` · `mis→find:4` · `mua→geom:4` · `fres→mua:4` · `io→chrome:3`
 
 > Elenchi completi per-dominio (globali, API) in `scripts/dep_census_out.json`.
 > Ordine di estrazione e meccanismi: `docs/MODULARIZZAZIONE_STUDIO.md` (strategia).
