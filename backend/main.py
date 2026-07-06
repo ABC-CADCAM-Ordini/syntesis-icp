@@ -121,6 +121,35 @@ app.add_middleware(
 # minimum_size=1024 evita compressione su payload piccoli (overhead).
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
+# ── Consolidamento dominio: redirect permanente dal nome legacy SENZA h al brand
+# canonico "Synthesis" CON h (8.87.0). Il software non e' ancora pubblico: si
+# consolida ORA per non lasciar radicare il dominio sbagliato in bookmark, link
+# esterni o indicizzazione. Effetto collaterale utile: unifica le sessioni, che
+# sono per-origine (chi entrava su syntesis-* non risultava loggato su synthesis-*).
+#
+# CHIRURGICO e HOST-BASED: redirige SOLO l'esatto host custom legacy
+# app.syntesis-icp.com. NON tocca (a) i domini Railway *.up.railway.app — usati
+# internamente, dagli health check e dal callback OAuth Google (gdrive.py REDIRECT_URI
+# punta al dominio Railway, non a un custom) —, (b) l'host canonico con-h,
+# (c) localhost. Nessun rischio di loop: target != sorgente, match esatto.
+# 308 (non 301): Permanent Redirect che PRESERVA metodo e body, cosi' anche
+# eventuali POST/PATCH verso il vecchio host arrivano interi al nuovo; permanente
+# = cache aggressiva del browser VOLUTA (la direzione e' definitiva).
+_LEGACY_HOST = "app.syntesis-icp.com"        # nome legacy SENZA h — da far sparire
+_CANONICAL_HOST = "app.synthesis-icp.com"    # brand canonico CON h
+
+@app.middleware("http")
+async def redirect_legacy_host(request, call_next):
+    # dietro il proxy Railway l'host reale puo' arrivare in X-Forwarded-Host
+    fwd = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    host = fwd.split(",")[0].split(":")[0].strip().lower()
+    if host == _LEGACY_HOST:
+        target = f"https://{_CANONICAL_HOST}{request.url.path}"
+        if request.url.query:
+            target += f"?{request.url.query}"
+        return RedirectResponse(url=target, status_code=308)
+    return await call_next(request)
+
 app.include_router(auth_router, prefix="/auth")
 app.include_router(admin_router, prefix="/admin")
 
