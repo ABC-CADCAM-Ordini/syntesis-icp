@@ -1,5 +1,16 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.87.1: DOMINIO (2/2) — pulizia testo brand senza-h → con-h
+
+Secondo e ultimo rilascio del consolidamento del dominio: dopo il redirect 8.87.0 che opera sull'URL, questo corregge i **testi visibili** ancora scritti col nome legacy senza-h. Cambiate le stringhe di contenuto: campo "Sito" del PDF report clinico (×2, `https://synthesis-icp.com`), footer legale della dashboard (`synthesis-icp.com`), testo del prompt di Vedere (`app.synthesis-icp.com`), e i fallback API di gestione/accedi (usati solo se `location.origin` manca → `https://app.synthesis-icp.com`).
+
+Esclusi di proposito, con motivo: le **email** (mittente `noreply@` in email_service.py + mailto `supporto@` in accedi) dipendono dal dominio con-h verificato in Resend (SPF/DKIM) — cambiarle nel codice senza il dominio email pronto significherebbe posta che non parte; i **nomi file** `syntesis-*.html`, la cartella/repo e il dominio Railway `syntesis-icp-production` sono identificatori interni, non brand che l'utente legge (rinominarli = rischio alto, zero beneficio visibile); il `window.open` railway di Vedere è un dominio interno. Nota: l'apex nudo `synthesis-icp.com` resta parcheggiato su register.it (azione manuale pendente) → il "Sito" del PDF diventerà cliccabile-funzionante quando l'apex verrà instradato, ma intanto la grafia è corretta.
+
+Implementazione:
+- v3b toccato → title/ANALIZZA_BUILD/DATE a 8.87.1; Vedere v8.0.5→v8.0.6-refactor; MAPPA "Versione software mappata" → 8.87.1 (nessun elemento UI mappato toccato, solo stringhe di contenuto)
+- batteria verde: check_anchors 36/36, check_inline, purelib 78/78, env gate, node --check dei blocchi inline di v3b + 4 pagine satellite; bump PATCH (solo testo, zero cambi funzionali)
+- deploy sequenziale LEGACY→BACKEND (anti-race ok); verifica live: PDF "Sito" servito = synthesis-icp.com (con h), footer dashboard con h, Vedere v8.0.6, redirect 308 dell'8.87.0 ancora attivo, gating 403
+
 ## 2026-07-06 — 8.87.0: DOMINIO — redirect nome legacy senza-h → "Synthesis" con-h
 
 Decisione di branding dell'utente: il nome corretto è **Synthesis con la H**; il senza-h deve sparire. Il software non è ancora pubblico (aperto ma usato da pochi per sviluppo), quindi è il momento ideale per consolidare, prima che il dominio sbagliato radichi in bookmark/link/indicizzazione. I due domini custom servivano contenuto byte-identico con 200 e nessun redirect fra loro — duplicazione vera, con anche un effetto funzionale: sessione/token/localStorage sono per-origine, quindi chi entrava sul senza-h non risultava loggato sul con-h.
