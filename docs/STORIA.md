@@ -1,5 +1,22 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.95.2: Bugfix — Sostituire posa lo scanbody anche in vista reticolo/both
+
+Il bug "shift+clic non posa" su Sostituire, individuato grazie alla diagnostica synLog aggiunta in 8.95.1. L'utente ha riprodotto sul suo scan reale (Multi-A con gengiva e più scanbody) e ha inviato le righe `[sost]` del log: `clic viewport {shift:true, hits:1842, face:false}`. Cioè: lo Shift era premuto, il raycast colpiva (1842 hit!), ma `hits[0].face` era falso, quindi la guardia `if(hits[0].face)` respingeva la posa.
+
+Causa radice: in modalità di rendering "reticolo/both" (solido + wireframe), `sostApplyRenderMode` (introdotta in 8.71.3 per portare la vista reticolo anche in Sostituire) chiama `applyRenderModeToMesh(sostMesh)`, che aggiunge al mesh della scansione un figlio `LineSegments` (`_wireOverlay`, una `WireframeGeometry`). Il punto chiave: `raycaster.intersectObject()` in THREE.js moderno è **ricorsivo per default**. `sostOnViewportClick` chiamava `intersectObject(sostMesh)` senza il secondo argomento, quindi il raggio colpiva anche l'overlay wireframe figlio; le intersezioni con le linee non hanno `.face`, e quel hit senza faccia finiva come `hits[0]` → la guardia lo scartava e la posa non avveniva. Il bug era latente dall'8.71.3 ed emergeva **solo** in vista reticolo/both (in solido non c'è overlay; in wireframe puro è solo `material.wireframe`, senza figlio).
+
+Non è una regressione della Fase 6f: il percorso di posa è byte-identico a prima; la modularizzazione non c'entra. È la strumentazione synLog di 8.95.1 (il "log della finestra segreta" che l'utente ricordava) ad aver individuato il punto esatto in un colpo.
+
+Il fix è un solo argomento: `raycaster.intersectObject(sostMesh, false)` — raycast **non ricorsivo**, esattamente come fa Analizza alla riga 1750, dove lo stesso identico bug era già stato documentato e risolto («il wireframe figlio veniva colpito per primo e non ha `.face` → il placement moriva»). Sostituire era rimasto l'unico dei workflow di posa senza quel flag. Riprodotto e verificato nel mock: in modalità 'both' `sostMesh.children` = `[LineSegments]`; il raycast ricorsivo dava `hits=2513, face=false` (il bug), quello non ricorsivo `hits=2, face=true` → marker posato.
+
+La strumentazione `synLog('sost')` aggiunta in 8.95.1 resta in produzione: ha fatto il suo lavoro e serve per il prossimo caso. Il gate verbatim di sost è stato ri-baselinato per `sostOnViewportClick`.
+
+Implementazione:
+- wf/sostituire.js: `intersectObject(sostMesh)` → `intersectObject(sostMesh, false)` in sostOnViewportClick.
+- scripts/gate/sost/golden.json ri-baselinato (sostOnViewportClick); registry + v3b title/ANALIZZA_BUILD 8.95.2.
+- NOTA follow-up: Replace-iT (replaceOnViewportClick, wf/replace.js r.817) usa anch'esso intersectObject ricorsivo, ma con fallback normale (0,0,1) invece di bloccare — non blocca la posa ma può orientarla male in vista reticolo/both; da valutare a parte.
+
 ## 2026-07-06 — 8.95.1: Diagnostica — posa di Sostituire cablata nel log segreto (synLog)
 
 L'utente ha segnalato che su Sostituire "il clic per posizionare non funziona" (shift+clic, ma nessun marker). Ho investigato con una riproduzione reale dell'app (mock server che stubba auth+registry, scanbody CAD veri caricati come scansione) e ho stabilito due cose: (1) non è una regressione della Fase 6f — il codice della posa (aggancio click nel monolite, `sostOnViewportClick`/`sostPlaceTemplate` in wf/sostituire.js) è byte-identico a prima e non dipende da nessuna funzione Misurare; (2) la posa funziona end-to-end per tutti e tre i tipi (1T3/OS/SR) nel repro pulito: shift+clic → raycast colpisce → `sostPlaceTemplate` → marker creato, in scena, visibile. Un dettaglio emerso: la posa è asincrona (carica i 3 template via `Promise.all` e crea il marker nel `.then`; il template OS è ~2.3 MB), senza feedback immediato al clic.
