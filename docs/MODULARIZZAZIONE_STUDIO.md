@@ -53,8 +53,14 @@
 > 11 run; stato sost + banner restano; RMSD 7,9µm verbatim). Avversariale 3/3 PASS; verifica live Claude Chrome
 > (cambio workflow a Sostituire commuta davvero). Monolite a 13.581 righe. NB: dead-code pre-esistente
 > _sostLocalWallAxis/sostTogglePlacedVisibility annotato.
-> ▶ Prossimo: **Fase 6e** (wf/replace-core.js + wf/replace-ui.js, ~67-92 fn Replace-iT; NON toccare la formula NDC;
-> dead-code si annota; gate scenario 3-punti sintetico + harness UI). Poi 6f mis ULTIMO (con report-comune).
+> ✅ **Fase 6e COMPLETATA** (2026-07-06, 8.92.0 commit 633720c): 92 fn Replace-iT → wf/replace.js (functions-only,
+> FILE UNICO perché 2127 righe < 3k — niente split core/ui; formula NDC picking preservata byte-identica; stato +
+> banner restano). Il gate ha còlto un bug '*/' nell'header del modulo (corretto). Avversariale 3/3 PASS; verifica
+> live Claude Chrome (cambio workflow a Replace-iT commuta davvero). Monolite a 11.296 righe (da 41.480 = -73%).
+> ▶ Prossimo (ULTIMO): **Fase 6f MISURARE** (wf/misurare-icp.js + wf/misurare-ui.js, ~3.900 r, il core clinico ICP,
+> + wf/report-comune.js pipeline PDF condivisa). Gate golden-master COMPLETO sulle fixtures (pipeline intera old/new:
+> load→seed→ICP→ΔXY/ΔZ/ΔD3D→classi, precisione piena). Rischio ALTO mitigato dal golden-master. RIGENERARE il
+> censimento e ri-validare l'ordine prima di iniziare (innesto A).
 
 ---
 

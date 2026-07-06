@@ -1,5 +1,18 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.92.0: MODULARIZZAZIONE Fase 6e (workflow Replace-iT → wf/replace.js)
+
+Quinto e ultimo workflow "gemello" estratto prima del core clinico: Replace-iT (accoppia CAD sorgente alla scansione, cascata librerie Marca/Modello/Diametro, seeding 3-punti, allineamento, raffina client/server ICP point-to-plane, export STL, albero scena, taglio scansione adattivo, anteprima 3D trackball). 92 funzioni verbatim in wf/replace.js. Con 2127 righe di corpi (< 3k) è un file unico, senza lo split core/ui che lo studio prevedeva solo oltre le 3k. Restano nel monolite: lo stato replace (~18 var, incluse replacePickDownX/Y/Shift lette dal listener pointerdown condiviso da tutte le pose, e replacePreviewMoveH/UpH assegnate dentro replacePreviewAttachInput), i banner §REPLACE-IT/§REPLACE-CUT-SCAN, e le funzioni di Sostituire (gemello già estratto) e Misurare (6f).
+
+Vincolo critico dello studio rispettato: la formula NDC del picking 3-punti `(clientX-rect.left)/rect.width` — quella storicamente corretta, non offsetX/clientWidth (regressione 8.59.2 revocata) — è preservata per costruzione, essendo l'estrazione byte-identica; verificato che vive in replaceOnViewportClick e replacePreviewPickAt nel modulo estratto.
+
+Il gate ha fatto il suo lavoro: al primo run ha còlto un bug nell'header del modulo che avevo scritto — una sequenza `*/` dentro il testo del commento (nel elenco `replaceCurrent*/replaceSource*/`) che chiudeva il commento a blocco in anticipo, rompendo il file. Corretto neutralizzando le sequenze `*/` e ri-verificato prima del deploy. Verifica avversariale 3-lenti Opus (verbatim+NDC, raggiungibilità+stato, separazione dal gemello Sostituire+load-order): 3/3 PASS, 0 blocker.
+
+Implementazione:
+- estrattore generato con i 92 nomi embeddati dal grep (zero rischio di typo su 92 nomi); gate scripts/gate/replace/gate.mjs (92 md5-verbatim + esposizione + residuo stato/banner + wiring)
+- monolite da 13.581 a 11.296 righe (da 41.480 iniziali = −73%); censimento post: replace interamente in wf/ (92)
+- deploy sequenziale LEGACY→BACKEND (anti-race ok); verifica live con Claude Chrome: 8.92.0 sui domini, wf/replace.js md5-identico su entrambi i servizi, 92 fn esposte, e il cambio workflow a Replace-iT funziona davvero sull'app reale (selectWorkflow('replace') senza errori → pannello, cascata librerie e albero girano, ritorno ad Analizza ok, altri 4 workflow non regrediti), zero errori console
+
 ## 2026-07-06 — 8.91.0: MODULARIZZAZIONE Fase 6d (workflow Sostituire → wf/sostituire.js)
 
 Quarto e più grande workflow estratto: Sostituire (placement scanbody via click con findScanbodyCenter, motore robusto centro+asse Kasa/wall/cap-plane/Method C, raffina, export STL binario, albero scena dedicato, cutview). 47 funzioni verbatim in wf/sostituire.js (2488 righe), functions-only. Le funzioni erano sparse in 11 zone del file (interlacciate con Replace-iT e con lo stato), quindi 11 tombstone §WF-SOST. Restano nel monolite: lo stato sost (16 var sostMesh/sostPlaced/sostStl/… lette anche da wf/tree.js e da selectWorkflow), il banner §SOSTITUIRE, e tutte le funzioni Replace (dominio gemello, fase 6e). Le annidate _sostFinishRefine/_sostRefineRound viaggiano dentro sostAlignAll. La precisione del placement (RMSD centroide 7,9µm sul sintetico-su-sintetico, rituale del progetto) è preservata per costruzione, essendo l'estrazione byte-identica.
