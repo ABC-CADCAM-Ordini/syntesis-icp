@@ -155,11 +155,13 @@ function sostLoadScanToScene(filename){
 // ── Placement: avvia modalità clic ──
 function sostStartPlacement(){
   if(!sostMesh){
+    try{ synLog('sost','posiziona rifiutato: nessuna scansione caricata'); }catch(_){}
     sostShowStatus('Carica prima una scansione.', true);
     return;
   }
   sostPlacementMode = true;
   renderer.domElement.style.cursor = 'crosshair';
+  try{ synLog('sost','posiziona ON (attesa SHIFT+clic)', {src:sostSourceTemplate}); }catch(_){}
   sostShowStatus('SHIFT+CLIC su uno scanbody per posizionarvi il marker · trascina per ruotare.');
 }
 
@@ -167,8 +169,8 @@ function sostStartPlacement(){
 function sostOnViewportClick(event){
   if(!sostPlacementMode || !sostMesh) return false;
   // 8.58.0: posa solo con SHIFT+CLIC PULITO -> ruotare il modello non posa fuori posizione.
-  if(Math.abs(event.clientX-replacePickDownX)>6||Math.abs(event.clientY-replacePickDownY)>6) return false;   // trascinamento = rotazione
-  if(!replacePickDownShift){ sostShowStatus('Tieni premuto Shift e clicca per posare il marker · trascina (senza Shift) per ruotare.'); return false; }
+  if(Math.abs(event.clientX-replacePickDownX)>6||Math.abs(event.clientY-replacePickDownY)>6){ try{ synLog('sost','clic ignorato: trascinamento (>6px = rotazione)'); }catch(_){} return false; }   // trascinamento = rotazione
+  if(!replacePickDownShift){ try{ synLog('sost','clic ignorato: Shift non premuto'); }catch(_){} sostShowStatus('Tieni premuto Shift e clicca per posare il marker · trascina (senza Shift) per ruotare.'); return false; }
   var rect = renderer.domElement.getBoundingClientRect();
   var mouse = new THREE.Vector2(
     ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -177,6 +179,7 @@ function sostOnViewportClick(event){
   var raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(mouse, camera);
   var hits = raycaster.intersectObject(sostMesh);
+  try{ synLog('sost','clic viewport', {shift:!!replacePickDownShift, hits:hits.length, face:!!(hits[0]&&hits[0].face), rectW:+rect.width.toFixed(0), rectH:+rect.height.toFixed(0)}); }catch(_){}
   if(hits.length > 0 && hits[0].face){   // 8.58.0 (review): guardia .face come Analizza (un overlay wireframe figlio non ha .face -> niente TypeError)
     sostPlaceTemplate(hits[0].point, hits[0].face.normal);
     sostPlacementMode = false;
@@ -744,8 +747,16 @@ function sostPlaceTemplate(rawPoint, rawNormal){
   // Passa il raggio del marker presente nella scansione di partenza
   // (1T3: 2.515, SR: 2.030, OS: 1.780) per fare il fit cilindro corretto.
   var sourceRadius = (SOSTITUIRE_TEMPLATE_INFO[sostSourceTemplate] || {}).radius;
-  var autoResult = findScanbodyCenter(sostMesh.geometry, rawPoint, rawNormal,
-    sourceRadius ? { radius: sourceRadius } : undefined);
+  try{ synLog('sost','posa start', {src:sostSourceTemplate, radius:sourceRadius, pt:[+rawPoint.x.toFixed(3),+rawPoint.y.toFixed(3),+rawPoint.z.toFixed(3)], findScanbody:typeof findScanbodyCenter}); }catch(_){}
+  var autoResult;
+  try {
+    autoResult = findScanbodyCenter(sostMesh.geometry, rawPoint, rawNormal,
+      sourceRadius ? { radius: sourceRadius } : undefined);
+  } catch(_fsc){
+    try{ synLog('sost','posa FALLITA: findScanbodyCenter ha lanciato', {msg:(_fsc&&_fsc.message)||String(_fsc)}); }catch(_){}
+    sostShowStatus('Errore nel rilevamento dello scanbody cliccato: '+((_fsc&&_fsc.message)||_fsc), true);
+    throw _fsc;
+  }
   var discWorld = autoResult.center;       // faccia del disco scansionato nel mondo
   var axis = autoResult.axis.clone().normalize();
   // Replace-iT: centraggio click-invariante (flag 'syntesis_sost_center'='robust').
@@ -918,11 +929,13 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     var geos = {};
     for(var i = 0; i < TPL_KEYS.length; i++){
       if(!bufs[i]){
+        try{ synLog('sost','posa FALLITA: template non caricato', {key:TPL_KEYS[i]}); }catch(_){}
         sostShowStatus('Impossibile caricare il template ' + TPL_KEYS[i], true);
         return;
       }
       geos[TPL_KEYS[i]] = sostParseSTLToGeometry(bufs[i]);
       if(!geos[TPL_KEYS[i]]){
+        try{ synLog('sost','posa FALLITA: parse template', {key:TPL_KEYS[i]}); }catch(_){}
         sostShowStatus('Errore parsing template ' + TPL_KEYS[i], true);
         return;
       }
@@ -1203,6 +1216,7 @@ function sostPlaceTemplate(rawPoint, rawNormal){
     var activeInfo = SOSTITUIRE_TEMPLATE_INFO[activeKey] || {label: activeKey};
     sostRenderPlacedList();
     sostUpdateRefineButtonState();
+    try{ synLog('sost','posa OK: marker piazzato', {num:sostCounter, idx:sostPlaced.length-1, tot:sostPlaced.length, reason:(typeof _sostInvLastReason==='string'?_sostInvLastReason:'')}); }catch(_){}
     sostShowStatus('Marker #' + sostCounter + ' posizionato (' + activeInfo.label + ').');
     try { rebuildTree(); } catch(e){}
     if(sostScanUI.cutOnMarkers) sostRebuildScanGeometry();
@@ -1228,6 +1242,7 @@ function sostPlaceTemplate(rawPoint, rawNormal){
       }
     }
   }).catch(function(err){
+    try{ synLog('sost','posa FALLITA: eccezione (.catch)', {msg:(err&&err.message)||String(err), stack:(err&&err.stack?String(err.stack).split('\n').slice(0,3).join(' | '):null)}); }catch(_){}
     console.error('[Sostituire] errore:', err);
     sostShowStatus('Errore: ' + (err.message || err), true);
   });

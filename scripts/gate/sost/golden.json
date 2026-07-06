@@ -6,8 +6,8 @@
   "sostOnSourceChange": "0f8744fb9f17b40cef91d2ffe8b8cca9",
   "sostOnScanPicked": "66871dd643372b428e1cf8722eed518c",
   "sostLoadScanToScene": "7863216f43c83f3ca7fe29b27f481a0e",
-  "sostStartPlacement": "95cdcf955a007500f4455df3dc17d92c",
-  "sostOnViewportClick": "2e1ec5524c6169ab47b5433e4fc5bff0",
+  "sostStartPlacement": "396fd29ccd273a5a2263bd11ae533acd",
+  "sostOnViewportClick": "d9b6680b69d542f04f93597afedd67a2",
   "sostEnsureLabelElements": "0ed0fc185e56a2b7dc6f1abc779de871",
   "sostUpdateLabels": "46b178fd82ac8335167db3160d99c0a4",
   "sostApplyRenderMode": "13506afa2d7162ad9589d092355b759b",
@@ -22,7 +22,7 @@
   "_sostMCOn": "fcaeadd19361c9d3c2e85760a24a2b36",
   "_sostMethodCFit": "e1ac06d4920ca57c6813f24955836cd6",
   "_sostMethodCPose": "d39302fc67456a0dab9d0cc74f18ba12",
-  "sostPlaceTemplate": "023447af6c2e55efcfb7191cf217ad7a",
+  "sostPlaceTemplate": "00c43ef9d873083460d9a8b5edc37965",
   "sostAlignAll": "ce87ca66bd9f9a654f6f1c1e2e4db75a",
   "sostRenderPlacedList": "b7095ba36c3d471d9c32de7c32dc315b",
   "sostDownloadDiagLog": "21e4a67abf4a201f6f513b9e21d948e9",
@@ -47,5 +47,6 @@
   "sostTogglePlacedVisibility": "1f3ff3b34b6a6b3c17f14c704a425d3c",
   "sostOpenCutView": "1c6c4a0fcd6ae9692c1bc6067f5aff6b",
   "sostRenderCutView": "4ede95ad7190b76773f148d8335081fc"
- }
+ },
+ "_rebaselined": "8.95.1: sostStartPlacement/sostOnViewportClick/sostPlaceTemplate re-baselinati per strumentazione synLog diagnostica (posa). Prova estrazione verbatim 6d = git @8.91.0."
 }
