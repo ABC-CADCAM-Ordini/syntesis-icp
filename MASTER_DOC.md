@@ -207,7 +207,7 @@ diagnostica e analisi statistica futura.
 
 **⚠️ ATTENZIONE: Non condividere queste credenziali pubblicamente.** Valori reali SOLO in `scripts/.env.local` (gitignored). Setup corrente e ID servizi: `CLAUDE.md` §10.
 
-> **AGGIORNATO 8.6.4 - infra a DUE servizi Railway** che servono lo stesso backend: **BACKEND** principale (`syntesis-icp-production.up.railway.app`, alias `app.syntesis-icp.com`) e **LEGACY** (`syntesis-icp-production-40e1.up.railway.app`), più **Postgres** (interno) e un servizio `frontend` inattivo. Ogni release va su **entrambi** i servizi attivi. Railway deploya via **GitHub App** (il repo può essere privato senza rompere i deploy). Token GitHub in `scripts/.env.local` come `GH_TOKEN`, push one-shot (mai nel remote URL).
+> **AGGIORNATO 8.6.4 - infra a DUE servizi Railway** che servono lo stesso backend: **BACKEND** principale (`syntesis-icp-production.up.railway.app`, dominio canonico `app.synthesis-icp.com` CON h; il legacy senza-h `app.syntesis-icp.com` fa 308 redirect al canonico dal 8.87.0) e **LEGACY** (`syntesis-icp-production-40e1.up.railway.app`), più **Postgres** (interno) e un servizio `frontend` inattivo. Ogni release va su **entrambi** i servizi attivi. Railway deploya via **GitHub App** (il repo può essere privato senza rompere i deploy). Token GitHub in `scripts/.env.local` come `GH_TOKEN`, push one-shot (mai nel remote URL).
 
 ### GitHub
 - Repository: `https://github.com/ABC-CADCAM-Ordini/syntesis-icp`

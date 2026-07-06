@@ -4,7 +4,8 @@ Data: 28 maggio 2026
 Sessione precedente: Claude chat (web). Questo file passa il lavoro a Claude Code.
 
 Repo: `ABC-CADCAM-Ordini/syntesis-icp`, branch `main`, cartella `backend/`.
-Backend live: https://app.syntesis-icp.com (Railway, versione attuale 8.3.x, health 200).
+Backend live (canonico, brand con-h): https://app.synthesis-icp.com (Railway, health 200).
+Il vecchio host senza-h https://app.syntesis-icp.com fa 308 redirect al canonico (dal 8.87.0).
 
 ---
 
@@ -142,11 +143,13 @@ NB: la ricreazione ha cambiato il CNAME target da `tqxxdh7s` a `ojl727lw.up.rail
 Il DNS su Register.it punta ancora al vecchio target ma funziona (cert wildcard). Per
 robustezza, aggiornare il CNAME su Register.it al nuovo valore quando possibile.
 
-## APEX syntesis-icp.com (da fare, deciso ma non eseguito)
-Far rispondere syntesis-icp.com (dominio nudo) con la pagina di login. Strada scelta:
+## APEX synthesis-icp.com (da fare, deciso ma non eseguito)
+Far rispondere il dominio nudo (`synthesis-icp.com` / `www`, con-h) con l'app. Strada scelta:
 REDIRECT 301 da pannello Register.it (Dominio & DNS → Redirect e sottodomini) verso
-https://app.syntesis-icp.com. NON praticabile servire l'app sull'apex via CNAME (apex +
-MX della posta lo vietano). Azione manuale di Francesco sul pannello Register.it.
+https://app.synthesis-icp.com (canonico con-h). NON praticabile servire l'app sull'apex via
+CNAME (apex + MX della posta lo vietano). Azione manuale di Francesco sul pannello Register.it.
+NB: il sottodominio `app.` senza-h è già coperto dal redirect 308 applicativo (8.87.0); questo
+punto riguarda SOLO l'apex nudo, che non passa dal backend (parcheggio register.it).
 
 ## Login Google
 NON operativo: il backend risponde "Google login non configurato sul server."

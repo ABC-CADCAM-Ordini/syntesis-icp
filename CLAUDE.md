@@ -10,7 +10,10 @@ STL via ICP, individua scanbody (cilindri di riferimento), calcola deviazioni
 centroide-per-centroide (ΔXY, ΔZ, ΔD3D), gestisce posizionamento MUA con cono di
 accoppiamento e fresabilità 5-assi, genera report PDF clinici. Target: laboratori
 odontotecnici e studi dentistici italiani.
-URL live: https://app.syntesis-icp.com — alias https://syntesis-icp-production.up.railway.app/.
+URL live (canonico, brand "Synthesis" CON h): https://app.synthesis-icp.com. Il
+vecchio host SENZA h https://app.syntesis-icp.com resta attivo ma fa **308 redirect
+permanente** al canonico (middleware `redirect_legacy_host` in `main.py`, dal 8.87.0).
+Alias tecnico Railway: https://syntesis-icp-production.up.railway.app/.
 
 Architettura reale, da rispettare per com'è, non per come "dovrebbe" essere:
 - Backend FastAPI su Railway.
@@ -29,7 +32,9 @@ Architettura reale, da rispettare per com'è, non per come "dovrebbe" essere:
 - **DB**: PostgreSQL su Railway (interno, non esposto)
 - **Deploy**: Railway su 2 servizi paralleli (LEGACY + BACKEND principale) per
   l'environment unico
-- **Custom domain**: `app.syntesis-icp.com` → CNAME verso il dominio Railway BACKEND
+- **Custom domain (canonico)**: `app.synthesis-icp.com` (CON h) → CNAME verso il
+  dominio Railway BACKEND. Il legacy `app.syntesis-icp.com` (SENZA h) resta attaccato
+  al BACKEND e fa 308 redirect al canonico (vedi §10)
 
 ## 3. Divieti assoluti (la cosa più importante di questo file)
 
@@ -207,8 +212,14 @@ ADMIN_USER=acadmin2025
 ```
 
 Domini live:
-- BACKEND principale: `syntesis-icp-production.up.railway.app` (alias `app.syntesis-icp.com`)
-- LEGACY: `syntesis-icp-production-40e1.up.railway.app`
+- Canonico brand (CON h): `app.synthesis-icp.com` → servito dal BACKEND, cert Let's Encrypt valido
+- Legacy SENZA h: `app.syntesis-icp.com` → **308 redirect permanente** al canonico
+  (middleware `redirect_legacy_host` in `main.py`, 8.87.0). Tenere ATTACCATO al BACKEND
+  per intercettare i vecchi link — NON staccare, o i bookmark falliscono invece di redirigere.
+- BACKEND principale (Railway): `syntesis-icp-production.up.railway.app`
+- LEGACY (Railway): `syntesis-icp-production-40e1.up.railway.app`
+- Apex nudo `synthesis-icp.com` / `www`: ancora parcheggiato su register.it (redirect
+  apex+www → canonico = azione manuale pendente; il redirect 308 copre solo il sottodominio `app.`)
 
 ## 11. Procedure standard
 

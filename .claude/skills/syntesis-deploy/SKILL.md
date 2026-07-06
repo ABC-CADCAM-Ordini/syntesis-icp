@@ -22,7 +22,7 @@ Rilascio di Syntesis-ICP sui due servizi Railway paralleli (LEGACY + BACKEND). C
 5. **Doc**: aggiorna `STATO_SISTEMA.md` (tabella versioni live + snapshot date) + appende entry a `docs/STORIA.md`. Salta in modalita' doc-only (la modifica E' la doc).
 6. **Git**: `git add` selettivo dei file modificati + commit con stile (`FASE: cosa cambia`, <=60 char, body bullet, no `Co-Authored-By`) + `git push origin main`.
 7. **Railway**: `serviceInstanceDeploy(serviceId, environmentId, latestCommit:true)` su entrambi i servizi via curl GraphQL. **Subito dopo, verifica anti-race**: `meta.commitHash` del deployment == `git rev-parse HEAD` (Railway puo' avere ancora il commit vecchio se il deploy parte troppo presto dopo il push → ri-triggera). Poi polling `deployments(first:1){status}` ogni 30s su entrambi finche' `SUCCESS` (timeout 5 min; stop&ask se >3 min in `BUILDING`/`DEPLOYING`). Skip in modalita' doc-only.
-8. **Verifica live**: curl `/api/registry/constants` (`backend_version`) + `/analizzare` (grep `<title>` + `ANALIZZA_BUILD`) su entrambi i domini Railway diretti, escluso `app.syntesis-icp.com` (cert SSL pre-esistente, tracciato in STATO_SISTEMA).
+8. **Verifica live**: curl `/api/registry/constants` (`backend_version`) + `/analizzare` (grep `<title>` + `ANALIZZA_BUILD`) sui due domini Railway diretti **e sul canonico con-h `app.synthesis-icp.com`** (cert Let's Encrypt valido). In più, verifica che il **legacy senza-h `app.syntesis-icp.com` risponda 308** con `Location` verso il canonico (redirect `redirect_legacy_host`, 8.87.0): chi arriva col vecchio indirizzo deve essere reindirizzato.
 
 ## Regole versionamento
 
@@ -249,27 +249,31 @@ done
 
 ## Verifica live
 
-Tre target: due domini Railway diretti + `app.syntesis-icp.com`. Quest'ultimo ha cert SSL pre-esistente non legato al deploy (cfr. STATO_SISTEMA, sospesi alta priorita'): se fallisce con `SSL: no alternative certificate subject name`, non e' una regressione del deploy - segnala soltanto, non bloccare.
+Target: i due domini Railway diretti + il **canonico con-h `app.synthesis-icp.com`** (cert Let's Encrypt valido; il vecchio problema SSL è RISOLTO). In più una verifica dedicata del **redirect**: il legacy senza-h `app.syntesis-icp.com` deve rispondere **308** con `Location: https://app.synthesis-icp.com...` (preservando path). Entrambi i domini custom sono serviti dal servizio BACKEND; su LEGACY il middleware di redirect è dormiente (vede solo il suo host railway). Nota DNS: il resolver locale a volte dà SERVFAIL transitorio sui domini custom — verificare con IP pinnato (`--resolve host:443:$(dig +short host | tail -1)`), non è una regressione del deploy.
 
 ```bash
 NEW_VER="8.1.9-A.5.2"  # esempio, sostituire con la versione effettivamente deployata
 DOMAINS=(
   "syntesis-icp-production.up.railway.app"
   "syntesis-icp-production-40e1.up.railway.app"
+  "app.synthesis-icp.com"                       # canonico brand con-h
 )
 for D in "${DOMAINS[@]}"; do
   echo "===== $D ====="
-  V=$(curl -sS --max-time 15 "https://$D/api/registry/constants" \
+  IP=$(dig +short "$D" | tail -1)                       # IP pinnato: aggira SERVFAIL locale transitorio
+  RES=(--resolve "$D:443:$IP")
+  V=$(curl -sSL "${RES[@]}" --max-time 15 "https://$D/api/registry/constants" \
     | python3 -c "import sys,json; print(json.load(sys.stdin).get('backend_version'))" 2>/dev/null)
-  T=$(curl -sS --max-time 15 "https://$D/analizzare" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+-A\.[0-9]+\.[0-9]+' | head -1)
+  T=$(curl -sSL "${RES[@]}" --max-time 15 "https://$D/analizzare" | grep -oiE '<title>[^<]*v[0-9.]+' | head -1)
   echo "  backend_version: $V"
-  echo "  title build:     $T"
-  if [ "$V" = "$NEW_VER" ] && [ "$T" = "v$NEW_VER" ]; then
-    echo "  OK"
-  else
-    echo "  MISMATCH (expected $NEW_VER) - retry tra 30s"
-  fi
+  echo "  title:           $T"
+  [ "$V" = "$NEW_VER" ] && echo "  OK" || echo "  MISMATCH (expected $NEW_VER) - retry tra 30s"
 done
+
+# Verifica REDIRECT del vecchio indirizzo: legacy senza-h deve dare 308 -> canonico con-h
+LEG="app.syntesis-icp.com"; LIP=$(dig +short "$LEG" | tail -1)
+echo "===== redirect $LEG (atteso 308 -> app.synthesis-icp.com) ====="
+curl -sD - --resolve "$LEG:443:$LIP" --max-time 15 -o /dev/null "https://$LEG/gestione?x=1" | grep -iE "^HTTP|^location"
 ```
 
 Su mismatch: aspetta 30s e ritenta una volta (probabile cache CDN/edge). Se ancora mismatch dopo il retry -> stop&ask.
@@ -293,7 +297,8 @@ echo "Re-deploying current main on Railway: $NEW_VER"
 | Polling >3 min in `BUILDING`/`DEPLOYING` | Stop&ask. L'utente sceglie: continua il polling, cancella il deploy, fa rollback git. |
 | Deployment `SUCCESS` ma `meta.commitHash` != `git rev-parse HEAD` (RACE post-push) | Il deploy ha preso il commit precedente (sync GitHub non pronta). **Ri-triggera** `serviceInstanceDeploy(latestCommit:true)` su quel servizio, `sleep 8`, ri-verifica il commit; procedi solo quando combacia. Vedi sezione "Verifica commit (anti-race)". |
 | `verify_live` mismatch versione | PRIMA distingui: se persiste dopo 1-2 min NON e' cache -> e' la RACE commit (verifica `meta.commitHash`, vedi sopra). Se transitorio (combacia dopo 30s) era CDN/cache. Wait 30s + retry una volta; se ancora mismatch e commit giusto -> stop&ask. |
-| `app.syntesis-icp.com` SSL cert error | Segnala soltanto, non bloccare. Sospeso pre-esistente, non legato al deploy. |
+| Dominio custom non risolve (`Could not resolve host`) | SERVFAIL transitorio del resolver locale (non regressione). Verifica con IP pinnato: `--resolve host:443:$(dig +short host \| tail -1)`. |
+| Legacy senza-h NON dà 308 (dà 200) | Il redirect `redirect_legacy_host` (8.87.0) non è attivo sul BACKEND: controlla che il commit deployato lo includa e che il dominio `app.syntesis-icp.com` sia ancora attaccato al servizio BACKEND. |
 | `RW_TOKEN` mancante (no `scripts/.env.local`) | Chiedi all'utente, crea il file con `chmod 600`, prosegui. Non loggare il valore. |
 | Sanity check versioni mismatch | Stop&ask prima del commit. Probabile bump incompleto, va sistemato. |
 | `bad substitution` su `${!var}` o pattern simili | Caso noto zsh vs bash: lo shell di default su macOS e' zsh. Riscrivere con due blocchi espliciti, oppure `eval "echo \$$var"`, oppure leggere il valore via `grep`/`sed` direttamente da `scripts/.env.local`. Vedi nota a inizio sezione "Mutation per entrambi i servizi". |
@@ -314,4 +319,4 @@ Vedi [CLAUDE.md §9 Rollback](../../../CLAUDE.md) per i dettagli completi.
 
 - Quando atterreranno `scripts/deploy_railway.py` e `scripts/verify_live.py` (Sessione 0.2 della Fase 0 stabilizzazione), sostituire le sezioni Railway/Verifica con chiamate a quegli script. La logica curl GraphQL inline qui resta come riferimento.
 - Se cambia lo schema versioning (promozione Fase A o introduzione Fase B), aggiornare la sezione "Regole versionamento" prima del primo deploy del nuovo schema.
-- Se `app.syntesis-icp.com` viene sistemato (cert SSL risolto), aggiungerlo come terzo target nella verifica live e rimuovere la nota.
+- Il canonico con-h `app.synthesis-icp.com` è già terzo target della verifica live (cert SSL risolto). Quando l'apex nudo `synthesis-icp.com`/`www` verrà instradato su register.it, aggiungere anche quello (con la verifica del suo redirect).
