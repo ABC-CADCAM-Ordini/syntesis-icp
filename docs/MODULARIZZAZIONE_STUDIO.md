@@ -46,10 +46,15 @@
 > SHIM jsPDF (proxy che registra la sequenza PDF: 1152 chiamate/6 pagine) + avversariale 3-lenti 3/3 PASS;
 > verifica live incl. Claude Chrome (4/4 esposte, report Misurare intatto). Monolite a 16.023 righe.
 > NB: la wf/report-comune.js (pipeline condivisa) NON è stata separata — intrecciata con mis, si farà con 6f.
-> ▶ Prossimo: **Fase 6d-0 INVERSIONE DEL CENTRALINO** (release autonoma, insistenza unanime della giuria):
-> ogni dominio registra window.SynWF.register(nome, {hardReset, hasUnsavedData, setArtifactsVisible});
-> selectWorkflow diventa dispatcher; le 16 scritture cross-domain migrano ai proprietari. Gate: truth-table
-> esaustiva 5 workflow × sporco/pulito. Poi 6d sost → 6e replace → 6f mis ULTIMO (con report-comune).
+> ⏸️ **Fase 6d-0 INVERSIONE DEL CENTRALINO: RINVIATA** (decisione utente 2026-07-06, Opzione B): è l'unico passo
+> BEHAVIORAL (non verbatim) — refactor di selectWorkflow, rischio sul percorso più usato. NON è un blocco duro per
+> 6d/6e (le loro fn escono functions-only senza inversione). Si farà quando serve davvero o con calma dedicata.
+> ✅ **Fase 6d COMPLETATA** (2026-07-06, 8.91.0 commit 4ee7dbb): 47 fn Sostituire → wf/sostituire.js (functions-only,
+> 11 run; stato sost + banner restano; RMSD 7,9µm verbatim). Avversariale 3/3 PASS; verifica live Claude Chrome
+> (cambio workflow a Sostituire commuta davvero). Monolite a 13.581 righe. NB: dead-code pre-esistente
+> _sostLocalWallAxis/sostTogglePlacedVisibility annotato.
+> ▶ Prossimo: **Fase 6e** (wf/replace-core.js + wf/replace-ui.js, ~67-92 fn Replace-iT; NON toccare la formula NDC;
+> dead-code si annota; gate scenario 3-punti sintetico + harness UI). Poi 6f mis ULTIMO (con report-comune).
 
 ---
 

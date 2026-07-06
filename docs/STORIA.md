@@ -1,5 +1,16 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.91.0: MODULARIZZAZIONE Fase 6d (workflow Sostituire → wf/sostituire.js)
+
+Quarto e più grande workflow estratto: Sostituire (placement scanbody via click con findScanbodyCenter, motore robusto centro+asse Kasa/wall/cap-plane/Method C, raffina, export STL binario, albero scena dedicato, cutview). 47 funzioni verbatim in wf/sostituire.js (2488 righe), functions-only. Le funzioni erano sparse in 11 zone del file (interlacciate con Replace-iT e con lo stato), quindi 11 tombstone §WF-SOST. Restano nel monolite: lo stato sost (16 var sostMesh/sostPlaced/sostStl/… lette anche da wf/tree.js e da selectWorkflow), il banner §SOSTITUIRE, e tutte le funzioni Replace (dominio gemello, fase 6e). Le annidate _sostFinishRefine/_sostRefineRound viaggiano dentro sostAlignAll. La precisione del placement (RMSD centroide 7,9µm sul sintetico-su-sintetico, rituale del progetto) è preservata per costruzione, essendo l'estrazione byte-identica.
+
+Verifica avversariale 3-lenti Opus (verbatim indipendente, raggiungibilità+stato, separazione da Replace+load-order): 3/3 PASS, 0 blocker. Il trap più pericoloso — lo scope — è pulito: tutte le 16 var di stato sost sono `var` top-level (globali reali su window), non `let/const`, quindi le 47 funzioni le leggono a call-time dallo script separato senza ReferenceError. Due note di dead-code pre-esistente (_sostLocalWallAxis, sostTogglePlacedVisibility, già senza chiamanti a HEAD, spostate verbatim) annotate per una pulizia dedicata (§3.4: non si rimuove dead-code in un task funzionale).
+
+Implementazione:
+- gate scripts/gate/sost/gate.mjs (47 md5-verbatim vs golden + esposizione via eval + residuo stato/banner + wiring 1:1)
+- monolite da 16.023 a 13.581 righe; censimento post: sost interamente in wf/ (47)
+- deploy sequenziale LEGACY→BACKEND (anti-race ok); verifica live con Claude Chrome (la più forte finora): 8.91.0 sui domini, wf/sostituire.js md5-identico su entrambi i servizi, 47 fn esposte, stato sost raggiungibile, e il CAMBIO WORKFLOW a Sostituire funziona davvero sull'app reale (selectWorkflow('sostituire') senza errori → pannello appare, analysisMode='sostituire', ritorno ad Analizza ok), zero errori console
+
 ## 2026-07-06 — 8.90.0: MODULARIZZAZIONE Fase 6c (report PDF Analizza → wf/report-analizza.js)
 
 Terzo workflow estratto, e il primo che tocca la generazione dei referti clinici PDF. Escono le 4 funzioni del report MUA PDF 6 pagine di Analizza (§REPORT-MUA-PDF): analReport_captureViews (cattura 4 viste 3D del viewer), analReport_generate (845 righe, genera il PDF con jsPDF), analReport_collectData (estrae i dati da muaObjects), analReport_buildRecommendations (raccomandazioni testuali). Verbatim in wf/report-analizza.js (terzo file wf/), functions-only. Le funzioni annidate dentro generate (addFooter/box/text/placeView) si muovono con lei.
