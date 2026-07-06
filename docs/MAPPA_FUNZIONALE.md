@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.94.0 (MODULARIZZAZIONE F6f 2/3: MISURARE report PDF/Excel fuori dal monolite — 41 fn dei domini §MISURARE-PDF/§REPORT-PIPELINE/§CERTIFICATO-TARATURA (report clinico PDF 6 pagine, disegni tecnici, grafico centroidi, metodologia/glossario, certificato taratura, export Excel) → `wf/misurare-pdf.js` (settimo file wf/; RESIDUO CRITICO che RESTA: `_synScaricoConoImg` preload img parse-time + i 3 banner). Aggiornato `scripts/gate/report/gate.mjs` (misICP_generateReport+addCornerLogo non più residuo-nel-monolite). Monolite 9.837 → 7.205 righe. Resta da estrarre: VIZ 23 fn (6f 3/3). F6f 1/3: 59 fn §MISURARE-ICP → `wf/misurare-icp.js` (**golden-master numerico headless verde** su 4 fixtures incl. multi-scanbody 5x; STATO misICP_* + costanti MIS_* + banner §MISURARE-ICP/§ASSE-CILINDRO-CONN restano). F6e: 92 fn REPLACE-IT → `wf/replace.js`. F6d: 47 fn SOSTITUIRE → `wf/sostituire.js`; F6c: 4 fn report Analizza → `wf/report-analizza.js`; F6b: 10 fn tree → `wf/tree.js`; F6a: 34 fn FRESABILITA → `wf/fresabilita.js`. Base 8.87.x redirect+testi con-h; 8.86.0 F5; 8.85.0 F4; 8.84.0-.2 F1-F3. — **Data:** 2026-07-06
+> **Versione software mappata:** 8.95.0 (MODULARIZZAZIONE F6f 3/3 — **CHIUDE LA FASE 6**: MISURARE viz 3D/albero fuori dal monolite — 23 fn del dominio §MISURARE-VIZ (label 3D HTML tracker, cutview 2D perpVectors/sliceByPlane/projectTo2D/drawCutview, albero scena CATIA show/hide/toggle/group/layer-vis-op/badge/reset) → `wf/misurare-viz.js` (ottavo file wf/; STATO misICP_labels/labelsVisible/layerColors/cutZoom + banner §MISURARE-VIZ restano). Con questo il dominio mis ha **0 funzioni nel monolite** (tutte 123 estratte: 59 icp + 41 pdf + 23 viz). **FASE 6 COMPLETA**: 8 file wf/ (fresabilita/tree/report-analizza/sostituire/replace/misurare-icp/misurare-pdf/misurare-viz), tutti i workflow fuori dal monolite. Monolite 7.205 → 6.711 righe (da 41.480 iniziali = **-84%**). F6f 2/3: 41 fn report PDF/Excel → `wf/misurare-pdf.js` (residuo `_synScaricoConoImg`; aggiornato `scripts/gate/report/gate.mjs`). F6f 1/3: 59 fn §MISURARE-ICP → `wf/misurare-icp.js` (**golden-master numerico headless verde** su 4 fixtures incl. multi-scanbody 5x). F6e: 92 fn REPLACE-IT → `wf/replace.js`. F6d: 47 fn SOSTITUIRE → `wf/sostituire.js`; F6c: 4 fn report Analizza → `wf/report-analizza.js`; F6b: 10 fn tree → `wf/tree.js`; F6a: 34 fn FRESABILITA → `wf/fresabilita.js`. Base 8.87.x redirect+testi con-h; 8.86.0 F5; 8.85.0 F4; 8.84.0-.2 F1-F3. — **Data:** 2026-07-06
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3). **8.74.0 (Fase B, commit 1 — unificazione chrome):** il pannello **Misurare** entra nel sistema FILL (via i gradienti pre-pastello: `.mis-btn-run` blu `#0077CC/#0050A0` → `--fill-primary`+`--dark`; modalità click-seed viola Tailwind `#8B5CF6/#7C3AED/#C4B5FD/#F5F3FF/#5B21B6` → famiglia **selezione** `--fill-sel`/`--pearl`/`--blue`; Annulla → `--pearl`+bordo); login in-app idem → `--fill-primary`; cutview `#1a1a22` → `var(--dark)`; danger `#E24B4A/#A32D2D` → `--red`/`--fill-error` (`.btn.danger`, hover del-btn dark). **CTA di pannello unificate** alla specifica di Sostituire (`padding:8px 10px; font-size:12px; letter-spacing:.03em`): i 5 bottoni di `#replaceFlow` allineati; `#sostBtnExport` passa da nero pieno a classe **`.export-btn`** (= Accoppia). Nuova classe **`.syn-select`** (bordo/raggio/font unici) sui 5 select di `#panelReplace` + `#misSeedType`. Canvas/PDF e palette-dati (gruppi, sfondo ambiente) NON toccati.
@@ -239,7 +239,7 @@ Esporta/confronta accoppiamenti. Condivide la toolbar `.analisi-only` con analiz
 
 ### Sotto-sezione — workflow **misurare** (`analysisMode='misurare'`, ramo [4678])
 
-Confronto ICP fra 2 STL, viewport dedicato (`misICP_mountViewport`). Pannello `panelMisurareICP` [1826]. **8.93.0 (F6f 1/3)**: le 59 fn del dominio §MISURARE-ICP (parse/ICP/seed/`misICP_run`/`misICP_onPick`/`misICP_reset`/`misICP_mountViewport`/render — vedi elenco tombstone §WF-MIS-ICP nel monolite) vivono in `wf/misurare-icp.js` (`<script src>` in testa dopo `wf/replace.js`); gli handler restano bare-global invariati. Lo STATO misICP_* + costanti MIS_* + banner §MISURARE-ICP/§ASSE-CILINDRO-CONN restano nel monolite. **8.94.0 (F6f 2/3)**: le 41 fn del report (`misICP_generateReport`/`misICP_renderClinicalPDF`/`misICP_renderCalibrationPDF`/`misICP_renderExcel`/§MISURARE-PDF/§REPORT-PIPELINE/§CERTIFICATO-TARATURA) vivono in `wf/misurare-pdf.js`; resta nel monolite `_synScaricoConoImg` (preload img). VIZ (cutview/albero/§MISURARE-VIZ) ancora nel monolite (6f 3/3):
+Confronto ICP fra 2 STL, viewport dedicato (`misICP_mountViewport`). Pannello `panelMisurareICP` [1826]. **8.93.0 (F6f 1/3)**: le 59 fn del dominio §MISURARE-ICP (parse/ICP/seed/`misICP_run`/`misICP_onPick`/`misICP_reset`/`misICP_mountViewport`/render — vedi elenco tombstone §WF-MIS-ICP nel monolite) vivono in `wf/misurare-icp.js` (`<script src>` in testa dopo `wf/replace.js`); gli handler restano bare-global invariati. Lo STATO misICP_* + costanti MIS_* + banner §MISURARE-ICP/§ASSE-CILINDRO-CONN restano nel monolite. **8.94.0 (F6f 2/3)**: le 41 fn del report (`misICP_generateReport`/`misICP_renderClinicalPDF`/`misICP_renderCalibrationPDF`/`misICP_renderExcel`/§MISURARE-PDF/§REPORT-PIPELINE/§CERTIFICATO-TARATURA) vivono in `wf/misurare-pdf.js`; resta nel monolite `_synScaricoConoImg` (preload img). **8.95.0 (F6f 3/3, CHIUDE la Fase 6)**: le 23 fn viz (label 3D `misICP_createLabels`/`misICP_updateLabels`, cutview `misICP_openCutview`/`misICP_drawCutview`, albero `misICP_showTree`/`misICP_applyLayerVis`/§MISURARE-VIZ) vivono in `wf/misurare-viz.js`; resta lo STATO misICP_labels/layerColors/cutZoom + banner §MISURARE-VIZ. Il dominio mis ha ora **0 fn nel monolite** (tutte 123 in wf/misurare-{icp,pdf,viz}.js). Gli handler restano bare-global invariati. Tabella dettaglio (id/handler/righe markup — le righe JS delle fn sono ora nei file wf/):
 
 | Elemento | id | Evento | Funzione | Effetto | Righe |
 |---|---|---|---|---|---|
@@ -502,36 +502,35 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 <!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
 
-### Fotografia (8.94.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+### Fotografia (8.95.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
 
 | Metrica | Valore |
 |---|---|
-| Righe / peso | **7206** / **0.41 MB** |
-| JS applicativo REALE | **5742** righe in 6 blocchi `<script>` (grezzo 5742, meno il blob B64) |
+| Righe / peso | **6712** / **0.39 MB** |
+| JS applicativo REALE | **5247** righe in 6 blocchi `<script>` (grezzo 5247, meno il blob B64) |
 | Asset B64 embedded | **0.0 MB** in 0 righe (**0%** del file) |
-| Funzioni top-level | 133 |
+| Funzioni top-level | 110 |
 | Globali condivise | 145 (di cui **24** toccate da 2+ domini) |
-| Export surface (handler inline) | 38 funzioni da preservare su `window` |
+| Export surface (handler inline) | 30 funzioni da preservare su `window` |
 
 ### Domini: dimensione e superficie di accoppiamento
 
 | Dominio | # fn | stato scritto→altri | stato letto←altri | API inline | API cross-dominio |
 |---|---|---|---|---|---|
 | `mua` | 37 | 5 | 8 | 5 | 14 |
-| `mis` | 23 | 0 | 1 | 8 | 1 |
 | `workflow` | 15 | 8 | 5 | 5 | 0 |
 | `diag` | 12 | 0 | 0 | 4 | 5 |
 | `export` | 8 | 0 | 1 | 5 | 0 |
 | `chrome` | 6 | 0 | 0 | 2 | 4 |
-| `fres` | 5 | 0 | 0 | 3 | 0 |
 | `log` | 5 | 0 | 0 | 0 | 1 |
+| `fres` | 5 | 0 | 0 | 3 | 0 |
 | `io` | 4 | 1 | 5 | 1 | 1 |
 | `bootstrap` | 3 | 2 | 5 | 1 | 0 |
 | `cut` | 3 | 0 | 1 | 3 | 3 |
-| `other` | 3 | 0 | 0 | 0 | 3 |
 | `tree` | 3 | 0 | 2 | 1 | 1 |
-| `geom` | 2 | 0 | 2 | 0 | 2 |
+| `other` | 3 | 0 | 0 | 0 | 3 |
 | `scene` | 2 | 0 | 2 | 0 | 1 |
+| `geom` | 2 | 0 | 2 | 0 | 2 |
 | `find` | 1 | 0 | 0 | 0 | 1 |
 | `colorclass` | 1 | 0 | 0 | 0 | 1 |
 
