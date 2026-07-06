@@ -1,5 +1,18 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.95.0: MODULARIZZAZIONE Fase 6f 3/3 (MISURARE viz → wf/misurare-viz.js) — CHIUDE LA FASE 6
+
+Ultimo dei tre rilasci incrementali di Misurare, e ultimo pezzo dell'intera Fase 6: la visualizzazione. 23 funzioni del dominio §MISURARE-VIZ (label 3D come tracker di elementi HTML sovrapposti al viewport, vista di taglio 2D — perpVectors/sliceByPlane/projectTo2D/drawCutview/bindCutviewWheel — e albero di scena in stile CATIA con show/hide/toggle gruppi, visibilità e opacità per layer, badge, reset) estratte verbatim in wf/misurare-viz.js. Restano nel monolite lo stato viz (misICP_labels/labelsVisible, labelTrackerOn, layerColors, cutZoom/cutCurrentPair/cutWheelBound) e il banner §MISURARE-VIZ.
+
+Con questo il dominio mis non ha più nessuna funzione nel monolite: tutte e 123 sono uscite, distribuite nei tre file allineati ai banner dell'autore (59 icp, 41 pdf, 23 viz). Monolite 7.205 → 6.711 righe.
+
+**La Fase 6 è completa.** Otto file in backend/static/wf/ ospitano ora tutti i workflow che prima vivevano nel monolite: fresabilita, tree, report-analizza, sostituire, replace, misurare-icp, misurare-pdf, misurare-viz. Il monolite syntesis-analyzer-v3b.html è passato da 41.480 righe (inizio campagna) a 6.711 (−84%). Ciò che resta nel file è l'ossatura: markup, stato globale condiviso, bootstrap, il dispatcher selectWorkflow, i banner di sezione e le funzioni core ancora non assegnate a un workflow — non più la logica dei workflow, che ora è modulare, un file per dominio, ciascuno con il suo gate di equivalenza verbatim.
+
+Meccanica invariata rispetto ai primi due rilasci 6f: estrazione functions-only verbatim, gate mis-viz (23 md5 byte-identici + esposizione + residuo + wiring), batteria completa verde (mis-icp 59 + mis-pdf 41 + golden-master + gli altri domini + anchors 36/36 + fixtures 12/12 + node --check). Deploy incrementale LEGACY canary → verifica → BACKEND, entrambi SUCCESS su commit 08ca943 (anti-race commitHash==HEAD), 8.95.0 live sul canonico con-h e sui railway, tutti e tre i wf/misurare-*.js serviti 200.
+
+Implementazione:
+- backend/static/wf/misurare-viz.js (23 fn); monolite: 6 tombstone §WF-MIS-VIZ + <script src> a riga 23; title + ANALIZZA_BUILD 8.95.0.
+
 ## 2026-07-06 — 8.94.0: MODULARIZZAZIONE Fase 6f 2/3 (MISURARE report PDF → wf/misurare-pdf.js)
 
 Secondo dei tre rilasci incrementali di Misurare: il blocco report. 41 funzioni dei domini §MISURARE-PDF / §REPORT-PIPELINE / §CERTIFICATO-TARATURA (report clinico PDF a 6 pagine con jsPDF, disegni tecnici cilindro/freccia/centroide, grafico dei centroidi, pagine di metodologia e glossario, certificato di taratura con modal + pagine + firme, export Excel con XLSX) estratte verbatim in wf/misurare-pdf.js. Monolite 9.837 → 7.205 righe.

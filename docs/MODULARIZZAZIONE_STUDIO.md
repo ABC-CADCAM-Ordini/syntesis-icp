@@ -72,10 +72,15 @@
 > loco: _synScaricoConoImg (preload img parse-time, NON-fn). addCornerLogo (annidata in misICP_renderCalibrationPDF) si
 > muove con la madre. Il gate report (6c) ha COLTO lo spostamento di misICP_generateReport+addCornerLogo (2 FAIL: li
 > asseriva residuo-nel-monolite 'resta, fase 6f') → gate report riconciliato. Monolite 9.837 → 7.205 righe. Live 8.94.0.
-> ▶ Prossimo (CHIUDE la Fase 6): **Fase 6f 3/3 (VIZ)** — 23 fn §MISURARE-VIZ → wf/misurare-viz.js (label 3D HTML tracker,
-> cutview 2D, albero scena CATIA). Golden verbatim mis-viz già catturato da HEAD (scripts/gate/mis/golden-viz.json). Il
-> gate golden-master numerico copre solo la spina ICP (regione icp); pdf/viz sono DOM/THREE-bound (gate verbatim
-> strutturale + node --check). RIGENERARE il censimento prima dell'estrazione viz.
+> ✅ **Fase 6f 3/3 (VIZ) COMPLETATA — CHIUDE LA FASE 6** (2026-07-06, 8.95.0 commit 08ca943): 23 fn §MISURARE-VIZ →
+> wf/misurare-viz.js (label 3D HTML tracker, cutview 2D, albero scena CATIA). STATO misICP_labels/layerColors/cutZoom +
+> banner §MISURARE-VIZ restano. Con questo il dominio mis ha 0 fn nel monolite (tutte 123: 59 icp + 41 pdf + 23 viz).
+> Live 8.95.0 su entrambi.
+> 🏁 **FASE 6 COMPLETA**: 8 file wf/ (fresabilita, tree, report-analizza, sostituire, replace, misurare-icp, misurare-pdf,
+> misurare-viz) — TUTTI i workflow fuori dal monolite. Monolite 41.480 → **6.711 righe (-84%)**. Nel monolite resta
+> l'ossatura: markup, stato globale, bootstrap, dispatcher selectWorkflow, banner, core non ancora assegnato a workflow.
+> ▶ Prossimo: **Fase 7** (rete di sicurezza dell'umano: scripts/gate/smoke/smoke.html non servita in prod + run_all.sh
+> in checklist) e **Fase 8** (regime permanente: MAPPA ancorata a file+§anchor, censimento auto-rigenerante). Vedi §FASE 7/8.
 
 ---
 
