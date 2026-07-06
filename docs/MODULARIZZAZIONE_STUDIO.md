@@ -57,10 +57,22 @@
 > FILE UNICO perché 2127 righe < 3k — niente split core/ui; formula NDC picking preservata byte-identica; stato +
 > banner restano). Il gate ha còlto un bug '*/' nell'header del modulo (corretto). Avversariale 3/3 PASS; verifica
 > live Claude Chrome (cambio workflow a Replace-iT commuta davvero). Monolite a 11.296 righe (da 41.480 = -73%).
-> ▶ Prossimo (ULTIMO): **Fase 6f MISURARE** (wf/misurare-icp.js + wf/misurare-ui.js, ~3.900 r, il core clinico ICP,
-> + wf/report-comune.js pipeline PDF condivisa). Gate golden-master COMPLETO sulle fixtures (pipeline intera old/new:
-> load→seed→ICP→ΔXY/ΔZ/ΔD3D→classi, precisione piena). Rischio ALTO mitigato dal golden-master. RIGENERARE il
-> censimento e ri-validare l'ordine prima di iniziare (innesto A).
+> ✅ **Fase 6f 1/3 (ICP) COMPLETATA** (2026-07-06, 8.93.0 commit 7f24043): 59 fn §MISURARE-ICP → wf/misurare-icp.js
+> (functions-only). DECISIONE UTENTE: split in **3 file allineati ai banner** (icp 59 / pdf 41 / viz 23) invece dei 2
+> del piano (icp/ui) — le 3 regioni sono contigue e disgiunte, il taglio cade su confini banner esistenti; **3 rilasci
+> incrementali** (icp→pdf→viz) per rollback granulare sul core clinico. Estrattore DEDICATO extract_mis_f6f.mjs
+> banner-box-aware (la regione mis ha 3 banner INTERNI §ASSE-CILINDRO-CONN/§REPORT-PIPELINE/§CERTIFICATO-TARATURA che
+> restano nel monolite — la macchina 6e li avrebbe spostati nel wf). GOLDEN-MASTER numerico headless (gate-golden.mjs):
+> spina ICP intera (parse→comps→partition→cluster→preAlign→runICP→applyTform→matchPairs→cylAxis→connessione datum→classi)
+> su 4 fixtures (incl. NUOVA multi-1t3-5x che stressa il ramo n≥3), old(HEAD)==new byte-identico + ground-truth ~0. Audit
+> 8-agenti (3 skeptic refuted=FALSE); dipendenza cross-dominio scoperta misICP_cylAxis→synAxisUseLateral (resta nel MAIN).
+> Il gate ha còlto un bug '*/' nell'header (corretto). Monolite 11.296 → 9.837 righe. Verifica live 8.93.0 su entrambi.
+> ▶ Prossimo: **Fase 6f 2/3 (PDF)** — 41 fn §MISURARE-PDF/§REPORT-PIPELINE/§CERTIFICATO-TARATURA → wf/misurare-pdf.js
+> (report PDF 6 pagine, calibrazione, excel). RESIDUO CRITICO: _synScaricoConoImg (preload img parse-time) resta nel
+> monolite. Golden verbatim mis-pdf già catturato da HEAD (scripts/gate/mis/golden-pdf.json). Poi **6f 3/3 (VIZ)** —
+> 23 fn §MISURARE-VIZ → wf/misurare-viz.js (label 3D, cutview, albero). Il gate golden-master numerico copre solo la
+> spina ICP (regione icp); pdf/viz sono DOM/THREE-bound (gate verbatim strutturale + node --check). RIGENERARE il
+> censimento prima di ogni sotto-estrazione (già rigenerato per icp).
 
 ---
 
