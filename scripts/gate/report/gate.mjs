@@ -1,8 +1,9 @@
 // Gate F6c — estrazione REPORT PDF Analizza (wf/report-analizza.js).
 //   1. VERBATIM: le 4 fn byte-identiche al monolite PRE-estrazione (golden md5 per fn da git HEAD);
 //   2. ESPOSIZIONE: il file valutato DEFINISCE tutte e 4 le fn come function (probe sandbox);
-//   3. RESIDUO INTATTO: banner §REPORT-MUA-PDF + report Misurare (misICP_generateReport) +
-//      addCornerLogo (annidata) restano nel monolite;
+//   3. RESIDUO INTATTO: banner §REPORT-MUA-PDF resta nel monolite. (NB: misICP_generateReport e
+//      addCornerLogo, che al 6c restavano nel monolite, sono passati a wf/misurare-pdf.js con la
+//      Fase 6f 2/3 (8.94.0) — non più residuo qui; il loro gate è scripts/gate/mis/gate.mjs pdf.)
 //   4. il monolite NON definisce più le 4 fn; lo <script src> esiste 1 volta.
 // (Il comportamento del PDF è verificato a parte dall'harness shim jsPDF: harness.html.)
 //
@@ -20,9 +21,8 @@ const GOLDEN = "scripts/gate/report/golden.json";
 const md5 = (s) => createHash("md5").update(s).digest("hex");
 
 const RESIDUE = [
-  "/* ==== §REPORT-MUA-PDF ==== */",       // banner (resta, check_anchors)
-  "function misICP_generateReport(",        // report Misurare (resta, fase 6f)
-  "function addCornerLogo(useWhite){",      // helper annidato condiviso (resta)
+  "/* ==== §REPORT-MUA-PDF ==== */",       // banner del report Analizza (resta, check_anchors)
+  // misICP_generateReport + addCornerLogo: passati a wf/misurare-pdf.js con la Fase 6f 2/3 (8.94.0).
 ];
 
 function headMono() { return execSync(`git show HEAD:${MONO}`, { maxBuffer: 64 * 1024 * 1024 }).toString(); }
