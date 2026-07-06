@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.87.1 (DOMINIO 2/2: pulizia testo brand senza-h → con-h — solo stringhe di contenuto (PDF "Sito", footer dashboard, prompt Vedere, fallback API gestione/accedi), nessun elemento UI mappato toccato; email escluse (dipendenza Resend). Base 8.87.0: redirect 308 backend senza-h → con-h. Base 8.86.0 F5: pannello Impostazioni → `ds/syn-env.js`, barra viewMode → `ds/syn-vmbar.js`, login → `ds/syn-auth-ui.js`; 8.85.0 F4: 27 fn pure → syn-math/geom/color; 8.84.0-.2: F1-F3) — **Data:** 2026-07-06
+> **Versione software mappata:** 8.88.0 (MODULARIZZAZIONE F6a: primo workflow fuori dal monolite — 34 fn del dominio FRESABILITA → `wf/fresabilita.js` (functions-only; stato/banner/monkey-patch restano nel monolite; group-dialog escluso perché è gestione gruppi MUA). Prep 8.87.2: dedup fresUpdateAllArrows (dead-code ×4→1). Base 8.87.0-.1: redirect dominio + testi con-h. 8.86.0 F5: pannello → `ds/syn-env.js`; 8.85.0 F4: 27 fn pure → syn-math/geom/color; 8.84.0-.2: F1-F3) — **Data:** 2026-07-06
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3). **8.74.0 (Fase B, commit 1 — unificazione chrome):** il pannello **Misurare** entra nel sistema FILL (via i gradienti pre-pastello: `.mis-btn-run` blu `#0077CC/#0050A0` → `--fill-primary`+`--dark`; modalità click-seed viola Tailwind `#8B5CF6/#7C3AED/#C4B5FD/#F5F3FF/#5B21B6` → famiglia **selezione** `--fill-sel`/`--pearl`/`--blue`; Annulla → `--pearl`+bordo); login in-app idem → `--fill-primary`; cutview `#1a1a22` → `var(--dark)`; danger `#E24B4A/#A32D2D` → `--red`/`--fill-error` (`.btn.danger`, hover del-btn dark). **CTA di pannello unificate** alla specifica di Sostituire (`padding:8px 10px; font-size:12px; letter-spacing:.03em`): i 5 bottoni di `#replaceFlow` allineati; `#sostBtnExport` passa da nero pieno a classe **`.export-btn`** (= Accoppia). Nuova classe **`.syn-select`** (bordo/raggio/font unici) sui 5 select di `#panelReplace` + `#misSeedType`. Canvas/PDF e palette-dati (gruppi, sfondo ambiente) NON toccati.
@@ -187,7 +187,7 @@ Valori = `style.display` impostato in ciascun ramo (`''` = visibile, `none` = na
 | `layersPanel` (sx) | flex [4650] | none [4671] | none [4692] | flex [4717] | albero scena |
 | `panelScanbodyType` (Box A) | `''` [4617-4618] | `''` [4617-4618] | none | none | **fix 8.4.5** (ternary `analizza\|\|accoppia`) |
 | `panelSostituire` | (uscita→none [4633]) | none | none | `''` [4725] | — |
-| `panelFresabilita` | on-demand | — | — | — | aperto da `openFresability` [1730], chiuso da `closeFresability` [1737]; `display:none` default [1735] |
+| `panelFresabilita` | on-demand | — | — | — | aperto da `openFresability`, chiuso da `closeFresability`; `display:none` default [1735]. **8.88.0 (F6a)**: i 34 handler/funzioni del dominio fresabilità (open/close, macchina, modo, overlay frecce, math) vivono in `wf/fresabilita.js`; stato (`fresState`) + banner §FRESABILITA + monkey-patch `calculateAngles` restano nel monolite |
 | `misurareStage` | hidden [4652] | hidden [4672] | condizionale [4697-4700] | hidden [4728] | stage caricamento ICP |
 
 ### Sotto-sezione — workflow **analizza** (`analysisMode='misura'`, ramo [4636])
@@ -449,7 +449,7 @@ Endpoint **solo backend** in `backend/main.py`, dietro `require_authorized` (adm
 | `_hardResetSostituire` | v3b [4894] | Reset stato Sostituire all'uscita | `selectWorkflow` [4986] |
 | `misICP_run` | v3b [6883] | ICP di confronto fra 2 STL (Misurare). **8.67.2 FIX allineamento**: il pre-align brute-force (`misICP_bruteForcePreAlign`) calcola il miglior fit Kabsch ma l'orchestrazione (~6932) lo applicava solo se `applied` (una permutazione ≠ identità batte l'identità). Con i cluster A/B nello STESSO ordine l'identità è già la migliore → `applied=false` → fit ottimo (~30µm) SCARTATO → `misICP_runICP` riparte dai centroidi GREZZI → minimo locale (RMSD scala-mm su STL congruenti, rotazione XY). Fix: `preUsable` (n∈[3..8] & rmsd finita) applica SEMPRE il best Kabsch come stato iniziale ICP + guard (scarta l'ICP se peggiora `preAlign.rmsd`) + composizione su `preUsable`. Casi già allineati invariati (best Kabsch≈identità=no-op); HD preservato. | btn `#misBtnRun` [1938] |
 | `toggleLayersPanel` | v3b [3807] | Toggle albero scena (`layersPanel`) | btn Albero Scena [1349] |
-| `openFresability` / `exportComponents` / `openCutView` / `openGroupDialog` / `openSettings` | v3b [5878] / [10940] / [11536] / [12356] / **ds/syn-env.js (8.86.0)** | Pannelli/dialog: fresabilità, export STL, cutview, gruppi, impostazioni | toolbar/pannelli Analizza/Accoppia |
+| `openFresability` / `exportComponents` / `openCutView` / `openGroupDialog` / `openSettings` | **wf/fresabilita.js (8.88.0)** / [10940] / [11536] / [12356] / **ds/syn-env.js (8.86.0)** | Pannelli/dialog: fresabilità, export STL, cutview, gruppi, impostazioni | toolbar/pannelli Analizza/Accoppia |
 | `saveCase` / `exportCase` / `undoLastMUA` / `clearAllMUA` / `toggleAxes` | v3b [3730] / [4610] / [4486] / [4493] / [3681] | Salva, esporta, annulla, reset MUA, toggle assi | menu File / toolbar |
 | `syntesisOpenFileDialog` | ds/syn-panel.js [284] | Apre file dialog STL | btn Carica file [1343] |
 | `switchTab` | dashboard [1461] | Cambia sezione della dashboard | sidebar [975-1043] |
@@ -502,16 +502,16 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 <!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
 
-### Fotografia (8.86.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+### Fotografia (8.88.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
 
 | Metrica | Valore |
 |---|---|
-| Righe / peso | **18259** / **0.97 MB** |
-| JS applicativo REALE | **16802** righe in 6 blocchi `<script>` (grezzo 16802, meno il blob B64) |
+| Righe / peso | **17394** / **0.94 MB** |
+| JS applicativo REALE | **15936** righe in 6 blocchi `<script>` (grezzo 15936, meno il blob B64) |
 | Asset B64 embedded | **0.0 MB** in 0 righe (**0%** del file) |
-| Funzioni top-level | 420 |
+| Funzioni top-level | 386 |
 | Globali condivise | 145 (di cui **35** toccate da 2+ domini) |
-| Export surface (handler inline) | 119 funzioni da preservare su `window` |
+| Export surface (handler inline) | 115 funzioni da preservare su `window` |
 
 ### Domini: dimensione e superficie di accoppiamento
 
@@ -520,7 +520,6 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 | `mis` | 123 | 1 | 3 | 19 | 7 |
 | `replace` | 92 | 7 | 8 | 33 | 10 |
 | `sost` | 47 | 7 | 6 | 16 | 9 |
-| `fres` | 39 | 1 | 1 | 7 | 3 |
 | `mua` | 37 | 5 | 8 | 14 | 23 |
 | `workflow` | 15 | 16 | 9 | 5 | 1 |
 | `tree` | 13 | 0 | 6 | 8 | 3 |
@@ -528,19 +527,20 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 | `export` | 8 | 1 | 2 | 5 | 2 |
 | `chrome` | 6 | 0 | 0 | 2 | 4 |
 | `log` | 5 | 0 | 0 | 0 | 1 |
-| `io` | 4 | 1 | 5 | 1 | 1 |
+| `fres` | 5 | 0 | 0 | 3 | 0 |
 | `report` | 4 | 0 | 2 | 1 | 0 |
+| `io` | 4 | 1 | 5 | 1 | 1 |
 | `cut` | 3 | 0 | 1 | 3 | 3 |
 | `other` | 3 | 0 | 0 | 0 | 3 |
 | `bootstrap` | 3 | 2 | 6 | 1 | 1 |
 | `scene` | 2 | 0 | 2 | 0 | 1 |
 | `geom` | 2 | 0 | 2 | 0 | 2 |
-| `colorclass` | 1 | 0 | 0 | 0 | 1 |
 | `find` | 1 | 0 | 0 | 0 | 1 |
+| `colorclass` | 1 | 0 | 0 | 0 | 1 |
 
 ### Accoppiamenti call-graph più pesanti (dominio→dominio: # funzioni)
 
-`mua→tree:12` · `mua→chrome:11` · `tree→mua:10` · `workflow→mua:9` · `mis→chrome:7` · `mua→cut:6` · `workflow→mis:5` · `workflow→replace:5` · `fres→chrome:5` · `mis→log:5` · `sost→tree:5` · `sost→mis:5`
+`mua→tree:12` · `mua→chrome:11` · `tree→mua:10` · `workflow→mua:9` · `mis→chrome:7` · `mua→cut:6` · `workflow→mis:5` · `workflow→replace:5` · `mis→log:5` · `sost→tree:5` · `sost→mis:5` · `io→mua:4`
 
 > Elenchi completi per-dominio (globali, API) in `scripts/dep_census_out.json`.
 > Ordine di estrazione e meccanismi: `docs/MODULARIZZAZIONE_STUDIO.md` (strategia).
