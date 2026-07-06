@@ -1,10 +1,15 @@
 {
  "generator": "scripts/make_fixtures.py",
- "source": "backend/static/syntesis-analyzer-v3b.html",
+ "source": [
+  "backend/static/assets/scanbody-1t3.b64.js",
+  "backend/static/assets/scanbody-os.b64.js",
+  "backend/static/assets/scanbody-sr.b64.js"
+ ],
  "pairs": [
   {
    "type": "scanbody-1t3",
    "source_var": "SCANBODY_B64",
+   "source_file": "backend/static/assets/scanbody-1t3.b64.js",
    "src_b64_md5": "1ba2d0b4de66a6a585cc1aa5e64d6f7a",
    "n_triangles": 7182,
    "transform": {
@@ -47,6 +52,7 @@
   {
    "type": "scanbody-os",
    "source_var": "SCANBODY_OS_B64",
+   "source_file": "backend/static/assets/scanbody-os.b64.js",
    "src_b64_md5": "751a49fe420a2c6d0a721d03d3605275",
    "n_triangles": 7998,
    "transform": {
@@ -89,6 +95,7 @@
   {
    "type": "scanbody-sr",
    "source_var": "SCANBODY_SR_B64",
+   "source_file": "backend/static/assets/scanbody-sr.b64.js",
    "src_b64_md5": "9c4189fcfe9570ecd9a0a4ccf2798fcc",
    "n_triangles": 8000,
    "transform": {
@@ -127,6 +134,77 @@
     0.4
    ],
    "note": "B = R@A + t. Allineamento atteso: recupero di T, deviazione ideale 0."
+  },
+  {
+   "type": "multi-1t3-5x",
+   "source_var": "(montaggio da SCANBODY_B64)",
+   "source_file": "backend/static/assets/scanbody-1t3.b64.js",
+   "src_b64_md5": "1ba2d0b4de66a6a585cc1aa5e64d6f7a",
+   "n_triangles": 35910,
+   "n_scanbody": 5,
+   "positions": [
+    [
+     0.0,
+     0.0,
+     0.0
+    ],
+    [
+     12.0,
+     3.0,
+     0.0
+    ],
+    [
+     24.0,
+     4.0,
+     0.0
+    ],
+    [
+     36.0,
+     3.0,
+     0.0
+    ],
+    [
+     48.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "transform": {
+    "axis": [
+     0.2,
+     0.3,
+     1.0
+    ],
+    "deg": 8.0,
+    "t": [
+     0.5,
+     -0.3,
+     0.2
+    ]
+   },
+   "R": [
+    [
+     0.990612562,
+     -0.130406301,
+     0.040999378
+    ],
+    [
+     0.13143978,
+     0.991043178,
+     -0.02360091
+    ],
+    [
+     -0.037554446,
+     0.028768307,
+     0.998880397
+    ]
+   ],
+   "t": [
+    0.5,
+    -0.3,
+    0.2
+   ],
+   "note": "Scena A = 5 copie di scanbody-1t3 traslate; B = R@A + t (T rigida GLOBALE nota). Allineamento atteso: recupero di T, deviazione per-centroide 0. Esercita il ramo n>=3 (bruteForcePreAlign/matchPairs/clusterComps)."
   }
  ]
 }
