@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.89.0 (MODULARIZZAZIONE F6b: secondo workflow fuori dal monolite — 10 fn tree-view (Albero Scena) → `wf/tree.js` (functions-only; `muaExpanded` resta nel monolite; escluse `setSceneObjectColor`/`__synApplyColor`/`getGroupBadgeColor` = utility scena/colore condivise). F6a: 34 fn FRESABILITA → `wf/fresabilita.js`; prep 8.87.2 dedup. Base 8.87.0-.1 redirect+testi con-h; 8.86.0 F5 → `ds/syn-env.js`; 8.85.0 F4 → syn-math/geom/color; 8.84.0-.2 F1-F3) — **Data:** 2026-07-06
+> **Versione software mappata:** 8.90.0 (MODULARIZZAZIONE F6c: terzo workflow fuori dal monolite — 4 fn report PDF Analizza (`analReport_*`) → `wf/report-analizza.js` (functions-only; banner §REPORT-MUA-PDF + report Misurare + pipeline condivisa restano nel monolite; gate shim jsPDF: 1152 chiamate PDF, 6 pagine). F6b: 10 fn tree-view → `wf/tree.js`; F6a: 34 fn FRESABILITA → `wf/fresabilita.js`; prep 8.87.2 dedup. Base 8.87.0-.1 redirect+testi con-h; 8.86.0 F5 → `ds/syn-env.js`; 8.85.0 F4 → syn-math/geom/color; 8.84.0-.2 F1-F3) — **Data:** 2026-07-06
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3). **8.74.0 (Fase B, commit 1 — unificazione chrome):** il pannello **Misurare** entra nel sistema FILL (via i gradienti pre-pastello: `.mis-btn-run` blu `#0077CC/#0050A0` → `--fill-primary`+`--dark`; modalità click-seed viola Tailwind `#8B5CF6/#7C3AED/#C4B5FD/#F5F3FF/#5B21B6` → famiglia **selezione** `--fill-sel`/`--pearl`/`--blue`; Annulla → `--pearl`+bordo); login in-app idem → `--fill-primary`; cutview `#1a1a22` → `var(--dark)`; danger `#E24B4A/#A32D2D` → `--red`/`--fill-error` (`.btn.danger`, hover del-btn dark). **CTA di pannello unificate** alla specifica di Sostituire (`padding:8px 10px; font-size:12px; letter-spacing:.03em`): i 5 bottoni di `#replaceFlow` allineati; `#sostBtnExport` passa da nero pieno a classe **`.export-btn`** (= Accoppia). Nuova classe **`.syn-select`** (bordo/raggio/font unici) sui 5 select di `#panelReplace` + `#misSeedType`. Canvas/PDF e palette-dati (gruppi, sfondo ambiente) NON toccati.
@@ -197,7 +197,7 @@ Default all'avvio. Posizionamento e analisi angolare MUA. Elementi UI specifici 
 | Elemento | id | Evento | Funzione | Stato | Effetto | Righe |
 |---|---|---|---|---|---|---|
 | Radio Tipo scanbody 1T3/OS/SR | `#analyzeSbTypeRadio` | onchange | `setAnalyzeSbType` | `window._ANALYZE_SBTYPE` | tipo CAD (radius/searchR) per nuovi MUA | [1666-1669] |
-| Report MUA (PDF) | `#btnAnalReport` | onclick | `analReport_generate` | muaObjects | genera PDF clinico | [1687] | disabled finché no MUA |
+| Report MUA (PDF) | `#btnAnalReport` | onclick | `analReport_generate` | muaObjects | genera PDF clinico. **8.90.0 (F6c)**: le 4 fn `analReport_*` (captureViews/generate/collectData/buildRecommendations) vivono in `wf/report-analizza.js`; banner §REPORT-MUA-PDF + addCornerLogo (annidata) + report Misurare restano nel monolite | [1687] | disabled finché no MUA |
 | Fresatura avanzata → | `#btnOpenFresability` | onclick | `openFresability` | — | apre `panelFresabilita` | [1730] |
 | Drop scansione | `#slotScan` / `#inputScan` | onclick/onchange | `inputScan.click()` / `loadScan` | `scanMesh` | carica STL scansione | [1919-1930] |
 | **Fresabilità**: macchina | `#fresMachineSelect` | onchange | `fresOnMachineChange` | fresatore sel. | aggiorna max angle | [1743] |
@@ -502,16 +502,16 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 <!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
 
-### Fotografia (8.89.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+### Fotografia (8.90.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
 
 | Metrica | Valore |
 |---|---|
-| Righe / peso | **17139** / **0.93 MB** |
-| JS applicativo REALE | **15680** righe in 6 blocchi `<script>` (grezzo 15680, meno il blob B64) |
+| Righe / peso | **16024** / **0.87 MB** |
+| JS applicativo REALE | **14564** righe in 6 blocchi `<script>` (grezzo 14564, meno il blob B64) |
 | Asset B64 embedded | **0.0 MB** in 0 righe (**0%** del file) |
-| Funzioni top-level | 376 |
+| Funzioni top-level | 372 |
 | Globali condivise | 145 (di cui **35** toccate da 2+ domini) |
-| Export surface (handler inline) | 99 funzioni da preservare su `window` |
+| Export surface (handler inline) | 98 funzioni da preservare su `window` |
 
 ### Domini: dimensione e superficie di accoppiamento
 
@@ -525,14 +525,13 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 | `diag` | 12 | 0 | 0 | 4 | 7 |
 | `export` | 8 | 1 | 2 | 5 | 2 |
 | `chrome` | 6 | 0 | 0 | 2 | 4 |
-| `fres` | 5 | 0 | 0 | 3 | 0 |
 | `log` | 5 | 0 | 0 | 0 | 1 |
-| `report` | 4 | 0 | 2 | 1 | 0 |
+| `fres` | 5 | 0 | 0 | 3 | 0 |
 | `io` | 4 | 1 | 5 | 1 | 1 |
-| `other` | 3 | 0 | 0 | 0 | 3 |
-| `tree` | 3 | 0 | 4 | 1 | 2 |
-| `cut` | 3 | 0 | 1 | 3 | 3 |
 | `bootstrap` | 3 | 2 | 6 | 1 | 1 |
+| `cut` | 3 | 0 | 1 | 3 | 3 |
+| `tree` | 3 | 0 | 4 | 1 | 2 |
+| `other` | 3 | 0 | 0 | 0 | 3 |
 | `scene` | 2 | 0 | 2 | 0 | 1 |
 | `geom` | 2 | 0 | 2 | 0 | 2 |
 | `find` | 1 | 0 | 0 | 0 | 1 |

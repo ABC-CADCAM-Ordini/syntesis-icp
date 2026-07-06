@@ -1,0 +1,110 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Gate F6c — harness report (shim jsPDF)</title>
+<style>body{font-family:monospace;padding:16px}.ok{color:#0a7a2f;font-weight:bold}.fail{color:#c21807;font-weight:bold}pre{background:#f5f5f5;padding:10px;overflow:auto;max-height:60vh}</style>
+</head><body>
+<h2>Gate F6c — wf/report-analizza.js: esposizione + shim jsPDF (sequenza API PDF)</h2>
+<div id="verdict">in esecuzione…</div>
+<pre id="detail"></pre>
+
+<span id="fresMachineName">VHF S5</span>
+
+<script>
+  // ── SHIM jsPDF: proxy che REGISTRA la sequenza di chiamate PDF ──────────────
+  window.__PDF_SEQ = [];
+  function RecDoc(opts){ window.__PDF_SEQ.push(["new jsPDF", JSON.stringify(opts||{})]); }
+  var METHODS = ["setFillColor","setLineWidth","setDrawColor","line","rect","circle","text",
+    "addPage","setTextColor","setLineDashPattern","setFontSize","setFont","addImage","lines",
+    "save","roundedRect","setPage","getNumberOfPages"];
+  METHODS.forEach(function(m){
+    RecDoc.prototype[m] = function(){ window.__PDF_SEQ.push([m, arguments.length]); return this; };
+  });
+  // splitTextToSize ritorna un array (generate itera sul risultato)
+  RecDoc.prototype.splitTextToSize = function(txt, w){
+    window.__PDF_SEQ.push(["splitTextToSize", arguments.length]);
+    return String(txt||"").split("\n");
+  };
+  RecDoc.prototype.internal = { pageSize: { getWidth:function(){return 210;}, getHeight:function(){return 297;} } };
+  window.jspdf = { jsPDF: RecDoc };
+
+  // ── stato foreign lasciato nel monolite (fornito qui come farebbe il MAIN) ──
+  var MAX_COUPLE_DIVERGENCE = 40, MAX_MILLING_ANGLE = 30, MUA_CONE_HALF_ANGLE = 20;
+  // globali 3D: usati per lo più dentro captureViews (che qui sovrascriviamo) o guardati
+  // (es. `renderer && renderer.domElement`). Vanno DICHIARATI o danno ReferenceError.
+  var renderer = { domElement: { width: 800, height: 600 } };
+  var scene = {}, camera = {}, scanMesh = null, controls = {};
+  var THREE = { Vector3: function(x,y,z){ this.x=x||0; this.y=y||0; this.z=z||0; } };
+  function showStatus(){}
+  function V3(x,y,z){ return {x:x,y:y,z:z}; }
+  // 3 MUA allineati in 2 gruppi, flag variati per esercitare le criticità
+  var muaObjects = [
+    { aligned:true, num:1, groupId:0, divergence:1.2, rigorousOK:true,  millingOK:true,  undercutOK:true,  position:V3(1,0,2),  axisDir:V3(0,0,1),   rmsd:18 },
+    { aligned:true, num:2, groupId:0, divergence:6.5, rigorousOK:false, millingOK:false, undercutOK:true,  position:V3(3,0,2),  axisDir:V3(0.1,0,0.99), rmsd:22 },
+    { aligned:true, num:3, groupId:1, divergence:2.1, rigorousOK:true,  millingOK:true,  undercutOK:true,  position:V3(5,0,4),  axisDir:V3(0,0.05,0.99), rmsd:15 },
+    { aligned:false, num:4, groupId:1 }
+  ];
+</script>
+
+<!-- IL FILE REALE, caricato come nell'app (classic script) -->
+<script src="/backend/static/wf/report-analizza.js"></script>
+
+<script>
+(function(){
+  var NAMES = ["analReport_captureViews","analReport_generate","analReport_collectData","analReport_buildRecommendations"];
+  var problems = [], notes = [];
+
+  // 1) ESPOSIZIONE
+  var missing = NAMES.filter(function(n){ return typeof window[n] !== "function"; });
+  if(missing.length) problems.push("NON esposte: " + missing.join(", "));
+  notes.push("esposte " + (NAMES.length - missing.length) + "/" + NAMES.length);
+
+  // 2) collectData: gira su muaObjects stub e produce struttura dati coerente
+  try {
+    var data = analReport_collectData();
+    if(!data || data.muaCount !== 3) problems.push("collectData: muaCount atteso 3, avuto " + (data&&data.muaCount));
+    if(!data || !data.scores || typeof data.scores.fresabilita !== "number") problems.push("collectData: scores.fresabilita mancante");
+    if(!data || !data.criticita || data.criticita.millingOutCount !== 1) problems.push("collectData: criticita.millingOutCount atteso 1, avuto " + (data&&data.criticita&&data.criticita.millingOutCount));
+    else notes.push("collectData OK (muaCount=3, fresabilita=" + data.scores.fresabilita + "%, millingOut=1, coneOut=" + data.criticita.coneOutCount + ")");
+  } catch(e){ problems.push("collectData ha lanciato: " + e.message); }
+
+  // 3) buildRecommendations: gira e ritorna array
+  try {
+    var recs = analReport_buildRecommendations(analReport_collectData());
+    if(!Array.isArray(recs)) problems.push("buildRecommendations non ritorna array (" + typeof recs + ")");
+    else notes.push("buildRecommendations OK (" + recs.length + " raccomandazioni)");
+  } catch(e){ problems.push("buildRecommendations ha lanciato: " + e.message); }
+
+  // 4) SHIM jsPDF: override captureViews (evita WebGL), esegue generate, registra la sequenza
+  window.analReport_captureViews = function(){
+    var dummy = "data:image/png;base64,iVBORw0KGgo=";
+    return { occlusale:dummy, vestibolare:dummy, linguale:dummy, prospettica:dummy };
+  };
+  window.__PDF_SEQ = [];
+  try {
+    analReport_generate();
+    var seq = window.__PDF_SEQ;
+    var counts = {};
+    seq.forEach(function(e){ counts[e[0]] = (counts[e[0]]||0)+1; });
+    var hasNew = counts["new jsPDF"] === 1;
+    var hasSave = counts["save"] >= 1;
+    var hasPages = (counts["addPage"]||0) >= 5;  // report multi-pagina
+    if(!hasNew) problems.push("shim: 'new jsPDF' non chiamato 1 volta (" + counts["new jsPDF"] + ")");
+    if(!hasSave) problems.push("shim: doc.save() mai chiamato (PDF non salvato)");
+    if(!hasPages) problems.push("shim: addPage < 5 (" + (counts["addPage"]||0) + ") — report multi-pagina non generato");
+    if(seq.length < 100) problems.push("shim: sequenza troppo corta (" + seq.length + " chiamate) — pipeline non completa");
+    if(problems.length === 0 || (hasNew && hasSave && hasPages))
+      notes.push("shim jsPDF OK: " + seq.length + " chiamate PDF, addPage=" + counts["addPage"] + ", text=" + counts["text"] + ", rect=" + counts["rect"] + ", addImage=" + counts["addImage"] + ", save=" + counts["save"]);
+    window.__PDF_SIGNATURE = { total: seq.length, counts: counts };
+  } catch(e){ problems.push("analReport_generate (shim) ha lanciato: " + e.message + " @ " + (e.stack||"").split("\n")[1]); }
+
+  var v = document.getElementById("verdict");
+  if(problems.length === 0){
+    v.className = "ok"; v.textContent = "VERDE — 4/4 esposte, collectData/buildRecommendations OK, pipeline PDF gira (shim jsPDF)";
+  } else {
+    v.className = "fail"; v.textContent = "ROSSO — " + problems.length + " problemi";
+  }
+  document.getElementById("detail").textContent =
+    (problems.length ? "PROBLEMI:\n- " + problems.join("\n- ") + "\n\n" : "") + "NOTE:\n- " + notes.join("\n- ");
+  window.__REPORT_GATE = { ok: problems.length === 0, problems: problems, notes: notes, signature: window.__PDF_SIGNATURE };
+})();
+</script>
+</body></html>
