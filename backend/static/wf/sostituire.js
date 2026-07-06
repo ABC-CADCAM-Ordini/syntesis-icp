@@ -178,7 +178,7 @@ function sostOnViewportClick(event){
   );
   var raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(mouse, camera);
-  var hits = raycaster.intersectObject(sostMesh);
+  var hits = raycaster.intersectObject(sostMesh, false);   // 8.95.2 FIX: NON ricorsivo (come Analizza r.1750). In modalita' render 'both' sostMesh ha un figlio LineSegments (_wireOverlay): intersectObject di default e' RICORSIVO -> colpiva l'overlay wireframe (senza .face, soglia linea) come hits[0] -> la guardia .face qui sotto respingeva la posa (bug "shift+clic non posa in vista reticolo"). false = solo le facce del mesh solido.
   try{ synLog('sost','clic viewport', {shift:!!replacePickDownShift, hits:hits.length, face:!!(hits[0]&&hits[0].face), rectW:+rect.width.toFixed(0), rectH:+rect.height.toFixed(0)}); }catch(_){}
   if(hits.length > 0 && hits[0].face){   // 8.58.0 (review): guardia .face come Analizza (un overlay wireframe figlio non ha .face -> niente TypeError)
     sostPlaceTemplate(hits[0].point, hits[0].face.normal);
