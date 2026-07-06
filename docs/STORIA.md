@@ -1,5 +1,18 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.90.0: MODULARIZZAZIONE Fase 6c (report PDF Analizza → wf/report-analizza.js)
+
+Terzo workflow estratto, e il primo che tocca la generazione dei referti clinici PDF. Escono le 4 funzioni del report MUA PDF 6 pagine di Analizza (§REPORT-MUA-PDF): analReport_captureViews (cattura 4 viste 3D del viewer), analReport_generate (845 righe, genera il PDF con jsPDF), analReport_collectData (estrae i dati da muaObjects), analReport_buildRecommendations (raccomandazioni testuali). Verbatim in wf/report-analizza.js (terzo file wf/), functions-only. Le funzioni annidate dentro generate (addFooter/box/text/placeView) si muovono con lei.
+
+Restano nel monolite di proposito: il banner §REPORT-MUA-PDF (tracciato da check_anchors), addCornerLogo (helper annidato in un'altra funzione, non top-level), e l'INTERO report Misurare (misICP_generateReport, §MISURARE-PDF / §CERTIFICATO-TARATURA) insieme alla §REPORT-PIPELINE condivisa — sono un secondo sistema PDF che appartiene al dominio mis (fase 6f) e non va toccato ora.
+
+Il gate è quello che lo studio prescrive esplicitamente per 6c, ed è diverso dagli altri: uno SHIM jsPDF. Poiché il PDF binario non è confrontabile, si stubba window.jspdf.jsPDF con un proxy che registra la sequenza di ogni chiamata PDF (setFillColor, rect, text, addPage, addImage, save…), si stubbano captureViews + muaObjects realistici + i globali 3D, e si esegue analReport_generate: la pipeline gira COMPLETA e produce una sequenza stabile (1152 chiamate jsPDF, 6 addPage = report 6 pagine, 214 text, 6 addImage, save=1). collectData sullo stub dà muaCount=3, fresabilita 67%, millingOut 1. Essendo l'estrazione verbatim (md5-identica), old==new per costruzione: lo shim è la prova comportamentale che il codice estratto genera davvero il referto. L'harness ha còlto uno stub renderer/3D mancante (corretto). Verifica avversariale 3-lenti Opus (verbatim, separazione dal report Misurare, dipendenze/raggiungibilità): 3/3 PASS, 0 blocker.
+
+Implementazione:
+- vincolo: analReport_generate è chiamata dall'handler inline onclick su #btnAnalReport → bare-global invariato; le 4 fn si chiamano fra loro (tutte in wf/)
+- monolite da 17.138 a 16.023 righe; 1 tombstone §WF-REPORT (cluster contiguo)
+- deploy sequenziale LEGACY→BACKEND (anti-race ok); verifica live incl. Claude Chrome sull'app reale: 8.90.0 sui domini, wf/report-analizza.js servito 200 con md5 identico al locale su entrambi i servizi, 4/4 fn report esposte, il report Misurare intatto e separato, jsPDF caricato, zero errori console, gating 403
+
 ## 2026-07-06 — 8.89.0: MODULARIZZAZIONE Fase 6b (secondo workflow → wf/tree.js)
 
 Secondo workflow estratto dal monolite: l'Albero Scena di Analizza (pannello "Livelli", rebuildTree che rigenera il DOM dell'albero, opacità globale scan+mua, ghost/restore, toggle visibilità layer/mua, espansione nodi). 10 function declaration escono verbatim in backend/static/wf/tree.js (secondo file wf/, dopo fresabilita.js), functions-only. Il dominio tree è pura vista: non possiede stato proprio salvo muaExpanded (mappa expand/collapse per-MUA) che resta nel monolite; zero monkey-patch.

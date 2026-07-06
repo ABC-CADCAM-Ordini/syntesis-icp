@@ -41,9 +41,15 @@
 > = utility scena/colore condivise). Scouting 5-lenti + avversariale 4-lenti (Opus) 4/4 PASS; gate
 > Node + harness browser classList/display; verifica live incl. Claude Chrome (pannello apre/chiude
 > sull'app reale). Monolite a 17.138 righe.
-> ▶ Prossimo: **Fase 6c** (wf/report-analizza.js ~1.200 r blocco 9 + wf/report-comune.js, mecc. B;
-> gate = shim jsPDF che diffa la sequenza di API-call old/new + smoke visivo; PDF Misurare NON si
-> separa da mis), poi 6d-0 INVERSIONE CENTRALINO (release autonoma) → 6d sost → 6e replace → 6f mis ULTIMO.
+> ✅ **Fase 6c COMPLETATA** (2026-07-06, 8.90.0 commit 8e7839d): 4 fn report PDF Analizza (analReport_*)
+> → wf/report-analizza.js (functions-only; banner + report Misurare + pipeline condivisa restano). Gate
+> SHIM jsPDF (proxy che registra la sequenza PDF: 1152 chiamate/6 pagine) + avversariale 3-lenti 3/3 PASS;
+> verifica live incl. Claude Chrome (4/4 esposte, report Misurare intatto). Monolite a 16.023 righe.
+> NB: la wf/report-comune.js (pipeline condivisa) NON è stata separata — intrecciata con mis, si farà con 6f.
+> ▶ Prossimo: **Fase 6d-0 INVERSIONE DEL CENTRALINO** (release autonoma, insistenza unanime della giuria):
+> ogni dominio registra window.SynWF.register(nome, {hardReset, hasUnsavedData, setArtifactsVisible});
+> selectWorkflow diventa dispatcher; le 16 scritture cross-domain migrano ai proprietari. Gate: truth-table
+> esaustiva 5 workflow × sporco/pulito. Poi 6d sost → 6e replace → 6f mis ULTIMO (con report-comune).
 
 ---
 
