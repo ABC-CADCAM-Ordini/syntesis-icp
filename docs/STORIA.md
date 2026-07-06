@@ -1,5 +1,19 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.95.1: Diagnostica — posa di Sostituire cablata nel log segreto (synLog)
+
+L'utente ha segnalato che su Sostituire "il clic per posizionare non funziona" (shift+clic, ma nessun marker). Ho investigato con una riproduzione reale dell'app (mock server che stubba auth+registry, scanbody CAD veri caricati come scansione) e ho stabilito due cose: (1) non è una regressione della Fase 6f — il codice della posa (aggancio click nel monolite, `sostOnViewportClick`/`sostPlaceTemplate` in wf/sostituire.js) è byte-identico a prima e non dipende da nessuna funzione Misurare; (2) la posa funziona end-to-end per tutti e tre i tipi (1T3/OS/SR) nel repro pulito: shift+clic → raycast colpisce → `sostPlaceTemplate` → marker creato, in scena, visibile. Un dettaglio emerso: la posa è asincrona (carica i 3 template via `Promise.all` e crea il marker nel `.then`; il template OS è ~2.3 MB), senza feedback immediato al clic.
+
+Non riproducendo un fallimento con CAD puliti, il difetto è verosimilmente legato alla scansione reale dell'utente (rumorosa, multi-scanbody, con gengiva) — il candidato numero uno è `findScanbodyCenter`, che croppa e fitta attorno al click. Su richiesta dell'utente (che ricordava il "log della finestra segreta") ho verificato che il sistema `synLog` esiste ed è vivo (buffer `SYN_LOG`, persistito in `localStorage['syn_session_log']` e ripristinato al reload, scaricabile dal pallino `#synLogDot` + password), ma NON registrava Sostituire (solo Misurare e il main). Quindi ho cablato la posa di Sostituire nel log: 11 chiamate `synLog('sost',...)` ai punti decisionali. In particolare `findScanbodyCenter` è ora avvolto in un try/catch che logga l'errore, lo mostra nella barra di stato e lo rilancia (prima un'eccezione lì saliva silenziosa). Nessun cambio di comportamento: i try/catch rilanciano o ritornano come prima; è pura osservabilità.
+
+Ora l'utente riproduce sul suo scan reale, apre il pallino segreto, scarica il log e lo invia: le righe `[sost]` diranno esattamente dove si ferma — `clic viewport {hits:0}` (clic fuori dallo scanbody), `clic ignorato: Shift non premuto`, oppure `posa start` senza un successivo `posa OK` (il `.then` è fallito, con la riga che specifica se è template mancante, findScanbodyCenter che ha lanciato, o un'altra eccezione col messaggio).
+
+Il gate verbatim di sost è stato ri-baselinato per le 3 funzioni instrumentate (la prova di estrazione verbatim della Fase 6d resta in git a 8.91.0). Smoke browser: la posa funziona ancora e cattura 6 righe `[sost]` nel log. Deploy su entrambi i servizi, 8.95.1 live; il `sostituire.js` servito sul canonico contiene le 11 chiamate.
+
+Implementazione:
+- wf/sostituire.js: 11 `synLog('sost',...)` in sostStartPlacement/sostOnViewportClick/sostPlaceTemplate; findScanbodyCenter wrappato.
+- scripts/gate/sost/golden.json ri-baselinato (3 fn); registry + v3b title/ANALIZZA_BUILD 8.95.1.
+
 ## 2026-07-06 — 8.95.0: MODULARIZZAZIONE Fase 6f 3/3 (MISURARE viz → wf/misurare-viz.js) — CHIUDE LA FASE 6
 
 Ultimo dei tre rilasci incrementali di Misurare, e ultimo pezzo dell'intera Fase 6: la visualizzazione. 23 funzioni del dominio §MISURARE-VIZ (label 3D come tracker di elementi HTML sovrapposti al viewport, vista di taglio 2D — perpVectors/sliceByPlane/projectTo2D/drawCutview/bindCutviewWheel — e albero di scena in stile CATIA con show/hide/toggle gruppi, visibilità e opacità per layer, badge, reset) estratte verbatim in wf/misurare-viz.js. Restano nel monolite lo stato viz (misICP_labels/labelsVisible, labelTrackerOn, layerColors, cutZoom/cutCurrentPair/cutWheelBound) e il banner §MISURARE-VIZ.
