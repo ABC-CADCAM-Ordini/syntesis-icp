@@ -67,12 +67,15 @@
 > su 4 fixtures (incl. NUOVA multi-1t3-5x che stressa il ramo n≥3), old(HEAD)==new byte-identico + ground-truth ~0. Audit
 > 8-agenti (3 skeptic refuted=FALSE); dipendenza cross-dominio scoperta misICP_cylAxis→synAxisUseLateral (resta nel MAIN).
 > Il gate ha còlto un bug '*/' nell'header (corretto). Monolite 11.296 → 9.837 righe. Verifica live 8.93.0 su entrambi.
-> ▶ Prossimo: **Fase 6f 2/3 (PDF)** — 41 fn §MISURARE-PDF/§REPORT-PIPELINE/§CERTIFICATO-TARATURA → wf/misurare-pdf.js
-> (report PDF 6 pagine, calibrazione, excel). RESIDUO CRITICO: _synScaricoConoImg (preload img parse-time) resta nel
-> monolite. Golden verbatim mis-pdf già catturato da HEAD (scripts/gate/mis/golden-pdf.json). Poi **6f 3/3 (VIZ)** —
-> 23 fn §MISURARE-VIZ → wf/misurare-viz.js (label 3D, cutview, albero). Il gate golden-master numerico copre solo la
-> spina ICP (regione icp); pdf/viz sono DOM/THREE-bound (gate verbatim strutturale + node --check). RIGENERARE il
-> censimento prima di ogni sotto-estrazione (già rigenerato per icp).
+> ✅ **Fase 6f 2/3 (PDF) COMPLETATA** (2026-07-06, 8.94.0 commit d45ddec): 41 fn §MISURARE-PDF/§REPORT-PIPELINE/
+> §CERTIFICATO-TARATURA → wf/misurare-pdf.js (report PDF 6 pagine, calibrazione, excel). RESIDUO CRITICO lasciato in
+> loco: _synScaricoConoImg (preload img parse-time, NON-fn). addCornerLogo (annidata in misICP_renderCalibrationPDF) si
+> muove con la madre. Il gate report (6c) ha COLTO lo spostamento di misICP_generateReport+addCornerLogo (2 FAIL: li
+> asseriva residuo-nel-monolite 'resta, fase 6f') → gate report riconciliato. Monolite 9.837 → 7.205 righe. Live 8.94.0.
+> ▶ Prossimo (CHIUDE la Fase 6): **Fase 6f 3/3 (VIZ)** — 23 fn §MISURARE-VIZ → wf/misurare-viz.js (label 3D HTML tracker,
+> cutview 2D, albero scena CATIA). Golden verbatim mis-viz già catturato da HEAD (scripts/gate/mis/golden-viz.json). Il
+> gate golden-master numerico copre solo la spina ICP (regione icp); pdf/viz sono DOM/THREE-bound (gate verbatim
+> strutturale + node --check). RIGENERARE il censimento prima dell'estrazione viz.
 
 ---
 

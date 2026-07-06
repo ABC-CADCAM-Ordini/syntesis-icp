@@ -1,5 +1,19 @@
 # Storia delle modifiche
 
+## 2026-07-06 — 8.94.0: MODULARIZZAZIONE Fase 6f 2/3 (MISURARE report PDF → wf/misurare-pdf.js)
+
+Secondo dei tre rilasci incrementali di Misurare: il blocco report. 41 funzioni dei domini §MISURARE-PDF / §REPORT-PIPELINE / §CERTIFICATO-TARATURA (report clinico PDF a 6 pagine con jsPDF, disegni tecnici cilindro/freccia/centroide, grafico dei centroidi, pagine di metodologia e glossario, certificato di taratura con modal + pagine + firme, export Excel con XLSX) estratte verbatim in wf/misurare-pdf.js. Monolite 9.837 → 7.205 righe.
+
+Residuo critico lasciato in loco: il blocco di preload `_synScaricoConoImg = new Image(); _synScaricoConoImg.src = '/static/assets/scarico_cono_mua_v4.png'` — uno statement top-level che parte a parse-time (fetch dell'immagine), non una funzione. L'audit 6f l'aveva segnalato come l'unico statement standalone non-fn interlacciato nella regione PDF; l'estrattore banner-box-aware lo lascia nel monolite perché non è una function declaration. addCornerLogo, che è annidata dentro misICP_renderCalibrationPDF (una delle 41), si sposta correttamente con la funzione madre.
+
+Il gate del report (6c, scripts/gate/report/gate.mjs) ha fatto il suo lavoro: al primo --check dopo l'estrazione ha dato 2 FAIL, perché asseriva che misICP_generateReport e addCornerLogo restassero nel monolite — un'assunzione scritta al 6c con la nota esplicita «resta, fase 6f». Ora che la fase 6f li ha spostati, il gate li ha colti e li ho riconciliati: rimossi dal residuo del gate report (il loro gate è ora scripts/gate/mis/gate.mjs pdf), lasciando solo il banner §REPORT-MUA-PDF. Il fatto che un gate di una fase precedente abbia intercettato lo spostamento previsto è esattamente il comportamento voluto dalla rete di sicurezza.
+
+Nota: il golden-master numerico (gate-golden.mjs) copre solo la spina ICP della regione icp; le 41 funzioni PDF sono DOM/THREE/jsPDF-bound e sono coperte dal gate verbatim strutturale (md5 byte-identici + esposizione via eval + residuo + wiring) e da node --check. Batteria completa verde (mis-icp 59 + golden-master + replace 92 + sost 47 + fres 34 + tree 10 + report 4, anchors 36/36, check_inline, fixtures 12/12). Deploy incrementale LEGACY canary → verifica → BACKEND, entrambi SUCCESS su commit d45ddec (anti-race commitHash==HEAD), 8.94.0 live sul canonico con-h e sui railway. Prossimo: 6f 3/3 (misurare-viz.js, 23 fn), che chiude la Fase 6.
+
+Implementazione:
+- backend/static/wf/misurare-pdf.js (41 fn); monolite: 7 tombstone §WF-MIS-PDF + <script src> a riga 22; title + ANALIZZA_BUILD 8.94.0.
+- scripts/gate/report/gate.mjs: residuo aggiornato (misICP_generateReport/addCornerLogo → wf/misurare-pdf.js).
+
 ## 2026-07-06 — 8.93.0: MODULARIZZAZIONE Fase 6f 1/3 (MISURARE core ICP → wf/misurare-icp.js)
 
 Inizio dell'estrazione dell'ultimo e più delicato workflow: Misurare, il core clinico ICP. Diviso in 3 rilasci incrementali allineati ai banner dell'autore (§MISURARE-ICP / §MISURARE-PDF / §MISURARE-VIZ), su scelta esplicita dell'utente per rollback granulare sul core clinico. Questo è il primo: 59 funzioni del dominio §MISURARE-ICP (parsing STL, componenti connessi, partizione scanbody/arcata, clustering, Kabsch+SVD3(Jacobi)+ICP nearest-neighbor, brute-force pre-align con permutazioni fino a n=8, asse cilindro cap-based, tipo scanbody, connessione clinica al datum, seeding click-to-seed per scansioni con gengiva, orchestratore misICP_run, mount/render viewport) estratte verbatim in wf/misurare-icp.js. Monolite 11.296 → 9.837 righe.
