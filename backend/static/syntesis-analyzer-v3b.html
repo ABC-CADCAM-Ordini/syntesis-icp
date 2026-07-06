@@ -17,7 +17,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Analizzare v8.87.1</title>
+<title>Synthesis-ICP - Analizzare v8.87.2</title>
 <!--
 ==== INDICE (§anchor grep-able) ============================================
 Navigazione: grep -n sul token (es. grep -n 'MISURARE-ICP'). Banner UNICI (gate:
@@ -1330,7 +1330,7 @@ function getAnalyzeSbCfg(){ return SCANBODY_CFG[getAnalyzeSbType()] || SCANBODY_
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.87.1';
+window.ANALIZZA_BUILD = '8.87.2';
 window.ANALIZZA_BUILD_DATE = '2026-07-06';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 
@@ -4533,24 +4533,6 @@ function fresUpdateArrow(gid){
       highlight.lookAt(camera.position);
     }
   }
-}
-
-function fresUpdateAllArrows(){
-  Object.keys(fresState.arrowsByGid).forEach(function(k){
-    fresUpdateArrow(parseInt(k,10));
-  });
-}
-
-function fresUpdateAllArrows(){
-  Object.keys(fresState.arrowsByGid).forEach(function(k){
-    fresUpdateArrow(parseInt(k,10));
-  });
-}
-
-function fresUpdateAllArrows(){
-  Object.keys(fresState.arrowsByGid).forEach(function(k){
-    fresUpdateArrow(parseInt(k,10));
-  });
 }
 
 function fresUpdateAllArrows(){
