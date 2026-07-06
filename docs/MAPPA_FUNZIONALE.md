@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.88.0 (MODULARIZZAZIONE F6a: primo workflow fuori dal monolite — 34 fn del dominio FRESABILITA → `wf/fresabilita.js` (functions-only; stato/banner/monkey-patch restano nel monolite; group-dialog escluso perché è gestione gruppi MUA). Prep 8.87.2: dedup fresUpdateAllArrows (dead-code ×4→1). Base 8.87.0-.1: redirect dominio + testi con-h. 8.86.0 F5: pannello → `ds/syn-env.js`; 8.85.0 F4: 27 fn pure → syn-math/geom/color; 8.84.0-.2: F1-F3) — **Data:** 2026-07-06
+> **Versione software mappata:** 8.89.0 (MODULARIZZAZIONE F6b: secondo workflow fuori dal monolite — 10 fn tree-view (Albero Scena) → `wf/tree.js` (functions-only; `muaExpanded` resta nel monolite; escluse `setSceneObjectColor`/`__synApplyColor`/`getGroupBadgeColor` = utility scena/colore condivise). F6a: 34 fn FRESABILITA → `wf/fresabilita.js`; prep 8.87.2 dedup. Base 8.87.0-.1 redirect+testi con-h; 8.86.0 F5 → `ds/syn-env.js`; 8.85.0 F4 → syn-math/geom/color; 8.84.0-.2 F1-F3) — **Data:** 2026-07-06
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3). **8.74.0 (Fase B, commit 1 — unificazione chrome):** il pannello **Misurare** entra nel sistema FILL (via i gradienti pre-pastello: `.mis-btn-run` blu `#0077CC/#0050A0` → `--fill-primary`+`--dark`; modalità click-seed viola Tailwind `#8B5CF6/#7C3AED/#C4B5FD/#F5F3FF/#5B21B6` → famiglia **selezione** `--fill-sel`/`--pearl`/`--blue`; Annulla → `--pearl`+bordo); login in-app idem → `--fill-primary`; cutview `#1a1a22` → `var(--dark)`; danger `#E24B4A/#A32D2D` → `--red`/`--fill-error` (`.btn.danger`, hover del-btn dark). **CTA di pannello unificate** alla specifica di Sostituire (`padding:8px 10px; font-size:12px; letter-spacing:.03em`): i 5 bottoni di `#replaceFlow` allineati; `#sostBtnExport` passa da nero pieno a classe **`.export-btn`** (= Accoppia). Nuova classe **`.syn-select`** (bordo/raggio/font unici) sui 5 select di `#panelReplace` + `#misSeedType`. Canvas/PDF e palette-dati (gruppi, sfondo ambiente) NON toccati.
@@ -156,7 +156,7 @@ App monolite (~3.87 MB). 4 workflow interni commutati da `selectWorkflow(wf)` ([
 
 | Elemento | id / classe | Funzione | Visibile in | Effetto a valle | Righe | Note |
 |---|---|---|---|---|---|---|
-| Albero Scena (**era "Livelli"**, rinominato 8.75.0) | `#btnLivelli` `.analisi-only` | `toggleLayersPanel` | analizza+accoppia | toggle albero scena (`layersPanel`); title "Albero Scena (L)" | [1337] | |
+| Albero Scena (**era "Livelli"**, rinominato 8.75.0) | `#btnLivelli` `.analisi-only` | `toggleLayersPanel` | analizza+accoppia | toggle albero scena (`layersPanel`); title "Albero Scena (L)". **8.89.0 (F6b)**: le 10 fn tree-view (`toggleLayersPanel`/`openLayersPanel`/`closeLayersPanel`/`rebuildTree`/`treeUnified_*`/`toggleLayer`/`toggleMuaLayer`/`toggleMuaExpand`) vivono in `wf/tree.js`; `muaExpanded` + `setSceneObjectColor`/`getGroupBadgeColor` restano nel monolite | [1337] | |
 | Albero Scena (dup, **era "Livelli"** — 8.75.0) | `.sostituire-only` | `toggleLayersPanel` | solo sostituire | toggle albero scena | [1345] | `display:none` default; visibilità centralizzata in `selectWorkflow` (corretto 8.4.6) |
 | **Posiziona** | `.green .analisi-only` | `startPlacement` | analizza+accoppia | `placementMode=true` → **8.58.0: SHIFT+CLIC pulito** posa il MUA (`placeMUA`); guardia movimento >6px = trascinamento → niente posa (ruotare non posa); clic senza Shift → hint. Shift/pos catturati al pointerdown via `replacePickDown*` (condivisi tra tutte le pose) | [1353] | |
 | **Raffina** | `#btnRaffina` `.analisi-only` | `alignAll` | analizza+accoppia | ICP refine di tutti i MUA | [1363] | |
@@ -448,7 +448,7 @@ Endpoint **solo backend** in `backend/main.py`, dietro `require_authorized` (adm
 | `sostOnSourceChange` | v3b [34892] | Scrive `sostSourceTemplate`/`sostActiveTemplate` (Box B) | radio Box B [1979-1981] |
 | `_hardResetSostituire` | v3b [4894] | Reset stato Sostituire all'uscita | `selectWorkflow` [4986] |
 | `misICP_run` | v3b [6883] | ICP di confronto fra 2 STL (Misurare). **8.67.2 FIX allineamento**: il pre-align brute-force (`misICP_bruteForcePreAlign`) calcola il miglior fit Kabsch ma l'orchestrazione (~6932) lo applicava solo se `applied` (una permutazione ≠ identità batte l'identità). Con i cluster A/B nello STESSO ordine l'identità è già la migliore → `applied=false` → fit ottimo (~30µm) SCARTATO → `misICP_runICP` riparte dai centroidi GREZZI → minimo locale (RMSD scala-mm su STL congruenti, rotazione XY). Fix: `preUsable` (n∈[3..8] & rmsd finita) applica SEMPRE il best Kabsch come stato iniziale ICP + guard (scarta l'ICP se peggiora `preAlign.rmsd`) + composizione su `preUsable`. Casi già allineati invariati (best Kabsch≈identità=no-op); HD preservato. | btn `#misBtnRun` [1938] |
-| `toggleLayersPanel` | v3b [3807] | Toggle albero scena (`layersPanel`) | btn Albero Scena [1349] |
+| `toggleLayersPanel` | **wf/tree.js (8.89.0)** | Toggle albero scena (`layersPanel`) | btn Albero Scena [1349] |
 | `openFresability` / `exportComponents` / `openCutView` / `openGroupDialog` / `openSettings` | **wf/fresabilita.js (8.88.0)** / [10940] / [11536] / [12356] / **ds/syn-env.js (8.86.0)** | Pannelli/dialog: fresabilità, export STL, cutview, gruppi, impostazioni | toolbar/pannelli Analizza/Accoppia |
 | `saveCase` / `exportCase` / `undoLastMUA` / `clearAllMUA` / `toggleAxes` | v3b [3730] / [4610] / [4486] / [4493] / [3681] | Salva, esporta, annulla, reset MUA, toggle assi | menu File / toolbar |
 | `syntesisOpenFileDialog` | ds/syn-panel.js [284] | Apre file dialog STL | btn Carica file [1343] |
@@ -502,16 +502,16 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 <!-- DEP-CENSUS:START (generato da scripts/dep_census.py — non editare a mano) -->
 
-### Fotografia (8.88.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
+### Fotografia (8.89.0 — rigenerare con `python3 scripts/dep_census.py --write-mappa`)
 
 | Metrica | Valore |
 |---|---|
-| Righe / peso | **17394** / **0.94 MB** |
-| JS applicativo REALE | **15936** righe in 6 blocchi `<script>` (grezzo 15936, meno il blob B64) |
+| Righe / peso | **17139** / **0.93 MB** |
+| JS applicativo REALE | **15680** righe in 6 blocchi `<script>` (grezzo 15680, meno il blob B64) |
 | Asset B64 embedded | **0.0 MB** in 0 righe (**0%** del file) |
-| Funzioni top-level | 386 |
+| Funzioni top-level | 376 |
 | Globali condivise | 145 (di cui **35** toccate da 2+ domini) |
-| Export surface (handler inline) | 115 funzioni da preservare su `window` |
+| Export surface (handler inline) | 99 funzioni da preservare su `window` |
 
 ### Domini: dimensione e superficie di accoppiamento
 
@@ -520,18 +520,18 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 | `mis` | 123 | 1 | 3 | 19 | 7 |
 | `replace` | 92 | 7 | 8 | 33 | 10 |
 | `sost` | 47 | 7 | 6 | 16 | 9 |
-| `mua` | 37 | 5 | 8 | 14 | 23 |
+| `mua` | 37 | 5 | 8 | 5 | 15 |
 | `workflow` | 15 | 16 | 9 | 5 | 1 |
-| `tree` | 13 | 0 | 6 | 8 | 3 |
 | `diag` | 12 | 0 | 0 | 4 | 7 |
 | `export` | 8 | 1 | 2 | 5 | 2 |
 | `chrome` | 6 | 0 | 0 | 2 | 4 |
-| `log` | 5 | 0 | 0 | 0 | 1 |
 | `fres` | 5 | 0 | 0 | 3 | 0 |
+| `log` | 5 | 0 | 0 | 0 | 1 |
 | `report` | 4 | 0 | 2 | 1 | 0 |
 | `io` | 4 | 1 | 5 | 1 | 1 |
-| `cut` | 3 | 0 | 1 | 3 | 3 |
 | `other` | 3 | 0 | 0 | 0 | 3 |
+| `tree` | 3 | 0 | 4 | 1 | 2 |
+| `cut` | 3 | 0 | 1 | 3 | 3 |
 | `bootstrap` | 3 | 2 | 6 | 1 | 1 |
 | `scene` | 2 | 0 | 2 | 0 | 1 |
 | `geom` | 2 | 0 | 2 | 0 | 2 |
@@ -540,7 +540,7 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 ### Accoppiamenti call-graph più pesanti (dominio→dominio: # funzioni)
 
-`mua→tree:12` · `mua→chrome:11` · `tree→mua:10` · `workflow→mua:9` · `mis→chrome:7` · `mua→cut:6` · `workflow→mis:5` · `workflow→replace:5` · `mis→log:5` · `sost→tree:5` · `sost→mis:5` · `io→mua:4`
+`mua→chrome:11` · `workflow→mua:9` · `mis→chrome:7` · `mua→cut:6` · `workflow→mis:5` · `workflow→replace:5` · `mis→log:5` · `sost→mis:5` · `io→mua:4` · `mua→other:4` · `mis→find:4` · `mua→geom:4`
 
 > Elenchi completi per-dominio (globali, API) in `scripts/dep_census_out.json`.
 > Ordine di estrazione e meccanismi: `docs/MODULARIZZAZIONE_STUDIO.md` (strategia).

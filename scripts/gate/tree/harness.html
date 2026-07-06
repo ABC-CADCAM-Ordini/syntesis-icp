@@ -1,0 +1,105 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Gate F6b — harness tree</title>
+<style>body{font-family:monospace;padding:16px}.ok{color:#0a7a2f;font-weight:bold}.fail{color:#c21807;font-weight:bold}pre{background:#f5f5f5;padding:10px;overflow:auto;max-height:60vh}</style>
+</head><body>
+<h2>Gate F6b — wf/tree.js: esposizione + classList/display + opacità</h2>
+<div id="verdict">in esecuzione…</div>
+<pre id="detail"></pre>
+
+<!-- DOM stub: gli elementi che le fn tree toccano -->
+<div id="layersPanel" style="display:none"></div>
+<button id="btnLivelli"></button>
+<div id="layerTree"></div>
+<span id="treeUnified_scanOpacityVal"></span>
+
+<script>
+  // stato foreign lasciato nel monolite: qui lo forniamo noi (come farebbe il MAIN)
+  var analysisMode = 'misura';
+  var scanMesh = { material: { opacity: 1.0, transparent: false, needsUpdate: false }, visible: true };
+  var muaObjects = [];
+  var muaExpanded = {};
+  var scanbodiesVisible = true;
+  var divergenceLabelsVisible = true;
+  var meanAxisLine = null;
+  var envSettings = { scanColor: '#b8a090' };
+  var synClipEnabled = false;
+</script>
+
+<!-- IL FILE REALE, caricato come nell'app (classic script) -->
+<script src="/backend/static/wf/tree.js"></script>
+
+<script>
+(function(){
+  var NAMES = ["openLayersPanel","closeLayersPanel","toggleLayersPanel","rebuildTree",
+    "treeUnified_setScanOpacity","treeUnified_ghostAll","treeUnified_restoreAll",
+    "toggleLayer","toggleMuaLayer","toggleMuaExpand"];
+  var problems = [], notes = [];
+  var panel = document.getElementById('layersPanel');
+  var btn = document.getElementById('btnLivelli');
+
+  // 1) ESPOSIZIONE: tutte e 10 raggiungibili come window.* (bare global)
+  var missing = NAMES.filter(function(n){ return typeof window[n] !== "function"; });
+  if(missing.length) problems.push("NON esposte: " + missing.join(", "));
+  notes.push("esposte " + (NAMES.length - missing.length) + "/" + NAMES.length);
+
+  // 2) CLASSLIST/DISPLAY (il gate dello studio): open/close/toggle del pannello Livelli
+  try {
+    openLayersPanel();
+    if(panel.style.display !== 'flex') problems.push("openLayersPanel: display atteso 'flex', avuto '" + panel.style.display + "'");
+    if(!btn.classList.contains('active')) problems.push("openLayersPanel: #btnLivelli manca classe 'active'");
+    if(localStorage.getItem('syntesis_layers_open') !== '1') problems.push("openLayersPanel: localStorage != '1'");
+
+    closeLayersPanel();
+    if(panel.style.display !== 'none') problems.push("closeLayersPanel: display atteso 'none', avuto '" + panel.style.display + "'");
+    if(btn.classList.contains('active')) problems.push("closeLayersPanel: 'active' non rimossa");
+    if(localStorage.getItem('syntesis_layers_open') !== '0') problems.push("closeLayersPanel: localStorage != '0'");
+
+    toggleLayersPanel(); // da chiuso -> apre
+    var t1 = panel.style.display === 'flex' && btn.classList.contains('active');
+    toggleLayersPanel(); // da aperto -> chiude
+    var t2 = panel.style.display === 'none' && !btn.classList.contains('active');
+    if(!t1 || !t2) problems.push("toggleLayersPanel non alterna correttamente (open="+t1+", close="+t2+")");
+    else notes.push("pannello classList/display: open/close/toggle OK");
+  } catch(e){ problems.push("panel classList/display ha lanciato: " + e.message); }
+
+  // 3) OPACITÀ: treeUnified_setScanOpacity muta material + label
+  try {
+    treeUnified_setScanOpacity(50);
+    if(Math.abs(scanMesh.material.opacity - 0.5) > 1e-9) problems.push("setScanOpacity(50): opacity atteso 0.5, avuto " + scanMesh.material.opacity);
+    if(!scanMesh.material.transparent) problems.push("setScanOpacity(50): material.transparent atteso true");
+    var lbl = document.getElementById('treeUnified_scanOpacityVal').textContent;
+    if(lbl !== '50%') problems.push("setScanOpacity(50): label atteso '50%', avuto '" + lbl + "'");
+    else notes.push("opacità: material.opacity=0.5 + label '50%' OK");
+  } catch(e){ problems.push("treeUnified_setScanOpacity ha lanciato: " + e.message); }
+
+  // 4) SMOKE rebuildTree: con scanMesh+muaObjects stub, non deve lanciare e scrive #layerTree
+  try {
+    rebuildTree();
+    var h = document.getElementById('layerTree').innerHTML;
+    if(typeof h !== 'string') problems.push("rebuildTree: #layerTree.innerHTML non è stringa");
+    else notes.push("rebuildTree smoke OK (#layerTree lunghezza " + h.length + ")");
+  } catch(e){ problems.push("rebuildTree ha lanciato: " + e.message); }
+
+  // 5) toggleMuaExpand: muta muaExpanded[num] poi chiama rebuildTree (con muaObjects=[] resta pulito).
+  //    Testiamo la mutazione propria della fn (rebuildTree con lista mua completa e' coperto live).
+  try {
+    muaObjects = [];
+    toggleMuaExpand(1);   // muaExpanded[1] = !undefined = true
+    if(muaExpanded[1] !== true) problems.push("toggleMuaExpand(1): muaExpanded[1] atteso true, avuto " + muaExpanded[1]);
+    toggleMuaExpand(1);   // di nuovo -> false
+    if(muaExpanded[1] !== false) problems.push("toggleMuaExpand(1) x2: muaExpanded[1] atteso false, avuto " + muaExpanded[1]);
+    if(muaExpanded[1] === false) notes.push("toggleMuaExpand: muaExpanded[1] alterna true/false OK");
+  } catch(e){ problems.push("toggleMuaExpand ha lanciato: " + e.message); }
+
+  var v = document.getElementById("verdict");
+  if(problems.length === 0){
+    v.className = "ok"; v.textContent = "VERDE — 10/10 esposte, classList/display + opacità + rebuild corretti";
+  } else {
+    v.className = "fail"; v.textContent = "ROSSO — " + problems.length + " problemi";
+  }
+  document.getElementById("detail").textContent =
+    (problems.length ? "PROBLEMI:\n- " + problems.join("\n- ") + "\n\n" : "") + "NOTE:\n- " + notes.join("\n- ");
+  window.__TREE_GATE = { ok: problems.length === 0, problems: problems, notes: notes };
+})();
+</script>
+</body></html>
