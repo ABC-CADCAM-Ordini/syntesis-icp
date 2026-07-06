@@ -1,6 +1,6 @@
 # Mappa funzionale — Syntesis-ICP
 
-> **Versione software mappata:** 8.90.0 (MODULARIZZAZIONE F6c: terzo workflow fuori dal monolite — 4 fn report PDF Analizza (`analReport_*`) → `wf/report-analizza.js` (functions-only; banner §REPORT-MUA-PDF + report Misurare + pipeline condivisa restano nel monolite; gate shim jsPDF: 1152 chiamate PDF, 6 pagine). F6b: 10 fn tree-view → `wf/tree.js`; F6a: 34 fn FRESABILITA → `wf/fresabilita.js`; prep 8.87.2 dedup. Base 8.87.0-.1 redirect+testi con-h; 8.86.0 F5 → `ds/syn-env.js`; 8.85.0 F4 → syn-math/geom/color; 8.84.0-.2 F1-F3) — **Data:** 2026-07-06
+> **Versione software mappata:** 8.91.0 (MODULARIZZAZIONE F6d: quarto workflow fuori dal monolite — 47 fn del dominio SOSTITUIRE (placement/motore robusto/export/albero/cutview) → `wf/sostituire.js` (functions-only, 11 run/tombstone; lo STATO sost `sostMesh/sostPlaced/...` + banner §SOSTITUIRE restano nel monolite; RMSD 7,9µm preservato per verbatim). F6c: 4 fn report Analizza → `wf/report-analizza.js`; F6b: 10 fn tree → `wf/tree.js`; F6a: 34 fn FRESABILITA → `wf/fresabilita.js`; prep 8.87.2 dedup. Base 8.87.0-.1 redirect+testi con-h; 8.86.0 F5 → `ds/syn-env.js`; 8.85.0 F4; 8.84.0-.2 F1-F3) — **Data:** 2026-07-06
 > **Generata dal codice reale, verificata per riga.** Ogni voce cita il file e la riga di provenienza. Dove un dettaglio non è verificabile è marcato **DA CHIARIRE**, non inventato.
 > **Stato documento:** completo — tutte e 5 le viste coperte.
 > **Design system (8.60.0–8.61.0, Fase pastello):** la UI usa token CSS. I token **condivisi** `--blue/--green/--red/--gold` (in `:root` v3b L40 + `ds/tokens.css` + `:root` JS-iniettato) restano **saturi** e servono testo/accenti **e le letture cliniche** (`.divergence-label` → token `--clin-*` = palette d3 canonica dal 8.60.0; `.angle-val.good/.warn/.bad`, avvisi sottosquadro/fresabilità, bordi `.clinical-section`). Dal **8.61.0** i soli **sfondi dei pulsanti/CTA** (~26) usano token **FILL pastello** dedicati `--fill-primary:#4FA3E3 / --fill-confirm:#8ADFB2 / --fill-warn:#FFE08A / --fill-error:#FF8D85 / --fill-sel:#7DBDF2` con **testo scuro** `var(--dark)` (contrasto AA). Quindi: pulsante pastello = `background:var(--fill-*)` + `color:var(--dark)`; testo/accenti/clinici = colori saturi. Mesh scansione → `#DCE6EC` rinviata (commit 3). **8.74.0 (Fase B, commit 1 — unificazione chrome):** il pannello **Misurare** entra nel sistema FILL (via i gradienti pre-pastello: `.mis-btn-run` blu `#0077CC/#0050A0` → `--fill-primary`+`--dark`; modalità click-seed viola Tailwind `#8B5CF6/#7C3AED/#C4B5FD/#F5F3FF/#5B21B6` → famiglia **selezione** `--fill-sel`/`--pearl`/`--blue`; Annulla → `--pearl`+bordo); login in-app idem → `--fill-primary`; cutview `#1a1a22` → `var(--dark)`; danger `#E24B4A/#A32D2D` → `--red`/`--fill-error` (`.btn.danger`, hover del-btn dark). **CTA di pannello unificate** alla specifica di Sostituire (`padding:8px 10px; font-size:12px; letter-spacing:.03em`): i 5 bottoni di `#replaceFlow` allineati; `#sostBtnExport` passa da nero pieno a classe **`.export-btn`** (= Accoppia). Nuova classe **`.syn-select`** (bordo/raggio/font unici) sui 5 select di `#panelReplace` + `#misSeedType`. Canvas/PDF e palette-dati (gruppi, sfondo ambiente) NON toccati.
@@ -264,7 +264,7 @@ Sostituzione scan body con ICP. Pannello `panelSostituire` [1965]:
 | Drop scansione partenza | `#sostSlotScan` / `#sostInputScan` | onclick/onchange | `sostInputScan.click()` / `sostOnScanPicked` | — | carica STL partenza. **8.80.3**: anche il **drop globale sul viewport** (listener `document` 'drop', v3b ~r.2445) ora è **workflow-aware** e instrada a `sostOnScanPicked` quando `analysisMode==='sostituire'` (prima cablato su `loadScanFile`→`scanMesh`, invisibile all'albero Sostituire); analogo per `replace`→`replaceOnScanPicked`, altrimenti `loadScanFile`. **8.80.4**: in `misurare` il drop globale NON carica (hint "usa gli slot A/B" via `misICP_showError`; prima doppio caricamento in `scanMesh` Analizza) e `misICP_onDrop` fa `stopPropagation` | [1972-1975] |
 | **Radio "Scansione di partenza" 1T3/SR/OS (Box B)** | `#sostSourceRadio` | onchange | `sostOnSourceChange` | `sostSourceTemplate`, `sostActiveTemplate` | tipo marker presente (allineamento) | [1978-1981] |
 > **Upload custom — RIMOSSO in 8.81.1.** La riga storica (`#sostInputCustom` / `sostOnCustomPicked`, template custom) era uno stub del prototipo 2026-04-23 mai agganciato al motore di posa e irraggiungibile da UI da quello stesso giorno (il trigger era il radio `#sostTemplateRadio`, eliminato in `a4268a8`). Catena eliminata integralmente (markup + JS + reset). L'esigenza è coperta da Replace-iT + librerie `/gestione`.
-| + Posiziona | `#sostBtnPlace` | onclick | `sostStartPlacement` | — | placement marker; **8.58.0: SHIFT+CLIC pulito** posa (`sostOnViewportClick`→`sostPlaceTemplate`), guardia movimento >6px = rotazione + hint senza Shift; aggiunta guardia `.face` (come Analizza). **8.80.3**: testo istruzione del pannello (`panelSostituire` ~r.1680) reso esplicito su **SHIFT+CLIC** (prima diceva solo "Clicca su ogni marker" → equivoco "il clic non posiziona"); comportamento invariato | [1988] |
+| + Posiziona | `#sostBtnPlace` | onclick | `sostStartPlacement` | — | placement marker; **8.58.0: SHIFT+CLIC pulito** posa (`sostOnViewportClick`→`sostPlaceTemplate`), guardia movimento >6px = rotazione + hint senza Shift; aggiunta guardia `.face` (come Analizza). **8.80.3**: testo istruzione del pannello (`panelSostituire` ~r.1680) reso esplicito su **SHIFT+CLIC**. **8.91.0 (F6d)**: le 47 fn del dominio Sostituire (`sost*`/`_sost*`: placement, motore robusto centro+asse, export STL, albero, cutview) vivono in `wf/sostituire.js`; lo stato `sostMesh/sostPlaced/sost*` + banner §SOSTITUIRE restano nel monolite | [1988] |
 | Raffina | `#sostBtnRefine` | onclick | `sostAlignAll` | — | ICP sostituzione — il point-ICP **centra** soltanto; l'**asse** del marker viene da un fit lateral-wall della parete scansionata. Gate motore (**8.14.0**): `auto` (default) = lateral solo se `sostSourceTemplate==='SR'`; `lateralwall` = sempre (era incondizionato in 8.13.0); `cap` = mai (→ asse dal point-ICP). Fallback `R·seed` se <8 triangoli parete — vedi `sostAlignAll` [38426]/[38607] | [1989] | disabled di default |
 | Esporta STL | `#sostBtnExport` | onclick | `sostExportSTL` | `_sostExportPending` | apre **`#sostExportDialog`** (nome file precompilato) → Conferma scarica col nome scelto (sanificato, `.stl` auto); Annulla non scarica | [1996] | `display:none` default; dialog nome file (8.4.7) |
 
@@ -506,40 +506,39 @@ _Fine mappa. Stato: tutte e 5 le viste coperte; **nessuna voce DA CHIARIRE apert
 
 | Metrica | Valore |
 |---|---|
-| Righe / peso | **16024** / **0.87 MB** |
-| JS applicativo REALE | **14564** righe in 6 blocchi `<script>` (grezzo 14564, meno il blob B64) |
+| Righe / peso | **13582** / **0.75 MB** |
+| JS applicativo REALE | **12121** righe in 6 blocchi `<script>` (grezzo 12121, meno il blob B64) |
 | Asset B64 embedded | **0.0 MB** in 0 righe (**0%** del file) |
-| Funzioni top-level | 372 |
-| Globali condivise | 145 (di cui **35** toccate da 2+ domini) |
-| Export surface (handler inline) | 98 funzioni da preservare su `window` |
+| Funzioni top-level | 325 |
+| Globali condivise | 145 (di cui **30** toccate da 2+ domini) |
+| Export surface (handler inline) | 82 funzioni da preservare su `window` |
 
 ### Domini: dimensione e superficie di accoppiamento
 
 | Dominio | # fn | stato scritto→altri | stato letto←altri | API inline | API cross-dominio |
 |---|---|---|---|---|---|
 | `mis` | 123 | 1 | 3 | 19 | 7 |
-| `replace` | 92 | 7 | 8 | 33 | 10 |
-| `sost` | 47 | 7 | 6 | 16 | 9 |
+| `replace` | 92 | 7 | 8 | 33 | 9 |
 | `mua` | 37 | 5 | 8 | 5 | 15 |
-| `workflow` | 15 | 16 | 9 | 5 | 1 |
+| `workflow` | 15 | 13 | 7 | 5 | 1 |
 | `diag` | 12 | 0 | 0 | 4 | 7 |
-| `export` | 8 | 1 | 2 | 5 | 2 |
+| `export` | 8 | 0 | 1 | 5 | 1 |
 | `chrome` | 6 | 0 | 0 | 2 | 4 |
-| `log` | 5 | 0 | 0 | 0 | 1 |
 | `fres` | 5 | 0 | 0 | 3 | 0 |
+| `log` | 5 | 0 | 0 | 0 | 1 |
 | `io` | 4 | 1 | 5 | 1 | 1 |
 | `bootstrap` | 3 | 2 | 6 | 1 | 1 |
-| `cut` | 3 | 0 | 1 | 3 | 3 |
-| `tree` | 3 | 0 | 4 | 1 | 2 |
 | `other` | 3 | 0 | 0 | 0 | 3 |
-| `scene` | 2 | 0 | 2 | 0 | 1 |
+| `tree` | 3 | 0 | 3 | 1 | 2 |
+| `cut` | 3 | 0 | 1 | 3 | 3 |
 | `geom` | 2 | 0 | 2 | 0 | 2 |
-| `find` | 1 | 0 | 0 | 0 | 1 |
+| `scene` | 2 | 0 | 2 | 0 | 1 |
 | `colorclass` | 1 | 0 | 0 | 0 | 1 |
+| `find` | 1 | 0 | 0 | 0 | 1 |
 
 ### Accoppiamenti call-graph più pesanti (dominio→dominio: # funzioni)
 
-`mua→chrome:11` · `workflow→mua:9` · `mis→chrome:7` · `mua→cut:6` · `workflow→mis:5` · `workflow→replace:5` · `mis→log:5` · `sost→mis:5` · `io→mua:4` · `mua→other:4` · `mis→find:4` · `mua→geom:4`
+`mua→chrome:11` · `workflow→mua:9` · `mis→chrome:7` · `mua→cut:6` · `workflow→mis:5` · `workflow→replace:5` · `mis→log:5` · `io→mua:4` · `mua→other:4` · `mis→find:4` · `mua→geom:4` · `fres→mua:4`
 
 > Elenchi completi per-dominio (globali, API) in `scripts/dep_census_out.json`.
 > Ordine di estrazione e meccanismi: `docs/MODULARIZZAZIONE_STUDIO.md` (strategia).
