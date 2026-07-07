@@ -1,5 +1,9 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.108.1: Archivio STL — la colonna azioni non viene piu' tagliata
+
+Con la miniatura aggiunta (8.108.0) la riga superava la larghezza del contenitore (`.wrap` `max-width:1200px`) e il pulsante **Elimina** finiva tagliato. Fix: contenitore più largo (`.wrap` 1200→**1480px**, sfrutta gli schermi ampi), padding delle celle più compatto (15/12 → 13/9, ~120px risparmiati su ~10 colonne) e miniatura ridotta (76×56 → 64×48). Il `.tablecard` ha già `overflow-x:auto` come rete su schermi stretti. Solo CSS. `run_all.sh` verde. Deploy `533eaf7`. Bump PATCH.
+
 ## 2026-07-07 — 8.108.0: Archivio STL — miniatura-immagine inline per riga
 
 Ultima delle quattro richieste: vedere l'anteprima del pezzo **già nella riga**, senza cliccare. Una **3D live per ogni riga** non è praticabile (178 file = troppi contesti WebGL, limite ~16), quindi la soluzione è una **miniatura-immagine**.
