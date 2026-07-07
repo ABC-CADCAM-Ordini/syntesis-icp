@@ -1644,14 +1644,26 @@ async def rit_find_libraries_by_keyword(keyword: str) -> list[dict]:
 
 
 async def rit_list_libraries() -> list[dict]:
-    """Elenco di tutte le librerie con conteggio type (per la tabella in /gestione)."""
+    """Elenco di tutte le librerie con conteggio type (per la tabella in /gestione).
+    8.102.0: aggiunge marca/modello/diametro + i FILE usati dalla libreria (per il
+    filtro 'cerca i file' nella tabella Librerie): files[] (tutti), files_madre[],
+    files_figlio[] (per ruolo). LEFT JOIN + array_remove(...,NULL); il CASE WHEN
+    separa madre/figlio (role NULL sulle Exocad -> resta solo in files[])."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT l.id, l.import_name, l.keyword, l.display, l.supplier,
-                   l.supplier_version, l.active, l.uploaded_by, l.uploaded_at,
-                   (SELECT COUNT(*) FROM rit_scanbody_type t WHERE t.library_id = l.id) AS n_types
+                   l.supplier_version, l.marca, l.modello, l.diametro,
+                   l.active, l.uploaded_by, l.uploaded_at,
+                   COUNT(t.id) AS n_types,
+                   array_remove(array_agg(DISTINCT t.marker_filename), NULL) AS files,
+                   array_remove(array_agg(DISTINCT (CASE WHEN t.role='madre'  THEN t.marker_filename END)), NULL) AS files_madre,
+                   array_remove(array_agg(DISTINCT (CASE WHEN t.role='figlio' THEN t.marker_filename END)), NULL) AS files_figlio
             FROM rit_library l
+            LEFT JOIN rit_scanbody_type t ON t.library_id = l.id
+            GROUP BY l.id, l.import_name, l.keyword, l.display, l.supplier,
+                     l.supplier_version, l.marca, l.modello, l.diametro,
+                     l.active, l.uploaded_by, l.uploaded_at
             ORDER BY l.uploaded_at DESC
         """)
     out = []
@@ -1659,6 +1671,9 @@ async def rit_list_libraries() -> list[dict]:
         d = dict(r)
         d["uploaded_at"] = _iso(d.get("uploaded_at"))
         d["n_types"] = int(d.get("n_types") or 0)
+        d["files"] = list(d.get("files") or [])
+        d["files_madre"] = list(d.get("files_madre") or [])
+        d["files_figlio"] = list(d.get("files_figlio") or [])
         out.append(d)
     return out
 

@@ -246,10 +246,19 @@
       <span class="rit-msg" id="rit-msg"></span>
     </div>
 
+    <!-- 8.102.0: filtri librerie — cerca per nome/marca/fornitore E per FILE usato (madre/figlio) -->
+    <div class="rit-upload" id="rit-filters" style="align-items:center;gap:10px;flex-wrap:wrap">
+      <input type="search" id="rit-f-q" placeholder="Cerca (nome, marca, fornitore, file…)" style="padding:6px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;font:inherit;min-width:240px">
+      <select id="rit-f-forn" style="padding:6px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;font:inherit"><option value="">Tutti i fornitori</option></select>
+      <select id="rit-f-stato" style="padding:6px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;font:inherit"><option value="">Tutti gli stati</option><option value="on">Attiva</option><option value="off">Non attiva</option></select>
+      <button class="btn revoke" id="rit-f-clear">Azzera</button>
+      <span class="rit-msg" id="rit-f-count"></span>
+    </div>
+
     <div class="tablecard">
       <table>
         <thead>
-          <tr><th>Import name</th><th>Keyword</th><th>Display</th><th>Fornitore</th><th>Type</th><th>Caricata</th><th>Stato</th><th></th></tr>
+          <tr><th>Import name</th><th>Keyword</th><th>Display</th><th>Fornitore</th><th>Type</th><th>File (madre/figlio)</th><th>Caricata</th><th>Stato</th><th></th></tr>
         </thead>
         <tbody id="rit-rows"></tbody>
       </table>
@@ -650,15 +659,58 @@
     // GET /admin/rit/libraries -> { libraries:[...] }
     fetch(API+"/admin/rit/libraries",{headers:adminHeaders()})
       .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
-      .then(function(d){ ritLibs=(d.libraries||[]); ritRender(); })
+      .then(function(d){ ritLibs=(d.libraries||[]); ritPopulateFilters(); ritWireFilters(); ritRender(); })
       .catch(function(status){ if(status!==401 && status!==403){ toast("Errore nel caricamento delle librerie."); } });
+  }
+
+  // 8.102.0: filtri librerie (cerca per nome/marca/fornitore/FILE + fornitore + stato).
+  function _ritFileChips(L){
+    function chip(f, tag, bg){ return '<span style="display:inline-block;margin:1px 2px;padding:1px 6px;border-radius:4px;font-size:11px;background:'+bg+'" title="'+tag+'">'+escapeHtml(f)+'</span>'; }
+    var out=[], known={};
+    (L.files_madre||[]).forEach(function(f){ out.push(chip(f,'madre','#dbeafe')); known[f]=1; });
+    (L.files_figlio||[]).forEach(function(f){ out.push(chip(f,'figlio','#dcfce7')); known[f]=1; });
+    (L.files||[]).forEach(function(f){ if(!known[f]) out.push(chip(f,'file','#e2e8f0')); });   // Exocad: role NULL
+    return out.length ? out.join('') : '<span class="umeta">—</span>';
+  }
+  function ritFilterMatch(L){
+    var q=($("rit-f-q").value||'').trim().toLowerCase();
+    var ff=$("rit-f-forn").value||'', fs=$("rit-f-stato").value||'';
+    if(fs==='on' && !L.active) return false;
+    if(fs==='off' && L.active) return false;
+    if(ff && (L.supplier||'')!==ff) return false;
+    if(q){
+      var hay=[L.import_name,L.keyword,L.display,L.supplier,L.marca,L.modello]
+        .concat(L.files||[]).join(' ').toLowerCase();
+      if(hay.indexOf(q)<0) return false;
+    }
+    return true;
+  }
+  function ritPopulateFilters(){
+    var forn={};
+    ritLibs.forEach(function(L){ if(L.supplier) forn[L.supplier]=1; });
+    var sel=$("rit-f-forn"); if(!sel) return;
+    var cur=sel.value;
+    var opts=['<option value="">Tutti i fornitori</option>'];
+    Object.keys(forn).sort().forEach(function(v){ opts.push('<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>'); });
+    sel.innerHTML=opts.join('');
+    if(cur && forn[cur]) sel.value=cur;
+  }
+  var _ritFiltersWired=false;
+  function ritWireFilters(){
+    if(_ritFiltersWired) return; _ritFiltersWired=true;
+    ['rit-f-q','rit-f-forn','rit-f-stato'].forEach(function(id){ var el=$(id); if(el) el.addEventListener('input', ritRender); });
+    var clr=$("rit-f-clear");
+    if(clr) clr.addEventListener('click', function(){ ['rit-f-q','rit-f-forn','rit-f-stato'].forEach(function(id){ var el=$(id); if(el) el.value=''; }); ritRender(); });
   }
 
   function ritRender(){
     var tb=$("rit-rows"); tb.innerHTML="";
-    if(!ritLibs.length){ $("rit-empty").classList.remove("hidden"); return; }
+    if(!ritLibs.length){ $("rit-empty").classList.remove("hidden"); $("rit-empty").textContent='Nessuna libreria importata.'; var _c0=$("rit-f-count"); if(_c0) _c0.textContent=''; return; }
+    var shown=ritLibs.filter(ritFilterMatch);
+    var _c=$("rit-f-count"); if(_c) _c.textContent = shown.length+' / '+ritLibs.length+' librerie';
+    if(!shown.length){ $("rit-empty").classList.remove("hidden"); $("rit-empty").textContent='Nessuna libreria col filtro corrente.'; return; }
     $("rit-empty").classList.add("hidden");
-    ritLibs.forEach(function(L){
+    shown.forEach(function(L){
       var tr=document.createElement("tr");
       tr.innerHTML =
         '<td class="uname">'+escapeHtml(L.import_name)+'</td>'+
@@ -666,6 +718,7 @@
         '<td class="umeta">'+escapeHtml(L.display||"—")+'</td>'+
         '<td class="umeta">'+escapeHtml(L.supplier||"—")+(L.supplier_version?' · '+escapeHtml(L.supplier_version):'')+'</td>'+
         '<td class="umeta num">'+(L.n_types!=null?L.n_types:0)+'</td>'+
+        '<td>'+_ritFileChips(L)+'</td>'+
         '<td class="umeta">'+fmtDate(L.uploaded_at)+(L.uploaded_by?'<br><span class="uemail">'+escapeHtml(L.uploaded_by)+'</span>':'')+'</td>'+
         '<td>'+(L.active
             ? '<span class="pill ok"><span class="dot"></span>Attiva</span>'
