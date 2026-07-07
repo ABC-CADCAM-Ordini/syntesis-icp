@@ -1091,13 +1091,24 @@
         '<td>'+_stlChips(a.marche)+'</td>'+
         '<td>'+_stlChips(a.modelli)+'</td>'+
         '<td>'+_stlChips(a.ruoli)+'</td>'+
-        '<td>'+(a.locked?'<span class="pill lock"><span class="dot"></span>Bloccato</span>'
-                        :'<span class="pill free">Libero</span>')+'</td>'+
+        '<td style="text-align:center">'+(a.locked
+            ? '<span title="Bloccato dal lucchetto" style="display:inline-block;width:13px;height:13px;border-radius:50%;background:#dc2626;box-shadow:0 0 0 2px #fecaca"></span>'
+            : '<span title="Libero" style="display:inline-block;width:13px;height:13px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 2px #bbf7d0"></span>')+'</td>'+
         '<td class="umeta">'+fmtDate(a.updated_at||a.uploaded_at)+
-          (a.uploaded_by?'<br><span class="uemail">'+escapeHtml(a.uploaded_by)+'</span>':'')+'</td>'+
+          (a.uploaded_by
+            ? ' <button class="linkbtn upd-toggle" type="button" title="Chi ha aggiornato" style="font-size:11px;padding:0 4px">&#9662;</button>'
+              + '<div class="upd-info" style="display:none;margin-top:3px"><span class="uemail">'+escapeHtml(a.uploaded_by)+'</span></div>'
+            : '')+'</td>'+
         '<td class="actcell"></td>';
       var act=tr.querySelector(".actcell");
       var _ul=tr.querySelector(".usage-link"); if(_ul) _ul.addEventListener("click", function(){ stlUsageOpen(a.name); });
+      var _ut=tr.querySelector(".upd-toggle");   // 8.106.0: chi ha aggiornato -> collassabile (accorcia la riga)
+      if(_ut) _ut.addEventListener("click", function(){
+        var inf=tr.querySelector(".upd-info"); if(!inf) return;
+        var open=inf.style.display!=="none";
+        inf.style.display=open?"none":"block";
+        _ut.innerHTML=open?"&#9662;":"&#9652;";
+      });
       var par=document.createElement("button");
       par.className="linkbtn"; par.textContent="Parentela";
       par.addEventListener("click", function(){ stlUsageOpen(a.name); });
