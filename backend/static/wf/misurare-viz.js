@@ -244,6 +244,7 @@ function misICP_applyLayerVis(group, visible){
 function misICP_applyLayerOp(group, opacity){
   var meshes = misICP_groupMeshes(group);
   meshes.forEach(function(m){
+    if(!m || !m.material) return;   // 8.100.1: guardia — lo slider (oninput) puo' colpire oggetti senza .material (Group/Line/mesh svuotato) -> "Cannot set properties of undefined (setting 'opacity')" (39 hit nel log)
     m.material.opacity = opacity;
     m.material.transparent = (opacity < 1);
   });
