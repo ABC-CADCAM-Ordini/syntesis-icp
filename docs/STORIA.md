@@ -1,5 +1,11 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.108.0: Archivio STL — miniatura-immagine inline per riga
+
+Ultima delle quattro richieste: vedere l'anteprima del pezzo **già nella riga**, senza cliccare. Una **3D live per ogni riga** non è praticabile (178 file = troppi contesti WebGL, limite ~16), quindi la soluzione è una **miniatura-immagine**.
+
+Un **renderer nascosto condiviso** (`_thumbRenderer`, `alpha`+`preserveDrawingBuffer`) rende ogni STL una volta, ne cattura un PNG (`canvas.toDataURL`), lo mette in **cache per sha256** e lo mostra come `<img>` nella nuova prima colonna. Caricamento **lazy** via `IntersectionObserver` (solo le righe vicine al viewport, `rootMargin` 250px) + coda **sequenziale** (15ms tra un render e l'altro) per non bloccare l'interfaccia; se una riga sparisce (cambio filtro) o è già in cache si salta/serve all'istante. Riuso `parseSTL` + THREE del preview — **nessuna dipendenza nuova, nessuna pipeline server**. Click sulla miniatura → apre l'anteprima 3D. `node --check` gestione, `run_all.sh` verde. Deploy `67df4fe`. Bump MINOR.
+
 ## 2026-07-07 — 8.107.0: Anteprima STL — faccia piatta obliqua + annotazione 3D
 
 L'utente ha aperto `ELO-AAR.stl` (cilindro con **top tagliato obliquo**) e ha visto "Faccia piatta: non rilevata", notando: «la faccia piatta può essere una faccia obliqua». Il mio rilevamento guardava solo pareti quasi-verticali (`|nz|<0.35`) → mancava le facce inclinate. Inoltre: «indica nell'anteprima dove è il valore in Z e in rotazione».
