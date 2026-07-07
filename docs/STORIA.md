@@ -1,5 +1,11 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.105.1: Fix del display dell'angolo faccia piatta (359.8° → −0.2°)
+
+L'utente ha aperto l'anteprima di `0T3 RP.STL` e ha visto **"Faccia piatta: 359.8°"**, dubitando: «sei sicuro? forse è 0°?». Aveva ragione: **359.8° = −0.2°** — il flat guarda verso ~+X, cioè ~0° — ma la convenzione 0–360 faceva "girare" a 359.8 un valore in realtà quasi-zero.
+
+Fix di sola **presentazione**: l'angolo passa a un range **con segno (−180, 180]** (`if _fa>180 _fa-=360`), così un flat a ~0° legge **−0.2°** invece di 359.8°. Aggiunto anche un indicatore di **confidenza** (dalla prominenza del picco già calcolata: ≥6 → *alta*, 3–6 → *media*) per dare fiducia sul numero. Il rilevamento non cambia. Verificato su sintetici (flat@0→0.0°, @180→179.9°, @90→90.0°, @45→44.7°): il −0.2° del file reale = flat CAD a 0° + rumore di tassellatura sub-grado. `node --check` gestione, `run_all.sh` verde. Deploy `2b2d465`. Bump PATCH.
+
 ## 2026-07-07 — 8.105.0: Replace-iT Fase 2a — collega/scollega le parentele (soft, reversibile)
 
 Passo alla Fase 2 (modifica della parentela), che tocca le scritture. Ragionato bene sul modello prima di scrivere, e il concetto smart concordato con l'utente è: **«la parentela è un interruttore, non una cancellazione»**.
