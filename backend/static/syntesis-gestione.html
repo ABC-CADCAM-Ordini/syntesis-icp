@@ -1481,7 +1481,12 @@
           var _far=Math.round(_fa)+0;
           var _cf=(meas.flatConfidence>=6)?'alta':'media';
           var _ti=(meas.flatTiltDeg>3)?(' · inclinata '+Math.round(meas.flatTiltDeg)+'° dalla verticale'):'';   // 8.107.0: faccia obliqua
-          parts.push('<b>Faccia piatta:</b> '+_far+'° <span style="color:#64748b">(rotazione dalla +X'+_ti+' · confidenza '+_cf+')</span>');
+          // 8.108.3: ASSE dominante. La faccia puo' essere rivolta su X O su Y: se la normale ha piu' Y che X
+          // -> "su +/-Y" (es. una faccia nel piano y=0 ha normale su Y); altrimenti "su +/-X".
+          var _ax='';
+          if(meas.flatNormal){ var _nx=meas.flatNormal[0], _ny=meas.flatNormal[1];
+            _ax = ' · rivolta su <b>' + ((Math.abs(_nx)>=Math.abs(_ny)) ? (_nx>=0?'+X':'-X') : (_ny>=0?'+Y':'-Y')) + '</b>'; }
+          parts.push('<b>Faccia piatta:</b> '+_far+'°'+_ax+' <span style="color:#64748b">(rotazione dalla +X'+_ti+' · confidenza '+_cf+')</span>');
         } else parts.push('<b>Faccia piatta:</b> <span style="color:#94a3b8">non rilevata</span>');
         mel.innerHTML=parts.join(' &nbsp;·&nbsp; ');
       }
