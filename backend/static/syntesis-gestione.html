@@ -367,7 +367,8 @@
     <div class="modal rit-modal" style="max-width:760px">
       <h3 id="stl-prev-title">Anteprima STL</h3>
       <div id="stl-prev-canvas"></div>
-      <p style="margin:10px 0 0;font-size:12.5px">Origine (0,0,0) = sfera bianca con terna assi:
+      <div id="stl-prev-meas" style="margin:9px 0 0;font-size:13px;color:#334155"></div>
+      <p style="margin:8px 0 0;font-size:12.5px">Origine (0,0,0) = sfera bianca con terna assi:
         <span style="color:#D64545;font-weight:600">X rosso</span> ·
         <span style="color:#0D9E6E;font-weight:600">Y verde</span> ·
         <span style="color:#0065B3;font-weight:600">Z blu</span>.
@@ -1324,6 +1325,40 @@
     return g;
   }
 
+  // 8.103.0: misure geometriche per l'anteprima. zTop = ingombro in asse Z (assume asse pezzo = Z, come
+  // questi CAD). flatAngleDeg = orientamento della FACCIA PIATTA di riferimento attorno a Z, dalla +X,
+  // antioraria: rilevata come PICCO area-pesato degli azimut delle normali di parete (|n.z|<0.35). La
+  // parete cilindrica ha azimut uniformi (fondo ~1x); il flat concentra facet complanari -> picco netto.
+  // Sotto una soglia di PROMINENZA -> null (nessun flat, mai un angolo a caso). Verificato su sintetici:
+  // flat@30/120/210 -> 29.7/119.8/209.5 (conf ~11); cilindro liscio -> null (conf ~1.2).
+  function stlMeasure(pos){
+    var nTri=pos.length/9, minZ=Infinity, maxZ=-Infinity;
+    var NB=360, hist=new Float64Array(NB), totalWall=0, i, b, k;
+    for(i=0;i<nTri;i++){
+      var o=i*9;
+      var ax=pos[o],ay=pos[o+1],az=pos[o+2], bx=pos[o+3],by=pos[o+4],bz=pos[o+5], cx=pos[o+6],cy=pos[o+7],cz=pos[o+8];
+      minZ=Math.min(minZ,az,bz,cz); maxZ=Math.max(maxZ,az,bz,cz);
+      var e1x=bx-ax,e1y=by-ay,e1z=bz-az, e2x=cx-ax,e2y=cy-ay,e2z=cz-az;
+      var nx=e1y*e2z-e1z*e2y, ny=e1z*e2x-e1x*e2z, nz=e1x*e2y-e1y*e2x;
+      var nl=Math.sqrt(nx*nx+ny*ny+nz*nz); if(nl<1e-12) continue;
+      var area=0.5*nl, unz=nz/nl;
+      if(Math.abs(unz)>0.35) continue;                 // tieni la parete (scarta top/base)
+      var deg=(Math.atan2(ny,nx)*180/Math.PI+360)%360;
+      hist[Math.floor(deg)%NB]+=area; totalWall+=area;
+    }
+    var res={zTop:maxZ, zMin:minZ, zRange:maxZ-minZ, flatAngleDeg:null, flatConfidence:0};
+    if(totalWall<1e-9) return res;
+    var sm=new Float64Array(NB);
+    for(b=0;b<NB;b++){ var s=0; for(k=-2;k<=2;k++) s+=hist[((b+k)%NB+NB)%NB]; sm[b]=s; }
+    var peak=0,pb=0; for(b=0;b<NB;b++) if(sm[b]>peak){peak=sm[b];pb=b;}
+    var mean=totalWall*5/NB, prom=mean>0?peak/mean:0;
+    var sx=0,sy=0;
+    for(k=-5;k<=5;k++){ var bb=((pb+k)%NB+NB)%NB, a=hist[bb], r=bb*Math.PI/180; sx+=a*Math.cos(r); sy+=a*Math.sin(r); }
+    res.flatConfidence=prom;
+    if(prom>=3.0) res.flatAngleDeg=(Math.atan2(sy,sx)*180/Math.PI+360)%360;
+    return res;
+  }
+
   function stlPreviewAsset(name){
     stlPreviewOpen(name,
       fetch(API+"/admin/rit/stl/"+encodeURIComponent(name)+"/content",{headers:adminHeaders()})
@@ -1333,6 +1368,7 @@
   function stlPreviewOpen(title, bufPromise){
     var gen=++prevGen;
     $("stl-prev-title").textContent="Anteprima — "+title;
+    var _m=$("stl-prev-meas"); if(_m) _m.innerHTML='<span style="color:#94a3b8">misure…</span>';
     $("stl-prev-overlay").classList.add("show");
     whenThree(function(){
       bufPromise.then(function(buf){ if(gen===prevGen){ stlPreviewRender(buf); } })
@@ -1354,6 +1390,17 @@
     var geo;
     try{ geo=parseSTL(buf); }
     catch(e){ toast("STL non valido: "+e.message); stlPreviewClose(); return; }
+    // 8.103.0: misure (Z top + angolo faccia piatta) mostrate sotto il canvas
+    try {
+      var meas=stlMeasure(geo.attributes.position.array), mel=$("stl-prev-meas");
+      if(mel){
+        var parts=['<b>Top da origine (Z):</b> '+meas.zTop.toFixed(2)+' mm',
+                   '<b>Ingombro Z:</b> '+meas.zRange.toFixed(2)+' mm'];
+        if(meas.flatAngleDeg!=null) parts.push('<b>Faccia piatta:</b> '+meas.flatAngleDeg.toFixed(1)+'° <span style="color:#64748b">(normale dalla +X, antioraria attorno a Z)</span>');
+        else parts.push('<b>Faccia piatta:</b> <span style="color:#94a3b8">non rilevata</span>');
+        mel.innerHTML=parts.join(' &nbsp;·&nbsp; ');
+      }
+    } catch(_m){}
     geo.computeBoundingSphere();
     var bs=geo.boundingSphere, R=Math.max(bs.radius,0.5), C=bs.center;
     // raggio che include SEMPRE l'origine (0,0,0): mesh + terna inquadrate insieme
