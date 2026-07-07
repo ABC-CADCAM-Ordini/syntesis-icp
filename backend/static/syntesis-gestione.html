@@ -372,6 +372,8 @@
         <span style="color:#D64545;font-weight:600">X rosso</span> ·
         <span style="color:#0D9E6E;font-weight:600">Y verde</span> ·
         <span style="color:#0065B3;font-weight:600">Z blu</span>.
+        <span style="color:#F59E0B;font-weight:600">Ambra</span> = faccia piatta rilevata + freccia (rotazione) ·
+        <span style="color:#0065B3;font-weight:600">anello blu</span> = altezza Z-top.
         Trascina per ruotare, rotella per zoom, tasto destro per pan.</p>
       <div class="row" style="margin-top:14px">
         <button class="btn revoke" id="stl-prev-close">Chiudi</button>
@@ -1373,37 +1375,54 @@
     return g;
   }
 
-  // 8.103.0: misure geometriche per l'anteprima. zTop = ingombro in asse Z (assume asse pezzo = Z, come
-  // questi CAD). flatAngleDeg = orientamento della FACCIA PIATTA di riferimento attorno a Z, dalla +X,
-  // antioraria: rilevata come PICCO area-pesato degli azimut delle normali di parete (|n.z|<0.35). La
-  // parete cilindrica ha azimut uniformi (fondo ~1x); il flat concentra facet complanari -> picco netto.
-  // Sotto una soglia di PROMINENZA -> null (nessun flat, mai un angolo a caso). Verificato su sintetici:
-  // flat@30/120/210 -> 29.7/119.8/209.5 (conf ~11); cilindro liscio -> null (conf ~1.2).
+  // 8.103.0 / 8.107.0: misure geometriche per l'anteprima. zTop = ingombro in asse Z (assume asse pezzo = Z).
+  // FACCIA PIATTA di riferimento rilevata a DUE STADI (la faccia puo' essere VERTICALE o OBLIQUA):
+  //   Stadio 1 (verticale): picco area-pesato degli azimut delle normali di parete (|n.z|<0.35); la parete
+  //     cilindrica ha azimut uniformi (fondo ~1x), il flat concentra facet complanari -> picco (prominenza>=3).
+  //   Stadio 2 (obliqua): nella banda inclinata 0.35<|n.z|<0.97 (dove il cilindro non c'e') cerca il cluster
+  //     di normali piu' CONCENTRATO (picco/totale-banda >= 0.40) -> un flat obliquo; uno smusso/chamfer si
+  //     spalma su tutti gli azimut (concentrazione bassa) -> NON rilevato.
+  // Ritorna azimut (rotazione attorno a Z), inclinazione (dalla verticale), confidenza, e normale+centroide
+  // del flat (per l'annotazione 3D). Verificato su sintetici: vert@0/30/120 conf 11.5; obliqua rilevata;
+  // chamfer e cilindro liscio -> null.
   function stlMeasure(pos){
-    var nTri=pos.length/9, minZ=Infinity, maxZ=-Infinity;
-    var NB=360, hist=new Float64Array(NB), totalWall=0, i, b, k;
-    for(i=0;i<nTri;i++){
-      var o=i*9;
+    var nTri=pos.length/9, minZ=Infinity, maxZ=-Infinity, F=[], i, o, t;
+    for(t=0;t<nTri;t++){
+      o=t*9;
       var ax=pos[o],ay=pos[o+1],az=pos[o+2], bx=pos[o+3],by=pos[o+4],bz=pos[o+5], cx=pos[o+6],cy=pos[o+7],cz=pos[o+8];
       minZ=Math.min(minZ,az,bz,cz); maxZ=Math.max(maxZ,az,bz,cz);
       var e1x=bx-ax,e1y=by-ay,e1z=bz-az, e2x=cx-ax,e2y=cy-ay,e2z=cz-az;
       var nx=e1y*e2z-e1z*e2y, ny=e1z*e2x-e1x*e2z, nz=e1x*e2y-e1y*e2x;
       var nl=Math.sqrt(nx*nx+ny*ny+nz*nz); if(nl<1e-12) continue;
-      var area=0.5*nl, unz=nz/nl;
-      if(Math.abs(unz)>0.35) continue;                 // tieni la parete (scarta top/base)
-      var deg=(Math.atan2(ny,nx)*180/Math.PI+360)%360;
-      hist[Math.floor(deg)%NB]+=area; totalWall+=area;
+      F.push({nx:nx/nl,ny:ny/nl,nz:nz/nl,area:0.5*nl,cx:(ax+bx+cx)/3,cy:(ay+by+cy)/3,cz:(az+bz+cz)/3});
     }
-    var res={zTop:maxZ, zMin:minZ, zRange:maxZ-minZ, flatAngleDeg:null, flatConfidence:0};
-    if(totalWall<1e-9) return res;
-    var sm=new Float64Array(NB);
-    for(b=0;b<NB;b++){ var s=0; for(k=-2;k<=2;k++) s+=hist[((b+k)%NB+NB)%NB]; sm[b]=s; }
-    var peak=0,pb=0; for(b=0;b<NB;b++) if(sm[b]>peak){peak=sm[b];pb=b;}
-    var mean=totalWall*5/NB, prom=mean>0?peak/mean:0;
-    var sx=0,sy=0;
-    for(k=-5;k<=5;k++){ var bb=((pb+k)%NB+NB)%NB, a=hist[bb], r=bb*Math.PI/180; sx+=a*Math.cos(r); sy+=a*Math.sin(r); }
-    res.flatConfidence=prom;
-    if(prom>=3.0) res.flatAngleDeg=(Math.atan2(sy,sx)*180/Math.PI+360)%360;
+    var res={zTop:maxZ, zMin:minZ, zRange:maxZ-minZ, flatAngleDeg:null, flatTiltDeg:null, flatConfidence:0, flatNormal:null, flatCentroid:null};
+    function refine(pn){
+      var sx=0,sy=0,sz=0,cx=0,cy=0,cz=0,w=0,j;
+      for(j=0;j<F.length;j++){ var f=F[j]; if(f.nx*pn[0]+f.ny*pn[1]+f.nz*pn[2]>0.9){ sx+=f.area*f.nx;sy+=f.area*f.ny;sz+=f.area*f.nz; cx+=f.area*f.cx;cy+=f.area*f.cy;cz+=f.area*f.cz; w+=f.area; } }
+      if(w<=0) return null;
+      var L=Math.hypot(sx,sy,sz);
+      return { nrm:[sx/L,sy/L,sz/L], cen:[cx/w,cy/w,cz/w], az:(Math.atan2(sy,sx)*180/Math.PI+360)%360, tilt:Math.asin(Math.min(1,Math.abs(sz)/L))*180/Math.PI };
+    }
+    // Stadio 1: VERTICALE
+    var NB=360, hist=new Float64Array(NB), tot=0, b, k;
+    for(i=0;i<F.length;i++){ var f=F[i]; if(Math.abs(f.nz)>0.35) continue; var d=(Math.atan2(f.ny,f.nx)*180/Math.PI+360)%360; hist[Math.floor(d)%NB]+=f.area; tot+=f.area; }
+    if(tot>0){
+      var sm=new Float64Array(NB); for(b=0;b<NB;b++){ var s=0; for(k=-2;k<=2;k++) s+=hist[((b+k)%NB+NB)%NB]; sm[b]=s; }
+      var peak=0,pb=0; for(b=0;b<NB;b++) if(sm[b]>peak){peak=sm[b];pb=b;}
+      var mean=tot*5/NB, prom=mean>0?peak/mean:0;
+      if(prom>=3.0){ var pr=pb*Math.PI/180, r=refine([Math.cos(pr),Math.sin(pr),0]); if(r){ res.flatAngleDeg=r.az; res.flatTiltDeg=0; res.flatConfidence=prom; res.flatNormal=r.nrm; res.flatCentroid=r.cen; return res; } }
+      res.flatConfidence=prom;
+    }
+    // Stadio 2: OBLIQUA (concentrazione nella banda inclinata)
+    var NAZ=90, NEL=30, H2={}, tot2=0, occ=0;
+    for(i=0;i<F.length;i++){ var g=F[i], a=Math.abs(g.nz); if(a<=0.35||a>=0.97) continue; var az=(Math.atan2(g.ny,g.nx)*180/Math.PI+360)%360, el=Math.asin(g.nz)*180/Math.PI; var bi=Math.min(NAZ-1,Math.floor(az/(360/NAZ))), bj=Math.min(NEL-1,Math.floor((el+90)/(180/NEL))), key=bj*NAZ+bi; if(!(key in H2)){H2[key]=0;occ++;} H2[key]+=g.area; tot2+=g.area; }
+    if(tot2>1e-9){
+      var pk2=0,pkey=-1,kk; for(kk in H2) if(H2[kk]>pk2){pk2=H2[kk];pkey=+kk;}
+      var conc=pk2/tot2, obc=conc*15;
+      if(conc>=0.40){ var oj=Math.floor(pkey/NAZ), oi=pkey%NAZ, oAz=(oi+0.5)*(360/NAZ)*Math.PI/180, oEl=((oj+0.5)*(180/NEL)-90)*Math.PI/180, on=[Math.cos(oEl)*Math.cos(oAz),Math.cos(oEl)*Math.sin(oAz),Math.sin(oEl)]; var ro=refine(on); if(ro){ res.flatAngleDeg=ro.az; res.flatTiltDeg=ro.tilt; res.flatConfidence=obc; res.flatNormal=ro.nrm; res.flatCentroid=ro.cen; return res; } }
+      if(obc>res.flatConfidence) res.flatConfidence=obc;
+    }
     return res;
   }
 
@@ -1447,7 +1466,8 @@
         if(meas.flatAngleDeg!=null){
           var _fa=meas.flatAngleDeg; if(_fa>180) _fa-=360;   // 8.105.1: range con segno (-180,180]: un flat a ~0 legge -0.2° invece di 359.8°
           var _cf=(meas.flatConfidence>=6)?'alta':'media';
-          parts.push('<b>Faccia piatta:</b> '+_fa.toFixed(1)+'° <span style="color:#64748b">(normale dalla +X, attorno a Z · confidenza '+_cf+')</span>');
+          var _ti=(meas.flatTiltDeg>3)?(' · inclinata '+meas.flatTiltDeg.toFixed(0)+'° dalla verticale'):'';   // 8.107.0: faccia obliqua
+          parts.push('<b>Faccia piatta:</b> '+_fa.toFixed(1)+'° <span style="color:#64748b">(rotazione dalla +X'+_ti+' · confidenza '+_cf+')</span>');
         } else parts.push('<b>Faccia piatta:</b> <span style="color:#94a3b8">non rilevata</span>');
         mel.innerHTML=parts.join(' &nbsp;·&nbsp; ');
       }
@@ -1472,7 +1492,37 @@
     var dot=new THREE.Mesh(new THREE.SphereGeometry(Math.max(Rall*0.018,0.05),16,12),
                            new THREE.MeshBasicMaterial({color:0xFFFFFF}));
     scene.add(dot);
-    prevState={renderer:renderer, controls:controls, geo:geo, alive:true};
+    prevState={renderer:renderer, controls:controls, geo:geo, alive:true, extra:[]};
+    // 8.107.0: ANNOTAZIONI — mostra DOVE si misurano Z e rotazione. Ambra = faccia piatta rilevata
+    // + freccia lungo la sua normale (la "rotazione"); anello blu all'altezza Z-top (l'ingombro Z).
+    try {
+      if(typeof meas!=='undefined' && meas){
+        if(meas.flatNormal && meas.flatCentroid){
+          var _fn=meas.flatNormal, _p=geo.attributes.position.array, _nT=_p.length/9, _fp=[], _tt, _oo, _vv;
+          for(_tt=0;_tt<_nT;_tt++){ _oo=_tt*9;
+            var _mx=(_p[_oo+4]-_p[_oo+1])*(_p[_oo+8]-_p[_oo+2])-(_p[_oo+5]-_p[_oo+2])*(_p[_oo+7]-_p[_oo+1]);
+            var _my=(_p[_oo+5]-_p[_oo+2])*(_p[_oo+6]-_p[_oo])-(_p[_oo+3]-_p[_oo])*(_p[_oo+8]-_p[_oo+2]);
+            var _mz=(_p[_oo+3]-_p[_oo])*(_p[_oo+7]-_p[_oo+1])-(_p[_oo+4]-_p[_oo+1])*(_p[_oo+6]-_p[_oo]);
+            var _ml=Math.sqrt(_mx*_mx+_my*_my+_mz*_mz); if(_ml<1e-12) continue;
+            if((_mx/_ml)*_fn[0]+(_my/_ml)*_fn[1]+(_mz/_ml)*_fn[2]>0.9){ for(_vv=0;_vv<9;_vv++) _fp.push(_p[_oo+_vv]); }
+          }
+          if(_fp.length){
+            var _fg=new THREE.BufferGeometry(); _fg.setAttribute("position", new THREE.Float32BufferAttribute(_fp,3)); _fg.computeVertexNormals();
+            var _fmesh=new THREE.Mesh(_fg, new THREE.MeshBasicMaterial({color:0xF59E0B, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthTest:false}));
+            _fmesh.renderOrder=2; scene.add(_fmesh); prevState.extra.push(_fg);
+          }
+          var _ar=new THREE.ArrowHelper(new THREE.Vector3(_fn[0],_fn[1],_fn[2]).normalize(),
+                    new THREE.Vector3(meas.flatCentroid[0],meas.flatCentroid[1],meas.flatCentroid[2]),
+                    Rall*0.5, 0xF59E0B, Rall*0.14, Rall*0.09);
+          scene.add(_ar);
+        }
+        if(isFinite(meas.zTop)){
+          var _rg=new THREE.RingGeometry(Rall*0.10, Rall*0.14, 40);
+          var _ring=new THREE.Mesh(_rg, new THREE.MeshBasicMaterial({color:0x0065B3, side:THREE.DoubleSide, transparent:true, opacity:0.85, depthTest:false}));
+          _ring.position.set(0,0,meas.zTop); _ring.renderOrder=2; scene.add(_ring); prevState.extra.push(_rg);
+        }
+      }
+    } catch(_an){}
     (function loop(){
       if(!prevState || !prevState.alive) return;
       controls.update();
@@ -1486,6 +1536,7 @@
       prevState.alive=false;
       try{ prevState.controls.dispose(); }catch(e){}
       try{ prevState.geo.dispose(); }catch(e){}
+      if(prevState.extra) prevState.extra.forEach(function(g){ try{ g.dispose(); }catch(e){} });
       try{ prevState.renderer.dispose(); }catch(e){}
       prevState=null;
     }
