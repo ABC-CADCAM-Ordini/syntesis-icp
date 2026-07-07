@@ -1498,28 +1498,52 @@
     var bg = role==='madre'?'#dbeafe':(role==='figlio'?'#dcfce7':'#e2e8f0');
     return '<span style="display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;background:'+bg+'">'+escapeHtml(role)+'</span>';
   }
+  // 8.105.0 (Fase 2a): stato del LINK (collegato/scollegato) + toggle Collega/Scollega.
+  var _usageName = "";
+  function _usageState(active){
+    return active
+      ? '<span class="pill ok"><span class="dot"></span>collegato</span>'
+      : '<span class="pill wait"><span class="dot"></span>scollegato</span>';
+  }
   function stlUsageRender(name, usage){
+    _usageName = name;
     var body=$("stl-usage-body");
     if(!usage.length){ body.innerHTML='<p class="umeta">Nessuna libreria usa questo file.</p>'; return; }
-    var libs={}; usage.forEach(function(u){ libs[u.library_id]=1; });
+    var libs={}, nOn=0, nOff=0;
+    usage.forEach(function(u){ libs[u.library_id]=1; if(u.type_active) nOn++; else nOff++; });
     var nLib=Object.keys(libs).length;
     var rows=usage.map(function(u){
-      return '<tr>'+
-        '<td class="uname">'+escapeHtml(u.import_name||'—')+(u.lib_display?'<br><span class="umeta">'+escapeHtml(u.lib_display)+'</span>':'')+'</td>'+
+      var off = !u.type_active;
+      var tog = '<button class="linkbtn '+(off?'':'danger')+' link-toggle" type="button" data-tid="'+u.type_id+'" data-lib="'+u.library_id+'" data-act="'+(off?'1':'0')+'">'+(off?'Collega':'Scollega')+'</button>';
+      return '<tr'+(off?' style="opacity:.5"':'')+'>'+
+        '<td class="uname">'+escapeHtml(u.import_name||'—')+(u.lib_display?'<br><span class="umeta">'+escapeHtml(u.lib_display)+'</span>':'')+(u.active?'':'<br><span class="umeta" style="color:#b45309">libreria non attiva</span>')+'</td>'+
         '<td class="umeta">'+escapeHtml(u.marca||'—')+'</td>'+
         '<td class="umeta">'+escapeHtml(u.modello||'—')+'</td>'+
         '<td class="umeta">'+escapeHtml(u.diametro!=null?String(u.diametro):'—')+'</td>'+
         '<td>'+_usageRoleChip(u.role)+'</td>'+
+        '<td>'+_usageState(u.type_active)+'</td>'+
         '<td class="umeta">'+escapeHtml(u.supplier||'—')+'</td>'+
         '<td class="umeta">'+escapeHtml(u.connection_id||'—')+'</td>'+
-        '<td>'+(u.active?'<span class="pill ok"><span class="dot"></span>Attiva</span>':'<span class="pill wait"><span class="dot"></span>Non attiva</span>')+'</td>'+
+        '<td class="actcell">'+tog+'</td>'+
         '</tr>';
     }).join('');
     body.innerHTML =
-      '<p class="umeta" style="margin:0 0 10px">Questo file compare in <b>'+nLib+'</b> librer'+(nLib===1?'ia':'ie')+' ('+usage.length+' collegament'+(usage.length===1?'o':'i')+' per ruolo).</p>'+
+      '<p class="umeta" style="margin:0 0 10px">Compare in <b>'+nLib+'</b> librer'+(nLib===1?'ia':'ie')+' — '+nOn+' collegat'+(nOn===1?'o':'i')+(nOff?(' · '+nOff+' scollegat'+(nOff===1?'o':'i')):'')+'.</p>'+
       '<div class="tablecard"><table><thead><tr>'+
-      '<th>Libreria</th><th>Marca</th><th>Modello</th><th>Ø</th><th>Ruolo</th><th>Fornitore</th><th>Connessione</th><th>Stato</th>'+
-      '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+      '<th>Libreria</th><th>Marca</th><th>Modello</th><th>Ø</th><th>Ruolo</th><th>Link</th><th>Fornitore</th><th>Connessione</th><th></th>'+
+      '</tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      '<p class="umeta" style="margin:10px 0 0;font-size:11.5px">Scollega = disattiva il link (reversibile: con Collega torna). Una libreria ATTIVA non puo\' restare senza madre o senza figlio.</p>';
+  }
+  function stlUsageToggle(tid, lib, toActive){
+    fetch(API+"/admin/rit/libraries/"+lib+"/types/"+tid,
+      {method:"PATCH", headers:Object.assign({"Content-Type":"application/json"}, adminHeaders()), body:JSON.stringify({active:!!toActive})})
+      .then(function(r){
+        if(r.status===409){ return r.json().then(function(d){ throw {m:(d&&d.detail)||"Operazione rifiutata."}; }); }
+        if(!r.ok) throw {m:"Errore ("+r.status+")"};
+        return r.json();
+      })
+      .then(function(){ if(_usageName) stlUsageOpen(_usageName); stlLoad(); })
+      .catch(function(e){ toast((e&&e.m)||"Errore nell'operazione."); });
   }
   function stlUsageClose(){ $("stl-usage-overlay").classList.remove("show"); }
 
@@ -1701,6 +1725,12 @@
   $("stl-prev-overlay").addEventListener("click", function(e){ if(e.target===$("stl-prev-overlay")) stlPreviewClose(); });
   $("stl-usage-close").addEventListener("click", stlUsageClose);
   $("stl-usage-overlay").addEventListener("click", function(e){ if(e.target===$("stl-usage-overlay")) stlUsageClose(); });
+  // 8.105.0: delega click sui toggle Collega/Scollega (il body si ri-renderizza, la delega resta)
+  $("stl-usage-body").addEventListener("click", function(e){
+    var b = e.target.closest && e.target.closest(".link-toggle");
+    if(!b) return;
+    stlUsageToggle(b.getAttribute("data-tid"), b.getAttribute("data-lib"), b.getAttribute("data-act")==="1");
+  });
   $("stl-code-overlay").addEventListener("click", function(e){ if(e.target===$("stl-code-overlay")) $("stl-code-overlay").classList.remove("show"); });
   $("rit-confirm-overlay").addEventListener("click", function(e){ if(e.target===$("rit-confirm-overlay")) $("rit-confirm-overlay").classList.remove("show"); });
   $("ed-add-row").addEventListener("click", function(){ edAddRow(); });

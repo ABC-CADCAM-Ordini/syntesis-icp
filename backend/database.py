@@ -2029,11 +2029,12 @@ async def rit_stl_asset_usage(name: str) -> list[dict]:
         rows = await conn.fetch("""
             SELECT l.id AS library_id, l.import_name, l.display AS lib_display,
                    l.marca, l.modello, l.diametro, l.supplier, l.connection_id, l.active,
+                   t.id AS type_id, t.active AS type_active,
                    t.role, t.display AS type_display, t.keyword AS type_keyword, t.is_eng
             FROM rit_scanbody_type t
             JOIN rit_library l ON l.id = t.library_id
             WHERE t.marker_filename = $1
-            ORDER BY l.marca NULLS LAST, l.modello NULLS LAST, l.diametro NULLS LAST, l.import_name
+            ORDER BY (t.active) DESC, l.marca NULLS LAST, l.modello NULLS LAST, l.diametro NULLS LAST, l.import_name
         """, name)
     return [dict(r) for r in rows]
 
