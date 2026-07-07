@@ -1,5 +1,22 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.99.1: Fix critico — la Raffina p2plane non applicava mai (Method C no-fit)
+
+L'utente ha collaudato 8.99.0 e riproposto lo stesso difetto: «il primo clic è perfetto sul cilindro, Raffina lo rende perfetto sul top ma sposta il cilindro». Stavolta però aveva scaricato il CSV — e le colonne diagnostiche che avevo aggiunto in 8.98.0 hanno smascherato subito il bug:
+
+```
+raffEngine = "p2plane-fallback:no-fit"   ← su TUTTI e 5 gli SR
+raffMcReason = "no-fit",  raffMcNcap = (vuoto)
+```
+
+**Method C ritornava `no-fit` per ogni marker** → il point-to-plane non applicava *mai*, cadeva sempre sul Kabsch punto-a-punto = esattamente il difetto che l'utente vedeva. Tutto il lavoro 8.98/8.99 era, in pratica, inerte.
+
+**Root cause.** In `sostAlignAll` seedavo `_sostMethodCPose` con `p.position`. Ma `p.position` **non è il centro del disco** — è la **connessione implantare** (`connectionWorld`, riga 1138: "origine clinica"), che per lo SR sta ~5mm sotto il disco lungo l'asse (capZ=+5). Method C classifica i punti cap con una banda assiale strettissima attorno al seed (`|s| ≤ 0.18mm`): seedato 5mm sotto il cap, non trovava **nessun** punto cap → `nc < 50` → `_sostMethodCFit` ritorna `null` → `no-fit`. Al piazzamento invece Method C funziona perché è seedato dal centro-disco refinito (`_cen`/`_capDiag.center`), dove il cap è a `s ≈ 0`.
+
+**Fix.** Seedare col **centro disco `p.discWorld`** (non `p.position`). La trasformazione rigida ora si costruisce dal centro disco (`oldDisc → D.center`) e si applica a gruppi + `p.position` (la connessione segue rigidamente) + `p.discWorld` + `p.axisDir` — prima la costruivo da `p.position`, quindi anche il *transform* era sbagliato di ~5mm. Anche `_sostRaffDiag` ora misura `p.discWorld`: i `raffCenShift`/`raffVsMc` ≈ 5mm che vedevo erano un **fantasma diagnostico** (connessione vs centro disco), non un movimento reale del Kabsch.
+
+**Verifica.** Riprodotto headless su SR sintetica: seed centro-disco → `applied`, `ncap=240`, `cenShift 0.0µm`; seed connessione −5mm → `no-fit` (identico al CSV reale); la tolleranza della banda cap è ~0.18mm. Il fallback per-marker al Kabsch resta il pavimento di sicurezza. Gate `sost` ri-baselinato, `run_all.sh` verde, `node --check`. Deploy commit `ba8a27f`, 8.99.1 live. Bump PATCH (bugfix; nessun cambio UI/default). Da collaudare live: il CSV deve ora mostrare `raffEngine=p2plane` (non più `fallback:no-fit`) e il cilindro non deve più spostarsi dopo la Raffina.
+
 ## 2026-07-07 — 8.99.0: Raffina punto-a-piano (Method C) diventa il default di Sostituire
 
 Dopo 8.98.0 (p2plane opt-in), l'utente ha riproposto lo stesso feedback: era ancora sul motore di default (Bilanciata), perché il point-to-plane era opt-in. Alla mia offerta di renderlo default ha risposto «sì, preferisco non smanettare col menu». Flip del default di `syntesis_sost_raffina` da `'balanced'` a `'p2plane'`.
