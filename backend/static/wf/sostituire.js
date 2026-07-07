@@ -1279,7 +1279,11 @@ function sostAlignAll(){
       // qui viene PROMOSSO nel percorso Raffina (riuso, nessun solutore nuovo). Fallback per-marker
       // al Kabsch pesato se Method C non applica (few-pts / trust-region / no-fit). 'balanced'
       // (default) e 'legacy5x' restano l'ICP punto-a-punto Kabsch (invariato).
-      var _raffinaMode = (function(){ try { return localStorage.getItem('syntesis_sost_raffina') || 'balanced'; } catch(e){ return 'balanced'; } })();
+      // 8.99.0: DEFAULT = 'p2plane' (era 'balanced'). Su richiesta utente ("preferisco non smanettare
+      // col menu") + supportato dai dati reali (mcApplied=ok, shift 0.8-3.9µm sui 6 SR) + pavimento di
+      // sicurezza (fallback per-marker al Kabsch bilanciato dove Method C non applica). Chi ha scelto
+      // ESPLICITAMENTE 'balanced'/'legacy5x' lo mantiene (valore localStorage rispettato).
+      var _raffinaMode = (function(){ try { return localStorage.getItem('syntesis_sost_raffina') || 'p2plane'; } catch(e){ return 'p2plane'; } })();
       var _useP2P = (_raffinaMode === 'p2plane');
       function _sostFinishRefine(rounds){
         sostRenderPlacedList();

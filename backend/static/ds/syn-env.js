@@ -367,8 +367,10 @@ function switchSettingsTab(which){
       var savedSc = localStorage.getItem('syntesis_sost_center') || 'robust';   // 8.96.0: default robust (coerente con synSostCenterRead)
       document.querySelectorAll('input[name="sostCenterOpt"]').forEach(function(r){ r.checked = (r.value === savedSc); });
       if(typeof onSostCenterChange === 'function') onSostCenterChange(savedSc);
-      // 8.97.0: Motore Raffina Sostituire (syntesis_sost_raffina): riallinea radio + stile (default balanced)
-      var savedRa = localStorage.getItem('syntesis_sost_raffina') || 'balanced';
+      // 8.97.0: Motore Raffina Sostituire (syntesis_sost_raffina): riallinea radio + stile.
+      // 8.99.0: default 'p2plane' (era 'balanced') — deve combaciare col default di sostAlignAll,
+      // altrimenti aprire Impostazioni ri-pinnerebbe 'balanced' in localStorage.
+      var savedRa = localStorage.getItem('syntesis_sost_raffina') || 'p2plane';
       document.querySelectorAll('input[name="sostRaffinaOpt"]').forEach(function(r){ r.checked = (r.value === savedRa); });
       if(typeof onSostRaffinaChange === 'function') onSostRaffinaChange(savedRa);
       // 8.48.0: Motore ICP Replace-iT (syntesis_replace_icp): riallinea radio + stile
