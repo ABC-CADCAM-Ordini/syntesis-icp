@@ -1,5 +1,11 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.104.1: UX — colonna "File" della tabella Librerie collassabile
+
+Subito dopo la colonna "File (madre/figlio)" (8.102.0), l'utente ha notato il problema pratico: una libreria come `nobel-biocare-multi-unit-4-8` ha **67 type**, quindi la cella elencava decine di chip e la riga diventava altissima. «Mettili sotto dettagli o crea un menu a tendina… sono troppi e la lista è troppo lunga.»
+
+Nuova `_ritFileCell(L)` in `syntesis-gestione.html`: di default un **riepilogo compatto** (`N file · M madre · F figlio`) con un pulsante **"▾ elenco"** che apre i chip in un **box scrollabile ad altezza fissa** (`max-height:150px`, `overflow:auto`) — così l'elenco non allunga mai la riga; "▴ nascondi" lo richiude. Le librerie con **≤4 file** restano mostrate inline (non serve collassare). La cella ha `max-width:340px`. Il toggle è per-riga (listener `.file-toggle` in `ritRender`). Il filtro "cerca per file" resta invariato (opera su `L.files`, non sul DOM). Solo frontend gestione. `node --check` gestione, `run_all.sh` verde. Deploy commit `cf0ce5d`. Bump PATCH.
+
 ## 2026-07-07 — 8.104.0: Replace-iT — vista "Parentela" per singolo file (Archivio STL)
 
 Richiesta dell'utente: un'area per vedere **tutte le parentele collegate a un singolo file** — dove compare, a chi è collegato. Le colonne aggregate (chip marche/modelli/ruolo, 8.101.0) danno il colpo d'occhio; questa dà il **dettaglio riga-per-riga**.
