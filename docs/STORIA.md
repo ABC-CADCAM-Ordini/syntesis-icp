@@ -1,5 +1,22 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.99.0: Raffina punto-a-piano (Method C) diventa il default di Sostituire
+
+Dopo 8.98.0 (p2plane opt-in), l'utente ha riproposto lo stesso feedback: era ancora sul motore di default (Bilanciata), perché il point-to-plane era opt-in. Alla mia offerta di renderlo default ha risposto «sì, preferisco non smanettare col menu». Flip del default di `syntesis_sost_raffina` da `'balanced'` a `'p2plane'`.
+
+Non è un flip alla cieca. Cinque motivi lo sostengono:
+1. **Pavimento di sicurezza per-marker.** Dove Method C non applica (`few-pts` / `trust-region` / `no-fit`), quel marker ricade sul Kabsch bilanciato = comportamento 8.97.0. Nessun marker può fare peggio di adesso.
+2. **Dati reali.** Nei CSV 8.96/8.97 la colonna `mcApplied` era `true` / `reason='ok'` su **tutti e 6** gli SR, con correzioni sane (0.8–3.9µm, <0.08°): Method C su *questi file* applica pulito, non cade in fallback.
+3. **Sintetico 0.00µm** (zero-error, già verificato headless in 8.98.0).
+4. **Idempotency guard** (`cenShift`<1µm & `axDeg`<0.01° → no-op) previene l'oscillazione dell'auto-loop coordinate-descent che gli scettici avevano segnalato.
+5. **Reversibile.** Il radio "Bilanciata" resta selezionabile; chi ha scelto *esplicitamente* balanced/legacy5x lo mantiene (`localStorage` rispettato).
+
+Implementazione:
+- `wf/sostituire.js` `sostAlignAll`: `_raffinaMode` default `'balanced'`→`'p2plane'` (+ catch).
+- `ds/syn-env.js` `switchSettingsTab`: `savedRa` default → `'p2plane'` — **deve combaciare** col default di `sostAlignAll`, altrimenti aprire Impostazioni ri-pinnerebbe `'balanced'` in `localStorage` (stessa trappola gestita in 8.96.0).
+- `v3b.html`: `checked` spostato sul radio p2plane; label aggiornate (p2plane = "default consigliato", balanced = "storica").
+- Gate `sost` (`sostAlignAll`) + `env` (`switchSettingsTab`) ri-baselinati; `run_all.sh` verde, `node --check`. Deploy commit `81e783e`, 8.99.0 live su canonico con-h + railway. Bump MINOR (default clinico di posa, come 8.96.0). Validazione live "gratis": la prossima posa+Raffina usa p2plane automaticamente e il CSV abituale mostra `raffEngine=p2plane`.
+
 ## 2026-07-07 — 8.98.0: Raffina punto-a-piano (Method C) — nuovo motore opt-in di Sostituire
 
 Follow-up di 8.97.0. Col peso bilanciato l'utente ha collaudato 6 SR reali e riferito: «molto buono sul top, **discreto** sul centraggio del cilindro, la strada è giusta». Il bilanciamento aveva migliorato, ma non chiuso, il gap laterale.
