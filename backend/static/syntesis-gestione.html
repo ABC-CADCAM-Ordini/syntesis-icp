@@ -272,10 +272,19 @@
       <button class="btn revoke" id="stl-code-btn">Codice lucchetto…</button>
       <span class="rit-msg" id="stl-msg"></span>
     </div>
+    <!-- 8.101.0: filtro parentela — parte da marca/modello/ruolo per trovare i file di quella relazione -->
+    <div class="rit-upload" id="stl-filters" style="align-items:center;gap:10px;flex-wrap:wrap">
+      <input type="search" id="stl-f-name" placeholder="Cerca file…" style="padding:6px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;font:inherit">
+      <select id="stl-f-marca" style="padding:6px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;font:inherit"><option value="">Tutte le marche</option></select>
+      <select id="stl-f-modello" style="padding:6px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;font:inherit"><option value="">Tutti i modelli</option></select>
+      <select id="stl-f-ruolo" style="padding:6px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;font:inherit"><option value="">Tutti i ruoli</option><option value="madre">madre</option><option value="figlio">figlio</option></select>
+      <button class="btn revoke" id="stl-f-clear">Azzera</button>
+      <span class="rit-msg" id="stl-f-count"></span>
+    </div>
     <div class="tablecard">
       <table>
         <thead>
-          <tr><th>File</th><th>Dimensione</th><th>Usato da</th><th>Lucchetto</th><th>Aggiornato</th><th></th></tr>
+          <tr><th>File</th><th>Dimensione</th><th>Usato da</th><th>Marca</th><th>Modello</th><th>Ruolo</th><th>Lucchetto</th><th>Aggiornato</th><th></th></tr>
         </thead>
         <tbody id="stl-rows"></tbody>
       </table>
@@ -932,20 +941,70 @@
     // GET /admin/rit/stl -> { assets:[...] }
     fetch(API+"/admin/rit/stl",{headers:adminHeaders()})
       .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
-      .then(function(d){ stlAssets=(d.assets||[]); stlRender(); edRefreshFileSelects(); })
+      .then(function(d){ stlAssets=(d.assets||[]); stlPopulateFilters(); stlWireFilters(); stlRender(); edRefreshFileSelects(); })
       .catch(function(status){ if(status!==401 && status!==403){ toast("Errore nel caricamento dell'archivio STL."); } });
+  }
+
+  // 8.101.0: filtro parentela (marca/modello/ruolo) sull'Archivio STL.
+  function _stlChips(arr){
+    if(!arr || !arr.length) return '<span class="umeta">—</span>';
+    return arr.map(function(x){ return '<span class="pill free" style="margin:1px 2px;display:inline-block">'+escapeHtml(String(x))+'</span>'; }).join('');
+  }
+  function stlFilterMatch(a){
+    var q = ($("stl-f-name").value||'').trim().toLowerCase();
+    var fm = $("stl-f-marca").value||'', fmo = $("stl-f-modello").value||'', fr = $("stl-f-ruolo").value||'';
+    if(q && String(a.name||'').toLowerCase().indexOf(q)<0) return false;
+    if(fm && (a.marche||[]).indexOf(fm)<0) return false;
+    if(fmo && (a.modelli||[]).indexOf(fmo)<0) return false;
+    if(fr && (a.ruoli||[]).indexOf(fr)<0) return false;
+    return true;
+  }
+  function stlPopulateFilters(){
+    var marche={}, modelli={};
+    stlAssets.forEach(function(a){
+      (a.marche||[]).forEach(function(m){ if(m) marche[m]=1; });
+      (a.modelli||[]).forEach(function(m){ if(m) modelli[m]=1; });
+    });
+    function fill(sel, vals, allLabel){
+      if(!sel) return;
+      var cur = sel.value;
+      var opts = ['<option value="">'+allLabel+'</option>'];
+      Object.keys(vals).sort().forEach(function(v){ opts.push('<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>'); });
+      sel.innerHTML = opts.join('');
+      if(cur && vals[cur]) sel.value = cur;   // preserva la scelta se ancora valida
+    }
+    fill($("stl-f-marca"), marche, 'Tutte le marche');
+    fill($("stl-f-modello"), modelli, 'Tutti i modelli');
+  }
+  var _stlFiltersWired = false;
+  function stlWireFilters(){
+    if(_stlFiltersWired) return; _stlFiltersWired = true;
+    ['stl-f-name','stl-f-marca','stl-f-modello','stl-f-ruolo'].forEach(function(id){
+      var el=$(id); if(el) el.addEventListener('input', stlRender);
+    });
+    var clr=$("stl-f-clear");
+    if(clr) clr.addEventListener('click', function(){
+      ['stl-f-name','stl-f-marca','stl-f-modello','stl-f-ruolo'].forEach(function(id){ var el=$(id); if(el) el.value=''; });
+      stlRender();
+    });
   }
 
   function stlRender(){
     var tb=$("stl-rows"); tb.innerHTML="";
-    if(!stlAssets.length){ $("stl-empty").classList.remove("hidden"); return; }
+    if(!stlAssets.length){ $("stl-empty").classList.remove("hidden"); $("stl-empty").textContent='Nessun file in archivio.'; var _c0=$("stl-f-count"); if(_c0) _c0.textContent=''; return; }
+    var shown = stlAssets.filter(stlFilterMatch);
+    var _c=$("stl-f-count"); if(_c) _c.textContent = shown.length + ' / ' + stlAssets.length + ' file';
+    if(!shown.length){ $("stl-empty").classList.remove("hidden"); $("stl-empty").textContent='Nessun file col filtro corrente.'; return; }
     $("stl-empty").classList.add("hidden");
-    stlAssets.forEach(function(a){
+    shown.forEach(function(a){
       var tr=document.createElement("tr");
       tr.innerHTML =
         '<td class="rit-mono" style="color:var(--accent-deep);font-weight:600">'+escapeHtml(a.name)+'</td>'+
         '<td class="umeta num">'+fmtBytes(a.size_bytes)+'</td>'+
         '<td class="umeta num">'+(a.used_by>0 ? a.used_by+(a.used_by===1?' libreria':' librerie') : '—')+'</td>'+
+        '<td>'+_stlChips(a.marche)+'</td>'+
+        '<td>'+_stlChips(a.modelli)+'</td>'+
+        '<td>'+_stlChips(a.ruoli)+'</td>'+
         '<td>'+(a.locked?'<span class="pill lock"><span class="dot"></span>Bloccato</span>'
                         :'<span class="pill free">Libero</span>')+'</td>'+
         '<td class="umeta">'+fmtDate(a.updated_at||a.uploaded_at)+

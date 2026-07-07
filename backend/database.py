@@ -1968,16 +1968,26 @@ async def rit_list_stl_assets() -> list[dict]:
     """Archivio STL per nome (cartella unica). used_by = n. librerie che usano
     l'asset, di QUALSIASI sorgente (Exocad/CSV/editor): match per nome su
     marker_filename (gia' basename per tutte le righe dopo la normalizzazione
-    in init_db)."""
+    in init_db).
+    8.101.0: aggiunge la PARENTELA aggregata per-file: 'marche', 'modelli',
+    'ruoli' (madre/figlio) delle librerie che usano l'asset. La relazione e' gia'
+    nel modello (rit_scanbody_type collega file<->libreria con role; rit_library
+    porta marca/modello); qui la si tira fuori per il filtro nell'Archivio STL.
+    array_remove(...,NULL) toglie i buchi (asset non usato -> array vuoto)."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT a.name, a.sha256, a.locked, a.size_bytes, a.uploaded_by,
                    a.uploaded_at, a.updated_at,
-                   (SELECT COUNT(DISTINCT t.library_id)
-                      FROM rit_scanbody_type t
-                     WHERE t.marker_filename = a.name) AS used_by
+                   COUNT(DISTINCT t.library_id) AS used_by,
+                   array_remove(array_agg(DISTINCT l.marca),   NULL) AS marche,
+                   array_remove(array_agg(DISTINCT l.modello), NULL) AS modelli,
+                   array_remove(array_agg(DISTINCT t.role),    NULL) AS ruoli
             FROM rit_stl_asset a
+            LEFT JOIN rit_scanbody_type t ON t.marker_filename = a.name
+            LEFT JOIN rit_library l ON l.id = t.library_id
+            GROUP BY a.name, a.sha256, a.locked, a.size_bytes, a.uploaded_by,
+                     a.uploaded_at, a.updated_at
             ORDER BY a.name
         """)
     out = []
@@ -1986,6 +1996,9 @@ async def rit_list_stl_assets() -> list[dict]:
         d["uploaded_at"] = _iso(d.get("uploaded_at"))
         d["updated_at"] = _iso(d.get("updated_at"))
         d["used_by"] = int(d.get("used_by") or 0)
+        d["marche"] = list(d.get("marche") or [])
+        d["modelli"] = list(d.get("modelli") or [])
+        d["ruoli"] = list(d.get("ruoli") or [])
         out.append(d)
     return out
 
