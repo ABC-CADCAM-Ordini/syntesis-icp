@@ -1408,12 +1408,21 @@
       F.push({nx:nx/nl,ny:ny/nl,nz:nz/nl,area:0.5*nl,cx:(ax+bx+cx)/3,cy:(ay+by+cy)/3,cz:(az+bz+cz)/3});
     }
     var res={zTop:maxZ, zMin:minZ, zRange:maxZ-minZ, flatAngleDeg:null, flatTiltDeg:null, flatConfidence:0, flatNormal:null, flatCentroid:null};
-    function refine(pn){
+    function refine(pn, thr){
       var sx=0,sy=0,sz=0,cx=0,cy=0,cz=0,w=0,j;
-      for(j=0;j<F.length;j++){ var f=F[j]; if(f.nx*pn[0]+f.ny*pn[1]+f.nz*pn[2]>0.9){ sx+=f.area*f.nx;sy+=f.area*f.ny;sz+=f.area*f.nz; cx+=f.area*f.cx;cy+=f.area*f.cy;cz+=f.area*f.cz; w+=f.area; } }
+      for(j=0;j<F.length;j++){ var f=F[j]; if(f.nx*pn[0]+f.ny*pn[1]+f.nz*pn[2]>thr){ sx+=f.area*f.nx;sy+=f.area*f.ny;sz+=f.area*f.nz; cx+=f.area*f.cx;cy+=f.area*f.cy;cz+=f.area*f.cz; w+=f.area; } }
       if(w<=0) return null;
       var L=Math.hypot(sx,sy,sz);
-      return { nrm:[sx/L,sy/L,sz/L], cen:[cx/w,cy/w,cz/w], az:(Math.atan2(sy,sx)*180/Math.PI+360)%360, tilt:Math.asin(Math.min(1,Math.abs(sz)/L))*180/Math.PI };
+      return { nrm:[sx/L,sy/L,sz/L], cen:[cx/w,cy/w,cz/w], w:w, az:(Math.atan2(sy,sx)*180/Math.PI+360)%360, tilt:Math.asin(Math.min(1,Math.abs(sz)/L))*180/Math.PI };
+    }
+    // 8.108.4: MEAN-SHIFT a cono che STRINGE. Parte dal picco (sul flat) con cono moderato (~16°) e lo
+    // restringe ri-centrando: scarta i facet "sporchi" (smussi adiacenti) che un cono largo includerebbe
+    // -> la normale converge su quella VERA del flat. Verificato sintetico: flat-90 + smusso in cima -> -90.0
+    // (il cono largo 0.9 dava -75); nessuna regressione su verticale/obliqua/chamfer/liscio.
+    function refineMS(seed){
+      var r=refine(seed, 0.96); if(!r) return null;
+      [0.985, 0.995].forEach(function(thr){ var rr=refine(r.nrm, thr); if(rr && rr.w>0) r=rr; });
+      return r;
     }
     // Stadio 1: VERTICALE
     var NB=360, hist=new Float64Array(NB), tot=0, b, k;
@@ -1422,7 +1431,7 @@
       var sm=new Float64Array(NB); for(b=0;b<NB;b++){ var s=0; for(k=-2;k<=2;k++) s+=hist[((b+k)%NB+NB)%NB]; sm[b]=s; }
       var peak=0,pb=0; for(b=0;b<NB;b++) if(sm[b]>peak){peak=sm[b];pb=b;}
       var mean=tot*5/NB, prom=mean>0?peak/mean:0;
-      if(prom>=3.0){ var pr=pb*Math.PI/180, r=refine([Math.cos(pr),Math.sin(pr),0]); if(r){ res.flatAngleDeg=r.az; res.flatTiltDeg=0; res.flatConfidence=prom; res.flatNormal=r.nrm; res.flatCentroid=r.cen; return res; } }
+      if(prom>=3.0){ var pr=pb*Math.PI/180, r=refineMS([Math.cos(pr),Math.sin(pr),0]); if(r){ res.flatAngleDeg=r.az; res.flatTiltDeg=r.tilt; res.flatConfidence=prom; res.flatNormal=r.nrm; res.flatCentroid=r.cen; return res; } }
       res.flatConfidence=prom;
     }
     // Stadio 2: OBLIQUA (concentrazione nella banda inclinata)
@@ -1431,7 +1440,7 @@
     if(tot2>1e-9){
       var pk2=0,pkey=-1,kk; for(kk in H2) if(H2[kk]>pk2){pk2=H2[kk];pkey=+kk;}
       var conc=pk2/tot2, obc=conc*15;
-      if(conc>=0.40){ var oj=Math.floor(pkey/NAZ), oi=pkey%NAZ, oAz=(oi+0.5)*(360/NAZ)*Math.PI/180, oEl=((oj+0.5)*(180/NEL)-90)*Math.PI/180, on=[Math.cos(oEl)*Math.cos(oAz),Math.cos(oEl)*Math.sin(oAz),Math.sin(oEl)]; var ro=refine(on); if(ro){ res.flatAngleDeg=ro.az; res.flatTiltDeg=ro.tilt; res.flatConfidence=obc; res.flatNormal=ro.nrm; res.flatCentroid=ro.cen; return res; } }
+      if(conc>=0.40){ var oj=Math.floor(pkey/NAZ), oi=pkey%NAZ, oAz=(oi+0.5)*(360/NAZ)*Math.PI/180, oEl=((oj+0.5)*(180/NEL)-90)*Math.PI/180, on=[Math.cos(oEl)*Math.cos(oAz),Math.cos(oEl)*Math.sin(oAz),Math.sin(oEl)]; var ro=refineMS(on); if(ro){ res.flatAngleDeg=ro.az; res.flatTiltDeg=ro.tilt; res.flatConfidence=obc; res.flatNormal=ro.nrm; res.flatCentroid=ro.cen; return res; } }
       if(obc>res.flatConfidence) res.flatConfidence=obc;
     }
     return res;

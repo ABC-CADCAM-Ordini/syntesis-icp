@@ -34,6 +34,7 @@ import numpy as np
 # Quando si promuove la Fase A in produzione, il suffisso sparisce -> 8.2.0.
 #
 # History:
+#   8.108.4        (2026-07-07): FIX precisione angolo faccia piatta — normale "tirata" da smussi adiacenti. L'utente ha confermato che ZFX-AAR_2 ha il flat esattamente su -Y (-90deg) ma la detection dava -75deg: la refine mediava i facet entro un cono LARGO (0.9 ~= 25deg) includendo gli smussi/facet adiacenti che spostavano la normale. FIX: nuova refineMS = MEAN-SHIFT a cono che STRINGE (parte dal picco, che e' sul flat, con cono ~16deg 0.96 e lo restringe a 0.985 poi 0.995 ri-centrando ogni volta) -> scarta i facet sporchi e converge sulla normale VERA. Verificato sintetico: flat-90 + smusso in cima -> -90.0 (col cono largo dava -75); nessuna regressione (verticale 0/30/-90 conf 11.5, obliqua, chamfer/liscio -> null); recupera -90 anche con smusso ad area pari fino a ~15deg di distanza. Applicato a entrambi gli stadi (verticale+obliqua); il verticale ora riporta anche la tilt reale (r.tilt invece di 0 fisso). Solo frontend gestione. node --check. Bump PATCH. VALIDARE LIVE: anteprima ZFX-AAR_2.stl -> faccia piatta ~-90deg rivolta su -Y.
 #   8.108.3        (2026-07-07): UX anteprima STL — la faccia piatta indica l'ASSE DOMINANTE (su X o su Y). Richiesta utente: la faccia puo' essere rivolta su Y, non solo su X; controllarlo. Se la normale del flat ha componente Y maggiore della X -> "rivolta su +/-Y" (es. faccia nel piano y=0 ha normale su Y); altrimenti "+/-X". Cosi' su ZFX-AAR_2 (normale ~-75deg dalla +X = prevalentemente -Y) ora dice esplicitamente 'rivolta su -Y'. Usa meas.flatNormal[0/1] (gia' calcolata). Solo display (l'angolo dalla +X resta come riferimento assoluto). node --check. Bump PATCH.
 #   8.108.2        (2026-07-07): UX anteprima STL — angolo faccia piatta ARROTONDATO all'intero (richiesta utente: "0 o 1 ma non 0,x"). La risoluzione della misura e' ~+/-0.5deg (rumore tassellatura) e i CAD hanno flat a angoli TONDI (0/30/45/90...): 0.2deg e' in realta' 0deg -> false precision. Rotazione e inclinazione ora Math.round (0.2->0, 29.7->30, 44.7->45; Math.round(-0)+0 -> "0", niente -0). Solo display. node --check. Bump PATCH.
 #   8.108.1        (2026-07-07): UX Archivio STL — la colonna azioni (Elimina) veniva TAGLIATA dopo l'aggiunta della miniatura (8.108.0): riga troppo larga per il contenitore (.wrap max-width 1200). FIX: .wrap 1200->1480 (piu' largo su schermi ampi), padding celle 15/12->13/9 (piu' compatto, ~120px risparmiati su ~10 colonne), miniatura 76x56->64x48. Il .tablecard ha gia' overflow-x:auto come rete (scrolla su schermi stretti). Solo CSS gestione. node --check. Bump PATCH.
@@ -270,7 +271,7 @@ import numpy as np
 #   8.1.2-A.2   (2026-05-02): aggiunto backend/registry.py + endpoint
 #   8.1.1-A.0   (2026-05-02): rimosso icp_engine_lab.py (copia 1:1)
 #   8.1.0       (2026-05-02): stato pre-Fase A (Analizzare promosso ieri)
-BACKEND_VERSION = "8.108.3"
+BACKEND_VERSION = "8.108.4"
 
 REGISTRY_VERSION = "1.1.0"   # versione dello schema del registry (cambia se si aggiungono/rimuovono campi)
 REGISTRY_SOURCE = "backend/registry.py"
