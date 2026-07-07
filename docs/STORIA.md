@@ -1,5 +1,22 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.100.1: Il session log pesca il suo primo bug (errore "opacity su undefined")
+
+Poche ore dopo il rilascio della "stella polare" (8.100.0), l'utente ha scaricato il log e ha detto «guarda, funziona bene!». Funziona così bene che aveva già registrato **93 volte** lo stesso errore JavaScript, in 3 firme (stesso errore, righe diverse per via delle versioni):
+```
+Uncaught TypeError: Cannot set properties of undefined (setting 'opacity')
+ Misurare   line 7142   — 39 hit (2026-07-06)
+ Sostituire line 10816  — 26 hit (2026-06-26)
+ Sostituire line 10820  — 28 hit (2026-07-01)
+```
+I numeri di riga sono delle versioni **pre-estrazione** (8.71–8.73, quando Sostituire e Misurare vivevano ancora nel monolite). Non fatale — l'utente completava le pose lo stesso — ma senza il log non lo avremmo mai visto.
+
+**Root cause.** `misICP_applyLayerOp` (`wf/misurare-viz.js`) applicava `m.material.opacity = …` dentro un `forEach` **senza guardia**. Lo slider di opacità dell'albero scena scatta su `oninput`, cioè decine di volte durante un trascinamento; se tra i mesh del gruppo ce n'è uno senza `.material` (un `Group`, una `Line`, o un mesh appena svuotato), ogni tick lancia l'eccezione → burst di 39 errori in pochi decimi di secondo.
+
+**Fix.** `if(!m || !m.material) return;` nel `forEach`. I due errori di **Sostituire** (`sostOnGroupOpacityChange`/`sostOnScanOpacityChange`) erano invece **già guardati** nella versione attuale — infatti nel log non ricorrono più dopo il 2026-07-01: erano già stati risolti durante l'estrazione/hardening. Ho poi fatto l'**audit di tutte** le assegnazioni `.material.opacity` nei moduli `wf/`: le restanti sono o guardate (`if mesh && mesh.material`) o operano su mesh appena costruiti da `misICP_buildMesh` (che garantisce il material) → nessun'altra a rischio.
+
+Gate `mis-viz` (`misICP_applyLayerOp`) ri-baselinato, `run_all.sh` verde, `node --check`. Deploy commit `3a67490`, 8.100.1 live su entrambi i servizi. Bump PATCH (bugfix, nessun cambio UI). Da qui in poi il log di sessione deve mostrare **zero** occorrenze di questo errore.
+
 ## 2026-07-07 — 8.100.0: Session log "stella polare" — front + backend, scaricabile, redatto
 
 Direttiva dell'utente: «il log deve essere la nostra stella polare… quando entro nel menu segreto devo trovare un pulsante *scarica log*; il log deve essere presente ovunque, sia front che backend, e registrare tutto così da intercettare errori e bug. Ma non deve registrare password o token o altri elementi di sicurezza rubabili — la sicurezza è fondamentale».
