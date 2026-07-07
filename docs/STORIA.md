@@ -1,5 +1,19 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.95.4: Bugfix — Replace-iT posa lo scanbody orientato anche in vista reticolo/both
+
+Follow-up gemello dell'8.95.2 su Sostituire, esattamente come previsto nella nota di quel rilascio (STORIA 8.95.2: «Replace-iT (replaceOnViewportClick, wf/replace.js r.817) usa anch'esso intersectObject ricorsivo, ma con fallback normale (0,0,1) invece di bloccare — non blocca la posa ma può orientarla male in vista reticolo/both; da valutare a parte»). Qui la si valuta, si conferma e si corregge.
+
+Causa radice identica a Sostituire: in modalità di rendering "reticolo/both", `replaceApplyRenderMode` (8.39.0) chiama `applyRenderModeToMesh(replaceMesh)`, che aggiunge al mesh della scansione un figlio `LineSegments` (`_wireOverlay`, `WireframeGeometry`). `raycaster.intersectObject()` in THREE moderno è **ricorsivo per default**; `replaceOnViewportClick` (r.817) chiamava `intersectObject(replaceMesh)` senza il secondo argomento, quindi il raggio colpiva anche l'overlay wireframe figlio, che non ha `.face`, e quell'hit finiva come `hits[0]`. La differenza rispetto a Sostituire: Replace **non** ha una guardia che scarta l'hit senza `.face`. Il seme a 3 punti prende la posizione da `raycaster.ray.at(hits[0].distance)` (quindi il punto resta corretto) ma la normale outward dal fallback della r.837 `(hits[0].face && hits[0].face.normal) ? ... : new THREE.Vector3(0,0,1)`: colpendo l'overlay, `.face` è assente → la normale diventava `(0,0,1)` costante invece della normale di superficie vera → l'asse del seme risultava sbagliato → **marker orientato male** (posato sul punto giusto ma coricato). Latente dall'8.39.0, emergeva **solo** in vista reticolo/both (in solido non c'è overlay; in wireframe puro è solo `material.wireframe`, senza figlio).
+
+Il fix è un solo argomento: `raycaster.intersectObject(replaceMesh, false)` — raycast **non ricorsivo**, esattamente come Analizza r.1750 e Sostituire 8.95.2. `replaceMesh` è il `THREE.Mesh` solido (r.753), quindi il non-ricorsivo colpisce comunque le facce del solido e `hits[0].face` è presente; il fallback `(0,0,1)` resta come guardia difensiva ma in pratica non si innesca più. Riprodotto e verificato nel mock con THREE r169 reale + la vera `applyRenderModeToMesh`: in modalità 'both' `replaceMesh.children = [LineSegments]`; su un piano denso inclinato 40° il raycast ricorsivo dava `hits[0]` senza `.face` → normale `(0,0,1)` = **40° di errore**, quello non ricorsivo `hits[0]` Mesh `face=true` → normale vera = **0°** (FIX_WORKS).
+
+Nota di rilascio: preparato inizialmente come 8.95.3, ma quel numero è stato preso in parallelo dal dead-code cleanup (dead-code: 3 fn a 0-caller); il lavoro è stato ribasato su `main` e rinumerato **8.95.4**. Il gate verbatim di replace è stato ri-baselinato per `replaceOnViewportClick`. Deploy incrementale LEGACY canary → verifica → BACKEND, entrambi SUCCESS su commit `19eb19f` (anti-race `commitHash==HEAD`); 8.95.4 live sul canonico con-h e sui railway, `wf/replace.js` servito col fix su entrambi, legacy senza-h → 308.
+
+Implementazione:
+- wf/replace.js: `intersectObject(replaceMesh)` → `intersectObject(replaceMesh, false)` in replaceOnViewportClick (r.817).
+- scripts/gate/replace/golden.json ri-baselinato (replaceOnViewportClick); registry + v3b title/ANALIZZA_BUILD/DATE 8.95.4.
+
 ## 2026-07-06 — 8.95.3: Dead-code — rimosse 3 funzioni a 0 chiamanti
 
 Passo dedicato di pulizia (CLAUDE.md §3.4, mai durante un task funzionale). Ri-applica su main una pulizia che era rimasta in sospeso: una sessione precedente aveva rimosso 3 funzioni morte su un branch/worktree isolato (`claude/quizzical-pike-234138`, commit `8.91.1`), ma quel branch non era mai stato mergiato ed era fermo a un baseline vecchio (8.91.0) — un merge diretto avrebbe fatto conflitto coi cambi 8.95.1/.2 su `wf/sostituire.js`. Ho ri-verificato che le 3 funzioni sono ancora presenti in main e ancora senza chiamanti, e le ho rimosse fresche.
