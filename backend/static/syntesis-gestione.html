@@ -1433,8 +1433,11 @@
       if(mel){
         var parts=['<b>Top da origine (Z):</b> '+meas.zTop.toFixed(2)+' mm',
                    '<b>Ingombro Z:</b> '+meas.zRange.toFixed(2)+' mm'];
-        if(meas.flatAngleDeg!=null) parts.push('<b>Faccia piatta:</b> '+meas.flatAngleDeg.toFixed(1)+'° <span style="color:#64748b">(normale dalla +X, antioraria attorno a Z)</span>');
-        else parts.push('<b>Faccia piatta:</b> <span style="color:#94a3b8">non rilevata</span>');
+        if(meas.flatAngleDeg!=null){
+          var _fa=meas.flatAngleDeg; if(_fa>180) _fa-=360;   // 8.105.1: range con segno (-180,180]: un flat a ~0 legge -0.2° invece di 359.8°
+          var _cf=(meas.flatConfidence>=6)?'alta':'media';
+          parts.push('<b>Faccia piatta:</b> '+_fa.toFixed(1)+'° <span style="color:#64748b">(normale dalla +X, attorno a Z · confidenza '+_cf+')</span>');
+        } else parts.push('<b>Faccia piatta:</b> <span style="color:#94a3b8">non rilevata</span>');
         mel.innerHTML=parts.join(' &nbsp;·&nbsp; ');
       }
     } catch(_m){}
