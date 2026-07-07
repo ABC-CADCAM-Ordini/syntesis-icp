@@ -25,7 +25,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Analizzare v8.99.1</title>
+<title>Synthesis-ICP - Analizzare v8.100.0</title>
 <!--
 ==== INDICE (§anchor grep-able) ============================================
 Navigazione: grep -n sul token (es. grep -n 'MISURARE-ICP'). Banner UNICI (gate:
@@ -1338,7 +1338,7 @@ function getAnalyzeSbCfg(){ return SCANBODY_CFG[getAnalyzeSbType()] || SCANBODY_
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.99.1';
+window.ANALIZZA_BUILD = '8.100.0';
 window.ANALIZZA_BUILD_DATE = '2026-07-07';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 
@@ -1352,10 +1352,41 @@ var SYN_LOG_PW_HASH = '7c1e036f2346d7269d0e601a50a526201a022707e7f992c24b6da62a2
 // 8.72.0: sub-password AREA EXPERT (SHA-256). Sblocca/nasconde gli elementi .expert-only.
 var SYN_EXPERT_PW_HASH = '43f6c8ca434cd1285d8c78b6d220317007d28c66933fae477a22ac9e13503b65';
 var _synLogPT = 0;
+// 8.100.0: REDAZIONE SICUREZZA (non negoziabile). Il log NON deve mai contenere password, token,
+// JWT, segreti, header Authorization, cookie. _synRedact maschera per NOME-CHIAVE e per FORMA (JWT),
+// tronca stringhe lunghe, limita profondita'/ampiezza. _synRedactUrl toglie i valori dei query param
+// sensibili. Chiamati SEMPRE prima di mettere qualcosa nel log.
+var _SYN_SENSITIVE_RE = /(pass|pwd|token|jwt|secret|authoriz|bearer|cookie|api[_-]?key|credential|hash|session)/i;
+function _synRedact(v, depth){
+  depth = depth || 0;
+  try {
+    if(v == null) return v;
+    if(typeof v === 'string'){
+      if(/^[A-Za-z0-9_\-]{16,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}$/.test(v)) return '[REDACTED:jwt]';
+      if(/^Bearer\s+/i.test(v)) return '[REDACTED:bearer]';
+      return v.length > 300 ? (v.slice(0,300) + '…(+'+(v.length-300)+')') : v;
+    }
+    if(typeof v === 'number' || typeof v === 'boolean') return v;
+    if(typeof v !== 'object') return String(v);
+    if(depth > 4) return '[…]';
+    if(Array.isArray(v)) return v.slice(0, 50).map(function(x){ return _synRedact(x, depth+1); });
+    var o = {}, n = 0, keys = Object.keys(v);
+    for(var i = 0; i < keys.length; i++){
+      var k = keys[i];
+      if(n++ >= 60){ o['…'] = '[+'+(keys.length-60)+' chiavi]'; break; }
+      o[k] = _SYN_SENSITIVE_RE.test(k) ? '[REDACTED]' : _synRedact(v[k], depth+1);
+    }
+    return o;
+  } catch(_){ return '[unloggable]'; }
+}
+function _synRedactUrl(u){
+  try { return String(u).replace(/([?&][^=&]*(?:token|jwt|secret|auth|pass|key|session)[^=&]*=)[^&]*/gi, '$1[REDACTED]'); }
+  catch(_){ return ''; }
+}
 function synLog(cat, msg, data){
   try {
     var e = { t:new Date().toISOString(), cat:cat, msg:msg };
-    if(data!==undefined) e.data = data;
+    if(data!==undefined) e.data = _synRedact(data);
     SYN_LOG.push(e);
     if(SYN_LOG.length > SYN_LOG_MAX) SYN_LOG.splice(0, SYN_LOG.length - SYN_LOG_MAX);
     var now = (new Date()).getTime();
@@ -1373,6 +1404,29 @@ function synLogDownload(){
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function(){ try{URL.revokeObjectURL(a.href);}catch(_){} }, 1500);
   } catch(e){ alert('Errore download log: '+e); }
+}
+// 8.100.0: scarica il log COMPLETO (front client + backend server). Il backend arriva da /api/logs
+// (buffer in RAM, endpoint autenticato). Se il backend non risponde, scarica il solo front. Il token
+// va SOLO nell'header Authorization della richiesta (HTTPS), MAI nel file scaricato.
+function synLogDownloadAll(){
+  var front = synLogText();
+  var tok = ''; try { tok = localStorage.getItem('syntesis_token') || ''; } catch(_){}
+  var opts = tok ? { headers: { 'Authorization': 'Bearer ' + tok } } : {};
+  var _save = function(text){
+    try {
+      var blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = 'SynthesisSessionLog_'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ try{URL.revokeObjectURL(a.href);}catch(_){} }, 1500);
+    } catch(e){ alert('Errore download log: '+e); }
+  };
+  var _head = '=== SYNTHESIS SESSION LOG · ' + (window.ANALIZZA_BUILD||'?') + ' · ' + new Date().toISOString() + ' ===\n';
+  fetch('/api/logs', opts).then(function(r){ return r.ok ? r.text() : ''; }).catch(function(){ return ''; })
+    .then(function(back){
+      _save(_head + '\n=== FRONT (client) ===\n' + front +
+            '\n\n=== BACKEND (server) ===\n' + (back || '(non disponibile: endpoint assente o non autorizzato)') + '\n');
+    });
 }
 function synLogUnlock(){
   var pw = prompt('Password log di sessione:');
@@ -1404,20 +1458,100 @@ function synExpertToggle(){
   synLog('expert', on ? 'area Expert attivata' : 'area Expert disattivata');
   alert(on ? 'Area Expert ATTIVA: funzioni sperimentali e readout tecnici visibili. Ripeti la procedura per nascondere.' : 'Area Expert disattivata.');
 }
+// 8.100.0: HOOK di cattura completa (installati 1 volta). fetch -> ogni chiamata server (metodo/path/
+// stato/ms, MAI header/body: niente Authorization, niente password, niente STL); click/change -> ogni
+// azione utente (elemento, NON i valori dei campi testo/password); console.error/warn -> anche nel log.
+function _synInstallHooks(){
+  if(window._synHooked) return; window._synHooked = true;
+  // 1. fetch wrapper
+  try {
+    if(typeof window.fetch === 'function'){
+      var _of = window.fetch.bind(window);
+      window._synOrigFetch = _of;
+      window.fetch = function(input, init){
+        var url = ''; try { url = (typeof input === 'string') ? input : (input && input.url) || ''; } catch(_){}
+        var method = ((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+        var path = _synRedactUrl(String(url).replace(/^https?:\/\/[^/]+/,''));
+        var quiet = /\/api\/logs\b/.test(path);   // non auto-loggare la richiesta del log stesso
+        var t0 = (new Date()).getTime();
+        if(!quiet) synLog('net', method + ' ' + path + ' …');
+        return _of(input, init).then(function(res){
+          if(!quiet) synLog('net', method + ' ' + path + ' -> ' + res.status, { ms:(new Date()).getTime()-t0 });
+          return res;
+        }, function(err){
+          if(!quiet) synLog('net', method + ' ' + path + ' -> ERRORE', { err:String((err && err.message) || err), ms:(new Date()).getTime()-t0 });
+          throw err;
+        });
+      };
+    }
+  } catch(_){}
+  // 2. click delegate (mai valori di input)
+  try {
+    document.addEventListener('click', function(ev){
+      try {
+        var el = ev.target; if(!el) return;
+        var btn = (el.closest && el.closest('button,[role="button"],a,[onclick],label,.tab,input[type="radio"],input[type="checkbox"]')) || el;
+        var id = btn.id || (btn.getAttribute && (btn.getAttribute('data-id')||'')) || '';
+        var tag = (btn.tagName||'').toLowerCase();
+        var txt = (btn.textContent||'').replace(/\s+/g,' ').trim().slice(0,40);
+        synLog('ui', 'click ' + tag + (id?('#'+id):''), { txt:txt, wf:(window.__synWf||window.currentWorkflow||'') });
+      } catch(_){}
+    }, true);
+  } catch(_){}
+  // 3. change delegate: solo select/radio/checkbox (mai text/password/file value)
+  try {
+    document.addEventListener('change', function(ev){
+      try {
+        var el = ev.target; if(!el) return;
+        var tag = (el.tagName||'').toLowerCase(), type = (el.type||'').toLowerCase();
+        var lbl = (el.id||el.name||'');
+        if(tag==='select' || type==='radio' || type==='checkbox'){
+          synLog('ui', 'set ' + tag + (lbl?('#'+lbl):''), { val:(type==='checkbox'?el.checked:el.value) });
+        } else if(type==='file'){
+          synLog('ui', 'file input' + (lbl?(' #'+lbl):''), { n:(el.files?el.files.length:0), names:(el.files?Array.prototype.map.call(el.files,function(f){return String(f.name).slice(0,60);}).slice(0,8):[]) });
+        } else if(tag==='input' || tag==='textarea'){
+          synLog('ui', 'input ' + (lbl||tag) + ' (len ' + ((el.value||'').length) + ')');   // NON il valore
+        }
+      } catch(_){}
+    }, true);
+  } catch(_){}
+  // 4. console.error / console.warn -> anche nel log
+  try {
+    ['error','warn'].forEach(function(lvl){
+      var orig = console[lvl];
+      if(typeof orig !== 'function') return;
+      console[lvl] = function(){
+        try { synLog('console', lvl, Array.prototype.slice.call(arguments, 0, 6).map(function(a){ return (typeof a==='string') ? a.slice(0,300) : _synRedact(a); })); } catch(_){}
+        try { return orig.apply(console, arguments); } catch(_){}
+      };
+    });
+  } catch(_){}
+}
 function synLogInit(){
   try {
     try { var prev = localStorage.getItem('syn_session_log'); if(prev){ SYN_LOG = JSON.parse(prev); if(!Array.isArray(SYN_LOG)) SYN_LOG=[]; } } catch(_){ SYN_LOG=[]; }
-    synLog('session', '=== nuova sessione ===', { ver:(window.ANALIZZA_BUILD||'?'), ua:(navigator.userAgent||''), url:(location.href||'') });
+    synLog('session', '=== nuova sessione ===', { ver:(window.ANALIZZA_BUILD||'?'), ua:(navigator.userAgent||''), url:_synRedactUrl(location.href||'') });
+    _synInstallHooks();
     if(document.body && !document.getElementById('synLogDot')){
       var d = document.createElement('div'); d.id='synLogDot';
       d.style.cssText='position:fixed;left:7px;bottom:7px;width:11px;height:11px;border-radius:50%;background:#64748b;opacity:0.45;cursor:pointer;z-index:99999';
       d.addEventListener('click', synLogUnlock);
       document.body.appendChild(d);
     }
+    // 8.100.0: pulsante VISIBILE "scarica log" in modalita' Expert (.expert-only). Un click ->
+    // synLogDownloadAll (front+backend). Niente seconda password: sei gia' dentro l'area Expert.
+    if(document.body && !document.getElementById('synLogBtn')){
+      var b = document.createElement('button'); b.id='synLogBtn'; b.className='expert-only';
+      b.type='button'; b.textContent='⤓ log';
+      b.title='Scarica il log completo di sessione (front client + backend server), senza password/token';
+      b.style.cssText='position:fixed;left:24px;bottom:5px;z-index:99999;font-family:var(--mono,monospace);font-size:11px;font-weight:700;padding:4px 9px;border:1px solid #0065B3;border-radius:5px;background:#0065B3;color:#fff;cursor:pointer;opacity:.92';
+      b.addEventListener('click', synLogDownloadAll);
+      document.body.appendChild(b);
+    }
     // 8.72.0: ripristina l'area Expert della sessione precedente
     try { if(localStorage.getItem('syntesis_expert_mode') === '1') synExpertApply(true); } catch(_){}
     window.addEventListener('error', function(ev){ try{ synLog('error','window.onerror', { msg:(ev.message||''), src:(ev.filename||''), line:ev.lineno }); }catch(_){} });
-    window.addEventListener('unhandledrejection', function(ev){ try{ synLog('error','unhandledrejection', { reason:String(ev.reason) }); }catch(_){} });
+    window.addEventListener('unhandledrejection', function(ev){ try{ synLog('error','unhandledrejection', { reason:_synRedact(String(ev.reason)) }); }catch(_){} });
   } catch(_){}
 }
 if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', synLogInit); } else { synLogInit(); }

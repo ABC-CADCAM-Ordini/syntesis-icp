@@ -150,6 +150,68 @@ async def redirect_legacy_host(request, call_next):
         return RedirectResponse(url=target, status_code=308)
     return await call_next(request)
 
+# ── 8.100.0: SESSION LOG backend ("stella polare") — buffer in RAM (no DB, no nuovo servizio) ──────
+# Registra OGNI richiesta (metodo, path redatto, stato, durata) + OGNI warning/error applicativo.
+# SICUREZZA: nessun body, nessun header Authorization/token, nessun segreto. Redazione difensiva su
+# stringhe (JWT/bearer/password/token/secret) prima di scrivere nel buffer. Query param sensibili mascherati.
+# Esposto solo via GET /api/logs (require_authorized). Si azzera a ogni redeploy (accettato, §risposta utente).
+import collections as _collections
+import re as _re
+_SYN_LOG_BUF = _collections.deque(maxlen=3000)
+_SYN_BACK_JWT = _re.compile(r'\b[A-Za-z0-9_\-]{16,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b')
+_SYN_BACK_BEARER = _re.compile(r'(?i)\bbearer\s+[A-Za-z0-9._\-]+')
+# KV "contiene" (cattura anche env var tipo JWT_SECRET, DB_PASSWORD, ADMIN_TOKEN): la parola sensibile
+# puo' stare dentro un identificatore piu' lungo.
+_SYN_BACK_KV = _re.compile(r'(?i)([\w-]*(?:password|passwd|pwd|token|secret|jwt|api[_-]?key|authorization|cookie|credential)[\w-]*)\s*[=:]\s*\S+')
+_SYN_BACK_QS = _re.compile(r'(?i)([?&][^=&]*(?:token|jwt|secret|auth|pass|key|session)[^=&]*=)[^&]*')
+# credenziali negli URL di connessione: scheme://user:PASSWORD@host -> maschera la password
+_SYN_BACK_URLCRED = _re.compile(r'([a-zA-Z][a-zA-Z0-9+.\-]*://[^:@/\s]+:)[^@/\s]+@')
+
+def _syn_back_redact(s: str) -> str:
+    try:
+        s = _SYN_BACK_BEARER.sub('Bearer [REDACTED]', str(s))
+        s = _SYN_BACK_URLCRED.sub(r'\1[REDACTED]@', s)
+        s = _SYN_BACK_JWT.sub('[REDACTED:jwt]', s)
+        s = _SYN_BACK_KV.sub(r'\1=[REDACTED]', s)
+        return s[:2000]
+    except Exception:
+        return '[unloggable]'
+
+def _syn_back_push(line: str) -> None:
+    try:
+        _SYN_LOG_BUF.append(f"{datetime.utcnow().isoformat()}Z {line}")
+    except Exception:
+        pass
+
+class _SynBufHandler(logging.Handler):
+    """Cattura i warning/error applicativi (logger.warning/error/exception) nel buffer, redatti."""
+    def emit(self, record):
+        try:
+            _syn_back_push(f"[{record.levelname}] {record.name}: {_syn_back_redact(record.getMessage())}")
+        except Exception:
+            pass
+
+_syn_buf_handler = _SynBufHandler(level=logging.WARNING)   # WARNING+ = niente spam INFO/access di uvicorn
+logging.getLogger().addHandler(_syn_buf_handler)
+
+@app.middleware("http")
+async def _syn_request_logger(request, call_next):
+    _rawpath = request.url.path
+    # niente rumore: salta asset statici e la richiesta del log stesso
+    if _rawpath.startswith("/static/") or _rawpath == "/api/logs" or _rawpath == "/favicon.ico":
+        return await call_next(request)
+    _t0 = time.time()
+    _method = request.method
+    _path = _SYN_BACK_QS.sub(r'\1[REDACTED]', str(_rawpath) + (('?' + request.url.query) if request.url.query else ''))
+    _auth = 'auth' if request.headers.get('authorization') else 'anon'   # presenza, NON il valore
+    try:
+        resp = await call_next(request)
+        _syn_back_push(f"[REQ] {_method} {_path} -> {resp.status_code} ({int((time.time()-_t0)*1000)}ms, {_auth})")
+        return resp
+    except Exception as _e:
+        _syn_back_push(f"[REQ] {_method} {_path} -> EXC {type(_e).__name__} ({int((time.time()-_t0)*1000)}ms, {_auth})")
+        raise
+
 app.include_router(auth_router, prefix="/auth")
 app.include_router(admin_router, prefix="/admin")
 
@@ -368,6 +430,16 @@ async def leaderboard(
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
+
+
+@app.get("/api/logs", include_in_schema=False)
+async def syn_logs(current_user: dict = Depends(require_authorized)):
+    """8.100.0: log di sessione backend (buffer RAM), scaricato dal pulsante Expert del frontend e
+    unito al log front. Gate require_authorized (i pending prendono 403 -> il download mostra
+    'backend non disponibile'). Redazione gia' applicata all'inserimento: qui nessun segreto."""
+    from fastapi.responses import PlainTextResponse
+    body = "\n".join(_SYN_LOG_BUF) if _SYN_LOG_BUF else "(buffer vuoto)"
+    return PlainTextResponse(body, headers={"Cache-Control": "no-store"})
 
 
 
