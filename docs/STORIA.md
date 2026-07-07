@@ -1,5 +1,18 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.101.0: Replace-iT — filtro parentela nell'Archivio STL (marca/modello/ruolo)
+
+Richiesta dell'utente: quando si crea una nuova libreria di conversione, i sintetici **madre** e **figlio** possono già essere nel database e usati da altre librerie. Serviva un modo per **vedere e filtrare** i file per la marca/connessione collegata, così da trovare — e in futuro modificare — la **relazione di parentela** file ↔ libreria.
+
+**La buona notizia: la relazione era già tutta nel modello dati.** `rit_scanbody_type` collega ogni file (per nome/sha256) a una libreria con un `role` (madre/figlio); `rit_library` porta marca, modello, supplier, connection_id. Il "USATO DA N librerie" dell'Archivio STL era già questa join, aggregata a contatore. Quindi **nessuna migrazione** — bastava tirare fuori i dettagli e filtrarli.
+
+Scelta con l'utente: **Fase 1 (solo lettura + filtro)**, estendendo l'**Archivio STL** esistente.
+
+- **Backend** (`database.py` `rit_list_stl_assets`): `LEFT JOIN rit_scanbody_type + rit_library` con `array_remove(array_agg(DISTINCT ...), NULL)` → ogni asset ora porta `marche[]`, `modelli[]`, `ruoli[]` oltre a `used_by`.
+- **Frontend** (`syntesis-gestione.html`, Archivio STL): 3 colonne nuove (Marca / Modello / Ruolo, a chip) + una barra filtri (cerca-nome + select Marca + select Modello + select Ruolo madre/figlio + Azzera + contatore N/totale), con filtro client-side (`stlFilterMatch`/`stlPopulateFilters`/`stlWireFilters`).
+
+**Nota sul modello dati** emersa progettando: `connection_id` è popolato **solo per le librerie Exocad** (viene dall'XML); per csv/editor è NULL. La "connessione" universale è quindi **marca + modello** (valorizzati per tutte le sorgenti), ed è quella che usa il filtro. Non tocca il monolite analyzer. `py_compile` + `node --check` della gestione, `run_all.sh` verde. Deploy commit `a67d021` su entrambi i servizi; `/admin/rit/stl` risponde 403 anon (route viva, gated), gestione servita coi filtri. Bump MINOR. **Fase 2** (modificare la parentela: riassegnare il file madre/figlio di una libreria) rinviata a richiesta.
+
 ## 2026-07-07 — 8.100.1: Il session log pesca il suo primo bug (errore "opacity su undefined")
 
 Poche ore dopo il rilascio della "stella polare" (8.100.0), l'utente ha scaricato il log e ha detto «guarda, funziona bene!». Funziona così bene che aveva già registrato **93 volte** lo stesso errore JavaScript, in 3 firme (stesso errore, righe diverse per via delle versioni):
