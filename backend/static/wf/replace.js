@@ -814,7 +814,7 @@ function replaceOnViewportClick(event){
   var raycaster = new THREE.Raycaster();
   if(camera) camera.updateMatrixWorld();
   raycaster.setFromCamera(mouse, camera);
-  var hits = raycaster.intersectObject(replaceMesh);
+  var hits = raycaster.intersectObject(replaceMesh, false);   // 8.95.4 FIX: NON ricorsivo (come Analizza r.1750 / Sostituire 8.95.2). In vista render 'both' replaceApplyRenderMode aggiunge a replaceMesh un figlio LineSegments (_wireOverlay): intersectObject di default e' RICORSIVO -> colpiva l'overlay wireframe (senza .face, soglia linea) come hits[0]. Qui la posa NON veniva bloccata ma il fallback normale (0,0,1) alla r.837 sostituiva la normale di superficie vera -> asse del seme sbagliato (verificato nel mock: 40 gradi di errore). false = solo le facce del mesh solido.
   if(hits.length === 0) return false;
   // 8.59.5 (causa REALE del pallino spostato, trovata con diagnosi console A/B con l'utente): il
   // raycast su replaceMesh restituisce un hits[0].point FUORI dal raggio di ~0.5-1mm (misurato:
