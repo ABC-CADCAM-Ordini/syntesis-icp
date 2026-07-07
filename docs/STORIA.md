@@ -1,5 +1,14 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.102.0: Replace-iT — filtri anche sulla tabella Librerie (parentela a doppia entrata)
+
+Subito dopo i filtri sull'Archivio STL (8.101.0, *dal file → librerie*), l'utente: «anche su librerie metti dei filtri per cercare i file». Cioè l'entrata inversa: *dalla libreria → file*. Insieme, le due tabelle danno la navigazione a doppia entrata della parentela.
+
+- **Backend** (`database.py` `rit_list_libraries`): oltre a `marca`/`modello`/`diametro`, ora aggrega i **file usati** da ogni libreria — `files[]`, `files_madre[]`, `files_figlio[]` — via `LEFT JOIN rit_scanbody_type` + `array_remove(array_agg(DISTINCT CASE WHEN role=… END), NULL)`.
+- **Frontend** (`syntesis-gestione.html`, tabella Librerie): colonna nuova **"File (madre/figlio)"** con chip colorati (madre azzurro, figlio verde, senza-ruolo grigio = Exocad) + barra filtri: ricerca su nome/keyword/display/fornitore/marca/modello **e sui nomi dei file usati**, select **Fornitore**, select **Stato** (Attiva/Non attiva), Azzera, contatore N/totale. Filtro client-side (`ritFilterMatch`/`ritPopulateFilters`/`ritWireFilters`/`_ritFileChips`).
+
+Così puoi cercare **"quali librerie usano il file X"** — il reverse dell'Archivio STL. Non tocca il monolite analyzer. `py_compile` + `node --check` gestione, `run_all.sh` verde. Deploy commit `ee99997`; `/admin/rit/libraries` 403 anon (route viva, gated). Bump MINOR.
+
 ## 2026-07-07 — 8.101.0: Replace-iT — filtro parentela nell'Archivio STL (marca/modello/ruolo)
 
 Richiesta dell'utente: quando si crea una nuova libreria di conversione, i sintetici **madre** e **figlio** possono già essere nel database e usati da altre librerie. Serviva un modo per **vedere e filtrare** i file per la marca/connessione collegata, così da trovare — e in futuro modificare — la **relazione di parentela** file ↔ libreria.
