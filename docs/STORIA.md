@@ -1,5 +1,14 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.104.0: Replace-iT — vista "Parentela" per singolo file (Archivio STL)
+
+Richiesta dell'utente: un'area per vedere **tutte le parentele collegate a un singolo file** — dove compare, a chi è collegato. Le colonne aggregate (chip marche/modelli/ruolo, 8.101.0) danno il colpo d'occhio; questa dà il **dettaglio riga-per-riga**.
+
+- **Backend** (`database.py` `rit_stl_asset_usage(name)`): `JOIN rit_scanbody_type (marker_filename=name) → rit_library`, restituisce per ogni **uso** la libreria completa (import_name, display, marca, modello, diametro, fornitore, connessione, stato attiva) + il **ruolo** (madre/figlio) + il tipo. Una libreria può comparire più volte (più scanbody-type che usano lo stesso file). Endpoint `GET /admin/rit/stl/{name}/usage` (`require_contributor`).
+- **Frontend** (`syntesis-gestione.html`): modal **"Parentela — &lt;file&gt;"** con tabella Libreria / Marca / Modello / Ø / Ruolo (chip) / Fornitore / Connessione / Stato, più il riepilogo "compare in N librerie (M collegamenti per ruolo)". Due trigger dalla riga dell'Archivio STL: il link **"Parentela"** in fondo alla riga e la cella **"USATO DA N librerie"** resa cliccabile (`stlUsageOpen`/`stlUsageRender`/`stlUsageClose`).
+
+Così, partendo dal file, apri l'elenco completo delle librerie collegate col ruolo. Non tocca il monolite analyzer. `py_compile` (database.py + admin.py) + `node --check` gestione, `run_all.sh` verde. Deploy commit `3a90813`; `/usage` 403 anon (route viva, gated). Bump MINOR.
+
 ## 2026-07-07 — 8.103.0: Anteprima STL — misure Z-top e angolo della faccia piatta
 
 Richiesta dell'utente: nell'anteprima 3D dell'Archivio STL mostrare **la distanza del top dall'origine** (ingombro in asse Z) e, «se possibile», **l'angolo tra la faccia piatta di riferimento e l'asse X**. (Il pulsante *Anteprima* — la finestra 3D — esisteva già in fondo a ogni riga: qui si aggiungono solo le misure sotto il modello.)
