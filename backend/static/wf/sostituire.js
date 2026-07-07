@@ -1210,12 +1210,15 @@ function sostPlaceTemplate(rawPoint, rawNormal){
 function _sostRaffDiag(p, axB){
   if(!p || !p.diag) return;
   var d = p.diag;
-  var plCen = d.finalCen ? new THREE.Vector3(d.finalCen[0], d.finalCen[1], d.finalCen[2]) : p.position.clone();
-  d.raffCenShift = p.position.distanceTo(plCen);
+  // 8.99.1: misura il CENTRO DISCO (p.discWorld), coerente con finalCen/mcCen (anch'essi centri
+  // disco). p.position e' la connessione (~5mm sotto): usarla dava raffCenShift/raffVsMc ~5mm fantasma.
+  var cur = p.discWorld ? p.discWorld : p.position;
+  var plCen = d.finalCen ? new THREE.Vector3(d.finalCen[0], d.finalCen[1], d.finalCen[2]) : cur.clone();
+  d.raffCenShift = cur.distanceTo(plCen);
   var a0 = (axB ? axB.clone() : new THREE.Vector3(0,0,1)).normalize();
   var a1 = p.axisDir.clone().normalize();
   d.raffAxDeg = Math.acos(Math.min(1, Math.max(-1, a0.dot(a1)))) * 180 / Math.PI;
-  d.raffVsMc = d.mcCen ? p.position.distanceTo(new THREE.Vector3(d.mcCen[0], d.mcCen[1], d.mcCen[2])) : null;
+  d.raffVsMc = d.mcCen ? cur.distanceTo(new THREE.Vector3(d.mcCen[0], d.mcCen[1], d.mcCen[2])) : null;
 }
 
 function sostAlignAll(){
@@ -1315,12 +1318,18 @@ function sostAlignAll(){
         // gia' validato 1:1 Python, gia' shadow-loggato come colonne mc*). Nessun solutore nuovo:
         // _sostMethodCPose croppa 6mm, classifica cap/parete (bande |n.asse|) e risolve LM+IRLS con
         // trust-region interna (centro 60µm, asse 0.5°, ncap>=150/nwall>=600). Se applica -> muovo il
-        // marker a (D.center, D.axis) con una trasformazione rigida (rotazione asse->asse attorno alla
-        // posa corrente + traslazione del centro), come il blocco fix-asse ma con anche la traslazione;
-        // poi salto il Kabsch. Se NON applica (few-pts/trust-*/no-fit) -> fallback al Kabsch pesato sotto.
+        // marker a (D.center, D.axis) con una trasformazione rigida (rotazione asse->asse attorno al
+        // CENTRO DISCO + traslazione del centro disco); poi salto il Kabsch. Se NON applica
+        // (few-pts/trust-*/no-fit) -> fallback al Kabsch pesato sotto.
+        // 8.99.1 FIX: seedare Method C col CENTRO DISCO (p.discWorld), NON con p.position
+        // (= connessione implantare, ~5mm sotto il disco lungo l'asse per SR capZ=+5): seedato sulla
+        // connessione la banda cap |s|<=0.18mm non trovava punti -> Method C dava no-fit su OGNI marker
+        // (l'intero p2plane cadeva sul Kabsch = il difetto). Il centro/asse di Method C sono ancorati al
+        // disco (dove il cap e' a s~0), come al piazzamento (_cen/_capDiag.center).
         if(_useP2P){
           var _mcR = (SOSTITUIRE_TEMPLATE_INFO[sourceKey] || {}).radius || 2.03;
-          var _D = _sostMethodCPose(sostMesh.geometry, p.position.clone(), p.axisDir.clone().normalize(), _mcR);
+          var _oldDisc = (p.discWorld ? p.discWorld : p.position).clone();  // centro disco = seed corretto
+          var _D = _sostMethodCPose(sostMesh.geometry, _oldDisc.clone(), p.axisDir.clone().normalize(), _mcR);
           p.diag = p.diag || {};
           p.diag.raffEngine = _D.applied ? 'p2plane' : ('p2plane-fallback:' + (_D.reason||'?'));
           p.diag.raffMcReason = _D.reason;
@@ -1328,26 +1337,26 @@ function sostAlignAll(){
           if(_D.applied){
             var _oldAx = p.axisDir.clone().normalize();
             var _newAx = new THREE.Vector3(_D.axis[0], _D.axis[1], _D.axis[2]).normalize();
-            var _newCen = new THREE.Vector3(_D.center[0], _D.center[1], _D.center[2]);
-            var _mcMove = p.position.distanceTo(_newCen);
+            var _newDisc = new THREE.Vector3(_D.center[0], _D.center[1], _D.center[2]);
+            var _mcMove = _oldDisc.distanceTo(_newDisc);   // spostamento del CENTRO DISCO
             var _mcAd = Math.acos(Math.min(1, Math.max(-1, _oldAx.dot(_newAx)))) * 180 / Math.PI;
             // idempotenza per-marker: se Method C non muove piu' (converso), no-op -> l'auto-loop chiude.
             if(_mcMove < 1e-3 && _mcAd < 0.01){ return; }
             var _qD = new THREE.Quaternion().setFromUnitVectors(_oldAx, _newAx);
             var _Rd = new THREE.Matrix4().makeRotationFromQuaternion(_qD);
-            var _pP = p.position;
-            // T(newCen) * Rd * T(-pPos): ruota attorno alla posa corrente, poi porta il centro su newCen
+            // T(newDisc) * Rd * T(-oldDisc): ruota attorno al centro disco e lo porta su newDisc.
+            // La connessione (p.position) e i gruppi seguono RIGIDAMENTE la stessa M.
             var _M = new THREE.Matrix4()
-              .makeTranslation(_newCen.x, _newCen.y, _newCen.z)
+              .makeTranslation(_newDisc.x, _newDisc.y, _newDisc.z)
               .multiply(_Rd)
-              .multiply(new THREE.Matrix4().makeTranslation(-_pP.x, -_pP.y, -_pP.z));
+              .multiply(new THREE.Matrix4().makeTranslation(-_oldDisc.x, -_oldDisc.y, -_oldDisc.z));
             Object.keys(p.groups || {}).forEach(function(k){
               var g = p.groups[k]; if(!g) return;
               g.matrix.copy(new THREE.Matrix4().multiplyMatrices(_M, g.matrix));
               g.matrixAutoUpdate = false;
             });
-            if(p.discWorld){ p.discWorld.applyMatrix4(_M); }
-            p.position.copy(_newCen);
+            p.position.applyMatrix4(_M);            // la connessione segue rigidamente
+            if(p.discWorld){ p.discWorld.copy(_newDisc); }
             p.axisDir.copy(_newAx);
             var _endP = p.position.clone().add(p.axisDir.clone().multiplyScalar(20));
             p.axisLine.geometry.setFromPoints([p.position, _endP]);
