@@ -1,5 +1,17 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.107.0: Anteprima STL — faccia piatta obliqua + annotazione 3D
+
+L'utente ha aperto `ELO-AAR.stl` (cilindro con **top tagliato obliquo**) e ha visto "Faccia piatta: non rilevata", notando: «la faccia piatta può essere una faccia obliqua». Il mio rilevamento guardava solo pareti quasi-verticali (`|nz|<0.35`) → mancava le facce inclinate. Inoltre: «indica nell'anteprima dove è il valore in Z e in rotazione».
+
+`stlMeasure` ora è a **due stadi**: (1) **verticale** = il picco d'azimut delle normali di parete (metodo collaudato, invariato); se non trova nulla, (2) **obliqua** = nella banda inclinata `0.35<|nz|<0.97` (dove il cilindro non contribuisce) cerca il cluster di normali più **concentrato** (`picco/totale-banda ≥ 0.40`): un flat obliquo concentra tutto in una direzione; uno smusso/chamfer si spalma su tutti gli azimut (concentrazione bassa) → correttamente **non** rilevato. Ritorna azimut (rotazione, con segno −180…180), **inclinazione** (dalla verticale), confidenza (alta/media), e normale+centroide del flat.
+
+**Annotazione 3D** (`stlPreviewRender`): i facet della faccia piatta sono evidenziati in **ambra** con una **freccia** lungo la normale (la direzione della "rotazione"); un **anello blu** all'altezza `Z-top` indica l'ingombro in Z. Legenda aggiornata; le geometrie extra sono tracciate in `prevState.extra` e disposte alla chiusura. Verificato headless: verticale@0/30/120 conf 11.5; obliqua con inclinazione 45–70° conf 8–15; chamfer e cilindro liscio → null. `node --check` gestione, `run_all.sh` verde. Deploy `8eebb1f`. Bump MINOR.
+
+## 2026-07-07 — 8.106.0: UX Archivio STL — lucchetto a pallino, "chi ha aggiornato" collassabile
+
+Richieste per accorciare la riga: la colonna **Lucchetto** diventa un **pallino verde** (libero) / **rosso** (bloccato) invece del pill testuale; la colonna **Aggiornato** tiene la data sempre visibile e mette "chi ha aggiornato" (`uploaded_by`) in un **menu collassabile** (▾/▲). Nota: le *revisioni precedenti* non sono storicizzate nel modello — `rit_stl_asset` tiene solo lo stato corrente per nome, e l'overwrite "live per nome" non conserva le versioni vecchie — quindi il collassabile mostra il solo autore; uno storico revisioni sarebbe una feature nuova (conservare i blob). Solo frontend. Deploy `a49036e`. Bump MINOR.
+
 ## 2026-07-07 — 8.105.1: Fix del display dell'angolo faccia piatta (359.8° → −0.2°)
 
 L'utente ha aperto l'anteprima di `0T3 RP.STL` e ha visto **"Faccia piatta: 359.8°"**, dubitando: «sei sicuro? forse è 0°?». Aveva ragione: **359.8° = −0.2°** — il flat guarda verso ~+X, cioè ~0° — ma la convenzione 0–360 faceva "girare" a 359.8 un valore in realtà quasi-zero.
