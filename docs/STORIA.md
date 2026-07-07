@@ -1,5 +1,19 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.105.0: Replace-iT Fase 2a — collega/scollega le parentele (soft, reversibile)
+
+Passo alla Fase 2 (modifica della parentela), che tocca le scritture. Ragionato bene sul modello prima di scrivere, e il concetto smart concordato con l'utente è: **«la parentela è un interruttore, non una cancellazione»**.
+
+Nel modello, un link `rit_scanbody_type` ha già un flag **`active`**, e le librerie hanno già il concetto Attiva/Disattiva. Quindi: **scollegare = spegnere il link (`active=false`, soft, reversibile)**, **collegare = riaccenderlo**. Due proprietà rendono questa scelta sicura senza inventare nulla:
+- esiste già l'endpoint `PATCH /admin/rit/libraries/{lib}/types/{type}` con body `{active}`;
+- esiste già l'**invariante madre/figlio**: una libreria *attiva* non può restare senza un type capace-madre e uno capace-figlio → il backend ritorna `409 would_break` e blocca. Le **bozze** (libreria non attiva) si editano liberamente.
+
+Così la Fase 2a è quasi tutta frontend, appoggiata su scritture già protette:
+- **Backend** (`database.py` `rit_stl_asset_usage`): aggiunge `type_id` e `type_active` (per targetizzare il toggle e mostrarne lo stato), ordine `active DESC`.
+- **Frontend** (modal *Parentela*): colonna **"Link"** (badge *collegato*/*scollegato*) + un pulsante **Collega/Scollega** per riga (le righe scollegate sono in grigio) + riepilogo "N collegati · M scollegati". Delega `.link-toggle` su `#stl-usage-body` → `stlUsageToggle` → PATCH; il `409` (invariante) è mostrato come toast ("lascerebbe la libreria senza madre/figlio"); dopo il successo si ricaricano il modal e l'Archivio.
+
+Solo **soft** in questa fase: l'hard-delete e il *riaggancio-file* (swap madre/figlio verso un altro file condiviso) sono la **Fase 2b**, con più reti di sicurezza. Nota: gli aggregati (colonna "USATO DA", chip marche/modelli) contano ancora *tutti* i link (attivi + scollegati); il modal è la fonte di verità dello stato — filtrarli per-attivi è un follow-up di una riga se serve. `py_compile` + `node --check` gestione, `run_all.sh` verde. Deploy commit `b7be40e`. Bump MINOR.
+
 ## 2026-07-07 — 8.104.1: UX — colonna "File" della tabella Librerie collassabile
 
 Subito dopo la colonna "File (madre/figlio)" (8.102.0), l'utente ha notato il problema pratico: una libreria come `nobel-biocare-multi-unit-4-8` ha **67 type**, quindi la cella elencava decine di chip e la riga diventava altissima. «Mettili sotto dettagli o crea un menu a tendina… sono troppi e la lista è troppo lunga.»
