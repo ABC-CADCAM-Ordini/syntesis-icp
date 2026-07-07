@@ -682,7 +682,21 @@
     (L.files_madre||[]).forEach(function(f){ out.push(chip(f,'madre','#dbeafe')); known[f]=1; });
     (L.files_figlio||[]).forEach(function(f){ out.push(chip(f,'figlio','#dcfce7')); known[f]=1; });
     (L.files||[]).forEach(function(f){ if(!known[f]) out.push(chip(f,'file','#e2e8f0')); });   // Exocad: role NULL
-    return out.length ? out.join('') : '<span class="umeta">—</span>';
+    return out.join('');
+  }
+  // 8.104.1: cella File COLLASSABILE — le librerie grosse (es. 67 type) facevano righe enormi.
+  // Default = riepilogo compatto (N file · madre/figlio); "▾ elenco" apre i chip in un box
+  // scrollabile ad altezza fissa (non allunga la riga). Librerie con <=4 file restano inline.
+  function _ritFileCell(L){
+    var nTot=(L.files||[]).length, nM=(L.files_madre||[]).length, nF=(L.files_figlio||[]).length;
+    if(nTot===0) return '<span class="umeta">—</span>';
+    if(nTot<=4) return '<div style="line-height:1.8">'+_ritFileChips(L)+'</div>';
+    var summary='<span class="umeta"><b>'+nTot+'</b> file</span>'
+      + (nM?' · <span style="color:#1d4ed8">'+nM+' madre</span>':'')
+      + (nF?' · <span style="color:#15803d">'+nF+' figlio</span>':'');
+    return summary
+      + ' <button class="linkbtn file-toggle" type="button">▾ elenco</button>'
+      + '<div class="file-list" style="display:none;max-height:150px;overflow:auto;margin-top:5px;line-height:2">'+_ritFileChips(L)+'</div>';
   }
   function ritFilterMatch(L){
     var q=($("rit-f-q").value||'').trim().toLowerCase();
@@ -730,13 +744,20 @@
         '<td class="umeta">'+escapeHtml(L.display||"—")+'</td>'+
         '<td class="umeta">'+escapeHtml(L.supplier||"—")+(L.supplier_version?' · '+escapeHtml(L.supplier_version):'')+'</td>'+
         '<td class="umeta num">'+(L.n_types!=null?L.n_types:0)+'</td>'+
-        '<td>'+_ritFileChips(L)+'</td>'+
+        '<td style="max-width:340px">'+_ritFileCell(L)+'</td>'+
         '<td class="umeta">'+fmtDate(L.uploaded_at)+(L.uploaded_by?'<br><span class="uemail">'+escapeHtml(L.uploaded_by)+'</span>':'')+'</td>'+
         '<td>'+(L.active
             ? '<span class="pill ok"><span class="dot"></span>Attiva</span>'
             : '<span class="pill wait"><span class="dot"></span>Non attiva</span>')+'</td>'+
         '<td class="actcell"></td>';
       var act=tr.querySelector(".actcell");
+      var ftg=tr.querySelector(".file-toggle");     // 8.104.1: apri/chiudi l'elenco file
+      if(ftg) ftg.addEventListener("click", function(){
+        var fl=tr.querySelector(".file-list"); if(!fl) return;
+        var open=fl.style.display!=="none";
+        fl.style.display=open?"none":"block";
+        ftg.textContent=open?"▾ elenco":"▴ nascondi";
+      });
       var det=document.createElement("button");
       det.className="btn revoke"; det.textContent="Dettagli"; det.style.marginRight="8px";
       det.addEventListener("click", function(){ ritDetail(L.id); });
