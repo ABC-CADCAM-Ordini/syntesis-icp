@@ -1,5 +1,17 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.103.0: Anteprima STL — misure Z-top e angolo della faccia piatta
+
+Richiesta dell'utente: nell'anteprima 3D dell'Archivio STL mostrare **la distanza del top dall'origine** (ingombro in asse Z) e, «se possibile», **l'angolo tra la faccia piatta di riferimento e l'asse X**. (Il pulsante *Anteprima* — la finestra 3D — esisteva già in fondo a ogni riga: qui si aggiungono solo le misure sotto il modello.)
+
+Nuova funzione client-side `stlMeasure(pos)` in `syntesis-gestione.html`:
+- **Z-top / ingombro Z**: dalla bounding box (si assume l'asse del pezzo = Z, com'è in questi CAD).
+- **Angolo della faccia piatta**: rilevato come **picco area-pesato degli azimut delle normali di parete** (`|n.z|<0.35`). La parete cilindrica ha azimut distribuiti uniformemente (fondo ~1×); la faccia piatta è un cluster di facet complanari → un picco netto. Sopra una **soglia di prominenza** (≥3×) l'angolo è l'azimut della normale del flat (raffinato con media pesata attorno al picco); sotto soglia → *"non rilevata"* (mai un numero a caso).
+
+Verificato **headless** su sintetici: flat a 30/120/210° → rilevato 29.7/119.8/209.5° (confidenza ~11.5); cilindro liscio → `null` (confidenza 1.2, sotto soglia). Le misure compaiono sotto il canvas del modal. Non tocca il monolite analyzer. `node --check` gestione, `run_all.sh` verde. Deploy commit `470e558`, 8.103.0 live. Bump MINOR.
+
+**Da confermare con l'utente**: la *convenzione* dell'angolo. "Angolo faccia-X" è ambiguo — attualmente si restituisce l'**azimut della normale del flat dalla +X, antiorario attorno a Z**. Se serve un'altra convenzione (angolo del piano rispetto a X, o rotazione per portare il flat su +X) è una riga.
+
 ## 2026-07-07 — 8.102.0: Replace-iT — filtri anche sulla tabella Librerie (parentela a doppia entrata)
 
 Subito dopo i filtri sull'Archivio STL (8.101.0, *dal file → librerie*), l'utente: «anche su librerie metti dei filtri per cercare i file». Cioè l'entrata inversa: *dalla libreria → file*. Insieme, le due tabelle danno la navigazione a doppia entrata della parentela.
