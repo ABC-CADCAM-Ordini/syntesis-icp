@@ -293,7 +293,7 @@
     <div class="tablecard">
       <table>
         <thead>
-          <tr><th>File</th><th>Dimensione</th><th>Usato da</th><th>Marca</th><th>Modello</th><th>Ruolo</th><th>Lucchetto</th><th>Aggiornato</th><th></th></tr>
+          <tr><th></th><th>File</th><th>Dimensione</th><th>Usato da</th><th>Marca</th><th>Modello</th><th>Ruolo</th><th>Lucchetto</th><th>Aggiornato</th><th></th></tr>
         </thead>
         <tbody id="stl-rows"></tbody>
       </table>
@@ -1087,6 +1087,7 @@
     shown.forEach(function(a){
       var tr=document.createElement("tr");
       tr.innerHTML =
+        '<td class="thumbcell" style="padding:4px 6px"></td>'+
         '<td class="rit-mono" style="color:var(--accent-deep);font-weight:600">'+escapeHtml(a.name)+'</td>'+
         '<td class="umeta num">'+fmtBytes(a.size_bytes)+'</td>'+
         '<td class="umeta num">'+(a.used_by>0 ? '<a class="usage-link" style="color:var(--accent-deep);cursor:pointer;text-decoration:underline">'+a.used_by+(a.used_by===1?' libreria':' librerie')+'</a>' : '—')+'</td>'+
@@ -1103,6 +1104,16 @@
             : '')+'</td>'+
         '<td class="actcell"></td>';
       var act=tr.querySelector(".actcell");
+      // 8.108.0: miniatura-immagine lazy nella riga
+      var _tc=tr.querySelector(".thumbcell");
+      if(_tc){
+        var _img=document.createElement("img"); _img.className="stl-thumb"; _img.alt="";
+        _img.style.cssText="width:76px;height:56px;object-fit:contain;background:#eef2f7;border-radius:5px;display:block;cursor:pointer";
+        _img._name=a.name; _img._sha=a.sha256||a.name;
+        _img.addEventListener("click", function(){ stlPreviewAsset(a.name); });   // click miniatura -> anteprima 3D
+        _tc.appendChild(_img);
+        stlThumbObserve(_img);
+      }
       var _ul=tr.querySelector(".usage-link"); if(_ul) _ul.addEventListener("click", function(){ stlUsageOpen(a.name); });
       var _ut=tr.querySelector(".upd-toggle");   // 8.106.0: chi ha aggiornato -> collassabile (accorcia la riga)
       if(_ut) _ut.addEventListener("click", function(){
@@ -1546,6 +1557,61 @@
     prevGen++;   // invalida eventuali fetch ancora in volo
     $("stl-prev-overlay").classList.remove("show");
     stlPreviewDispose();
+  }
+
+  // 8.108.0: MINIATURE-IMMAGINE (thumbnail) nella riga. Un renderer NASCOSTO condiviso rende ogni STL una
+  // volta, cattura un PNG (toDataURL), lo mette in CACHE per sha256 e lo mostra come <img>. LAZY via
+  // IntersectionObserver (solo righe vicine al viewport), coda SEQUENZIALE per non bloccare. Nessuna
+  // dipendenza nuova / pipeline server: riuso parseSTL + THREE del preview. Click miniatura -> anteprima 3D.
+  var _thumbCache={}, _thumbQueue=[], _thumbBusy=false, _thumbRenderer=null, _thumbObs=null;
+  function stlThumbObserve(img){
+    if(img._sha && _thumbCache[img._sha]){ img.src=_thumbCache[img._sha]; return; }
+    if(!("IntersectionObserver" in window)){ _thumbEnqueue(img); return; }
+    if(!_thumbObs){
+      _thumbObs=new IntersectionObserver(function(es){
+        es.forEach(function(e){ if(e.isIntersecting){ _thumbObs.unobserve(e.target); _thumbEnqueue(e.target); } });
+      }, {rootMargin:"250px"});
+    }
+    _thumbObs.observe(img);
+  }
+  function _thumbEnqueue(img){
+    if(img._sha && _thumbCache[img._sha]){ img.src=_thumbCache[img._sha]; return; }
+    if(img._queued) return; img._queued=true;
+    _thumbQueue.push(img); _thumbTick();
+  }
+  function _thumbTick(){
+    if(_thumbBusy) return;
+    if(!window.THREE){ whenThree(_thumbTick); return; }
+    var img=_thumbQueue.shift(); if(!img) return;
+    if(!img.isConnected) return _thumbTick();                 // riga rimossa (filtro cambiato)
+    if(_thumbCache[img._sha]){ img.src=_thumbCache[img._sha]; return _thumbTick(); }
+    _thumbBusy=true;
+    fetch(API+"/admin/rit/stl/"+encodeURIComponent(img._name)+"/content",{headers:adminHeaders()})
+      .then(function(r){ return r.ok?r.arrayBuffer():Promise.reject(r.status); })
+      .then(function(buf){ var url=_thumbRender(buf); if(url){ _thumbCache[img._sha]=url; if(img.isConnected) img.src=url; } })
+      .catch(function(){ img.style.opacity="0.35"; })
+      .then(function(){ _thumbBusy=false; setTimeout(_thumbTick, 15); });
+  }
+  function _thumbRender(buf){
+    var THREE=window.THREE, W=152, H=112;
+    if(!_thumbRenderer){
+      _thumbRenderer=new THREE.WebGLRenderer({antialias:true, alpha:true, preserveDrawingBuffer:true});
+      _thumbRenderer.setPixelRatio(1); _thumbRenderer.setSize(W,H);
+    }
+    var geo; try{ geo=parseSTL(buf); }catch(e){ return null; }
+    geo.computeBoundingSphere();
+    var bs=geo.boundingSphere, R=Math.max(bs.radius,0.5), C=bs.center;
+    var scene=new THREE.Scene();
+    var cam=new THREE.PerspectiveCamera(38, W/H, R/100, R*40);
+    cam.up.set(0,0,1);
+    cam.position.set(C.x+R*1.9, C.y-R*1.9, C.z+R*1.35); cam.lookAt(C);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.15));
+    var dl=new THREE.DirectionalLight(0xffffff, 1.15); dl.position.set(1,-1,2); scene.add(dl);
+    scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x9FB2C4, metalness:0.1, roughness:0.6})));
+    _thumbRenderer.render(scene, cam);
+    var url; try{ url=_thumbRenderer.domElement.toDataURL("image/png"); }catch(e){ url=null; }
+    try{ geo.dispose(); }catch(e){}
+    return url;
   }
 
   // ========== 8.104.0: PARENTELA di un file (librerie collegate, con ruolo) ==========
