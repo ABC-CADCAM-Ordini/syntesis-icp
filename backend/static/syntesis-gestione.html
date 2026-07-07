@@ -379,6 +379,17 @@
     </div>
   </div>
 
+  <!-- 8.104.0: modal PARENTELA di un file (tutte le librerie collegate, con ruolo) -->
+  <div class="overlay" id="stl-usage-overlay">
+    <div class="modal rit-modal" style="max-width:960px">
+      <h3 id="stl-usage-title">Parentela</h3>
+      <div id="stl-usage-body" style="max-height:62vh;overflow:auto"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn revoke" id="stl-usage-close">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
 <!-- 8.50.0: Three.js r169 per l'anteprima STL — stesso pattern loader di /vedere
@@ -1055,7 +1066,7 @@
       tr.innerHTML =
         '<td class="rit-mono" style="color:var(--accent-deep);font-weight:600">'+escapeHtml(a.name)+'</td>'+
         '<td class="umeta num">'+fmtBytes(a.size_bytes)+'</td>'+
-        '<td class="umeta num">'+(a.used_by>0 ? a.used_by+(a.used_by===1?' libreria':' librerie') : '—')+'</td>'+
+        '<td class="umeta num">'+(a.used_by>0 ? '<a class="usage-link" style="color:var(--accent-deep);cursor:pointer;text-decoration:underline">'+a.used_by+(a.used_by===1?' libreria':' librerie')+'</a>' : '—')+'</td>'+
         '<td>'+_stlChips(a.marche)+'</td>'+
         '<td>'+_stlChips(a.modelli)+'</td>'+
         '<td>'+_stlChips(a.ruoli)+'</td>'+
@@ -1065,6 +1076,11 @@
           (a.uploaded_by?'<br><span class="uemail">'+escapeHtml(a.uploaded_by)+'</span>':'')+'</td>'+
         '<td class="actcell"></td>';
       var act=tr.querySelector(".actcell");
+      var _ul=tr.querySelector(".usage-link"); if(_ul) _ul.addEventListener("click", function(){ stlUsageOpen(a.name); });
+      var par=document.createElement("button");
+      par.className="linkbtn"; par.textContent="Parentela";
+      par.addEventListener("click", function(){ stlUsageOpen(a.name); });
+      act.appendChild(par);
       var pv=document.createElement("button");
       pv.className="linkbtn"; pv.textContent="Anteprima";
       pv.addEventListener("click", function(){ stlPreviewAsset(a.name); });
@@ -1446,6 +1462,46 @@
     stlPreviewDispose();
   }
 
+  // ========== 8.104.0: PARENTELA di un file (librerie collegate, con ruolo) ==========
+  function stlUsageOpen(name){
+    $("stl-usage-title").textContent="Parentela — "+name;
+    $("stl-usage-body").innerHTML='<p class="umeta">Carico…</p>';
+    $("stl-usage-overlay").classList.add("show");
+    fetch(API+"/admin/rit/stl/"+encodeURIComponent(name)+"/usage",{headers:adminHeaders()})
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(d){ stlUsageRender(name, d.usage||[]); })
+      .catch(function(){ $("stl-usage-body").innerHTML='<p class="umeta">Errore nel caricamento della parentela.</p>'; });
+  }
+  function _usageRoleChip(role){
+    if(!role) return '<span class="umeta">—</span>';
+    var bg = role==='madre'?'#dbeafe':(role==='figlio'?'#dcfce7':'#e2e8f0');
+    return '<span style="display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;background:'+bg+'">'+escapeHtml(role)+'</span>';
+  }
+  function stlUsageRender(name, usage){
+    var body=$("stl-usage-body");
+    if(!usage.length){ body.innerHTML='<p class="umeta">Nessuna libreria usa questo file.</p>'; return; }
+    var libs={}; usage.forEach(function(u){ libs[u.library_id]=1; });
+    var nLib=Object.keys(libs).length;
+    var rows=usage.map(function(u){
+      return '<tr>'+
+        '<td class="uname">'+escapeHtml(u.import_name||'—')+(u.lib_display?'<br><span class="umeta">'+escapeHtml(u.lib_display)+'</span>':'')+'</td>'+
+        '<td class="umeta">'+escapeHtml(u.marca||'—')+'</td>'+
+        '<td class="umeta">'+escapeHtml(u.modello||'—')+'</td>'+
+        '<td class="umeta">'+escapeHtml(u.diametro!=null?String(u.diametro):'—')+'</td>'+
+        '<td>'+_usageRoleChip(u.role)+'</td>'+
+        '<td class="umeta">'+escapeHtml(u.supplier||'—')+'</td>'+
+        '<td class="umeta">'+escapeHtml(u.connection_id||'—')+'</td>'+
+        '<td>'+(u.active?'<span class="pill ok"><span class="dot"></span>Attiva</span>':'<span class="pill wait"><span class="dot"></span>Non attiva</span>')+'</td>'+
+        '</tr>';
+    }).join('');
+    body.innerHTML =
+      '<p class="umeta" style="margin:0 0 10px">Questo file compare in <b>'+nLib+'</b> librer'+(nLib===1?'ia':'ie')+' ('+usage.length+' collegament'+(usage.length===1?'o':'i')+' per ruolo).</p>'+
+      '<div class="tablecard"><table><thead><tr>'+
+      '<th>Libreria</th><th>Marca</th><th>Modello</th><th>Ø</th><th>Ruolo</th><th>Fornitore</th><th>Connessione</th><th>Stato</th>'+
+      '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }
+  function stlUsageClose(){ $("stl-usage-overlay").classList.remove("show"); }
+
   // ========== 8.50.0: Crea libreria (editor in-pannello) ==========
   var edSeq=0;
   var edFiles={};   // rowid -> File (upload nuovo scelto per quella riga)
@@ -1622,6 +1678,8 @@
   $("stl-code-btn").addEventListener("click", function(){ stlCodeOpen(); });
   $("stl-prev-close").addEventListener("click", stlPreviewClose);
   $("stl-prev-overlay").addEventListener("click", function(e){ if(e.target===$("stl-prev-overlay")) stlPreviewClose(); });
+  $("stl-usage-close").addEventListener("click", stlUsageClose);
+  $("stl-usage-overlay").addEventListener("click", function(e){ if(e.target===$("stl-usage-overlay")) stlUsageClose(); });
   $("stl-code-overlay").addEventListener("click", function(e){ if(e.target===$("stl-code-overlay")) $("stl-code-overlay").classList.remove("show"); });
   $("rit-confirm-overlay").addEventListener("click", function(e){ if(e.target===$("rit-confirm-overlay")) $("rit-confirm-overlay").classList.remove("show"); });
   $("ed-add-row").addEventListener("click", function(){ edAddRow(); });

@@ -1005,6 +1005,14 @@ async def rit_stl_list_endpoint(admin: dict = Depends(require_contributor)):
     return {"assets": await rit_list_stl_assets()}
 
 
+@router.get("/rit/stl/{name}/usage")
+async def rit_stl_usage_endpoint(name: str, admin: dict = Depends(require_contributor)):
+    """8.104.0: PARENTELA del file — elenco delle librerie che lo usano (con ruolo
+    madre/figlio + marca/modello/diametro/fornitore/connessione/stato)."""
+    from database import rit_stl_asset_usage
+    return {"name": name, "usage": await rit_stl_asset_usage(name)}
+
+
 @router.post("/rit/stl")
 async def rit_stl_upload_endpoint(
     files: list[UploadFile] = File(...),
