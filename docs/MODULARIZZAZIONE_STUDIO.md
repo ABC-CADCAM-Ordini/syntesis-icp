@@ -79,8 +79,14 @@
 > 🏁 **FASE 6 COMPLETA**: 8 file wf/ (fresabilita, tree, report-analizza, sostituire, replace, misurare-icp, misurare-pdf,
 > misurare-viz) — TUTTI i workflow fuori dal monolite. Monolite 41.480 → **6.711 righe (-84%)**. Nel monolite resta
 > l'ossatura: markup, stato globale, bootstrap, dispatcher selectWorkflow, banner, core non ancora assegnato a workflow.
-> ▶ Prossimo: **Fase 7** (rete di sicurezza dell'umano: scripts/gate/smoke/smoke.html non servita in prod + run_all.sh
-> in checklist) e **Fase 8** (regime permanente: MAPPA ancorata a file+§anchor, censimento auto-rigenerante). Vedi §FASE 7/8.
+> ✅ **Fase 7 FATTA** (2026-07-06, tooling-only no-deploy): `scripts/gate/run_all.sh` (un comando = make_fixtures +
+> check_anchors + check_inline + fixtures + purelib + env + fres/tree/report/sost/replace + mis icp/pdf/viz +
+> golden-master + node --check di 18 file wf/ds; riepilogo verde/rosso, exit≠0 se rosso) VERDE su tutti; entra nella
+> checklist §11 di CLAUDE.md. `scripts/gate/smoke/smoke.html` (pagina statica NON in prod, aperta da `python3 -m
+> http.server` sulla radice): carica i moduli estratti e mostra verde/rosso per workflow = esposizione fn sentinella
+> (11 moduli) + GOLDEN-MASTER ICP eseguito NEL BROWSER sulle 4 fixtures (Δmax≈0µm, tipo scanbody corretto). 15 check
+> verdi, screenshot ok. Gate storico clip/ escluso (harness A/B pre-estrazione). SYN.modules.register (opzionale) NON fatto.
+> ▶ Prossimo: **Fase 8** (regime permanente: MAPPA ancorata a file+§anchor, censimento auto-rigenerante, checklist in CONTRIBUTING). Vedi §FASE 8.
 
 ---
 
@@ -301,7 +307,7 @@ Regola: >3k righe si spezza per responsabilità (`-core`/`-ui`), mai per caso.
 Prima di OGNI estrazione: rigenerare il censimento e ri-validare l'ordine sui numeri
 (innesto A: l'ordine è ricontrattabile coi dati, non congelato a priori).
 
-### FASE 7 — Rete di sicurezza dell'umano (effort M, ~2 gg)
+### FASE 7 — Rete di sicurezza dell'umano (effort M, ~2 gg) — ✅ FATTA 2026-07-06
 - `scripts/gate/smoke/smoke.html`: pagina statica NON servita in produzione, carica gli
   stessi `<script src>` dell'app, esegue N scenari deterministici (uno per workflow) e
   mostra verde/rosso coi valori. Si apre con `python3 -m http.server`, zero tooling.

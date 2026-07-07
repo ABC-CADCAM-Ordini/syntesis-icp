@@ -1,0 +1,138 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Synthesis-ICP · smoke test (Fase 7)</title>
+<!--
+  smoke.html — Fase 7: rete di sicurezza VISIVA. NON servita in produzione.
+  Carica gli stessi moduli estratti dell'app (wf/*.js + ds/ puri) e per ogni workflow
+  esegue uno scenario DETERMINISTICO, mostrando verde/rosso coi numeri. A colpo d'occhio:
+  "un modulo si e' rotto? il motore ICP misura ancora identico?".
+
+  Aprire dalla RADICE del repo con zero tooling:
+      python3 -m http.server 8099
+      -> http://localhost:8099/scripts/gate/smoke/smoke.html
+  (serve la radice cosi' la pagina puo' fetchare /backend/static/... e /tests/fixtures/...;
+   le fixtures STL si generano con: python3 scripts/make_fixtures.py)
+
+  Cosa PRENDE: rotture larghe — un modulo con errore di sintassi non espone le sue fn;
+  la spina ICP che smette di misurare 0 sulle fixtures sintetiche. Cosa NON prende: bug UI
+  fini legati a una modalita' specifica (per quelli serve uno scenario dedicato o l'app vera).
+-->
+<style>
+  body{font:14px/1.5 -apple-system,Helvetica,Arial,sans-serif;margin:0;background:#0f1420;color:#e6ebf2}
+  header{padding:16px 22px;border-bottom:1px solid #223}
+  h1{font-size:18px;margin:0}
+  .sub{color:#8aa;font-size:12px;margin-top:3px}
+  #summary{padding:12px 22px;font-weight:700;font-size:15px}
+  .grp{padding:4px 22px 14px}
+  .grp h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#7d93b0;margin:14px 0 6px}
+  .row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #1a2233}
+  .dot{width:11px;height:11px;border-radius:50%;flex:none}
+  .ok{background:#3ddc84}.bad{background:#ff6a6a}.pend{background:#5a6a82}
+  .name{flex:none;width:230px;font-weight:600}
+  .val{color:#9fb3cc;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+  .bad .val,.badtext{color:#ff9a9a}
+  code{color:#cfe}
+</style>
+<header>
+  <h1>Synthesis-ICP · smoke test <span class="sub" style="display:inline">Fase 7 — rete di sicurezza</span></h1>
+  <div class="sub">Verde = i moduli caricano e la spina ICP misura identico. Non e' un collaudo clinico: e' il check-up rapido post-modifica.</div>
+</header>
+<div id="summary" class="badtext">esecuzione…</div>
+<div id="report"></div>
+
+<!-- SHIM: costanti/helper che nel monolite vivono nel MAIN (residuo). Le fn estratte le leggono a call-time. -->
+<script>
+  window.__SMOKE_ERRORS = [];
+  window.addEventListener('error', function(e){ window.__SMOKE_ERRORS.push((e.filename||'').split('/').pop()+': '+e.message); });
+  var THREE = { Vector2:function(){}, Vector3:function(){}, Raycaster:function(){}, Mesh:function(){} }; // stub minimo: la spina ICP non lo usa
+  var MIS_ORIGIN_OFFSET = { SR:3.786, OS:5.574, '1T3':8.146 };
+  window.SYN = { scanbody:{ '1T3':{radius_mm:2.515,cap_z_mm:10}, OS:{radius_mm:1.78,cap_z_mm:6}, SR:{radius_mm:2.03,cap_z_mm:5} },
+    thresholds:{ d3_um:[50,100,150,250], angular_deg:[0.5,1.5,3,6] }, palette:{ d3_hex:['#639922','#D97706','#F97316','#EF4444','#A855F7'] } };
+  var MIS_CLIN = (function(){ var l=['Ottimo','Accettabile','Rischioso','Tensione','Fuori posizione'],t=window.SYN.thresholds.d3_um,p=window.SYN.palette.d3_hex,m=t.concat([9999]); return l.map(function(x,i){return {max:m[i],label:x,col:p[i]};}); })();
+  var MIS_CLIN_AX = (function(){ var l=['Ottimo','Accettabile','Rischioso','Tensione','Fuori'],t=window.SYN.thresholds.angular_deg,p=window.SYN.palette.d3_hex,m=t.concat([9999]); return l.map(function(x,i){return {max:m[i],label:x,col:p[i]};}); })();
+  function synAxisEngineRead(o){ try{ return localStorage.getItem('syntesis_axis_engine')||'auto'; }catch(e){ return o; } }
+  function synAxisUseLateral(isSR,o){ var e=synAxisEngineRead(o); return e==='lateralwall'||(e==='auto'&&isSR); }
+  function synLog(){}
+</script>
+
+<!-- moduli estratti dell'app (functions-only: definiscono soltanto, non eseguono a load) -->
+<script src="/backend/static/ds/syn-math.js"></script>
+<script src="/backend/static/ds/syn-geom.js"></script>
+<script src="/backend/static/ds/syn-color.js"></script>
+<script src="/backend/static/wf/fresabilita.js"></script>
+<script src="/backend/static/wf/tree.js"></script>
+<script src="/backend/static/wf/report-analizza.js"></script>
+<script src="/backend/static/wf/sostituire.js"></script>
+<script src="/backend/static/wf/replace.js"></script>
+<script src="/backend/static/wf/misurare-icp.js"></script>
+<script src="/backend/static/wf/misurare-pdf.js"></script>
+<script src="/backend/static/wf/misurare-viz.js"></script>
+
+<script>
+(function(){
+  var report = document.getElementById('report'), fails = 0, total = 0;
+  function group(title){ var g=document.createElement('div'); g.className='grp'; g.innerHTML='<h2>'+title+'</h2>'; report.appendChild(g); return g; }
+  function row(g, name, ok, val){ total++; if(!ok) fails++; var r=document.createElement('div'); r.className='row '+(ok?'':'bad'); r.innerHTML='<span class="dot '+(ok?'ok':'bad')+'"></span><span class="name">'+name+'</span><span class="val">'+(val||'')+'</span>'; g.appendChild(r); return ok; }
+
+  // ── 1) ESPOSIZIONE: ogni modulo ha caricato ed espone una fn sentinella ──
+  var gExp = group('Moduli caricati (esposizione funzioni)');
+  var sentinels = [
+    ['ds/syn-math (purelib)', 'parseSTL'], ['ds/syn-geom', 'getTransformedTriangles'], ['ds/syn-color', 'classifyDivergence'],
+    ['wf/fresabilita', 'fresClassify'], ['wf/tree', 'rebuildTree'], ['wf/report-analizza', 'analReport_generate'],
+    ['wf/sostituire', 'sostPlaceTemplate'], ['wf/replace', 'replaceShowStatus'],
+    ['wf/misurare-icp', 'misICP_run'], ['wf/misurare-pdf', 'misICP_generateReport'], ['wf/misurare-viz', 'misICP_createLabels']
+  ];
+  sentinels.forEach(function(s){
+    var ok = typeof window[s[1]] === 'function';
+    row(gExp, s[0], ok, ok ? s[1]+'()' : 'MANCA '+s[1]);
+  });
+  if(window.__SMOKE_ERRORS.length) row(gExp, 'errori di caricamento', false, window.__SMOKE_ERRORS.join(' | '));
+
+  // ── 2) GOLDEN-MASTER ICP nel browser: la spina misura 0 sulle fixtures (ground-truth) ──
+  var gIcp = group('Motore ICP · spina numerica su fixtures sintetiche (deviazione attesa ~0)');
+  function toAB(buf){ return buf; }
+  function runSpine(type){
+    return fetch('/tests/fixtures/stl/pairs/'+type+'_A.stl').then(function(r){return r.arrayBuffer();}).then(function(A){
+      return fetch('/tests/fixtures/stl/pairs/'+type+'_B.stl').then(function(r){return r.arrayBuffer();}).then(function(B){
+        var triA=misICP_pSTL(A), triB=misICP_pSTL(B);
+        var cA=misICP_comps(triA), cB=misICP_comps(triB);
+        var pA=misICP_partition(triA,cA), pB=misICP_partition(triB,cB);
+        var rA=pA.scan.map(function(ci){return misICP_cen(triA,cA[ci]);});
+        var rB=pB.scan.map(function(ci){return misICP_cen(triB,cB[ci]);});
+        var thr=Math.max(misICP_autoThresh(rA),misICP_autoThresh(rB));
+        var clA=misICP_clusterComps(rA,thr), clB=misICP_clusterComps(rB,thr);
+        var ceA=clA.map(function(cl){return misICP_clusterCentroid(triA,cA,pA.scan,cl);});
+        var ceB=clB.map(function(cl){return misICP_clusterCentroid(triB,cB,pB.scan,cl);});
+        var pre=misICP_bruteForcePreAlign(ceA,ceB);
+        var pu=(pre.n>=3&&pre.n<=8&&isFinite(pre.rmsd));
+        var ceBp=pu?ceB.map(function(p){var rp=misICP_mv3(pre.R,p);return [rp[0]+pre.t[0],rp[1]+pre.t[1],rp[2]+pre.t[2]];}):ceB;
+        var icp=misICP_runICP(ceA,ceBp,60);
+        if(pu&&icp.rmsd>pre.rmsd) icp={R:misICP_eye3(),t:[0,0,0],rmsd:pre.rmsd};
+        if(pu){ var Rc=misICP_mul3(icp.R,pre.R), Rt=misICP_mv3(icp.R,pre.t); icp={R:Rc,t:[Rt[0]+icp.t[0],Rt[1]+icp.t[1],Rt[2]+icp.t[2]],rmsd:icp.rmsd}; }
+        var triBt=misICP_applyTform(triB,icp.R,icp.t);
+        var ceBt=ceB.map(function(p){var rp=misICP_mv3(icp.R,p);return [rp[0]+icp.t[0],rp[1]+icp.t[1],rp[2]+icp.t[2]];});
+        var pairs=misICP_matchPairs(ceA,ceBt);
+        var maxD=0, sb=null;
+        pairs.forEach(function(p,i){ if(p.iB<0)return; if(p.d3*1000>maxD)maxD=p.d3*1000; if(i===0){ var t=misICP_clusterTris(triA,cA,pA.scan,clA[p.iA]); var d=misICP_detectSbType(t); sb=d?d.type:null; } });
+        return {n:ceA.length, maxD3um:maxD, sbType:sb};
+      });
+    });
+  }
+  var types=[['scanbody-1t3','1T3'],['scanbody-os','OS'],['scanbody-sr','SR'],['multi-1t3-5x','1T3']];
+  var chain = Promise.resolve();
+  types.forEach(function(t){
+    chain = chain.then(function(){
+      return runSpine(t[0]).then(function(r){
+        var ok = (r.maxD3um < 0.01) && (r.sbType === t[1]);
+        row(gIcp, t[0], ok, 'n='+r.n+' · Δmax='+r.maxD3um.toFixed(4)+'µm · tipo='+(r.sbType||'?')+(ok?'':' [atteso ~0 / '+t[1]+']'));
+      }).catch(function(e){ row(gIcp, t[0], false, 'errore: '+e.message+' (fixtures generate? python3 scripts/make_fixtures.py)'); });
+    });
+  });
+
+  chain.then(function(){
+    var s=document.getElementById('summary');
+    if(fails===0){ s.className=''; s.style.color='#3ddc84'; s.textContent='✅ TUTTO VERDE — '+total+' check, nessuna regressione.'; }
+    else { s.style.color='#ff6a6a'; s.textContent='❌ '+fails+' / '+total+' check ROSSI — guarda le righe rosse sotto.'; }
+  });
+})();
+</script>

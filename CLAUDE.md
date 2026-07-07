@@ -238,6 +238,10 @@ Domini live:
    `docs/MAPPA_FUNZIONALE.md` e committale insieme al codice (vedi §4).
 
 ### Deploy
+0. **Gate**: `bash scripts/gate/run_all.sh` deve essere VERDE (un comando lancia tutti i
+   gate di equivalenza + check_anchors/check_inline + node --check; Fase 7). Rosso = NON
+   deployare. Facoltativo: aprire `scripts/gate/smoke/smoke.html` (via `python3 -m http.server`
+   dalla radice) per il check-up visivo per-workflow (esposizione moduli + golden-master ICP).
 1. Bump versione in `registry.py` (+ punti frontend se tocchi v3b — vedi §6). Se
    la modifica tocca elementi UI, aggiorna `docs/MAPPA_FUNZIONALE.md` nello stesso
    commit (righe corrispondenti + "Versione software mappata") — vedi §4.
