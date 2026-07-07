@@ -1431,7 +1431,19 @@
       var sm=new Float64Array(NB); for(b=0;b<NB;b++){ var s=0; for(k=-2;k<=2;k++) s+=hist[((b+k)%NB+NB)%NB]; sm[b]=s; }
       var peak=0,pb=0; for(b=0;b<NB;b++) if(sm[b]>peak){peak=sm[b];pb=b;}
       var mean=tot*5/NB, prom=mean>0?peak/mean:0;
-      if(prom>=3.0){ var pr=pb*Math.PI/180, r=refineMS([Math.cos(pr),Math.sin(pr),0]); if(r){ res.flatAngleDeg=r.az; res.flatTiltDeg=r.tilt; res.flatConfidence=prom; res.flatNormal=r.nrm; res.flatCentroid=r.cen; return res; } }
+      // 8.108.5: PREFERISCI L'ASSE X (0°). Su parti con flat su piu' lati (teste rettangolari/quadre) tra i
+      // picchi FORTI (>=0.6*max) scegli quello piu' vicino all'asse X (dist da 0 o 180), a parita' preferisci
+      // 0°. Un flat singolo (solo su Y, o obliquo) resta invariato; un candidato-X DEBOLE (<0.6*max = rumore)
+      // non snappa. Richiesta utente: "tra 90 e 0 preferisci sempre 0".
+      var pbSel=pb;
+      for(b=0;b<NB;b++){ if(sm[b] < 0.6*peak) continue;
+        if(sm[b]>=sm[((b-1)%NB+NB)%NB] && sm[b]>=sm[(b+1)%NB]){
+          var _sc=(b>180?b-360:b), _ss=(pbSel>180?pbSel-360:pbSel);
+          var _dc=Math.min(Math.abs(_sc),Math.abs(Math.abs(_sc)-180)), _ds=Math.min(Math.abs(_ss),Math.abs(Math.abs(_ss)-180));
+          if(_dc<_ds-0.5 || (Math.abs(_dc-_ds)<=0.5 && Math.abs(_sc)<Math.abs(_ss))) pbSel=b;
+        }
+      }
+      if(prom>=3.0){ var pr=pbSel*Math.PI/180, r=refineMS([Math.cos(pr),Math.sin(pr),0]); if(r){ res.flatAngleDeg=r.az; res.flatTiltDeg=r.tilt; res.flatConfidence=sm[pbSel]/mean; res.flatNormal=r.nrm; res.flatCentroid=r.cen; return res; } }
       res.flatConfidence=prom;
     }
     // Stadio 2: OBLIQUA (concentrazione nella banda inclinata)
