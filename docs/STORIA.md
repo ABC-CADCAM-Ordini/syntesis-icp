@@ -1,5 +1,20 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.100.0: Session log "stella polare" — front + backend, scaricabile, redatto
+
+Direttiva dell'utente: «il log deve essere la nostra stella polare… quando entro nel menu segreto devo trovare un pulsante *scarica log*; il log deve essere presente ovunque, sia front che backend, e registrare tutto così da intercettare errori e bug. Ma non deve registrare password o token o altri elementi di sicurezza rubabili — la sicurezza è fondamentale».
+
+Il logger di sessione esisteva già (8.71.0, `synLog`) ma: (a) non c'era **nessun pulsante visibile** — il pallino chiedeva una password e, solo con quella *del log*, scaricava (l'utente digitava quella *expert* e attivava la modalità, senza capire perché non trovava il download); (b) catturava poco (init, errori, alcune chiamate manuali); (c) niente lato **backend**.
+
+**Front.** Il blocco `synLog` è stato esteso con:
+- **Redazione a monte** (non negoziabile): `_synRedact` maschera per nome-chiave (`pass|pwd|token|jwt|secret|authoriz|bearer|cookie|api_key|credential|hash|session`) e per *forma* (stringhe JWT / `Bearer …`), tronca le stringhe lunghe, limita profondità/ampiezza; è applicata **dentro `synLog`** a ogni `data`, quindi copre anche le chiamate esistenti. `_synRedactUrl` toglie i valori dei query-param sensibili.
+- **Cattura completa** (`_synInstallHooks`, una volta): wrapper su `window.fetch` che logga *ogni* chiamata server (metodo, path redatto, stato, ms — **mai** header o body, così niente `Authorization`/password/STL); delega `click` e `change` a livello documento (l'*elemento*, mai i valori dei campi testo/password; per i file solo i nomi); cattura di `console.error/warn`.
+- **Pulsante visibile** `#synLogBtn` "⤓ log" con classe `.expert-only` (fisso, in basso a sinistra): un click → `synLogDownloadAll`, che scarica il front + fa `fetch('/api/logs')` e unisce il backend in un unico `.txt`. Il token va **solo** nell'header `Authorization`, mai nel file.
+
+**Backend** (`main.py`): buffer in RAM `collections.deque(maxlen=3000)` (niente DB, niente nuovo servizio — si azzera a ogni redeploy, accettato); `_syn_back_redact` con match "contiene" che cattura anche le env-var (`JWT_SECRET`, `DB_PASSWORD`, `ADMIN_TOKEN`) + le credenziali negli URL di connessione (`postgresql://user:pass@…`) + JWT/bearer; un `logging.Handler` a livello WARNING+ sul root logger cattura tutti i `logger.warning/error/exception` applicativi (redatti); un middleware `_syn_request_logger` registra ogni richiesta (`[REQ]` metodo/path-redatto/stato/ms/presenza-auth, saltando `/static/` e `/api/logs`); endpoint `GET /api/logs` gated `require_authorized` (i pending ricevono 403 → il download mostra "backend non disponibile").
+
+**Verifica.** Redazione testata in modo **avversariale** su entrambi i lati (JWT nudi, `Bearer`, `password=`, `token:`, `JWT_SECRET`, `DB_PASSWORD`, URL postgres con credenziali, oggetti annidati) → **tutto redatto**, messaggi innocui intatti. Backend provato **end-to-end** con FastAPI `TestClient` (richieste loggate, `/static/` saltati, `/api/logs`-self escluso, query e warning redatti). `run_all.sh` verde, `py_compile`, `node --check`. Deploy commit `cea9cfe` su entrambi i servizi; `/api/logs` anon → 403, `/api/health` → 200. Bump MINOR. Da collaudare: area Expert → "⤓ log" → `.txt` con FRONT+BACKEND, senza alcun segreto.
+
 ## 2026-07-07 — 8.99.1: Fix critico — la Raffina p2plane non applicava mai (Method C no-fit)
 
 L'utente ha collaudato 8.99.0 e riproposto lo stesso difetto: «il primo clic è perfetto sul cilindro, Raffina lo rende perfetto sul top ma sposta il cilindro». Stavolta però aveva scaricato il CSV — e le colonne diagnostiche che avevo aggiunto in 8.98.0 hanno smascherato subito il bug:
