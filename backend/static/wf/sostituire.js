@@ -1292,7 +1292,15 @@ function sostAlignAll(){
         var stepCad = Math.max(1, Math.floor((nCadTri * 3) / maxTplPts));
         var m = sourceGroup.matrix.elements;
         var tplWorld = [];
-        var tplWeights = [];  // v7.3.7.004: weighted ICP (cap dominante per planarita`)
+        var tplWeights = [];  // pesi ICP (riempiti DOPO la raccolta, vedi _capW)
+        var tplIsCap = [];    // 8.97.0: cap(true)/parete(false) per punto, per bilanciare i pesi
+        var nCap = 0, nBody = 0;
+        // 8.97.0: Raffina BILANCIATA (default) vs 5x storica. Bilanciata = Sigma_pesi_cap =
+        // Sigma_pesi_parete (peso_cap = nBody/nCap) -> il cap non domina piu' su SR/1T3 (cap
+        // grande) e la parete rientra nel fit -> centraggio migliore tenendo il top. Il 5x fisso
+        // era tarato per l'OS (area_body/area_cap ~5:1); su SR sovra-pesava il cap = gap laterale.
+        // Fallback al 5x storico col flag localStorage 'syntesis_sost_raffina'='legacy5x'.
+        var _raffinaBalanced = (function(){ try { return localStorage.getItem('syntesis_sost_raffina') !== 'legacy5x'; } catch(e){ return true; } })();
         for(var ti = 0; ti < nCadTri; ti++){
           for(var vi = 0; vi < 3; vi++){
             if(((ti * 3) + vi) % stepCad !== 0) continue;
@@ -1308,18 +1316,24 @@ function sostAlignAll(){
             //   - body (cilindro): normale laterale                      -> guida centro XY
             // Dopo il flip SR (v7.3.6.004) tutti i template hanno convenzione coerente:
             // cap a Zmax, normali cap in direzione +Z locale.
+            // 8.97.0: classifico cap(normale ~+/-Z locale) vs parete; il PESO lo assegno DOPO
+            // la raccolta (per bilanciare cap<->parete, vedi _capW sotto). Francesco 2026-04-25:
+            // "la faccia piatta guida la planarita`" -> il cap resta pesato, ma non domina.
             if(cadNorm){
-              var nlz = cadNorm[o + 2];
-              // Peso 5x sul cap: con ratio area_body/area_cap ~5:1 per OS, il peso 5x
-              // porta il contributo del cap a pari livello del body (5x*1 cap = 5 body),
-              // e oltre per 1T3/SR dove il cap ha area relativa maggiore.
-              // Francesco 2026-04-25: "la faccia piatta guida la planarita`".
-              tplWeights.push(Math.abs(nlz) > 0.8 ? 5.0 : 1.0);
+              var isCapPt = Math.abs(cadNorm[o + 2]) > 0.8;
+              tplIsCap.push(isCapPt);
+              if(isCapPt) nCap++; else nBody++;
             } else {
-              tplWeights.push(1.0);
+              tplIsCap.push(false); nBody++;
             }
           }
         }
+
+        // 8.97.0: assegna i pesi. Bilanciata: peso_cap = nBody/nCap (Sigma_cap=Sigma_parete) ->
+        // cap e parete contribuiscono ugualmente, per QUALSIASI tipo. Legacy: 5x fisso (dominava
+        // il cap su SR/1T3). Fallback al 5x se conteggi degeneri (nCap o nBody = 0).
+        var _capW = (_raffinaBalanced && nCap > 0 && nBody > 0) ? (nBody / nCap) : 5.0;
+        for(var _wi = 0; _wi < tplIsCap.length; _wi++) tplWeights.push(tplIsCap[_wi] ? _capW : 1.0);
 
         // 2. Crop cilindrico STRETTO (margine 0.6mm invece di 1.5mm)
         var cullInfo = SOSTITUIRE_CULL_CYL[sourceKey] || {radius: 3.0, zMin: -2, zMax: 8};
@@ -1421,7 +1435,8 @@ function sostAlignAll(){
           }
           if(goodM.length < 15) break;  // troppo pochi inlier
 
-          // Kabsch weighted: cap domina planarita`, body centra XY (v7.3.7.004)
+          // Kabsch weighted (8.97.0): cap e parete bilanciati (planarita` del disco + centro
+          // laterale del cilindro insieme); col flag legacy5x il cap torna a dominare.
           var kb = kabsch(goodM, goodF, goodW);
 
           // Applica R, t a TUTTI i moving (non solo inlier)
