@@ -1,5 +1,20 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.96.0: Il centraggio "Robust click-invariante" diventa il default di Sostituire
+
+Su richiesta dell'utente. Sintomo segnalato: «il primo clic è preciso sul cilindro ma meno sul top del disco; Raffina migliora il top ma peggiora la centratura del cilindro — l'avevamo risolto e ora è tornato». Non era una regressione di codice: il centraggio di Sostituire ha due motori, selezionabili in Impostazioni → Algoritmo, e la scelta è salvata **per-browser** in `localStorage` (`syntesis_sost_center`) con default `'legacy'`. L'utente aveva risolto scegliendo `'robust'`, ma su un browser fresco / dopo un reset dello storage il default tornava `'legacy'` e il difetto ricompariva.
+
+Il motore **legacy** deriva il centro dal fit del cilindro sul crop del click: centra bene il cilindro ma il top del disco resta meno preciso, e la Raffina (ICP pesato disco+cilindro) poi tira verso il disco degradando il cilindro. Il motore **robust click-invariante** (`_sostCylFitInvariant`, dall'8.63.4) fitta cap + parete in modo congiunto ancorato all'asse, indipendente dal punto di click: il primo clic è già preciso su entrambi, e la Raffina non ha più da correggere il cilindro.
+
+Il fix è cambiare il default `'legacy'` → `'robust'` — ma in **due** punti, entrambi necessari: (1) `synSostCenterRead()` nel monolite, il default runtime che la posa legge; (2) `ds/syn-env.js` (`switchSettingsTab`), l'inizializzazione del pannello Impostazioni, che all'apertura **riscrive** il valore in `localStorage` — se avessi cambiato solo il primo, aprire Impostazioni una volta avrebbe ri-fissato `'legacy'`. In più: radio pre-selezionato su robust, label aggiornate (Robust = «default consigliato», Legacy = «storico/fallback»).
+
+Il rischio è basso perché il robust ha un **doppio fail-soft**: se la parete è povera o la copertura sotto 140°, ritorna automaticamente al centro legacy — quindi il pavimento del comportamento è esattamente quello attuale, mai peggio. E chi ha scelto **esplicitamente** `'legacy'` lo mantiene (il valore in localStorage è rispettato: il default cambia solo per chi non ha una preferenza salvata).
+
+Il gate env è stato ri-baselinato per `switchSettingsTab` (unica funzione toccata in syn-env.js). `run_all.sh` verde, check_inline, node --check. Deploy su entrambi i servizi, 8.96.0 live. Collaudo utente in corso.
+
+Implementazione:
+- backend/static/syntesis-analyzer-v3b.html: synSostCenterRead default robust + radio checked + label; ds/syn-env.js: switchSettingsTab init default robust; scripts/gate/env/golden.json ri-baselinato; registry + v3b title/ANALIZZA_BUILD 8.96.0.
+
 ## 2026-07-07 — 8.95.4: Bugfix — Replace-iT posa lo scanbody orientato anche in vista reticolo/both
 
 Follow-up gemello dell'8.95.2 su Sostituire, esattamente come previsto nella nota di quel rilascio (STORIA 8.95.2: «Replace-iT (replaceOnViewportClick, wf/replace.js r.817) usa anch'esso intersectObject ricorsivo, ma con fallback normale (0,0,1) invece di bloccare — non blocca la posa ma può orientarla male in vista reticolo/both; da valutare a parte»). Qui la si valuta, si conferma e si corregge.
