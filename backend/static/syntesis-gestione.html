@@ -1476,9 +1476,12 @@
                    '<b>Ingombro Z:</b> '+meas.zRange.toFixed(2)+' mm'];
         if(meas.flatAngleDeg!=null){
           var _fa=meas.flatAngleDeg; if(_fa>180) _fa-=360;   // 8.105.1: range con segno (-180,180]: un flat a ~0 legge -0.2° invece di 359.8°
+          // 8.108.2: arrotonda all'INTERO. La risoluzione della misura e' ~±0.5° (rumore tassellatura); i CAD
+          // hanno flat a angoli TONDI (0/30/45/90...) -> 0.2° e' in realta' 0°. Math.round(-0) -> "0" (no "-0").
+          var _far=Math.round(_fa)+0;
           var _cf=(meas.flatConfidence>=6)?'alta':'media';
-          var _ti=(meas.flatTiltDeg>3)?(' · inclinata '+meas.flatTiltDeg.toFixed(0)+'° dalla verticale'):'';   // 8.107.0: faccia obliqua
-          parts.push('<b>Faccia piatta:</b> '+_fa.toFixed(1)+'° <span style="color:#64748b">(rotazione dalla +X'+_ti+' · confidenza '+_cf+')</span>');
+          var _ti=(meas.flatTiltDeg>3)?(' · inclinata '+Math.round(meas.flatTiltDeg)+'° dalla verticale'):'';   // 8.107.0: faccia obliqua
+          parts.push('<b>Faccia piatta:</b> '+_far+'° <span style="color:#64748b">(rotazione dalla +X'+_ti+' · confidenza '+_cf+')</span>');
         } else parts.push('<b>Faccia piatta:</b> <span style="color:#94a3b8">non rilevata</span>');
         mel.innerHTML=parts.join(' &nbsp;·&nbsp; ');
       }
