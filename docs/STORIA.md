@@ -1,5 +1,13 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.109.1: disabilita temporaneamente File > "Area personale" (Dashboard)
+
+Su richiesta dell'utente ("puoi disabilitare Area personale da File → Area personale? La rimetteremo quando sarà finita e pronta") la voce del menu File che apre la Dashboard è stata **nascosta** su Analizza (`syntesis-analyzer-v3b.html`) e, per coerenza (stessa feature non pronta), su Vedere (`syntesis-icp-vedere.html`).
+
+La voce `#fmDashboardItem` ha `display:none` di default nel markup ed è **mostrata al login** dal modulo **condiviso** `ds/syn-auth-ui.js` (`dash.style.display='flex'` in `syntAuthRefreshUI`). Quel modulo è sotto **gate byte-verbatim** (`scripts/gate/env/gate.mjs`) → non toccato. Soluzione: una regola CSS `#fmDashboardItem{display:none !important}` (che batte l'inline impostato dal JS) in un piccolo `<style>` dedicato in v3b e nel foglio inline di Vedere, con commento esplicito. **Riabilitare = rimuovere quella riga** (una per pagina). Nessuna logica toccata; la route `/dashboard` resta raggiungibile via URL.
+
+Versioni: `ANALIZZA_BUILD` 8.100.1 → **8.109.1** (+ `<title>` v3b), Vedere v8.0.6 → **v8.0.7-refactor** (4 stringhe), `BACKEND_VERSION` → 8.109.1. Gate `run_all.sh` verde (il modulo gated è intatto). `MAPPA_FUNZIONALE` aggiornata (righe Area personale di Analizza e Vedere + header versione). Bump PATCH.
+
 ## 2026-07-07 — 8.109.0: redesign `/gestione` look "Cockpit tecnico"
 
 Su richiesta dell'utente ("dal punto di vista grafico è migliorabile il backend?") ho esplorato il redesign della pagina admin `/gestione` con un percorso a bozze: prima **3 direzioni** (A "sereno pastello", B "console laterale", C "editoriale denso") pubblicate come Artifact navigabili; l'utente ha scelto **B** ma trovando la resa "un po' soft, molto femminile, pastello", ho generato **3 varianti carattere** sul telaio B (cockpit tecnico / blueprint ingegneristico / solido a contrasto). Scelta finale: **Cockpit tecnico**.
