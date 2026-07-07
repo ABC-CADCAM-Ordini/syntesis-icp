@@ -1,5 +1,24 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.98.0: Raffina punto-a-piano (Method C) — nuovo motore opt-in di Sostituire
+
+Follow-up di 8.97.0. Col peso bilanciato l'utente ha collaudato 6 SR reali e riferito: «molto buono sul top, **discreto** sul centraggio del cilindro, la strada è giusta». Il bilanciamento aveva migliorato, ma non chiuso, il gap laterale.
+
+**Diagnosi (workflow avversariale a 7 agenti; 2 scettici su 3 hanno refutato la mia prima proposta).** La Raffina (`sostAlignAll`) è un ICP **punto-a-punto** (Kabsch pesato): il funzionale minimizza il residuo 3-D *pieno* di ogni coppia, quindi **accoppia i residui tangenziali spuri**. Un punto del disco che scivola tangenzialmente sul piano del disco genera un residuo che Kabsch trasforma in un tiro *laterale* di tutto il corpo (informazione laterale falsa dal cap); simmetricamente un punto di parete che scivola lungo l'asse genera un tiro *assiale* falso. Perciò qualunque peso cap↔parete **sposta soltanto il compromesso** top↔centraggio lungo la stessa curva — non lo elimina (5×: top ottimo + gap; bilanciato: top buono + centraggio discreto). I CSV confermano che la posa *prima* della Raffina è già a 0.8–3.9µm / <0.08° (colonne `mc*`): il residuo lo introduce la Raffina.
+
+La correzione strutturale è **point-to-plane** (residuo lungo la normale della scansione), che disaccoppia i gradi di libertà: il disco vincola solo assiale+tilt (lo scorrimento tangenziale è libero → niente tiro laterale spurio), la parete solo radiale/centraggio.
+
+**Scoperta chiave.** Quel motore **esiste già**, ed è migliore di un Chen-Medioni generico: è **Method C** (`_sostMethodCPose`, `sostituire.js`), un point-to-plane *semantico* (cap residuo assiale + parete radiale + coerenza normali, risolto con LM+IRLS Tukey) **già validato 1:1 vs Python** (~0.004µm), **già shadow-loggato** come le colonne `mc*` del CSV, già con trust-region (centro 60µm, asse 0.5°) e gate point-count. Riscrivere un point-to-plane grezzo sarebbe stato *peggio*: con le normali per-triangolo grezze del nearest-neighbor, i punti sul bordo arrotondato del disco (normale che ruota da assiale a radiale) re-inietterebbero il tiro laterale che si vuole togliere. Quindi: **riuso, non riscrittura**.
+
+**Cosa fa 8.98.0.** Nuovo motore Raffina opt-in `'p2plane'` (flag `syntesis_sost_raffina`): per ogni marker la Raffina chiama `_sostMethodCPose` seedato sulla posa corrente; se applica, il marker viene portato a `(center, axis)` di Method C con una trasformazione rigida (rotazione asse→asse attorno al centro + traslazione, lo stesso pattern del fix-asse lateral-wall) e il Kabsch viene saltato; se Method C non applica (few-pts / trust-region / no-fit), **fallback** al Kabsch pesato per quel marker. Il ramo p2plane bypassa il doppio fix-asse (Method C fitta già l'asse). **Default invariato** (`'balanced'`) → zero regressione; p2plane è in collaudo.
+
+**Strumentazione.** Il CSV PosaDiag era *placement-only* — l'effetto della Raffina non era misurabile. Aggiunte 7 colonne post-Raffina (`raffEngine/raffCenShiftUm/raffAxDeg/raffVsMcUm/raffMcReason/raffMcNcap/raffMcNwall`) via il nuovo helper `_sostRaffDiag`. La metrica-oro è `raffVsMc` = distanza del centro post-Raffina dall'optimum Method C: **~0 = la Raffina converge all'optimum invece di deviarne** (il p2point mostra invece il drift).
+
+Implementazione:
+- `backend/static/wf/sostituire.js`: ramo `_useP2P` in `sostAlignAll` (route Method C + trasf. rigida + fallback), helper `_sostRaffDiag`, 7 colonne in `sostDownloadDiagLog`. `_sostMethodCFit`/`_sostMethodCPose` **non toccati** (solo chiamati).
+- `backend/static/syntesis-analyzer-v3b.html`: 3° radio "Punto-a-piano — Method C (beta)" + `onSostRaffinaChange` esteso a 3 stati. `ds/syn-env.js` invariato (il `querySelectorAll` cicla già tutti i radio).
+- **Verifica headless** su SR sintetica (source==target): Method C `applied`, `cenShift` 0.00µm, `|fit−truth|` 0.00µm; converge esatto da un seed a +20µm e da asse +0.3° → rispetta la direttiva errore-zero. Gate `sost` (`sostAlignAll`+`sostDownloadDiagLog`) ri-baselinato, `run_all.sh` verde. Deploy commit `761b5d5`, 8.98.0 live su canonico con-h + railway. Bump MINOR. PENDING: collaudo live A/B (SR+OS+1T3+sintetico).
+
 ## 2026-07-07 — 8.97.0: Raffina bilanciata (peso cap vs parete) — nuovo default di Sostituire
 
 Follow-up diretto di 8.96.0. Con il centraggio `robust` ora default, l'utente ha collaudato su 6 SR reali (CSV diagnostica posa 8.96.0) e ha confermato: il primo clic e il **top del disco** sono buoni, ma la **Raffina** (il weighted-ICP `sostAlignAll`) apriva dello **spazio laterale sul cilindro** accoppiato — «raffina migliora il top ma peggiora la centratura del cilindro». La posa iniziale era corretta (assi concordi ~0.05°, ombre cap/mc micrometriche nel CSV): il gap lo introduceva la Raffina.
