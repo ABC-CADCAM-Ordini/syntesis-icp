@@ -25,7 +25,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Analizzare v8.95.4</title>
+<title>Synthesis-ICP - Analizzare v8.96.0</title>
 <!--
 ==== INDICE (§anchor grep-able) ============================================
 Navigazione: grep -n sul token (es. grep -n 'MISURARE-ICP'). Banner UNICI (gate:
@@ -1338,7 +1338,7 @@ function getAnalyzeSbCfg(){ return SCANBODY_CFG[getAnalyzeSbType()] || SCANBODY_
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.95.4';
+window.ANALIZZA_BUILD = '8.96.0';
 window.ANALIZZA_BUILD_DATE = '2026-07-07';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 
@@ -2394,8 +2394,11 @@ function synAxisUseLateral(isSR, onThrow){
 // Motore di centraggio Sostituire (Replace-iT): 'legacy' (default, comportamento
 // 8.14.0) | 'robust' (centraggio click-invariante full-surface, vedi sostRobustCenter).
 function synSostCenterRead(){
-  try { return localStorage.getItem('syntesis_sost_center') || 'legacy'; }
-  catch(e){ return 'legacy'; }
+  // 8.96.0: DEFAULT = 'robust' (era 'legacy'). Il motore click-invariante (fit cap+parete
+  // congiunto) e' il centraggio consigliato; fail-soft a legacy se la parete/copertura non basta.
+  // Chi ha scelto esplicitamente 'legacy' lo mantiene (valore in localStorage rispettato).
+  try { return localStorage.getItem('syntesis_sost_center') || 'robust'; }
+  catch(e){ return 'robust'; }
 }
 
 // Motore asse cilindro: cap-media (default) vs lateral-wall. Stesso pattern di onAlgoChange.
@@ -2417,7 +2420,7 @@ function onAxisEngineChange(value){
   }
 }
 
-// Motore centraggio Sostituire (syntesis_sost_center): legacy (default) vs robust. Stesso pattern.
+// Motore centraggio Sostituire (syntesis_sost_center): robust (default 8.96.0) vs legacy (fallback). Stesso pattern.
 function onSostCenterChange(value){
   if(value !== 'legacy' && value !== 'robust') return;
   try { localStorage.setItem('syntesis_sost_center', value); } catch(e){}
@@ -6483,18 +6486,18 @@ window.addEventListener('DOMContentLoaded',init);
         <label style="display:block;font-family:var(--mono);font-size:12px;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Motore centraggio Sostituire</label>
         <div style="display:flex;flex-direction:column;gap:8px">
           <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="sostCenterOptLegacy">
-            <input type="radio" name="sostCenterOpt" value="legacy" checked onchange="onSostCenterChange(this.value)" style="margin-top:2px">
+            <input type="radio" name="sostCenterOpt" value="legacy" onchange="onSostCenterChange(this.value)" style="margin-top:2px">
             <div style="flex:1">
-              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Legacy (storico)</div>
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Legacy (storico — fallback)</div>
               <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
                 Centro dal fit cilindro sul crop del click. Comportamento 8.14.0.
               </div>
             </div>
           </label>
           <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="sostCenterOptRobust">
-            <input type="radio" name="sostCenterOpt" value="robust" onchange="onSostCenterChange(this.value)" style="margin-top:2px">
+            <input type="radio" name="sostCenterOpt" value="robust" checked onchange="onSostCenterChange(this.value)" style="margin-top:2px">
             <div style="flex:1">
-              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Robust click-invariante (beta, 1T3/OS/SR)</div>
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Robust click-invariante (default consigliato, 1T3/OS/SR)</div>
               <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
                 Centro da fit full-surface ancorato all&apos;asse (ri-crop iterato della parete), indipendente dal punto di click. Esteso a 1T3/OS/SR (8.63.0; per 1T3/OS usa un asse lateral-wall locale). Doppio fail-soft: parete povera o copertura insufficiente &rarr; resta il centro legacy. Sperimentale (A/B vs Legacy, da validare su scansioni reali).
               </div>

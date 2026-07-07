@@ -364,7 +364,7 @@ function switchSettingsTab(which){
       document.querySelectorAll('input[name="axisEngineOpt"]').forEach(function(r){ r.checked = (r.value === savedAx); });
       if(typeof onAxisEngineChange === 'function') onAxisEngineChange(savedAx);
       // Motore centraggio Sostituire (syntesis_sost_center): riallinea radio + stile
-      var savedSc = localStorage.getItem('syntesis_sost_center') || 'legacy';
+      var savedSc = localStorage.getItem('syntesis_sost_center') || 'robust';   // 8.96.0: default robust (coerente con synSostCenterRead)
       document.querySelectorAll('input[name="sostCenterOpt"]').forEach(function(r){ r.checked = (r.value === savedSc); });
       if(typeof onSostCenterChange === 'function') onSostCenterChange(savedSc);
       // 8.48.0: Motore ICP Replace-iT (syntesis_replace_icp): riallinea radio + stile
