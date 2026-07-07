@@ -1,5 +1,21 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.97.0: Raffina bilanciata (peso cap vs parete) — nuovo default di Sostituire
+
+Follow-up diretto di 8.96.0. Con il centraggio `robust` ora default, l'utente ha collaudato su 6 SR reali (CSV diagnostica posa 8.96.0) e ha confermato: il primo clic e il **top del disco** sono buoni, ma la **Raffina** (il weighted-ICP `sostAlignAll`) apriva dello **spazio laterale sul cilindro** accoppiato — «raffina migliora il top ma peggiora la centratura del cilindro». La posa iniziale era corretta (assi concordi ~0.05°, ombre cap/mc micrometriche nel CSV): il gap lo introduceva la Raffina.
+
+**Root cause.** `sostAlignAll` è un ICP pesato (Kabsch pesato). Nel campionamento del template il cap/disco riceveva un peso **5× fisso** rispetto alla parete (`Math.abs(nlz) > 0.8 ? 5.0 : 1.0`). Quel 5× era tarato sull'**OS**, dove il rapporto area_parete/area_cap è ~5:1 e quindi 5× riporta cap e parete a parità di contributo. Ma su **SR/1T3** il cap è geometricamente grande: con 5× il cap **dominava** la somma dei pesi → l'allineamento ruotava per incollarsi al disco superiore e, come conseguenza, **staccava la parete** → gap laterale visibile sul cilindro.
+
+**Fix.** Il peso del cap diventa **bilanciato dinamicamente**: `capW = nBody / nCap`, così che Σ(pesi cap) = Σ(pesi parete) per **qualsiasi** tipo di scanbody, non solo l'OS. Cap e parete contribuiscono in parti uguali: il top resta guidato *e* la parete rientra nel fit → centraggio del cilindro migliore senza perdere il disco. Fail-soft al 5× storico se i conteggi sono degeneri (`nCap==0` o `nBody==0`).
+
+**Reversibilità / A-B.** Aggiunto un radio in Impostazioni → Algoritmo — "Motore Raffina Sostituire": *bilanciata* (default) / *5× storica* — con flag `localStorage` `syntesis_sost_raffina` (`balanced`/`legacy5x`), handler `onSostRaffinaChange` e init sync in `ds/syn-env.js` (`switchSettingsTab`). Chi vuole il vecchio comportamento lo riattiva senza toccare il codice.
+
+Implementazione:
+- `backend/static/wf/sostituire.js` `sostAlignAll`: rimosso il push del peso fisso 5×; ora accumula `tplIsCap[]`/`nCap`/`nBody` nel loop di campionamento e, dopo, `capW = (_raffinaBalanced && nCap>0 && nBody>0) ? nBody/nCap : 5.0`.
+- `backend/static/syntesis-analyzer-v3b.html`: radio `sostRaffinaOptBalanced`/`sostRaffinaOptLegacy` nel pannello Impostazioni→Algoritmo + handler `onSostRaffinaChange`.
+- `backend/static/ds/syn-env.js` `switchSettingsTab`: init sync del radio dal `localStorage`.
+- Verificato nel mock end-to-end (posa robust + Raffina bilanciata pulita, fallback 5× ok, radio presente). Gate `sost` (`sostAlignAll`) + `env` (`switchSettingsTab`) ri-baselinati; `run_all.sh` verde. Deploy commit `e71530c`, 8.97.0 live su canonico con-h + railway. Bump MINOR. PENDING: collaudo live A/B dell'utente.
+
 ## 2026-07-07 — 8.96.0: Il centraggio "Robust click-invariante" diventa il default di Sostituire
 
 Su richiesta dell'utente. Sintomo segnalato: «il primo clic è preciso sul cilindro ma meno sul top del disco; Raffina migliora il top ma peggiora la centratura del cilindro — l'avevamo risolto e ora è tornato». Non era una regressione di codice: il centraggio di Sostituire ha due motori, selezionabili in Impostazioni → Algoritmo, e la scelta è salvata **per-browser** in `localStorage` (`syntesis_sost_center`) con default `'legacy'`. L'utente aveva risolto scegliendo `'robust'`, ma su un browser fresco / dopo un reset dello storage il default tornava `'legacy'` e il difetto ricompariva.
