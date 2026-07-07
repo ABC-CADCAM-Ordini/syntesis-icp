@@ -1,5 +1,18 @@
 # Storia delle modifiche
 
+## 2026-07-07 — 8.109.0: redesign `/gestione` look "Cockpit tecnico"
+
+Su richiesta dell'utente ("dal punto di vista grafico è migliorabile il backend?") ho esplorato il redesign della pagina admin `/gestione` con un percorso a bozze: prima **3 direzioni** (A "sereno pastello", B "console laterale", C "editoriale denso") pubblicate come Artifact navigabili; l'utente ha scelto **B** ma trovando la resa "un po' soft, molto femminile, pastello", ho generato **3 varianti carattere** sul telaio B (cockpit tecnico / blueprint ingegneristico / solido a contrasto). Scelta finale: **Cockpit tecnico**.
+
+Implementazione con massima cautela sul file di produzione (`syntesis-gestione.html`, ~1925 righe di cui ~1450 di JS): trasformazione eseguita su una **copia** in scratchpad + **verifica adversariale** indipendente prima di toccare il file reale. Verifica: inventario `function`(86)/`id`(80)/`$("…")`(56) **identico** all'originale → logica JS intatta; `node --check` OK; colori-asse anteprima STL 3D preservati.
+
+Cosa cambia:
+- **Shell**: i 4 TAB in alto (`.admin-tabs`) diventano una **SIDEBAR** scura ink-blu (`<aside class="sb">`: brand Synthesis ICP + nav `.sb-item[data-pane]` con icone SVG + chip Amministrazione in fondo); il contenuto va in `<div class="main">` con una **topbar sottile**. `switchAdminTab` e il wiring click (2 occorrenze) passano da `.admin-tabs .atab` a `.sb-item`; `data-pane`/`tabpane`/logica toggle invariati.
+- **Re-skin CSS** via `:root` superset (nomi-var esistenti preservati + token Cockpit): accent BLU Synthesis `#0065B3` (niente teal), header tabella scuri, pill sature (bosco/ambra/blu/indaco/mattone), KPI peso 700, `focus-visible`. ~6 literal colore nel JS allineati (chip file madre/figlio, conteggi, pallini lucchetto, bg miniatura, "libreria non attiva").
+- **Preservato**: colori-asse anteprima STL 3D (X rosso/Y verde/Z blu/ambra), canvas 3D scuro. Solo frontend gestione — **non tocca** v3b/backend/DB.
+
+Gate `run_all.sh` verde. Deploy `58c3cc8` su LEGACY+BACKEND (anti-race commitHash==HEAD), 8.109.0 live su canonico con-h + railway (`/gestione` serve 4 `.sb-item`). Bump MINOR (feature UI). `MAPPA_FUNZIONALE` aggiornata (header versione + riga route Gestione + sezione Vista Gestione). **Residuo**: CSS morto `.admin-tabs` (pulizia dedicata) + **step 2** (icone/mini-chart nelle KPI, ordinamento colonne cliccabile, empty-state illustrati).
+
 ## 2026-07-07 — 8.108.1: Archivio STL — la colonna azioni non viene piu' tagliata
 
 Con la miniatura aggiunta (8.108.0) la riga superava la larghezza del contenitore (`.wrap` `max-width:1200px`) e il pulsante **Elimina** finiva tagliato. Fix: contenitore più largo (`.wrap` 1200→**1480px**, sfrutta gli schermi ampi), padding delle celle più compatto (15/12 → 13/9, ~120px risparmiati su ~10 colonne) e miniatura ridotta (76×56 → 64×48). Il `.tablecard` ha già `overflow-x:auto` come rete su schermi stretti. Solo CSS. `run_all.sh` verde. Deploy `533eaf7`. Bump PATCH.
