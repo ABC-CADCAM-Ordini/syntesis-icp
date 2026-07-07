@@ -25,7 +25,7 @@
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
      Software concesso in licenza a Biaggini Medical Devices S.r.l. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Analizzare v8.97.0</title>
+<title>Synthesis-ICP - Analizzare v8.98.0</title>
 <!--
 ==== INDICE (§anchor grep-able) ============================================
 Navigazione: grep -n sul token (es. grep -n 'MISURARE-ICP'). Banner UNICI (gate:
@@ -1338,7 +1338,7 @@ function getAnalyzeSbCfg(){ return SCANBODY_CFG[getAnalyzeSbType()] || SCANBODY_
 // ║    8. LAYER TREE        - rebuildTree(), toggles                  ║
 // ║    9. UI HELPERS        - showStatus(), resetCamera()             ║
 // ╚══════════════════════════════════════════════════════════════════╝
-window.ANALIZZA_BUILD = '8.97.0';
+window.ANALIZZA_BUILD = '8.98.0';
 window.ANALIZZA_BUILD_DATE = '2026-07-07';
 console.log('[Analizza] build', window.ANALIZZA_BUILD, window.ANALIZZA_BUILD_DATE);
 
@@ -2435,17 +2435,17 @@ function onSostCenterChange(value){
 }
 
 // 8.97.0: Motore Raffina Sostituire (syntesis_sost_raffina): balanced (default) vs legacy5x. Stesso pattern.
+// 8.98.0: aggiunto 'p2plane' (Method C semantico point-to-plane: disaccoppia disco e cilindro).
 function onSostRaffinaChange(value){
-  if(value !== 'balanced' && value !== 'legacy5x') return;
+  if(value !== 'balanced' && value !== 'legacy5x' && value !== 'p2plane') return;
   try { localStorage.setItem('syntesis_sost_raffina', value); } catch(e){}
-  var optB = document.getElementById('sostRaffinaOptBalanced');
-  var optL = document.getElementById('sostRaffinaOptLegacy');
-  if(optB && optL){
-    optB.style.borderColor = (value === 'balanced') ? 'var(--blue)' : 'var(--border)';
-    optB.style.background = (value === 'balanced') ? '#F0F9FF' : '#fff';
-    optL.style.borderColor = (value === 'legacy5x') ? 'var(--blue)' : 'var(--border)';
-    optL.style.background = (value === 'legacy5x') ? '#F0F9FF' : '#fff';
-  }
+  var opts = { balanced:'sostRaffinaOptBalanced', legacy5x:'sostRaffinaOptLegacy', p2plane:'sostRaffinaOptP2P' };
+  Object.keys(opts).forEach(function(v){
+    var el = document.getElementById(opts[v]);
+    if(!el) return;
+    el.style.borderColor = (value === v) ? 'var(--blue)' : 'var(--border)';
+    el.style.background = (value === v) ? '#F0F9FF' : '#fff';
+  });
 }
 
 // 8.48.0: Motore ICP Replace-iT (syntesis_replace_icp): point-to-point (default) vs point-to-plane (beta).
@@ -6530,6 +6530,15 @@ window.addEventListener('DOMContentLoaded',init);
               <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Bilanciata (default consigliato)</div>
               <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
                 L&apos;ICP pesato equilibra disco e parete (contributo cap = contributo parete, per ogni tipo): tiene il top del disco E recupera il centraggio del cilindro. Consigliata su SR/1T3 (cap grande), dove il peso storico faceva dominare il disco e apriva spazio laterale sul cilindro.
+              </div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:#fff" id="sostRaffinaOptP2P">
+            <input type="radio" name="sostRaffinaOpt" value="p2plane" onchange="onSostRaffinaChange(this.value)" style="margin-top:2px">
+            <div style="flex:1">
+              <div style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--dark)">Punto-a-piano &mdash; Method C (beta)</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">
+                Instrada la Raffina attraverso il fit semantico Method C: ogni punto vincola solo lungo la normale della superficie (disco &rarr; solo planarita&apos;, parete &rarr; solo centraggio). Disaccoppia i due &mdash; top E centraggio insieme, senza il compromesso del peso. Fallback automatico alla Bilanciata dove il disco &egrave; poco coperto. In collaudo (A/B su SR/OS/1T3).
               </div>
             </div>
           </label>

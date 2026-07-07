@@ -1203,6 +1203,21 @@ function sostPlaceTemplate(rawPoint, rawNormal){
   });
 }
 
+// 8.98.0: diagnostica post-Raffina per-marker (drift dal placement finalCen + distanza dall'optimum
+// Method C mcCen + delta asse). Solo scrittura su p.diag, zero effetto su posa/numeri. Usato da
+// entrambi i rami della Raffina (p2plane via Method C e Kabsch balanced/legacy5x/fallback) cosi'
+// l'A/B e' quantitativo: raffVsMc→0 = la Raffina converge all'optimum invece di allontanarsene.
+function _sostRaffDiag(p, axB){
+  if(!p || !p.diag) return;
+  var d = p.diag;
+  var plCen = d.finalCen ? new THREE.Vector3(d.finalCen[0], d.finalCen[1], d.finalCen[2]) : p.position.clone();
+  d.raffCenShift = p.position.distanceTo(plCen);
+  var a0 = (axB ? axB.clone() : new THREE.Vector3(0,0,1)).normalize();
+  var a1 = p.axisDir.clone().normalize();
+  d.raffAxDeg = Math.acos(Math.min(1, Math.max(-1, a0.dot(a1)))) * 180 / Math.PI;
+  d.raffVsMc = d.mcCen ? p.position.distanceTo(new THREE.Vector3(d.mcCen[0], d.mcCen[1], d.mcCen[2])) : null;
+}
+
 function sostAlignAll(){
   if(!sostMesh || sostPlaced.length === 0){
     sostShowStatus('Nessun marker posizionato.', true);
@@ -1256,6 +1271,16 @@ function sostAlignAll(){
       // round finche' nessun marker si muove oltre soglia (1µm) o si raggiunge il cap (12 round).
       // Come Replace-iT replaceRefineAll. setTimeout(0) tra i round -> UI reattiva + progresso live.
       var SOST_REFINE_MAX_ROUNDS = 12, SOST_REFINE_EPS_MM = 1e-3;
+      // 8.98.0: motore Raffina a 3 stati (flag localStorage 'syntesis_sost_raffina'). 'p2plane'
+      // instrada la Raffina attraverso Method C (_sostMethodCPose): ICP SEMANTICO point-to-plane
+      // (cap residuo assiale + parete radiale + coerenza normali, IRLS Tukey) che DISACCOPPIA il
+      // seating del disco dal centraggio del cilindro -> top E centro insieme, SENZA il compromesso
+      // del peso cap. Method C e' gia' validato 1:1 vs Python e gia' shadow-loggato (colonne mc*):
+      // qui viene PROMOSSO nel percorso Raffina (riuso, nessun solutore nuovo). Fallback per-marker
+      // al Kabsch pesato se Method C non applica (few-pts / trust-region / no-fit). 'balanced'
+      // (default) e 'legacy5x' restano l'ICP punto-a-punto Kabsch (invariato).
+      var _raffinaMode = (function(){ try { return localStorage.getItem('syntesis_sost_raffina') || 'balanced'; } catch(e){ return 'balanced'; } })();
+      var _useP2P = (_raffinaMode === 'p2plane');
       function _sostFinishRefine(rounds){
         sostRenderPlacedList();
         sostShowStatus('Raffinamento completato (' + rounds + ' round, ' + sostPlaced.length + ' marker).');
@@ -1276,10 +1301,62 @@ function sostAlignAll(){
         sostPlaced.forEach(function(p){
         if(!p || !p.position || !p.groups) return;
         var _posB = p.position.clone();
+        var _axB = p.axisDir ? p.axisDir.clone() : new THREE.Vector3(0,0,1);  // 8.98.0: asse pre-Raffina per diag raffAxDeg
         var sourceKey = sostSourceTemplate;
         var cadGeo = geos[sourceKey];
         var sourceGroup = p.groups && p.groups[sourceKey];
         if(!cadGeo || !sourceGroup) return;
+
+        // 8.98.0: RAMO p2plane — instrada la Raffina attraverso Method C (semantico point-to-plane,
+        // gia' validato 1:1 Python, gia' shadow-loggato come colonne mc*). Nessun solutore nuovo:
+        // _sostMethodCPose croppa 6mm, classifica cap/parete (bande |n.asse|) e risolve LM+IRLS con
+        // trust-region interna (centro 60µm, asse 0.5°, ncap>=150/nwall>=600). Se applica -> muovo il
+        // marker a (D.center, D.axis) con una trasformazione rigida (rotazione asse->asse attorno alla
+        // posa corrente + traslazione del centro), come il blocco fix-asse ma con anche la traslazione;
+        // poi salto il Kabsch. Se NON applica (few-pts/trust-*/no-fit) -> fallback al Kabsch pesato sotto.
+        if(_useP2P){
+          var _mcR = (SOSTITUIRE_TEMPLATE_INFO[sourceKey] || {}).radius || 2.03;
+          var _D = _sostMethodCPose(sostMesh.geometry, p.position.clone(), p.axisDir.clone().normalize(), _mcR);
+          p.diag = p.diag || {};
+          p.diag.raffEngine = _D.applied ? 'p2plane' : ('p2plane-fallback:' + (_D.reason||'?'));
+          p.diag.raffMcReason = _D.reason;
+          p.diag.raffMcNcap = _D.ncap; p.diag.raffMcNwall = _D.nwall;
+          if(_D.applied){
+            var _oldAx = p.axisDir.clone().normalize();
+            var _newAx = new THREE.Vector3(_D.axis[0], _D.axis[1], _D.axis[2]).normalize();
+            var _newCen = new THREE.Vector3(_D.center[0], _D.center[1], _D.center[2]);
+            var _mcMove = p.position.distanceTo(_newCen);
+            var _mcAd = Math.acos(Math.min(1, Math.max(-1, _oldAx.dot(_newAx)))) * 180 / Math.PI;
+            // idempotenza per-marker: se Method C non muove piu' (converso), no-op -> l'auto-loop chiude.
+            if(_mcMove < 1e-3 && _mcAd < 0.01){ return; }
+            var _qD = new THREE.Quaternion().setFromUnitVectors(_oldAx, _newAx);
+            var _Rd = new THREE.Matrix4().makeRotationFromQuaternion(_qD);
+            var _pP = p.position;
+            // T(newCen) * Rd * T(-pPos): ruota attorno alla posa corrente, poi porta il centro su newCen
+            var _M = new THREE.Matrix4()
+              .makeTranslation(_newCen.x, _newCen.y, _newCen.z)
+              .multiply(_Rd)
+              .multiply(new THREE.Matrix4().makeTranslation(-_pP.x, -_pP.y, -_pP.z));
+            Object.keys(p.groups || {}).forEach(function(k){
+              var g = p.groups[k]; if(!g) return;
+              g.matrix.copy(new THREE.Matrix4().multiplyMatrices(_M, g.matrix));
+              g.matrixAutoUpdate = false;
+            });
+            if(p.discWorld){ p.discWorld.applyMatrix4(_M); }
+            p.position.copy(_newCen);
+            p.axisDir.copy(_newAx);
+            var _endP = p.position.clone().add(p.axisDir.clone().multiplyScalar(20));
+            p.axisLine.geometry.setFromPoints([p.position, _endP]);
+            p.axisLine.geometry.attributes.position.needsUpdate = true;
+            // diag post-Raffina: drift totale dal placement (finalCen) e distanza dall'optimum Method C
+            _sostRaffDiag(p, _axB);
+            p.rmsd = _D.cenShift;
+            var _mv = p.position.distanceTo(_posB);
+            if(_mv > maxMove) maxMove = _mv;
+            return;   // marker gestito da Method C: salta il Kabsch
+          }
+          // _D.applied === false -> cade nel Kabsch pesato sotto (fallback), diag gia' annotato
+        }
 
         // 1. Sample punti template nel frame world
         var cadPos = cadGeo.attributes.position.array;
@@ -1300,7 +1377,7 @@ function sostAlignAll(){
         // grande) e la parete rientra nel fit -> centraggio migliore tenendo il top. Il 5x fisso
         // era tarato per l'OS (area_body/area_cap ~5:1); su SR sovra-pesava il cap = gap laterale.
         // Fallback al 5x storico col flag localStorage 'syntesis_sost_raffina'='legacy5x'.
-        var _raffinaBalanced = (function(){ try { return localStorage.getItem('syntesis_sost_raffina') !== 'legacy5x'; } catch(e){ return true; } })();
+        var _raffinaBalanced = (_raffinaMode !== 'legacy5x');   // 8.98.0: p2plane usa il peso bilanciato per il fallback Kabsch
         for(var ti = 0; ti < nCadTri; ti++){
           for(var vi = 0; vi < 3; vi++){
             if(((ti * 3) + vi) % stepCad !== 0) continue;
@@ -1564,6 +1641,10 @@ function sostAlignAll(){
         p.rmsd = prevRMSD;
         var _mv = p.position.distanceTo(_posB);
         if(_mv > maxMove) maxMove = _mv;
+        // 8.98.0: diag post-Raffina anche per il ramo Kabsch (balanced/legacy5x, o fallback p2plane).
+        p.diag = p.diag || {};
+        if(!_useP2P){ p.diag.raffEngine = _raffinaMode; p.diag.raffMcReason = ''; }
+        _sostRaffDiag(p, _axB);
         });
         sostRenderPlacedList();   // aggiornamento live ad ogni round
         if(maxMove < SOST_REFINE_EPS_MM || round >= SOST_REFINE_MAX_ROUNDS){ _sostFinishRefine(round); return; }
@@ -1630,7 +1711,7 @@ function sostDownloadDiagLog(){
   function vv(o){ return o ? (f(o.x)+','+f(o.y)+','+f(o.z)) : ',,'; }
   var lines = [];
   lines.push('# Syntesis-ICP - diagnostica posa Sostituire | versione=' + ver + ' | motore_centraggio=' + eng + ' | motore_asse=' + axeng + ' | n_marker=' + sostPlaced.length);
-  lines.push('marker,tipo,raggio,engine,applied,reason,seedCenX,seedCenY,seedCenZ,seedAxX,seedAxY,seedAxZ,fitCenX,fitCenY,fitCenZ,fitAxX,fitAxY,fitAxZ,geomAxX,geomAxY,geomAxZ,kasaCenX,kasaCenY,kasaCenZ,kasaCov,finalCenX,finalCenY,finalCenZ,finalAxX,finalAxY,finalAxZ,clickX,clickY,clickZ,clickNX,clickNY,clickNZ,connX,connY,connZ,capApplied,capReason,capDAng,capPlaneRMSum,capCov,capAreaFrac,capLamRatio,capN,capNWall,capCenShiftUm,capAxX,capAxY,capAxZ,capCenX,capCenY,capCenZ,mcApplied,mcReason,mcCenShiftUm,mcAxDeg,mcRfit,mcNcap,mcNwall,mcAxX,mcAxY,mcAxZ,mcCenX,mcCenY,mcCenZ');
+  lines.push('marker,tipo,raggio,engine,applied,reason,seedCenX,seedCenY,seedCenZ,seedAxX,seedAxY,seedAxZ,fitCenX,fitCenY,fitCenZ,fitAxX,fitAxY,fitAxZ,geomAxX,geomAxY,geomAxZ,kasaCenX,kasaCenY,kasaCenZ,kasaCov,finalCenX,finalCenY,finalCenZ,finalAxX,finalAxY,finalAxZ,clickX,clickY,clickZ,clickNX,clickNY,clickNZ,connX,connY,connZ,capApplied,capReason,capDAng,capPlaneRMSum,capCov,capAreaFrac,capLamRatio,capN,capNWall,capCenShiftUm,capAxX,capAxY,capAxZ,capCenX,capCenY,capCenZ,mcApplied,mcReason,mcCenShiftUm,mcAxDeg,mcRfit,mcNcap,mcNwall,mcAxX,mcAxY,mcAxZ,mcCenX,mcCenY,mcCenZ,raffEngine,raffCenShiftUm,raffAxDeg,raffVsMcUm,raffMcReason,raffMcNcap,raffMcNwall');
   sostPlaced.forEach(function(p){
     var d = p.diag || {};
     var row = [
@@ -1659,7 +1740,16 @@ function sostDownloadDiagLog(){
       (d.mcRfit!=null && !isNaN(d.mcRfit) ? (+d.mcRfit).toFixed(4) : ''),
       (d.mcNcap!=null && !isNaN(d.mcNcap) ? (''+d.mcNcap) : ''),
       (d.mcNwall!=null && !isNaN(d.mcNwall) ? (''+d.mcNwall) : ''),
-      v3(d.mcAx), v3(d.mcCen)
+      v3(d.mcAx), v3(d.mcCen),
+      // 8.98.0: catena post-RAFFINA. raffCenShift/raffVsMc in µm. raffVsMc = distanza dall'optimum
+      // Method C (mcCen): ~0 = la Raffina converge all'optimum; grande = drift (Kabsch punto-a-punto).
+      '"' + String(d.raffEngine||'').replace(/"/g,'') + '"',
+      (d.raffCenShift!=null && !isNaN(d.raffCenShift) ? (+d.raffCenShift*1000).toFixed(1) : ''),
+      (d.raffAxDeg!=null && !isNaN(d.raffAxDeg) ? (+d.raffAxDeg).toFixed(3) : ''),
+      (d.raffVsMc!=null && !isNaN(d.raffVsMc) ? (+d.raffVsMc*1000).toFixed(1) : ''),
+      '"' + String(d.raffMcReason||'').replace(/"/g,'') + '"',
+      (d.raffMcNcap!=null && !isNaN(d.raffMcNcap) ? (''+d.raffMcNcap) : ''),
+      (d.raffMcNwall!=null && !isNaN(d.raffMcNwall) ? (''+d.raffMcNwall) : '')
     ];
     lines.push(row.join(','));
   });
