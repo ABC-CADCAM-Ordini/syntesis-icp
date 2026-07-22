@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Synthesis-ICP - Vedere v8.0.7-refactor (Synthesis Core)
+<!-- Synthesis-ICP - Vedere v8.0.8-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Vedere v8.0.7-refactor</title>
+<title>Synthesis-ICP - Vedere v8.0.8-refactor</title>
 <!-- Gate accesso (8.78.0, chiusura rollout sospeso 2026-05-29): pagina privata.
      Anti-flash + verifica client; la sicurezza vera resta server-side (auth.py). -->
 <style>html{visibility:hidden}</style>
@@ -934,7 +934,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.7-refactor</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.8-refactor</span>
     </div>
   </div>
   <button class="btn-home" onclick="goHomeNewSession()" data-tooltip="Home (nuova sessione)">
@@ -2833,6 +2833,44 @@ filePicker.addEventListener('change', async e => {
   const urlParams = new URLSearchParams(window.location.search);
   const fileId = urlParams.get('file_id');
   const fileName = urlParams.get('file_name') || 'file.stl';
+
+  // ── 8.110.0: AUTO-LOAD DA URL GENERICO (?url=) ─────────────────────────────
+  // Apre un modello ospitato altrove (es. STL paziente di ac-ordini su Supabase
+  // Storage PUBBLICO) senza passare da Drive: fetch client-side diretto → stesso
+  // percorso del drag-drop (loadFile; il formato si deduce dall'estensione di
+  // file_name). SICUREZZA: solo https e host Supabase (*.supabase.co) — un link
+  // con host arbitrario NON viene aperto (fetch senza credenziali, sola geometria).
+  const extUrl = urlParams.get('url');
+  if (extUrl) {
+    let u = null;
+    try { u = new URL(extUrl); } catch (_) { u = null; }
+    const hostOk = !!u && u.protocol === 'https:' &&
+      (u.hostname === 'supabase.co' || u.hostname.endsWith('.supabase.co'));
+    if (!hostOk) {
+      setStatus('Errore: link non consentito (solo https da Supabase).');
+      showToast('Link non consentito per l\'apertura automatica', 'error');
+      return;
+    }
+    setStatus('Apertura file da link: ' + fileName + '...');
+    try {
+      const fileRes = await fetch(u.href);
+      if (!fileRes.ok) {
+        setStatus('Errore: file non scaricabile (HTTP ' + fileRes.status + ')');
+        showToast('File non scaricabile dal link (HTTP ' + fileRes.status + ')', 'error');
+        return;
+      }
+      const blob = await fileRes.blob();
+      const fileObj = new File([blob], fileName, { type: blob.type || 'application/octet-stream' });
+      await loadFile(fileObj);
+      setStatus('File caricato da link: ' + fileName);
+    } catch (err) {
+      console.error('[autoLoad url] errore:', err);
+      setStatus('Errore caricamento da link: ' + err.message);
+      showToast('Errore: ' + err.message, 'error');
+    }
+    return;
+  }
+
   if (!fileId) return;  // nessun parametro, niente da fare
 
   setStatus('Apertura file da Drive: ' + fileName + '...');
