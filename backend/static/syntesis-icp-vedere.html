@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Synthesis-ICP - Vedere v8.0.9-refactor (Synthesis Core)
+<!-- Synthesis-ICP - Vedere v8.0.10-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Vedere v8.0.9-refactor</title>
+<title>Synthesis-ICP - Vedere v8.0.10-refactor</title>
 <!-- Gate accesso (8.78.0, chiusura rollout sospeso 2026-05-29): pagina privata.
      Anti-flash + verifica client; la sicurezza vera resta server-side (auth.py). -->
 <style>html{visibility:hidden}</style>
@@ -934,7 +934,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.9-refactor</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.10-refactor</span>
     </div>
   </div>
   <button class="btn-home" onclick="goHomeNewSession()" data-tooltip="Home (nuova sessione)">
@@ -2851,6 +2851,39 @@ filePicker.addEventListener('change', async e => {
   const fileId = urlParams.get('file_id');
   const fileName = urlParams.get('file_name') || 'file.stl';
 
+  // ── 8.112.0: LINK OSPITE FIRMATO (#g=) ─────────────────────────────────────
+  // Se il gate ha già verificato il token (ospite non loggato) → window.SYN_GUEST.url
+  // è autorevole. Se l'utente è LOGGATO (accesso pieno) ma apre un #g=, lo verifichiamo
+  // qui per l'url autorevole. L'url dell'STL sta DENTRO il token firmato (validato
+  // server-side, host pinnato), non in query → niente di sensibile nei log.
+  let _guest = (window.SYN_GUEST && window.SYN_GUEST.url) ? window.SYN_GUEST : null;
+  if (!_guest) {
+    const _hm = (window.location.hash || '').match(/(?:^#|&)g=([^&]+)/);
+    if (_hm) {
+      try {
+        const _r = await fetch('/auth/guest/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ g: _hm[1] }) });
+        const _d = _r.ok ? await _r.json() : null;
+        if (_d && _d.ok) _guest = { url: _d.url, label: _d.label };
+      } catch (_) {}
+    }
+  }
+  if (_guest) {
+    const _gname = (String(_guest.label || 'Modello 3D').replace(/[^\w .\-]/g, '').trim() || 'Modello 3D') + '.stl';
+    setStatus('Apertura modello…');
+    try {
+      const _res = await fetch(_guest.url);   // url già validato server-side (host pinnato)
+      if (!_res.ok) { setStatus('Errore: file non scaricabile (HTTP ' + _res.status + ')'); showToast('File non scaricabile (HTTP ' + _res.status + ')', 'error'); return; }
+      const _blob = await _res.blob();
+      await loadFile(new File([_blob], _gname, { type: _blob.type || 'application/octet-stream' }));
+      setStatus('Modello caricato');
+    } catch (err) {
+      console.error('[autoLoad guest] errore:', err);
+      setStatus('Errore caricamento: ' + err.message);
+      showToast('Errore: ' + err.message, 'error');
+    }
+    return;
+  }
+
   // ── 8.110.0: AUTO-LOAD DA URL GENERICO (?url=) ─────────────────────────────
   // Apre un modello ospitato altrove (es. STL paziente di ac-ordini su Supabase
   // Storage PUBBLICO) senza passare da Drive: fetch client-side diretto → stesso
@@ -2861,8 +2894,9 @@ filePicker.addEventListener('change', async e => {
   if (extUrl) {
     let u = null;
     try { u = new URL(extUrl); } catch (_) { u = null; }
-    const hostOk = !!u && u.protocol === 'https:' &&
-      (u.hostname === 'supabase.co' || u.hostname.endsWith('.supabase.co'));
+    // 8.112.0: host pinnato per UGUAGLIANZA (era endsWith '.supabase.co', aggirabile:
+    // chiunque può registrare un progetto Supabase e creare un bucket 'ordini-stl').
+    const hostOk = !!u && u.protocol === 'https:' && u.hostname === 'gnqnebjuhnxvndrpcdtt.supabase.co';
     if (!hostOk) {
       setStatus('Errore: link non consentito (solo https da Supabase).');
       showToast('Link non consentito per l\'apertura automatica', 'error');
@@ -8542,8 +8576,56 @@ document.addEventListener('click', (e) => {
 // Gli altri rimandano alle relative pagine /analizzare e /replacer (legacy) sul backend.
 // Se il file è aperto in locale (file://), rimanda al sito live invece di rotte relative
 // che fallirebbero (file:///analizzare non esiste).
+// ── 8.112.0: modalità OSPITE (link firmato da ac-ordini, senza login) ──────────
+// Solo "Vedere" è disponibile; gli altri workflow invitano a registrarsi.
+function showGuestUpsell(){
+  let m = document.getElementById('guestUpsell');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'guestUpsell';
+    m.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(10,18,28,.55);backdrop-filter:blur(2px)';
+    m.innerHTML = '<div style="background:var(--white);border-radius:14px;max-width:380px;width:90%;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.35);font-family:var(--font)">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--dark);margin-bottom:6px">Strumento riservato</div>'
+      + '<div style="font-size:13px;color:var(--gray);line-height:1.55;margin-bottom:16px">Stai guardando il modello come <b>ospite</b>. Analizza, Misura, Sostituisci e Replace richiedono un account Synthesis-ICP.</div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end">'
+      + '<button id="guestUpsellClose" type="button" style="padding:9px 14px;border:1px solid var(--border);background:var(--white);color:var(--dark);border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)">Continua a vedere</button>'
+      + '<a href="/accedi" style="padding:9px 16px;background:var(--blue);color:#fff;border-radius:9px;font-size:13px;font-weight:800;text-decoration:none">Registrati</a>'
+      + '</div></div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function(e){ if (e.target === m) m.style.display = 'none'; });
+    m.querySelector('#guestUpsellClose').onclick = function(){ m.style.display = 'none'; };
+  }
+  m.style.display = 'flex';
+}
+function applyGuestUI(){
+  if (!window.SYN_GUEST) return;
+  if (!document.getElementById('guestBanner')) {
+    var b = document.createElement('div');
+    b.id = 'guestBanner';
+    b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:9000;background:var(--dark);color:#fff;padding:8px 14px;border-radius:20px;font-family:var(--font);font-size:12px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.28);display:flex;align-items:center;gap:10px';
+    b.innerHTML = '<span>Ospite · sola visualizzazione</span><a href="/accedi" style="color:#8fd1ff;font-weight:800;text-decoration:none">Registrati per gli strumenti di analisi</a>';
+    document.body.appendChild(b);
+  }
+  var items = document.querySelectorAll('.workflow-menu-item[data-wf]');
+  for (var i = 0; i < items.length; i++) {
+    var el = items[i];
+    if (el.getAttribute('data-wf') !== 'vedere' && !el.querySelector('.wf-lock')) {
+      el.style.opacity = '.6';
+      var lk = document.createElement('span');
+      lk.className = 'wf-lock';
+      lk.textContent = '🔒';
+      lk.style.cssText = 'margin-left:auto;font-size:12px';
+      el.appendChild(lk);
+    }
+  }
+}
+window.addEventListener('syn-guest-ready', applyGuestUI);
+if (window.SYN_GUEST) applyGuestUI();
+
 function selectWorkflow(wf) {
   closeWorkflowMenu();
+  // 8.112.0: ospite → solo Vedere; gli altri workflow invitano a registrarsi (modale).
+  if (window.SYN_GUEST && wf !== 'vedere') { showGuestUpsell(); return; }
   if (wf === 'vedere') return; // gia' attivo
   if (wf === 'analizza' || wf === 'accoppia' || wf === 'misurare' || wf === 'sostituire' || wf === 'replace') {
     // 8.61.2: passa il deep-link ?wf= così ogni voce atterra sul SUO workflow nel monolite (prima andavano tutte su Analizza default). + Replace-iT aggiunto.

@@ -60,13 +60,50 @@
     } catch(e){}
   }
 
-  function denyAndRedirect(){
+  function hardRedirect(){
     rememberDeepLink();
     clearSession();
     // replace() evita che la pagina riservata resti nello stack di
     // navigazione (back button non ci riporta).
     try { location.replace(LOGIN_PAGE); }
     catch(e){ location.href = LOGIN_PAGE; }
+  }
+
+  // 8.112.0: ACCESSO OSPITE — solo su /vedere e solo se il link porta un token
+  // firmato nel FRAGMENT (#g=...). Il fragment non arriva mai al server (niente
+  // token nei log/Referer). La verifica è server-side (/auth/guest/verify); il
+  // gate JS è solo UX. Le altre pagine (/analizzare,/dashboard) → guestVedereToken
+  // null → redirect normale.
+  function guestVedereToken(){
+    if ((location.pathname || "") !== "/vedere") return null;
+    var m = (location.hash || "").match(/(?:^#|&)g=([^&]+)/);
+    return m ? m[1] : null;
+  }
+  function tryGuestReveal(tk){
+    fetch("/auth/guest/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ g: tk })
+    }).then(function(res){
+      return res.ok ? res.json() : null;
+    }).then(function(d){
+      if (d && d.ok) {
+        // url e label AUTOREVOLI dal payload firmato (non da ?url grezzo)
+        try { window.SYN_GUEST = { url: d.url, label: d.label, exp: d.exp }; } catch(e){}
+        reveal();
+        // segnala alla pagina (Vedere) che è in modalità ospite → blocca gli altri workflow
+        try { window.dispatchEvent(new Event("syn-guest-ready")); } catch(e){}
+      } else {
+        hardRedirect();
+      }
+    }).catch(hardRedirect);
+  }
+  // Ogni ramo di "accesso negato" tenta prima l'accesso ospite (solo su /vedere#g=),
+  // così un syntesis_token scaduto in localStorage NON blocca un link ospite valido.
+  function denyAndRedirect(){
+    var tk = guestVedereToken();
+    if (tk) { tryGuestReveal(tk); return; }
+    hardRedirect();
   }
 
   function isAuthorized(user){

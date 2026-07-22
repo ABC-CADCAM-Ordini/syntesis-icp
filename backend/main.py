@@ -5,7 +5,7 @@ Copyright (C) Francesco Biaggini. Tutti i diritti riservati.
 
 # 8.81.0 CLEANUP (audit 8.80.4): rimossi import inutilizzati Form, Request (fastapi),
 # timedelta (datetime) e 5 nomi dal blocco database (verifica AST: zero riferimenti).
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, RedirectResponse, Response
@@ -266,8 +266,108 @@ async def vedere_page():
     con strumenti di misura, forme e annotazioni. Prima voce dell'elenco workflow."""
     _vd = _STATIC_DIR / "syntesis-icp-vedere.html"
     if _vd.exists():
-        return FileResponse(str(_vd), headers=_NO_STORE_HEADERS)
+        return FileResponse(str(_vd), headers={**_NO_STORE_HEADERS, "Referrer-Policy": "no-referrer"})
     return JSONResponse({"error": "Vedere not found"}, status_code=404)
+
+
+# ── 8.112.0: ACCESSO OSPITE FIRMATO per /vedere (link da ac-ordini) ───────────
+# Un link firmato da ac-ordini (Supabase Edge Function vedere-guest-link, segreto
+# CONDIVISO GUEST_LINK_SECRET) sblocca la modalità OSPITE sola-visualizzazione di
+# Vedere, senza login. La verifica è QUI, server-side (la sicurezza non sta nel gate
+# JS, §139). Token "<p>.<sig>": p=b64url(JSON), sig=b64url(HMAC-SHA256(secret, p)).
+# Il segreto è DEDICATO (≠ JWT_SECRET). Fail-closed su assenza segreto / kill-switch.
+import hmac as _hmac, hashlib as _hashlib, base64 as _b64, json as _json
+from urllib.parse import urlparse as _urlparse
+
+_GUEST_SECRET = os.getenv("GUEST_LINK_SECRET", "")
+_GUEST_SECRET_PREV = os.getenv("GUEST_LINK_SECRET_PREV", "")   # rotazione zero-downtime
+_GUEST_DISABLED = os.getenv("GUEST_DISABLED", "").strip().lower() not in ("", "0", "false", "no")
+_GUEST_MAX_TTL = 8 * 24 * 60 * 60                     # cap TTL (il signer usa 7 giorni)
+_GUEST_STL_HOST = os.getenv("GUEST_STL_HOST", "gnqnebjuhnxvndrpcdtt.supabase.co")  # host Supabase ac-ordini, pinnato
+_GUEST_STL_PATH = "/storage/v1/object/public/ordini-stl/"
+_GUEST_RL: dict[str, list[float]] = {}                # rate-limit dedicato, bounded
+_GUEST_RL_WINDOW, _GUEST_RL_LIMIT, _GUEST_RL_MAXKEYS = 60.0, 120, 5000
+
+def _guest_b64url_decode(s: str) -> bytes:
+    return _b64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+def _guest_sig_ok(p: str, sig: str) -> bool:
+    _jwt = os.getenv("JWT_SECRET", "")
+    for secret in (_GUEST_SECRET, _GUEST_SECRET_PREV):
+        if not secret or len(secret) < 32 or secret == _jwt:      # mai firmare/verificare con chiave debole o = sessione
+            continue
+        expected = _b64.urlsafe_b64encode(
+            _hmac.new(secret.encode(), p.encode(), _hashlib.sha256).digest()
+        ).decode().rstrip("=")
+        if _hmac.compare_digest(expected, sig):
+            return True
+    return False
+
+def _guest_url_ok(url: str) -> bool:
+    # host pinnato per UGUAGLIANZA (non endswith .supabase.co: namespace aperto → un bucket
+    # 'ordini-stl' su un progetto altrui passerebbe un check a suffisso). Authority pulita.
+    if not url or "@" in url or any(c in url for c in ("\\", " ", "\t", "\n", "\r")):
+        return False
+    try:
+        u = _urlparse(url)
+    except Exception:
+        return False
+    return (u.scheme == "https" and u.hostname == _GUEST_STL_HOST
+            and (u.path or "").startswith(_GUEST_STL_PATH))
+
+def _guest_rate_ok(key: str) -> bool:
+    now = time.time()
+    if len(_GUEST_RL) > _GUEST_RL_MAXKEYS:            # bounded: niente memory-exhaustion
+        _GUEST_RL.clear()
+    hits = [t for t in _GUEST_RL.get(key, []) if t > now - _GUEST_RL_WINDOW]
+    hits.append(now)
+    _GUEST_RL[key] = hits
+    return len(hits) <= _GUEST_RL_LIMIT
+
+@app.post("/auth/guest/verify", include_in_schema=False)
+async def guest_verify(request: Request):
+    """Verifica un link ospite firmato da ac-ordini. PUBBLICO (nessuna sessione), ma
+    la capability è sola-visualizzazione (scope 'vedere'); le API di analisi restano
+    require_authorized. Ritorna url+label AUTOREVOLI dal payload firmato."""
+    if _GUEST_DISABLED:
+        return JSONResponse({"ok": False, "error": "disabilitato"}, status_code=403)
+    if not _GUEST_SECRET or len(_GUEST_SECRET) < 32:
+        return JSONResponse({"ok": False, "error": "non configurato"}, status_code=503)
+    # IP: l'ULTIMO hop dell'XFF è quello aggiunto dal proxy Railway (il primo è
+    # spoofabile dal client). Fallback a client.host. Rate-limit = solo anti-abuso.
+    _xff = request.headers.get("x-forwarded-for", "")
+    _ip = (_xff.split(",")[-1].strip() if _xff else "") or (request.client.host if request.client else "?")
+    if not _guest_rate_ok(_ip):
+        return JSONResponse({"ok": False, "error": "troppe richieste"}, status_code=429)
+    try:
+        _body = await request.json()
+        g = str(_body.get("g", "")) if isinstance(_body, dict) else ""
+    except Exception:
+        return JSONResponse({"ok": False}, status_code=400)
+    # Forma attesa "<b64url>.<b64url>": rifiuta subito input malformati/non-ASCII
+    # (evita il TypeError di compare_digest → 500 su firma non-ASCII).
+    if not _re.fullmatch(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", g):
+        return JSONResponse({"ok": False}, status_code=401)
+    p, _, sig = g.partition(".")
+    if not p or not sig or not _guest_sig_ok(p, sig):
+        return JSONResponse({"ok": False}, status_code=401)
+    try:
+        payload = _json.loads(_guest_b64url_decode(p))
+        exp, iat = int(payload.get("exp", 0)), int(payload.get("iat", 0))
+    except Exception:
+        return JSONResponse({"ok": False}, status_code=401)
+    now = int(time.time())
+    if (payload.get("v") != "1" or payload.get("aud") != "synthesis-vedere"
+            or payload.get("scope") != "vedere"):
+        return JSONResponse({"ok": False}, status_code=401)
+    if exp <= now or (exp - iat) > _GUEST_MAX_TTL:
+        return JSONResponse({"ok": False, "error": "scaduto"}, status_code=401)
+    url = str(payload.get("url", ""))
+    if not _guest_url_ok(url):
+        return JSONResponse({"ok": False}, status_code=401)
+    label = str(payload.get("label", "Modello 3D"))[:60]
+    return JSONResponse({"ok": True, "guest": True, "url": url, "label": label, "exp": exp})
+
 
 @app.get("/dashboard", include_in_schema=False)
 async def dashboard_page():
