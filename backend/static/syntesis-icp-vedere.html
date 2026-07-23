@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Synthesis-ICP - Vedere v8.0.16-refactor (Synthesis Core)
+<!-- Synthesis-ICP - Vedere v8.0.17-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Vedere v8.0.16-refactor</title>
+<title>Synthesis-ICP - Vedere v8.0.17-refactor</title>
 <!-- Gate accesso (8.78.0, chiusura rollout sospeso 2026-05-29): pagina privata.
      Anti-flash + verifica client; la sicurezza vera resta server-side (auth.py). -->
 <style>html{visibility:hidden}</style>
@@ -190,6 +190,15 @@ body{
 }
 .section-pip-actions{display:flex;gap:3px;align-items:center}
 .section-tools{display:flex;gap:3px}
+/* 8.117.0 (Concept C): strip di comandi orientazione/offset della sezione */
+.section-pip-ctrls{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:5px 10px;background:#16232e;border-bottom:1px solid #2a3a48;
+  flex-shrink:0;
+}
+.secctrl{display:flex;align-items:center;gap:4px;color:#a0b4c8}
+.secctrl label{font-family:var(--mono);font-size:9px;font-weight:800;color:#a0b4c8}
+.secctrl input[type=range]{width:70px;height:3px;accent-color:var(--blue);cursor:pointer}
 
 /* Quando swap attivo: i tools della cut view fluttuano in alto a destra del viewport */
 .section-tools-floating{
@@ -963,7 +972,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.16-refactor</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.17-refactor</span>
     </div>
   </div>
   <button class="btn-home" onclick="goHomeNewSession()" data-tooltip="Home (nuova sessione)">
@@ -1181,6 +1190,25 @@ input[type="file"]{display:none}
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>
           </button>
         </div>
+      </div>
+      <!-- 8.117.0 (Concept C): comandi orientazione/offset della sezione (niente gizmo in scena) -->
+      <div class="section-pip-ctrls" id="secCtrls">
+        <div class="secctrl" data-tooltip="Scorri il taglio (offset lungo la normale)">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v12M5 5L8 2l3 3M5 11l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <input type="range" id="secOffset" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="secctrl" data-tooltip="Rotazione nel piano (attorno alla normale)">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" stroke-linecap="round"/><path d="M12 2v3h-3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <input type="range" id="secRoll" min="-180" max="180" step="1" value="0">
+        </div>
+        <div class="secctrl" data-tooltip="Inclina attorno a U"><label>U</label><input type="range" id="secTiltU" min="-90" max="90" step="1" value="0"></div>
+        <div class="secctrl" data-tooltip="Inclina attorno a V"><label>V</label><input type="range" id="secTiltV" min="-90" max="90" step="1" value="0"></div>
+        <button class="section-pip-btn" id="secFlipBtn" data-tooltip="Capovolgi lato (flip normale)">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v12" stroke-linecap="round"/><path d="M6 5L3 8l3 3M10 5l3 3-3 3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="section-pip-btn" id="secResetOriBtn" data-tooltip="Azzera orientazione">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8a5 5 0 1 0 1.6-3.7M3 3v2.5h2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </div>
       <canvas id="sectionCanvas"></canvas>
       <div class="section-pip-hint" id="secHint" style="display:none"></div>
@@ -5705,6 +5733,11 @@ function onCanvasPointerDown(e) {
   }
 
   // ===== DRAG SU SEZIONE =====
+  // 8.117.0 (Concept C): DEAD CODE. Il gizmo in scena e' stato sostituito da un
+  // marker-origine non pickabile (senza userData.isHandlePart), quindi pickHandle
+  // non restituisce piu' kind:'section' e questo ramo e' irraggiungibile.
+  // L'orientazione ora si pilota dai comandi PIP (recomputeSectionOrientation).
+  // Lasciato in attesa di un passo di pulizia dedicato (CLAUDE.md §3.4).
   if (pick.kind === 'section') {
     const s = pick.section;
     if (pick.isRotationRing) {
@@ -5869,6 +5902,8 @@ function onCanvasPointerMoveDrag(e) {
   }
 
   // ========== BRANCH SEZIONE ==========
+  // 8.117.0 (Concept C): DEAD CODE — activeHandle.kind non e' mai piu' 'section'
+  // (marker non pickabile). Orientazione via comandi PIP. Pulizia dedicata a parte.
   if (activeHandle.kind === 'section') {
     const s = activeHandle.section;
     const handle = activeHandle.handle;
@@ -6516,6 +6551,21 @@ function sceneCenter() {
   return box.getCenter(new THREE.Vector3());
 }
 
+// 8.117.0: semi-estensione della bbox proiettata su una direzione (per i limiti
+// dello slider di offset del taglio lungo la normale).
+function halfExtentAlong(box, dir, center) {
+  if (!box || box.isEmpty()) return 1;
+  let mn = Infinity, mx = -Infinity;
+  const cx = [box.min.x, box.max.x], cy = [box.min.y, box.max.y], cz = [box.min.z, box.max.z];
+  for (let i = 0; i < 8; i++) {
+    const p = new THREE.Vector3(cx[i & 1], cy[(i >> 1) & 1], cz[(i >> 2) & 1]);
+    const d = p.sub(center).dot(dir);
+    if (d < mn) mn = d;
+    if (d > mx) mx = d;
+  }
+  return Math.max((mx - mn) * 0.5, 1);
+}
+
 function drawPendingSection(p1, p2) {
   // Preview: una semplice linea tratteggiata blu tra primo e secondo click.
   // La linea è il piano di taglio visto di taglio. Al secondo click si
@@ -6590,9 +6640,16 @@ function createSection(p1, p2) {
   // N = normale del piano (perpendicolare alla traccia E perpendicolare a camDir)
   const N = new THREE.Vector3().crossVectors(U, V).normalize();
 
-  const center = p1.clone().add(p2).multiplyScalar(0.5);
-  // Quadrato 1:1: lato = distanza tra i due click
-  const side = Math.max(p1.distanceTo(p2), 1.0);
+  // 8.117.0 (Concept C): dimensione e ORIGINE dal PEZZO, non dai click. I due
+  // click definiscono solo l'orientamento (U,V,N); il piano si centra sul centro
+  // della bounding box dei layer mesh visibili e il lato copre il pezzo
+  // (~1.1x la diagonale => indipendente dall'orientazione successiva).
+  const _secBox = new THREE.Box3(); let _secAnyBox = false;
+  state.layers.forEach(l => { if (l.visible && l.object && l.object.isMesh) { _secBox.expandByObject(l.object); _secAnyBox = true; } });
+  const baseCenter = _secAnyBox ? _secBox.getCenter(new THREE.Vector3()) : p1.clone().add(p2).multiplyScalar(0.5);
+  const diag = _secAnyBox ? _secBox.getSize(new THREE.Vector3()).length() : Math.max(p1.distanceTo(p2), 1.0);
+  const side = Math.max(diag * 1.1, 1.0);
+  const center = baseCenter.clone();
   const width = side, height = side;
 
   clearPendingSection();
@@ -6605,37 +6662,22 @@ function createSection(p1, p2) {
   // Equazione plane.constant: per un piano (N,c) con punto sul piano P, c = -N.dot(P)
   const plane = new THREE.Plane(N.clone(), -N.dot(center));
 
-  // 4 maniglie cardinali ai centri dei lati (rosse U / verdi V)
+  // 8.117.0 (Concept C): NIENTE gizmo in scena. Solo un piccolo marker-origine
+  // al centro del pezzo; orientamento e offset si controllano dai comandi nella
+  // PIP (secOffset/secRoll/secTiltU/secTiltV/secFlipBtn). Il marker sta in
+  // `handles` (senza userData.isHandlePart => non pickabile) per riusare i toggle
+  // di visibilita' e il cleanup di removeSection senza edit fuori scope.
   const handles = [];
-  const RED = 0xDC2626;
-  const GREEN = 0x0D9E6E;
-  const YELLOW = 0xF59E0B;
-
-  const cardinalSpecs = [
-    { axis: 'U', sign: +1, color: RED,   arrows: [U.clone(), U.clone().negate()] },
-    { axis: 'U', sign: -1, color: RED,   arrows: [U.clone(), U.clone().negate()] },
-    { axis: 'V', sign: +1, color: GREEN, arrows: [V.clone(), V.clone().negate()] },
-    { axis: 'V', sign: -1, color: GREEN, arrows: [V.clone(), V.clone().negate()] }
-  ];
-  for (const spec of cardinalSpecs) {
-    const dir = (spec.axis === 'U' ? U : V).clone().multiplyScalar(spec.sign);
-    const half = (spec.axis === 'U' ? width : height) * 0.5;
-    const gizmo = buildHandleGizmo(spec.color, spec.arrows);
-    gizmo.position.copy(center).add(dir.clone().multiplyScalar(half));
-    scene.add(gizmo);
-    handles.push({ mesh: gizmo, axis: spec.axis, sign: spec.sign });
-  }
-
-  // Maniglia centrale gialla con frecce + 3 anelli rotazione
-  const centerHandle = buildHandleGizmo(YELLOW, [
-    U.clone(), U.clone().negate(),
-    V.clone(), V.clone().negate(),
-    N.clone(), N.clone().negate()
-  ]);
-  addRotationRings(centerHandle, U, V, N);
-  centerHandle.position.copy(center);
-  scene.add(centerHandle);
-  handles.push({ mesh: centerHandle, axis: 'C', sign: 0 });
+  const markerR = Math.max(side * 0.012, 0.15);
+  const marker = new THREE.Mesh(
+    new THREE.SphereGeometry(markerR, 16, 12),
+    new THREE.MeshBasicMaterial({ color: 0xF59E0B, depthTest: false, transparent: true, opacity: 0.95 })
+  );
+  marker.renderOrder = 1001;
+  marker.layers.set(GIZMO_LAYER);
+  marker.position.copy(center);
+  scene.add(marker);
+  handles.push({ mesh: marker, axis: 'M' });
 
   state.section = {
     id: state.nextId++,
@@ -6644,7 +6686,18 @@ function createSection(p1, p2) {
     center: center.clone(),
     normal: N.clone(), U: U.clone(), V: V.clone(),
     width, height,
-    rect, plane, handles,
+    rect, plane, handles, marker,
+    // 8.117.0: frame base congelato (orientamento dai click) + parametri
+    // controllati dai comandi PIP. La normale di clip = N0(ruotata)*flip.
+    ori: {
+      U0: U.clone(), V0: V.clone(), N0: N.clone(),
+      baseCenter: baseCenter.clone(),
+      roll: 0, tiltU: 0, tiltV: 0,   // radianti
+      offset: 0,                     // mm lungo N geometrico
+      flip: 1,                       // +1 / -1 (lato tenuto)
+      box: _secBox.clone(),          // bbox pezzo (per ricalcolare il range offset dopo il tilt)
+      offsetRange: halfExtentAlong(_secBox, N, center)
+    },
     measures2D: [],            // misure lineari dentro la sezione 2D
     angles2D: [],              // misure angolari dentro la sezione 2D (role angle-2d-section)
     sectionLines: []           // mesh delle linee di intersezione (calcolate ogni frame)
@@ -6662,16 +6715,16 @@ function createSection(p1, p2) {
   // Mostra PIP e applica clipping
   applySectionClipping(true);
   showSectionPip(true);
+  syncSectionControls();     // 8.117.0: imposta range offset + azzera gli slider
   updateSectionVisuals();
   rebuildSectionLines();
 
-  // Auto-fit della PIP sui segmenti di intersezione effettivi (Blocco 4e).
-  // Il rettangolo handle e' piccolo (lato = distanza primo-secondo click),
-  // ma le linee di intersezione possono essere molto piu' estese: senza
-  // questo fit si vede una PIP nera (camera centrata nel rettangolo, mesh fuori).
+  // Auto-fit della PIP sui segmenti di intersezione effettivi (Blocco 4e): il
+  // rettangolo ora copre il pezzo, ma le linee di intersezione possono avere
+  // estensione diversa, quindi si centra la camera sui segmenti reali.
   fitSectionCameraToContent();
 
-  setStatus('Sezione attiva. Trascina i control point per orientarla.');
+  setStatus('Sezione attiva. Usa i comandi nella finestra per orientarla.');
   renderLayerList();
 }
 
@@ -7074,6 +7127,37 @@ function applySectionClipping(on) {
   }
 }
 
+// 8.117.0 (Concept C): ricalcola orientazione+offset del taglio dai parametri
+// dei comandi PIP, partendo SEMPRE dal frame base congelato (U0/V0/N0) con una
+// singola quaternion => niente drift (ortonormalita' preservata). Separa la
+// normale GEOMETRICA (rect/offset/proiezione 2D) da quella di CLIP (=geom*flip).
+function recomputeSectionOrientation() {
+  const s = state.section; if (!s || !s.ori) return;
+  const o = s.ori;
+  // roll INNERMOST: q = Rv*Ru*Rn => Ngeom = Rv*Ru*N0 (indipendente dal roll,
+  // perche' Rn*N0=N0) e il roll e' una VERA rotazione in-piano di U,V attorno a
+  // Ngeom. (Fix review: col roll esterno, dopo un tilt la normale di taglio
+  // precessionava su un cono e "ruota nel piano" spostava invece il taglio.)
+  const q = new THREE.Quaternion()
+    .multiply(new THREE.Quaternion().setFromAxisAngle(o.V0, o.tiltV))
+    .multiply(new THREE.Quaternion().setFromAxisAngle(o.U0, o.tiltU))
+    .multiply(new THREE.Quaternion().setFromAxisAngle(o.N0, o.roll));
+  const U = o.U0.clone().applyQuaternion(q).normalize();
+  const V = o.V0.clone().applyQuaternion(q).normalize();
+  const Ngeom = o.N0.clone().applyQuaternion(q).normalize();
+  s.U.copy(U);
+  s.V.copy(V);
+  s.normal.copy(Ngeom).multiplyScalar(o.flip);                 // normale di clip
+  s.center.copy(o.baseCenter).addScaledVector(Ngeom, o.offset); // offset su N geom (stabile al flip)
+  // Fix review (minor): range dell'offset ricalcolato sulla normale CORRENTE
+  // (Ngeom), non su quella iniziale — altrimenti dopo un tilt forte lo slider
+  // non copre il pezzo. Aggiorna solo min/max/step (il value resta).
+  o.offsetRange = halfExtentAlong(o.box, Ngeom, o.baseCenter);
+  const _off = document.getElementById('secOffset');
+  if (_off) { _off.min = (-o.offsetRange).toFixed(3); _off.max = o.offsetRange.toFixed(3); _off.step = (o.offsetRange / 100).toFixed(4); }
+  updateSectionVisuals();
+}
+
 function updateSectionVisuals() {
   if (!state.section) return;
   const s = state.section;
@@ -7083,16 +7167,8 @@ function updateSectionVisuals() {
   s.rect = buildSectionRectMesh(s.center, s.U, s.V, s.width, s.height, 0x0065B3);
   scene.add(s.rect);
 
-  // Aggiorna posizione maniglie cardinali e centrale
-  s.handles.forEach(h => {
-    if (h.axis === 'C') {
-      h.mesh.position.copy(s.center);
-    } else {
-      const axisVec = (h.axis === 'U' ? s.U : s.V).clone().multiplyScalar(h.sign);
-      const half = (h.axis === 'U' ? s.width : s.height) * 0.5;
-      h.mesh.position.copy(s.center).add(axisVec.clone().multiplyScalar(half));
-    }
-  });
+  // 8.117.0: riposiziona il solo marker-origine (niente piu' handle cardinali)
+  s.handles.forEach(h => { if (h.axis === 'M') h.mesh.position.copy(s.center); });
 
   // Aggiorna piano di clipping
   s.plane.normal.copy(s.normal);
@@ -7719,6 +7795,48 @@ document.getElementById('secAngleBtn').addEventListener('click', () => {
 document.getElementById('secFitBtn').addEventListener('click', () => {
   if (state.section) fitSectionCameraToContent();
 });
+
+// === 8.117.0 (Concept C): comandi orientazione/offset della sezione ===
+// Nessun gizmo in scena: rotazioni (roll attorno a N, tilt attorno a U/V),
+// offset lungo la normale e flip del lato si pilotano da questi controlli.
+let _secRecalcRAF = 0;
+function scheduleSectionRecompute() {
+  if (_secRecalcRAF) return;
+  _secRecalcRAF = requestAnimationFrame(() => { _secRecalcRAF = 0; recomputeSectionOrientation(); });
+}
+function bindSecOri(id, key, deg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', () => {
+    if (!state.section || !state.section.ori) return;
+    state.section.ori[key] = deg ? THREE.MathUtils.degToRad(+el.value) : +el.value;
+    scheduleSectionRecompute();   // coalescia: 1 ricostruzione linee per frame
+  });
+}
+bindSecOri('secOffset', 'offset', false);
+bindSecOri('secRoll', 'roll', true);
+bindSecOri('secTiltU', 'tiltU', true);
+bindSecOri('secTiltV', 'tiltV', true);
+document.getElementById('secFlipBtn').addEventListener('click', () => {
+  if (!state.section || !state.section.ori) return;
+  state.section.ori.flip *= -1;
+  recomputeSectionOrientation();
+});
+document.getElementById('secResetOriBtn').addEventListener('click', () => {
+  if (!state.section || !state.section.ori) return;
+  const o = state.section.ori; o.roll = o.tiltU = o.tiltV = o.offset = 0; o.flip = 1;
+  syncSectionControls();
+  recomputeSectionOrientation();
+});
+function syncSectionControls() {
+  const s = state.section; if (!s || !s.ori) return;
+  const r = s.ori.offsetRange || 1;
+  const off = document.getElementById('secOffset');
+  if (off) { off.min = (-r).toFixed(3); off.max = r.toFixed(3); off.step = (r / 100).toFixed(4); off.value = s.ori.offset; }
+  const roll = document.getElementById('secRoll'); if (roll) roll.value = THREE.MathUtils.radToDeg(s.ori.roll);
+  const tu = document.getElementById('secTiltU'); if (tu) tu.value = THREE.MathUtils.radToDeg(s.ori.tiltU);
+  const tv = document.getElementById('secTiltV'); if (tv) tv.value = THREE.MathUtils.radToDeg(s.ori.tiltV);
+}
 
 // === Drag della PIP per riposizionarla (solo se non è in maxi) ===
 (function bindPipDrag(){
