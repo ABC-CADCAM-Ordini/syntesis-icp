@@ -1,5 +1,18 @@
 # Storia delle modifiche
 
+## 2026-07-23 — 8.115.0: gizmo di trasformazione discreto e a trigger esplicito in Vedere
+
+Su richiesta dell'utente: selezionando un oggetto in Vedere compariva il **gizmo di trasformazione** (le frecce RGB del `transformControls`, `TransformControls` di three r169 in modalità translate), percepito come troppo invasivo/poco elegante ("sistema di origini"). Nota: in scena non esiste più alcuna terna/griglia globale (rimossa) — quel gizmo È il `transformControls`. Scelto l'**Approccio A + dimensione**: nascondere il gizmo di default e agganciarlo solo a un trigger esplicito, più ridurne la dimensione. Coerente con la preferenza dell'utente per trigger espliciti vs auto-comportamenti (cfr. la posa ▶ Allinea di Replace-iT).
+
+Implementazione (solo frontend `syntesis-icp-vedere.html`, 5 edit chirurgici):
+- **`setSize(0.85)` → `0.6`** alla creazione del `transformControls`: frecce più piccole ed eleganti quando appaiono.
+- **`selectLayer`**: rimosso l'`attach` automatico su selezione (`transformControls.attach(l.group)` + `setMode`). Ora selezionare un oggetto lo lascia in **stato neutro** (`state.transformMode = null` + `detach`); la selezione resta visibile da Properties Panel + riga evidenziata nell'Albero Scena. Il gizmo NON compare più sulla sola selezione.
+- **`setTransformMode(mode)`**: riscritto come macchina a stati. Guardia `if (state.selectedId === null) return` (tasti T/R a vuoto = no-op). Se la modalità richiesta è già attiva → **toggle-off**: `detach` + `state.transformMode = null` (gizmo via, oggetto ancora selezionato). Altrimenti → `attach(l.group)` + `setMode(mode)` + `updateModeButtons`. Il gizmo si aggancia SOLO entrando esplicitamente in Sposta (`#btnMoveMode`/T) o Ruota (`#btnRotateMode`/R).
+- **`deselectLayer`**: oltre a `detach` ora azzera a neutro (`state.transformMode = null`) e chiama `updateModeButtons` (nessun pulsante resta attivo). Esc/cambio-file/toggle-invisibile continuano a passare da qui (invariati).
+- **`state` init**: `transformMode: 'translate'` → `null` (neutro).
+
+Verifica: `node --check` sui blocchi `<script>` OK; **test deterministico della macchina a stati 18/18 PASS** (mock `transformControls`+DOM, sequenza select→T→toggle-off→R→Esc + guardie + `setSize 0.6`). Gate `run_all.sh` verde sui check pertinenti (il solo FAIL `purelib` è ambientale: `three.module.min.js` vendored gitignored assente nel worktree). Verifica visiva live rinviata al post-deploy (la vedere.html reale è dietro `syn-gate.js` + richiede backend/STL). Vedere v8.0.13→v8.0.14-refactor (commento+title+badge). MAPPA_FUNZIONALE aggiornata (righe Sposta/Ruota/Deseleziona + header versione + changelog). Bump MINOR (feature UX retrocompatibile).
+
 ## 2026-07-23 — 8.114.0: overlay di caricamento modello in Vedere
 
 Su richiesta dell'utente: quando Vedere apre un STL da un **link ospite/esterno** (link firmato generato da ac-ordini, Edge Function `vedere-guest-link` → `/auth/guest/verify`; oppure `?url=` esterno o `?file_id=` Drive) il download impiega qualche secondo e **prima non c'era alcun feedback visivo** — schermo fermo finché il modello non appariva. Aggiunto un overlay di caricamento che **compare appena parte il `fetch`** e **sparisce quando il modello è pronto**; in caso di errore mostra un messaggio.
