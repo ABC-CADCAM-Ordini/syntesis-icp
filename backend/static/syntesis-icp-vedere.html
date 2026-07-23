@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Synthesis-ICP - Vedere v8.0.15-refactor (Synthesis Core)
+<!-- Synthesis-ICP - Vedere v8.0.16-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Vedere v8.0.15-refactor</title>
+<title>Synthesis-ICP - Vedere v8.0.16-refactor</title>
 <!-- Gate accesso (8.78.0, chiusura rollout sospeso 2026-05-29): pagina privata.
      Anti-flash + verifica client; la sicurezza vera resta server-side (auth.py). -->
 <style>html{visibility:hidden}</style>
@@ -963,7 +963,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.15-refactor</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.16-refactor</span>
     </div>
   </div>
   <button class="btn-home" onclick="goHomeNewSession()" data-tooltip="Home (nuova sessione)">
@@ -2567,7 +2567,7 @@ function buildMaterial(isPoints, hasColor, showColor, colorHex) {
     shininess: 30,
     vertexColors: hasColor && showColor,
     side: THREE.DoubleSide,
-    transparent: false,
+    transparent: true,   // 8.116.1 FIX cap sezione: opaco alla vista (opacity 1.0 + depthWrite default true) MA in coda TRASPARENTE, cosi' le mesh-stencil del cap (renderOrder 1, depthTest) scrivono lo stencil PRIMA che la base scriva il depth. transparent:false (8.113.0) metteva la base in coda opaca e rompeva il cap.
     opacity: 1.0,
     flatShading: false
   });
@@ -8721,7 +8721,7 @@ if (window.SynCutViewManager) {
           // Ripristino opacity originale del materiale base (in caso fosse stata modificata da wireframe mode)
           if (sel.meta && sel.meta.original && sel.meta.original.opacity != null) {
             layer.material.opacity = sel.meta.original.opacity;
-            layer.material.transparent = (sel.meta.original.opacity < 1.0);
+            layer.material.transparent = true;   // 8.116.1: resta in coda trasparente anche a opacity 1.0 (cap sezione)
           }
           if (!layer.wireframeOverlay) {
             // Reticolo "Entrambi" uniformato a /analizzare: WireframeGeometry + LineSegments
@@ -8776,7 +8776,7 @@ if (window.SynCutViewManager) {
           layer.color = orig.color;
           if (layer.material) {
             layer.material.color.set(orig.color);
-            layer.material.transparent = (orig.opacity < 1.0);
+            layer.material.transparent = true;   // 8.116.1: idem, non ricadere in coda opaca
             layer.material.opacity = orig.opacity;
             layer.material.depthWrite = (orig.opacity >= 1.0);
             layer.material.wireframe = false;
