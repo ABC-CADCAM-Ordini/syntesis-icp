@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Synthesis-ICP - Vedere v8.0.10-refactor (Synthesis Core)
+<!-- Synthesis-ICP - Vedere v8.0.11-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Vedere v8.0.10-refactor</title>
+<title>Synthesis-ICP - Vedere v8.0.11-refactor</title>
 <!-- Gate accesso (8.78.0, chiusura rollout sospeso 2026-05-29): pagina privata.
      Anti-flash + verifica client; la sicurezza vera resta server-side (auth.py). -->
 <style>html{visibility:hidden}</style>
@@ -934,7 +934,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.10-refactor</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.11-refactor</span>
     </div>
   </div>
   <button class="btn-home" onclick="goHomeNewSession()" data-tooltip="Home (nuova sessione)">
@@ -2515,8 +2515,8 @@ function buildMaterial(isPoints, hasColor, showColor, colorHex) {
     shininess: 30,
     vertexColors: hasColor && showColor,
     side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.85,
+    transparent: false,
+    opacity: 1.0,
     flatShading: false
   });
 }
@@ -2565,13 +2565,13 @@ function addLayer(name, type, parsed) {
     name,
     module: 'vedere',
     three: { group, meshes: [object3d], labels: [], helpers: [] },
-    visual: { visible: true, opacity: 0.85, color: colorHex, transparent: false, renderMode: defaultRenderMode },
+    visual: { visible: true, opacity: 1.0, color: colorHex, transparent: false, renderMode: defaultRenderMode },
     meta: {
       fileName: name, format: type,
       triangles: Math.round(count), bbox: size, unit: 'mm',
       // Memorizzo i default per il bottone "Ripristina"
       original: {
-        opacity: 0.85,
+        opacity: 1.0,
         color: colorHex,
         visible: true,
         renderMode: defaultRenderMode,
@@ -2819,8 +2819,12 @@ function fitCameraToScene() {
   const center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z, 1);
   const fov = camera.fov * Math.PI / 180;
-  const dist = Math.abs(maxDim / Math.sin(fov / 2)) * 0.7;
-  camera.position.set(center.x + dist*0.55, center.y - dist*0.7, center.z + dist*0.55);
+  // 8.113.0: riempi lo spazio utile — fit STRETTO della sfera che racchiude il modello
+  // all'apertura verticale (margine ~8%), invece del vecchio margine ~40%.
+  const radius = box.getBoundingSphere(new THREE.Sphere()).radius || (maxDim * 0.5);
+  const dist = (radius / Math.sin(fov / 2)) * 1.08;
+  const dir = new THREE.Vector3(0.55, -0.7, 0.55).normalize();
+  camera.position.copy(center).addScaledVector(dir, dist);
   controls.target.copy(center);
   controls.update();
 }
