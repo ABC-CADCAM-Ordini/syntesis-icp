@@ -1,5 +1,21 @@
 # Storia delle modifiche
 
+## 2026-07-23 — 8.116.0: misure angolari in Vedere (fix cancellazione 3D + angolo nella sezione)
+
+Due interventi sulle misure ANGOLARI di Vedere, richiesti dall'utente come "da fare dopo". Rilasciata subito dopo la 8.115.0 (gizmo), di cui eredita il codice via rebase: contenuti indipendenti e non sovrapposti (il gizmo tocca `transformControls`/`setTransformMode`/`selectLayer`; questa release tocca misure/sezione).
+
+**(A) FIX — l'angolo 3D non si cancellava.** `deleteObject` (cestino nell'albero scena) e il delete del pannello Proprietà trattavano OGNI misura come lineare (`scene.remove(m.line); m.line.geometry.dispose()`). Un angolo (`kind === 'angle-measure'`) non ha `m.line` ma `m.objects`/`m.arcGroup`/`m.labelEl` → `TypeError` a metà cleanup, cancellazione abortita, voce orfana nell'albero. Fix: entrambi i punti instradano a `removeMeasure(id)`, l'unico cleanup kind-aware (mappando `synId` → `id` interno). Foldato nello stesso passo il gemello sul **toggle di visibilità** (albero + pannello), che crashava su `m.line.visible` per gli angoli → ora kind-aware (`objects`/`arcGroup` vs `line`/`endDots`).
+
+**(B) FEATURE — angolo nella finestra di sezione.** Prima lo strumento Angolo era solo-3D (`angleOnClick` sul canvas principale, raycast + proiezione a schermo) e la PiP di sezione aveva solo il righello: un angolo "nella sezione" non produceva alcun valore. Nuovo strumento dedicato: pulsante `#secAngleBtn` nei tool della PiP, 4 click nel piano ortho, angolo **ESATTO** nel piano 2D (`acos(|d1·d2|/(|d1||d2|))`, nessuna proiezione), vertice = intersezione delle rette, arco sul lato acuto + label DOM nella PiP.
+
+Implementazione (solo frontend `syntesis-icp-vedere.html`):
+- Nuovo tipo `angle-2d-section` in `MEASURE_TYPES`; stato `sectionAngleActive`/`sectionAnglePoints`; storage `state.section.angles2D` (init in `createSection`, cleanup in `removeSection`).
+- Funzioni `setSectionAngleActive`/`sectionAngleCanvasClick`/`commitSectionAngle`/`updateSectionAngleLabels`/`removeSectionAngle`/`setSectionAngleVisible`; ESC + mutua esclusione col righello 2D.
+- Wiring albero (gruppo MISURE 2D, escluso dal gruppo 3D), visibilità e cancellazione dall'albero, Proprietà `renderMeasure2DAngle` (info-only, come il lineare 2D).
+- Le due modifiche non toccano le funzioni del gizmo 8.115.0 (merge 3-way pulito su tutto il codice funzionale; conflitti solo su ancoraggi di versione/doc, risolti a 8.116.0 / Vedere v8.0.15).
+
+Verifica: `node --check` 3/3 blocchi `<script>` sul file merged; gate `check_inline` + `check_anchors` VERDI (`purelib` rosso = vendored THREE r169 assente nel worktree, testa i moduli dell'analyzer, indipendente da Vedere). Numerica provata con 5 casi golden (90°/45°/30°/flip-acuto/vertice-esteso) + harness THREE r169 (rendering marker/segmenti/arco/label corretti). Verifica live in-app impossibile in sessione (gate di login). Vedere v8.0.14 → **v8.0.15-refactor**, `BACKEND_VERSION` 8.115.0 → **8.116.0**.
+
 ## 2026-07-23 — 8.115.0: gizmo di trasformazione discreto e a trigger esplicito in Vedere
 
 Su richiesta dell'utente: selezionando un oggetto in Vedere compariva il **gizmo di trasformazione** (le frecce RGB del `transformControls`, `TransformControls` di three r169 in modalità translate), percepito come troppo invasivo/poco elegante ("sistema di origini"). Nota: in scena non esiste più alcuna terna/griglia globale (rimossa) — quel gizmo È il `transformControls`. Scelto l'**Approccio A + dimensione**: nascondere il gizmo di default e agganciarlo solo a un trigger esplicito, più ridurne la dimensione. Coerente con la preferenza dell'utente per trigger espliciti vs auto-comportamenti (cfr. la posa ▶ Allinea di Replace-iT).

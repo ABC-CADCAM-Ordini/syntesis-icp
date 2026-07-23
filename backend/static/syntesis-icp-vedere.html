@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Synthesis-ICP - Vedere v8.0.14-refactor (Synthesis Core)
+<!-- Synthesis-ICP - Vedere v8.0.15-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Vedere v8.0.14-refactor</title>
+<title>Synthesis-ICP - Vedere v8.0.15-refactor</title>
 <!-- Gate accesso (8.78.0, chiusura rollout sospeso 2026-05-29): pagina privata.
      Anti-flash + verifica client; la sicurezza vera resta server-side (auth.py). -->
 <style>html{visibility:hidden}</style>
@@ -963,7 +963,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.14-refactor</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.15-refactor</span>
     </div>
   </div>
   <button class="btn-home" onclick="goHomeNewSession()" data-tooltip="Home (nuova sessione)">
@@ -1162,6 +1162,9 @@ input[type="file"]{display:none}
           <div class="section-tools" id="secTools">
             <button class="section-pip-btn" id="secRulerBtn" data-tooltip="Misura nella sezione (M)">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 11l10-10 4 4-10 10z" stroke-linejoin="round"/><path d="M3 9l1 1M5 7l1.5 1.5M7 5l1 1M9 3l1.5 1.5" stroke-linecap="round"/></svg>
+            </button>
+            <button class="section-pip-btn" id="secAngleBtn" data-tooltip="Angolo nella sezione">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12M2 14L13 5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 14a7 7 0 0 0-3.1-5.8" stroke-linecap="round"/></svg>
             </button>
             <button class="section-pip-btn" id="secFitBtn" data-tooltip="Adatta vista (F)">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6V3h3M13 6V3h-3M3 10v3h3M13 10v3h-3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1598,6 +1601,14 @@ input[type="file"]{display:none}
       label: 'Angolo tra due linee',
       unit: '°',
       points: 4,            // 2 punti per linea 1, 2 punti per linea 2
+      dimension: 'angle',
+      format: function(v, u) { return v.toFixed(2) + ' ' + (u || '°'); },
+      icon: 'measureIcon'
+    },
+    'angle-2d-section': {
+      label: 'Angolo 2D (sezione)',
+      unit: '°',
+      points: 4,            // 2 punti per linea 1, 2 punti per linea 2, nel piano sezione
       dimension: 'angle',
       format: function(v, u) { return v.toFixed(2) + ' ' + (u || '°'); },
       icon: 'measureIcon'
@@ -2074,6 +2085,9 @@ const state = {
   sectionSwapped: false,    // true: 3D è nella PIP, 2D è nel viewport principale
   sectionRulerActive: false,
   sectionRulerFirstPoint: null,
+  sectionAngleActive: false,        // strumento angolo dedicato alla PIP di sezione
+  sectionAnglePoints: [],           // 4 punti 2D nel piano sezione: [p1l1, p2l1, p1l2, p2l2]
+  sectionAnglePendingColor: null,   // colore palette scelto al primo click della misura
 };
 
 // Three.js init — r169: setup THREE differito a three-ready (era eager a parse-time).
@@ -6631,7 +6645,8 @@ function createSection(p1, p2) {
     normal: N.clone(), U: U.clone(), V: V.clone(),
     width, height,
     rect, plane, handles,
-    measures2D: [],            // misure dentro la sezione 2D
+    measures2D: [],            // misure lineari dentro la sezione 2D
+    angles2D: [],              // misure angolari dentro la sezione 2D (role angle-2d-section)
     sectionLines: []           // mesh delle linee di intersezione (calcolate ogni frame)
   };
   // Bridge: registra sezione nel SynRegistry
@@ -6859,12 +6874,22 @@ function removeSection() {
     m.line.geometry.dispose(); m.line.material.dispose();
     if (m.labelEl) m.labelEl.remove();
   });
+  // Rimuovo gli angoli 2D (oggetti multipli: 2 segmenti + arco + marker; nessun m.line singolo)
+  if (s.angles2D) s.angles2D.forEach(m => {
+    if (m.objects) m.objects.forEach(o => {
+      if (o.parent) o.parent.remove(o);
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
+    if (m.labelEl) m.labelEl.remove();
+  });
   // Bridge: rimuovo dal registry (rimuove anche le misure 2D figlie via cascata)
   if (s.synId) window.SynRegistry.remove(s.synId);
   state.section = null;
   applySectionClipping(false);
   showSectionPip(false);
   setSectionRulerActive(false);
+  setSectionAngleActive(false);
   renderLayerList();
 }
 
@@ -7303,6 +7328,7 @@ function resizeMainRenderer() {
 // ----------- Misure 2D nella sezione -----------
 
 function setSectionRulerActive(on) {
+  if (on && state.sectionAngleActive) setSectionAngleActive(false);
   state.sectionRulerActive = on;
   state.sectionRulerFirstPoint = null;
   document.getElementById('secRulerBtn').classList.toggle('active', on);
@@ -7463,6 +7489,207 @@ function updateSectionMeasureLabels() {
   });
 }
 
+// ----------- Angolo 2D nella sezione (8.116.0) -----------
+// Strumento angolo dedicato alla PIP di sezione. A differenza dell'angolo 3D
+// (che PROIETTA i punti a schermo, vedi commitAngleMeasure), qui il piano e' gia'
+// 2D (ortho sectionCamera) quindi l'angolo tra i due segmenti e' ESATTO:
+// theta = acos(|d1.d2| / (|d1||d2|)), sempre acuto 0-90.
+// 4 click: linea1 (2 punti) + linea2 (2 punti). Oggetti in sectionScene, label DOM
+// nella PIP, registrato come figlio della sezione (role 'angle-2d-section').
+let pendingSecAngleObjs = [];   // marker + segmento linea1 temporanei durante il tracciamento
+
+function clearPendingSectionAngle() {
+  for (const o of pendingSecAngleObjs) {
+    if (o.parent) o.parent.remove(o);
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  }
+  pendingSecAngleObjs = [];
+}
+
+function setSectionAngleActive(on) {
+  if (on && state.sectionRulerActive) setSectionRulerActive(false);
+  state.sectionAngleActive = on;
+  state.sectionAnglePoints = [];
+  state.sectionAnglePendingColor = null;
+  clearPendingSectionAngle();
+  const btn = document.getElementById('secAngleBtn');
+  if (btn) btn.classList.toggle('active', on);
+  sectionCanvas.classList.toggle('ruler-active', on);   // riusa il crosshair
+  const hint = document.getElementById('secHint');
+  if (on) {
+    hint.textContent = 'ANGOLO — LINEA 1, PRIMO PUNTO  ·  ESC ESCE';
+    hint.style.display = '';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+function sectionAngleCanvasClick(e) {
+  if (!state.sectionAngleActive) return;
+  if (e.button !== 0) return;
+  const p = sectionCanvasToWorld2D(e);
+  if (state.sectionAnglePoints.length === 0) {
+    state.sectionAnglePendingColor = nextMeasureColor();
+  }
+  const accent = state.sectionAnglePendingColor;
+  const accentHex = new THREE.Color(accent).getHex();
+  state.sectionAnglePoints.push(p.clone());
+
+  // Marker del punto cliccato
+  const mk = new THREE.Mesh(new THREE.CircleGeometry(0.08, 16), new THREE.MeshBasicMaterial({ color: accentHex }));
+  mk.position.copy(p);
+  mk.renderOrder = 5;
+  sectionScene.add(mk);
+  pendingSecAngleObjs.push(mk);
+
+  // A fine di ciascuna linea (2 o 4 punti) disegno il segmento
+  if (state.sectionAnglePoints.length === 2 || state.sectionAnglePoints.length === 4) {
+    const i0 = state.sectionAnglePoints.length - 2;
+    const a = state.sectionAnglePoints[i0], b = state.sectionAnglePoints[i0 + 1];
+    const ln = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([a, b]),
+      new THREE.LineBasicMaterial({ color: accentHex })
+    );
+    sectionScene.add(ln);
+    pendingSecAngleObjs.push(ln);
+  }
+
+  const hint = document.getElementById('secHint');
+  const n = state.sectionAnglePoints.length;
+  if (n === 1)      hint.textContent = 'ANGOLO — LINEA 1, SECONDO PUNTO  ·  ESC ANNULLA';
+  else if (n === 2) hint.textContent = 'ANGOLO — LINEA 2, PRIMO PUNTO  ·  ESC ANNULLA';
+  else if (n === 3) hint.textContent = 'ANGOLO — LINEA 2, SECONDO PUNTO  ·  ESC ANNULLA';
+
+  if (n === 4) {
+    commitSectionAngle();
+    // Gli oggetti pending sono ora di proprieta' della misura
+    pendingSecAngleObjs = [];
+    state.sectionAnglePoints = [];
+    state.sectionAnglePendingColor = null;
+    hint.textContent = 'ANGOLO — LINEA 1, PRIMO PUNTO  ·  ESC ESCE';
+  }
+}
+
+function commitSectionAngle() {
+  if (!state.section) { clearPendingSectionAngle(); return; }
+  const [a1, b1, a2, b2] = state.sectionAnglePoints;
+  const d1x = b1.x - a1.x, d1y = b1.y - a1.y;
+  const d2x = b2.x - a2.x, d2y = b2.y - a2.y;
+  const l1 = Math.hypot(d1x, d1y), l2 = Math.hypot(d2x, d2y);
+  if (l1 < 1e-4 || l2 < 1e-4) { setStatus('Linee troppo corte, angolo annullato'); clearPendingSectionAngle(); return; }
+
+  // Angolo acuto ESATTO nel piano 2D della sezione
+  const cos = Math.min(1, Math.max(0, Math.abs((d1x * d2x + d1y * d2y) / (l1 * l2))));
+  const angleDeg = Math.acos(cos) * 180 / Math.PI;
+
+  // Vertice = intersezione delle due rette (fallback: baricentro se ~parallele)
+  let vx, vy;
+  const det = -d1x * d2y + d1y * d2x;
+  if (Math.abs(det) > 1e-6) {
+    const ex = a2.x - a1.x, ey = a2.y - a1.y;
+    const t = (-ex * d2y + ey * d2x) / det;
+    vx = a1.x + t * d1x; vy = a1.y + t * d1y;
+  } else {
+    vx = (a1.x + b1.x + a2.x + b2.x) / 4;
+    vy = (a1.y + b1.y + a2.y + b2.y) / 4;
+  }
+  const vertex = new THREE.Vector3(vx, vy, 0);
+
+  // Arco: polyline sull'angolo corto (acuto), raggio ~30% del segmento piu' corto
+  const far1 = (Math.hypot(a1.x - vx, a1.y - vy) > Math.hypot(b1.x - vx, b1.y - vy)) ? a1 : b1;
+  const far2 = (Math.hypot(a2.x - vx, a2.y - vy) > Math.hypot(b2.x - vx, b2.y - vy)) ? a2 : b2;
+  const ang1 = Math.atan2(far1.y - vy, far1.x - vx);
+  const ang2 = Math.atan2(far2.y - vy, far2.x - vx);
+  let da = ang2 - ang1;
+  while (da >  Math.PI) da -= 2 * Math.PI;
+  while (da < -Math.PI) da += 2 * Math.PI;
+  // Se le due "braccia" formano l'angolo OTTUSO, punto il secondo braccio dal lato
+  // opposto: cosi' l'arco disegnato copre sempre l'angolo ACUTO riportato dalla label.
+  if (Math.abs(da) > Math.PI / 2 + 1e-6) da -= Math.sign(da) * Math.PI;
+  const arcR = Math.max(1e-3, Math.min(l1, l2) * 0.30);
+  const accent = state.sectionAnglePendingColor || '#FF6B35';
+  const accentHex = new THREE.Color(accent).getHex();
+  const arcPts = [];
+  const AN = 28;
+  for (let i = 0; i <= AN; i++) {
+    const a = ang1 + da * (i / AN);
+    arcPts.push(new THREE.Vector3(vx + Math.cos(a) * arcR, vy + Math.sin(a) * arcR, 0));
+  }
+  const arc = new THREE.Line(new THREE.BufferGeometry().setFromPoints(arcPts), new THREE.LineBasicMaterial({ color: accentHex }));
+  arc.renderOrder = 4;
+  sectionScene.add(arc);
+
+  // Label DOM persistente nella PIP
+  const labelEl = document.createElement('div');
+  labelEl.className = 'measure-label';
+  labelEl.style.background = accent;
+  labelEl.textContent = angleDeg.toFixed(2) + '°';
+  document.getElementById('sectionPip').appendChild(labelEl);
+
+  const objs = pendingSecAngleObjs.slice();   // 4 marker + 2 segmenti
+  objs.push(arc);
+
+  const angle2D = {
+    kind: 'angle-2d-section',
+    p1l1: a1.clone(), p2l1: b1.clone(),
+    p1l2: a2.clone(), p2l2: b2.clone(),
+    vertex, angle: angleDeg, color: accent,
+    objects: objs, labelEl, visible: true,
+  };
+  angle2D.synId = window.SynMeasureManager.add({
+    type: 'angle-2d-section',
+    name: 'Angolo 2D ' + (state.section.angles2D.length + 1),
+    value: angleDeg,
+    unit: '°',
+    module: 'vedere',
+    parentId: state.section.synId,
+    points: [
+      { x: a1.x, y: a1.y, z: 0 }, { x: b1.x, y: b1.y, z: 0 },
+      { x: a2.x, y: a2.y, z: 0 }, { x: b2.x, y: b2.y, z: 0 },
+    ],
+    visual: { visible: true, color: accent },
+  }).id;
+  state.section.angles2D.push(angle2D);
+  setStatus('Angolo sezione: ' + angleDeg.toFixed(2) + '°');
+}
+
+// Riposiziona le label degli angoli 2D ad ogni frame (come updateSectionMeasureLabels)
+function updateSectionAngleLabels() {
+  if (!state.section || !state.section.angles2D) return;
+  const pipRect = document.getElementById('sectionPip').getBoundingClientRect();
+  const rect = sectionCanvas.getBoundingClientRect();
+  const cw = rect.width, ch = rect.height;
+  state.section.angles2D.forEach(m => {
+    if (!m.labelEl) return;
+    const x = ((m.vertex.x - sectionCamera.left) / (sectionCamera.right - sectionCamera.left)) * cw;
+    const y = ((sectionCamera.top - m.vertex.y) / (sectionCamera.top - sectionCamera.bottom)) * ch;
+    m.labelEl.style.left = (x + (rect.left - pipRect.left)) + 'px';
+    m.labelEl.style.top  = (y + (rect.top  - pipRect.top))  + 'px';
+  });
+}
+
+function setSectionAngleVisible(m, on) {
+  m.visible = on;
+  if (m.objects) m.objects.forEach(o => { if (o.visible !== undefined) o.visible = on; });
+  if (m.labelEl) m.labelEl.style.display = on ? '' : 'none';
+}
+
+function removeSectionAngle(synId) {
+  if (!state.section || !state.section.angles2D) return;
+  const idx = state.section.angles2D.findIndex(m => m.synId === synId);
+  if (idx < 0) return;
+  const m = state.section.angles2D[idx];
+  if (m.objects) m.objects.forEach(o => {
+    if (o.parent) o.parent.remove(o);
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  });
+  if (m.labelEl) m.labelEl.remove();
+  state.section.angles2D.splice(idx, 1);
+  window.SynRegistry.remove(synId);
+}
+
 // ----------- Bind eventi sezione -----------
 
 canvas.addEventListener('pointermove', sectionPlaceOnPointerMove);
@@ -7485,6 +7712,9 @@ document.getElementById('secMaxBtn').addEventListener('click', toggleSectionPipM
 document.getElementById('secSwapBtn').addEventListener('click', swapSectionPip);
 document.getElementById('secRulerBtn').addEventListener('click', () => {
   setSectionRulerActive(!state.sectionRulerActive);
+});
+document.getElementById('secAngleBtn').addEventListener('click', () => {
+  setSectionAngleActive(!state.sectionAngleActive);
 });
 document.getElementById('secFitBtn').addEventListener('click', () => {
   if (state.section) fitSectionCameraToContent();
@@ -7565,6 +7795,7 @@ document.getElementById('secFitBtn').addEventListener('click', () => {
 
 sectionCanvas.addEventListener('mousemove', sectionCanvasMouseMove);
 sectionCanvas.addEventListener('click', sectionCanvasClick);
+sectionCanvas.addEventListener('click', sectionAngleCanvasClick);
 
 // === Zoom con rotella ===
 sectionCanvas.addEventListener('wheel', (e) => {
@@ -7613,7 +7844,7 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('mouseup', (e) => {
   if (_secPan) {
     _secPan = null;
-    sectionCanvas.style.cursor = state.sectionRulerActive ? 'crosshair' : 'default';
+    sectionCanvas.style.cursor = (state.sectionRulerActive || state.sectionAngleActive) ? 'crosshair' : 'default';
   }
 });
 // Sopprimo il menu contestuale del tasto destro sopra al canvas sezione
@@ -7632,6 +7863,7 @@ function hookSectionRender(){
     if (state.section) {
       sectionRenderer.render(sectionScene, sectionCamera);
       updateSectionMeasureLabels();
+      updateSectionAngleLabels();
     }
   };
 }
@@ -7648,9 +7880,20 @@ document.addEventListener('keydown', e => {
       setSectionPlaceMode(!state.sectionPlaceMode);
     }
   }
-  // Esc nella section ruler
+  // Esc nella section ruler / angolo sezione
   if (e.key === 'Escape') {
-    if (state.sectionRulerActive) {
+    if (state.sectionAngleActive) {
+      if (state.sectionAnglePoints.length > 0) {
+        // Annulla i punti in corso, resta in modalita' per ricominciare
+        state.sectionAnglePoints = [];
+        state.sectionAnglePendingColor = null;
+        clearPendingSectionAngle();
+        document.getElementById('secHint').textContent = 'ANGOLO — LINEA 1, PRIMO PUNTO  ·  ESC ESCE';
+      } else {
+        setSectionAngleActive(false);
+      }
+      e.stopPropagation();
+    } else if (state.sectionRulerActive) {
       if (state.sectionRulerFirstPoint) {
         state.sectionRulerFirstPoint = null;
         clearPendingSectionMeasure();
@@ -7746,11 +7989,11 @@ setStatus('Pronto');
   function buildTreeForGroup(groupKey) {
     let items = [];
     if (groupKey === 'measures2d') {
-      // Misure 2D = quelle con role 'linear-2d-section'
-      items = window.SynRegistry.query({ type: 'measure', role: 'linear-2d-section' });
+      // Misure 2D = quelle nel piano sezione: lineari (linear-2d-section) e angolari (angle-2d-section)
+      items = window.SynRegistry.getAll().filter(o => o.type === 'measure' && (o.role === 'linear-2d-section' || o.role === 'angle-2d-section'));
     } else if (groupKey === 'measures') {
-      // Solo misure 3D top-level (non figlie di sezione)
-      items = window.SynRegistry.getAll().filter(o => o.type === 'measure' && o.role !== 'linear-2d-section');
+      // Solo misure 3D top-level (non figlie di sezione): escludo entrambi i tipi 2D
+      items = window.SynRegistry.getAll().filter(o => o.type === 'measure' && o.role !== 'linear-2d-section' && o.role !== 'angle-2d-section');
     } else {
       const gMap = window.SynRegistry.byGroup();
       items = (gMap.get(groupKey) || []).filter(o => !o.parentId);
@@ -7854,13 +8097,20 @@ setStatus('Pronto');
         layer.visible = newVisible;
         layer.group.visible = newVisible;
       }
-    } else if (obj.type === 'measure' && obj.role !== 'linear-2d-section') {
+    } else if (obj.type === 'measure' && obj.role !== 'linear-2d-section' && obj.role !== 'angle-2d-section') {
       const m = state.measures.find(x => x.synId === obj.id);
       if (m) {
         m.visible = newVisible;
-        m.line.visible = newVisible;
-        if (m.endDots) m.endDots.forEach(d => d.visible = newVisible);
-        applyGizmoSelection();
+        // Kind-aware: un angolo 3D non ha m.line/m.endDots ma m.objects/m.arcGroup
+        // (senza questa distinzione m.line.visible lanciava TypeError sugli angoli).
+        if (m.kind === 'angle-measure') {
+          if (m.objects) m.objects.forEach(o => { if (o.visible !== undefined) o.visible = newVisible; });
+          if (m.arcGroup) m.arcGroup.style.display = newVisible ? '' : 'none';
+        } else {
+          m.line.visible = newVisible;
+          if (m.endDots) m.endDots.forEach(d => d.visible = newVisible);
+          applyGizmoSelection();
+        }
         if (m.labelEl) m.labelEl.style.display = newVisible ? '' : 'none';
       }
     } else if (obj.type === 'shape') {
@@ -7888,6 +8138,12 @@ setStatus('Pronto');
           m2d.sphere2.visible = newVisible;
           if (m2d.labelEl) m2d.labelEl.style.display = newVisible ? '' : 'none';
         }
+      }
+    } else if (obj.role === 'angle-2d-section') {
+      // Angolo 2D dentro la sezione (oggetti multipli in angles2D)
+      if (state.section) {
+        const a2d = state.section.angles2D.find(x => x.synId === obj.id);
+        if (a2d) setSectionAngleVisible(a2d, newVisible);
       }
     }
   }
@@ -7945,22 +8201,17 @@ setStatus('Pronto');
     if (obj.type === 'mesh' || obj.type === 'pointcloud') {
       const layer = state.layers.find(l => l.synId === obj.id);
       if (layer) removeLayer(layer.id);
-    } else if (obj.type === 'measure' && obj.role !== 'linear-2d-section') {
-      // Rimuovo la singola misura 3D
+    } else if (obj.type === 'measure' && obj.role !== 'linear-2d-section' && obj.role !== 'angle-2d-section') {
+      // Rimuovo la singola misura 3D (lineare O angolare) via removeMeasure, l'unico
+      // cleanup kind-aware: un angolo (kind==='angle-measure') non ha m.line/m.handles
+      // ma m.objects/m.arcGroup, quindi il vecchio cleanup lineare inline crashava su
+      // m.line.geometry.dispose() e la misura restava orfana in scena e nell'albero.
+      // deleteObject indicizza per synId, removeMeasure per id interno: mappo.
       const idx = state.measures.findIndex(m => m.synId === obj.id);
-      if (idx >= 0) {
-        const m = state.measures[idx];
-        scene.remove(m.line);
-        m.line.geometry.dispose(); m.line.material.dispose();
-        m.handles.forEach(h => {
-          scene.remove(h.mesh);
-          h.mesh.traverse(o => { if (o.isMesh) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); } });
-        });
-        disposeMeasureDots(m);   // 8.80.4: senza, i pallini d'estremita' (endDots, depthTest:false) restavano orfani in scena
-        if (m.labelEl) m.labelEl.remove();
-        state.measures.splice(idx, 1);
-        window.SynRegistry.remove(obj.id);
-      }
+      if (idx >= 0) removeMeasure(state.measures[idx].id);
+    } else if (obj.role === 'angle-2d-section') {
+      // Angolo 2D dentro la sezione
+      removeSectionAngle(obj.id);
     } else if (obj.type === 'shape') {
       const idx = state.circles.findIndex(c => c.synId === obj.id);
       if (idx >= 0) {
@@ -8089,7 +8340,7 @@ if (window.SynCutViewManager) {
   function typeBadge(obj) {
     const map = {
       mesh: 'MESH', pointcloud: 'POINTCLOUD',
-      measure: obj.role === 'linear-2d-section' ? 'MISURA 2D' : 'MISURA 3D',
+      measure: (obj.role === 'linear-2d-section' || obj.role === 'angle-2d-section') ? 'MISURA 2D' : 'MISURA 3D',
       shape: 'FORMA', section: 'SEZIONE',
       marker: 'MARKER', helper: 'HELPER',
     };
@@ -8228,6 +8479,20 @@ if (window.SynCutViewManager) {
     `;
   }
 
+  function renderMeasure2DAngle(obj) {
+    const parent = obj.parentId ? window.SynRegistry.get(obj.parentId) : null;
+    const value = obj.meta && obj.meta.value;
+    const valueText = obj.meta && obj.meta.valueText;
+    // Info-only, coerente con renderMeasure2D: gestione (mostra/nascondi, rimuovi) dall'albero scena.
+    return `
+      <div class="props-section">
+        <div class="props-section-title">Angolo 2D in sezione</div>
+        <div class="props-row"><span class="props-row-key">Valore</span><span class="props-row-value">${escapeHtml(valueText || (value != null ? value.toFixed(2) + '°' : '—'))}</span></div>
+        <div class="props-row"><span class="props-row-key">Sezione</span><span class="props-row-value">${parent ? escapeHtml(parent.name) : '—'}</span></div>
+      </div>
+    `;
+  }
+
   function renderShape(obj) {
     const circle = state.circles.find(c => c.synId === obj.id);
     const isVisible = obj.visual.visible;
@@ -8292,6 +8557,7 @@ if (window.SynCutViewManager) {
     `;
     if (obj.type === 'mesh' || obj.type === 'pointcloud') html += renderMesh(obj);
     else if (obj.type === 'measure' && obj.role === 'linear-2d-section') html += renderMeasure2D(obj);
+    else if (obj.type === 'measure' && obj.role === 'angle-2d-section') html += renderMeasure2DAngle(obj);
     else if (obj.type === 'measure') html += renderMeasure(obj);
     else if (obj.type === 'shape') html += renderShape(obj);
     else if (obj.type === 'section') html += renderSection(obj);
@@ -8325,9 +8591,19 @@ if (window.SynCutViewManager) {
       if (sel.type === 'mesh' || sel.type === 'pointcloud') {
         const layer = state.layers.find(l => l.synId === sel.id);
         if (layer) { layer.visible = newVisible; layer.group.visible = newVisible; }
-      } else if (sel.type === 'measure' && sel.role !== 'linear-2d-section') {
+      } else if (sel.type === 'measure' && sel.role !== 'linear-2d-section' && sel.role !== 'angle-2d-section') {
         const m = state.measures.find(x => x.synId === sel.id);
-        if (m) { m.visible = newVisible; m.line.visible = newVisible; if (m.endDots) m.endDots.forEach(d => d.visible = newVisible); applyGizmoSelection(); if (m.labelEl) m.labelEl.style.display = newVisible ? '' : 'none'; }
+        if (m) {
+          m.visible = newVisible;
+          // Kind-aware: gli angoli 3D non hanno m.line (crashava m.line.visible).
+          if (m.kind === 'angle-measure') {
+            if (m.objects) m.objects.forEach(o => { if (o.visible !== undefined) o.visible = newVisible; });
+            if (m.arcGroup) m.arcGroup.style.display = newVisible ? '' : 'none';
+          } else {
+            m.line.visible = newVisible; if (m.endDots) m.endDots.forEach(d => d.visible = newVisible); applyGizmoSelection();
+          }
+          if (m.labelEl) m.labelEl.style.display = newVisible ? '' : 'none';
+        }
       } else if (sel.type === 'shape') {
         const c = state.circles.find(x => x.synId === sel.id);
         if (c) { c.visible = newVisible; c.ring.visible = newVisible; applyGizmoSelection(); if (c.labelEl) c.labelEl.style.display = newVisible ? '' : 'none'; }
@@ -8516,18 +8792,12 @@ if (window.SynCutViewManager) {
       if (sel.type === 'mesh' || sel.type === 'pointcloud') {
         const layer = state.layers.find(l => l.synId === sel.id);
         if (layer) removeLayer(layer.id);
-      } else if (sel.type === 'measure' && sel.role !== 'linear-2d-section') {
+      } else if (sel.type === 'measure' && sel.role !== 'linear-2d-section' && sel.role !== 'angle-2d-section') {
+        // Stesso fix di deleteObject: angolo O lineare -> removeMeasure (kind-aware).
         const idx = state.measures.findIndex(m => m.synId === sel.id);
-        if (idx >= 0) {
-          const m = state.measures[idx];
-          scene.remove(m.line);
-          m.line.geometry.dispose(); m.line.material.dispose();
-          m.handles.forEach(h => { scene.remove(h.mesh); h.mesh.traverse(o => { if (o.isMesh) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); } }); });
-          disposeMeasureDots(m);   // 8.80.4: senza, i pallini d'estremita' (endDots) restavano orfani in scena
-          if (m.labelEl) m.labelEl.remove();
-          state.measures.splice(idx, 1);
-          window.SynRegistry.remove(sel.id);
-        }
+        if (idx >= 0) removeMeasure(state.measures[idx].id);
+      } else if (sel.role === 'angle-2d-section') {
+        removeSectionAngle(sel.id);
       } else if (sel.type === 'shape') {
         const idx = state.circles.findIndex(c => c.synId === sel.id);
         if (idx >= 0) {
