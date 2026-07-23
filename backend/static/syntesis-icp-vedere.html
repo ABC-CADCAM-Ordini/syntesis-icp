@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Synthesis-ICP - Vedere v8.0.12-refactor (Synthesis Core)
+<!-- Synthesis-ICP - Vedere v8.0.13-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Vedere v8.0.12-refactor</title>
+<title>Synthesis-ICP - Vedere v8.0.13-refactor</title>
 <!-- Gate accesso (8.78.0, chiusura rollout sospeso 2026-05-29): pagina privata.
      Anti-flash + verifica client; la sicurezza vera resta server-side (auth.py). -->
 <style>html{visibility:hidden}</style>
@@ -963,7 +963,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.12-refactor</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.13-refactor</span>
     </div>
   </div>
   <button class="btn-home" onclick="goHomeNewSession()" data-tooltip="Home (nuova sessione)">
@@ -2630,7 +2630,9 @@ function addLayer(name, type, parsed) {
       const _l = state.layers[state.layers.length - 1];
       const _overlay = new THREE.LineSegments(
         new THREE.WireframeGeometry(_l.geometry),
-        new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthTest: true })
+        new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthTest: true,
+          clippingPlanes: (_l.material.clippingPlanes && _l.material.clippingPlanes.length)
+            ? _l.material.clippingPlanes.slice() : null })
       );
       _overlay.renderOrder = 1;
       _l.group.add(_overlay);
@@ -7003,6 +7005,12 @@ function applySectionClipping(on) {
         l.material.side = THREE.DoubleSide;
         l.material.needsUpdate = true;
       }
+      // Il reticolo "Entrambi" e' un LineSegments con materiale a parte: senza
+      // clippingPlanes il solido si tagliava ma il wireframe restava intero.
+      if (l.wireframeOverlay && l.wireframeOverlay.material) {
+        l.wireframeOverlay.material.clippingPlanes = [state.section.plane];
+        l.wireframeOverlay.material.needsUpdate = true;
+      }
     });
     renderer.localClippingEnabled = true;
     // Costruisco le mesh stencil + cap plane
@@ -7012,6 +7020,10 @@ function applySectionClipping(on) {
       if (l.material) {
         l.material.clippingPlanes = [];
         l.material.needsUpdate = true;
+      }
+      if (l.wireframeOverlay && l.wireframeOverlay.material) {
+        l.wireframeOverlay.material.clippingPlanes = [];
+        l.wireframeOverlay.material.needsUpdate = true;
       }
     });
     renderer.localClippingEnabled = false;
@@ -8429,6 +8441,10 @@ if (window.SynCutViewManager) {
               transparent: true,
               opacity: 0.35,
               depthTest: true,
+              // Se il taglio e' gia' attivo, l'overlay nasce clippato (altrimenti
+              // resterebbe intero finche' non si ri-tocca la sezione).
+              clippingPlanes: (layer.material.clippingPlanes && layer.material.clippingPlanes.length)
+                ? layer.material.clippingPlanes.slice() : null,
             });
             const overlay = new THREE.LineSegments(wireGeo, overlayMat);
             overlay.renderOrder = 1;
