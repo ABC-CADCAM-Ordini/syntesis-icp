@@ -2,10 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<!-- Synthesis-ICP - Vedere v8.0.11-refactor (Synthesis Core)
+<!-- Synthesis-ICP - Vedere v8.0.12-refactor (Synthesis Core)
      Copyright (C) Francesco Biaggini. Tutti i diritti riservati. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Synthesis-ICP - Vedere v8.0.11-refactor</title>
+<title>Synthesis-ICP - Vedere v8.0.12-refactor</title>
 <!-- Gate accesso (8.78.0, chiusura rollout sospeso 2026-05-29): pagina privata.
      Anti-flash + verifica client; la sicurezza vera resta server-side (auth.py). -->
 <style>html{visibility:hidden}</style>
@@ -816,6 +816,35 @@ body{
 .empty-hint p{max-width:420px;line-height:1.5;font-size:13px}
 .empty-hint .hint{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.15em;margin-top:18px;color:rgba(15,25,35,.45)}
 
+/* 8.114.0: overlay di caricamento modello (download STL da link ospite/esterno).
+   Compare all'avvio del fetch, sparisce a modello pronto; stato errore cliccabile. */
+.model-loader{
+  position:absolute;inset:0;z-index:60;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  background:rgba(15,25,35,.34);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+  text-align:center;padding:40px;
+}
+.model-loader.visible{display:flex}
+.model-loader.error{cursor:pointer}
+.ml-ring{
+  width:60px;height:60px;border-radius:50%;
+  background:conic-gradient(from 0deg,#FF8C42,#FF4D8D,#FFD166,#C84BFF,#FF6B35,#FF9FC8,#FF8C42);
+  -webkit-mask:radial-gradient(farthest-side,#0000 calc(100% - 7px),#000 0);
+          mask:radial-gradient(farthest-side,#0000 calc(100% - 7px),#000 0);
+  animation:mlSpin .85s linear infinite;
+  box-shadow:0 0 16px rgba(255,140,66,.45),0 0 34px rgba(200,75,255,.22);
+}
+@keyframes mlSpin{to{transform:rotate(360deg)}}
+.ml-msg{font-family:var(--font);font-size:15px;font-weight:800;color:var(--white);letter-spacing:.02em;text-shadow:0 1px 4px rgba(0,0,0,.4)}
+.ml-sub{font-family:var(--mono);font-size:11px;font-weight:600;color:rgba(255,255,255,.85);letter-spacing:.04em;max-width:380px;word-break:break-word;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.model-loader.error .ml-ring{
+  animation:none;background:var(--red);
+  -webkit-mask:none;mask:none;
+  box-shadow:0 4px 14px rgba(220,38,38,.4);
+  display:flex;align-items:center;justify-content:center;
+}
+.model-loader.error .ml-ring::after{content:'!';font-family:var(--font);font-weight:800;font-size:34px;color:var(--white);line-height:1}
+
 .footer{
   height:26px;background:var(--white);
   border-top:1px solid var(--border);
@@ -934,7 +963,7 @@ input[type="file"]{display:none}
   <div class="workflow-title-block">
     <div class="workflow-breadcrumb">
       <span class="current">Vedere</span>
-      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.11-refactor</span>
+      <span class="sep" style="margin-left:8px;font-size:12px;font-family:var(--mono);font-weight:500;color:var(--gray)">v8.0.12-refactor</span>
     </div>
   </div>
   <button class="btn-home" onclick="goHomeNewSession()" data-tooltip="Home (nuova sessione)">
@@ -1159,6 +1188,13 @@ input[type="file"]{display:none}
       <h2>Apri o trascina un file</h2>
       <p>Il primo file definisce la scena. I file successivi mantengono le coordinate native e si sovrappongono se condividono l'origine del progetto.</p>
       <div class="hint">STL &middot; OBJ &middot; PLY &middot; XYZ &middot; PCD &middot; PTS</div>
+    </div>
+
+    <!-- 8.114.0: overlay caricamento modello (download da link ospite/esterno) -->
+    <div class="model-loader" id="modelLoader">
+      <div class="ml-ring"></div>
+      <div class="ml-msg" id="mlMsg">Caricamento modello&hellip;</div>
+      <div class="ml-sub" id="mlSub"></div>
     </div>
 
     <div class="color-pop" id="colorPop">
@@ -2490,10 +2526,12 @@ async function loadFile(file) {
     addLayer(file.name, ext, result);
     setStatus('Caricato ' + file.name);
     showToast('Caricato ' + file.name, 'ok');
+    return true;   // 8.114.0: esito per l'overlay di caricamento (autoLoad)
   } catch (err) {
     console.error(err);
     showToast('Errore: ' + err.message, 'error');
     setStatus('Errore caricamento');
+    return false;
   }
 }
 
@@ -2874,14 +2912,17 @@ filePicker.addEventListener('change', async e => {
   if (_guest) {
     const _gname = (String(_guest.label || 'Modello 3D').replace(/[^\w .\-]/g, '').trim() || 'Modello 3D') + '.stl';
     setStatus('Apertura modello…');
+    showModelLoader('Caricamento modello…', String(_guest.label || ''));   // 8.114.0
     try {
       const _res = await fetch(_guest.url);   // url già validato server-side (host pinnato)
-      if (!_res.ok) { setStatus('Errore: file non scaricabile (HTTP ' + _res.status + ')'); showToast('File non scaricabile (HTTP ' + _res.status + ')', 'error'); return; }
+      if (!_res.ok) { showModelLoaderError('File non scaricabile (HTTP ' + _res.status + ')'); setStatus('Errore: file non scaricabile (HTTP ' + _res.status + ')'); showToast('File non scaricabile (HTTP ' + _res.status + ')', 'error'); return; }
       const _blob = await _res.blob();
-      await loadFile(new File([_blob], _gname, { type: _blob.type || 'application/octet-stream' }));
-      setStatus('Modello caricato');
+      const _ok = await loadFile(new File([_blob], _gname, { type: _blob.type || 'application/octet-stream' }));
+      if (_ok) { hideModelLoader(); setStatus('Modello caricato'); }
+      else { showModelLoaderError('Impossibile leggere il modello'); }
     } catch (err) {
       console.error('[autoLoad guest] errore:', err);
+      showModelLoaderError(err.message);
       setStatus('Errore caricamento: ' + err.message);
       showToast('Errore: ' + err.message, 'error');
     }
@@ -2907,19 +2948,23 @@ filePicker.addEventListener('change', async e => {
       return;
     }
     setStatus('Apertura file da link: ' + fileName + '...');
+    showModelLoader('Caricamento modello…', fileName);   // 8.114.0
     try {
       const fileRes = await fetch(u.href);
       if (!fileRes.ok) {
+        showModelLoaderError('File non scaricabile (HTTP ' + fileRes.status + ')');
         setStatus('Errore: file non scaricabile (HTTP ' + fileRes.status + ')');
         showToast('File non scaricabile dal link (HTTP ' + fileRes.status + ')', 'error');
         return;
       }
       const blob = await fileRes.blob();
       const fileObj = new File([blob], fileName, { type: blob.type || 'application/octet-stream' });
-      await loadFile(fileObj);
-      setStatus('File caricato da link: ' + fileName);
+      const ok = await loadFile(fileObj);
+      if (ok) { hideModelLoader(); setStatus('File caricato da link: ' + fileName); }
+      else { showModelLoaderError('Impossibile leggere il modello'); }
     } catch (err) {
       console.error('[autoLoad url] errore:', err);
+      showModelLoaderError(err.message);
       setStatus('Errore caricamento da link: ' + err.message);
       showToast('Errore: ' + err.message, 'error');
     }
@@ -2940,6 +2985,7 @@ filePicker.addEventListener('change', async e => {
       showToast('Non autenticato. Apri /dashboard, accedi, e riprova', 'error');
       return;
     }
+    showModelLoader('Caricamento modello…', fileName);   // 8.114.0
 
     // Step 2+3 (8.80.4): scarico via PROXY backend /api/me/gdrive/file/{id}/content
     // (Bearer nostro, cap dimensione C3) — stesso pattern della dashboard
@@ -2958,6 +3004,7 @@ filePicker.addEventListener('change', async e => {
       else if (fileRes.status === 413) _msg = 'File troppo grande per l\'apertura da Drive';
       else if (fileRes.status === 401 || fileRes.status === 403) _msg = 'Sessione scaduta. Accedi di nuovo dalla dashboard';
       else _msg = 'File non trovato o non accessibile su Drive';
+      showModelLoaderError(_msg);
       showToast(_msg, 'error');
       return;
     }
@@ -2965,10 +3012,12 @@ filePicker.addEventListener('change', async e => {
 
     // Step 4: costruisco un File e lo passo a loadFile come se fosse stato trascinato
     const fileObj = new File([blob], fileName, { type: blob.type || 'application/octet-stream' });
-    await loadFile(fileObj);
-    setStatus('File caricato da Drive: ' + fileName);
+    const ok = await loadFile(fileObj);
+    if (ok) { hideModelLoader(); setStatus('File caricato da Drive: ' + fileName); }
+    else { showModelLoaderError('Impossibile leggere il modello'); }
   } catch (err) {
     console.error('[autoLoad] errore:', err);
+    showModelLoaderError(err.message);
     setStatus('Errore caricamento file da Drive: ' + err.message);
     showToast('Errore: ' + err.message, 'error');
   }
@@ -3016,6 +3065,26 @@ document.addEventListener('keydown', e => {
 });
 
 function setStatus(msg) { document.getElementById('footerLeft').textContent = msg; }
+// 8.114.0: overlay di caricamento modello (feedback visivo durante il download
+// di STL da link ospite/esterno, che può richiedere qualche secondo).
+function showModelLoader(msg, sub){
+  const el = document.getElementById('modelLoader'); if (!el) return;
+  el.classList.remove('error'); el.onclick = null;
+  document.getElementById('mlMsg').textContent = msg || 'Caricamento modello…';
+  document.getElementById('mlSub').textContent = sub || '';
+  el.classList.add('visible');
+}
+function hideModelLoader(){
+  const el = document.getElementById('modelLoader'); if (!el) return;
+  el.classList.remove('visible','error'); el.onclick = null;
+}
+function showModelLoaderError(msg){
+  const el = document.getElementById('modelLoader'); if (!el) return;
+  el.classList.add('visible','error');
+  document.getElementById('mlMsg').textContent = 'Errore di caricamento';
+  document.getElementById('mlSub').textContent = (msg || '') + ' · clicca per chiudere';
+  el.onclick = hideModelLoader;
+}
 let toastTimer;
 function showToast(msg, kind) {
   const t = document.getElementById('toast');

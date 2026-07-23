@@ -1,5 +1,17 @@
 # Storia delle modifiche
 
+## 2026-07-23 — 8.114.0: overlay di caricamento modello in Vedere
+
+Su richiesta dell'utente: quando Vedere apre un STL da un **link ospite/esterno** (link firmato generato da ac-ordini, Edge Function `vedere-guest-link` → `/auth/guest/verify`; oppure `?url=` esterno o `?file_id=` Drive) il download impiega qualche secondo e **prima non c'era alcun feedback visivo** — schermo fermo finché il modello non appariva. Aggiunto un overlay di caricamento che **compare appena parte il `fetch`** e **sparisce quando il modello è pronto**; in caso di errore mostra un messaggio.
+
+Implementazione (solo frontend `syntesis-icp-vedere.html`):
+- **CSS** `.model-loader` (overlay `position:absolute;inset:0` dentro `.viewport`, scrim scuro + blur, `z-index:60`) con spinner ad **anello** `.ml-ring` che riusa la palette conica del bordo brand (`conic-gradient` arancio→rosa→oro→viola, donut via `mask` radiale, `@keyframes mlSpin` .85s) + testo `.ml-msg` "Caricamento modello…" e sottotitolo `.ml-sub` (label/nome file). Stato `.error`: anello rosso pieno con "!" (`::after`), cursore pointer.
+- **HTML** `#modelLoader` (`#mlMsg`/`#mlSub`) accanto a `#emptyHint`.
+- **JS** `showModelLoader(msg,sub)` / `hideModelLoader()` / `showModelLoaderError(msg)` accanto a `setStatus`; l'overlay in errore diventa cliccabile per chiudersi (`onclick=hideModelLoader`). `loadFile` ora **ritorna `true`/`false`** (esito del parse) così l'auto-load distingue download-ok+parse-ok da parse fallito (i 2 chiamanti drag-drop/picker ignorano il valore → nessuna regressione).
+- **Aggancio** ai 3 rami di `autoLoadFromURL`: ospite `#g=` (`window.SYN_GUEST`), `?url=` esterno (host Supabase pinnato), `?file_id=` Drive (proxy). `showModelLoader` prima del `fetch`; `showModelLoaderError` su HTTP non-ok / eccezione / parse fallito; `hideModelLoader` a modello pronto. `toast` e `setStatus` esistenti invariati.
+
+Versioni: Vedere v8.0.11 → **v8.0.12-refactor** (commento header + `<title>` + badge topbar), `BACKEND_VERSION` 8.113.0 → **8.114.0**, `LAST_UPDATED` 2026-07-23. v3b **non toccato** (nessun `ANALIZZA_BUILD`/CACHEBUST). Gate `run_all.sh` **verde** (`check_inline` = `node --check` su ogni `<script>` inline incluso Vedere). `MAPPA_FUNZIONALE` aggiornata (versione mappata + riga Vedere). Bump **MINOR** (feature retrocompatibile).
+
 ## 2026-07-07 — 8.109.1: disabilita temporaneamente File > "Area personale" (Dashboard)
 
 Su richiesta dell'utente ("puoi disabilitare Area personale da File → Area personale? La rimetteremo quando sarà finita e pronta") la voce del menu File che apre la Dashboard è stata **nascosta** su Analizza (`syntesis-analyzer-v3b.html`) e, per coerenza (stessa feature non pronta), su Vedere (`syntesis-icp-vedere.html`).
